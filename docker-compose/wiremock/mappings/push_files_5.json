@@ -1,0 +1,22 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "POST",
+        "urlPath": "/documents",
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 500,
+        "headers": {
+          "Content-Type": "application/problem+json; charset=utf-8"
+        },
+        "body": "{\"message\": \"This will be repeated endlessly.\"}"
+      }
+    }
+  ]
+}

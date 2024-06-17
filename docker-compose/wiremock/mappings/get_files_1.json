@@ -1,0 +1,167 @@
+{
+  "mappings": [
+    {
+      "scenarioName": "Get the only File for connector 1 test",
+      "requiredScenarioState": "Started",
+      "newScenarioState": "File Downloaded",
+      "request": {
+        "method": "GET",
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "1"
+          },
+          "cdr-processing-mode": {
+            "equalTo": "test"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*",
+          "cdr-document-uuid": "234-test"
+        },
+        "base64Body": "IlRoZSBjb3Ntb3MgaXMgd2l0aGluIHVzLiBXZSBhcmUgbWFkZSBvZiBzdGFyLXN0dWZmLiBXZSBhcmUgYSB3YXkgZm9yIHRoZSB1bml2ZXJzZSB0byBrbm93IGl0c2VsZi4iIC0gKENhcmwgU2FnYW4p"
+      }
+    },
+    {
+      "scenarioName": "Get the only File for connector 1 test",
+      "requiredScenarioState": "File Downloaded",
+      "newScenarioState": "Done",
+      "request": {
+        "method": "DELETE",
+        "url": "/documents/234-test",
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "1"
+          },
+          "cdr-processing-mode": {
+            "equalTo": "test"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*"
+        }
+      }
+    },
+    {
+      "scenarioName": "Get the only File for connector 1 test",
+      "requiredScenarioState": "Done",
+      "newScenarioState": "Started",
+      "request": {
+        "method": "GET",
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "1"
+          },
+          "cdr-processing-mode": {
+            "equalTo": "test"
+          }
+        }
+      },
+      "response": {
+        "status": 204,
+        "headers": {
+          "Content-Type": "*/*"
+        }
+      }
+    },
+
+    {
+      "scenarioName": "Get the only File for connector 1 production",
+      "requiredScenarioState": "Started",
+      "newScenarioState": "File Downloaded",
+      "request": {
+        "method": "GET",
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "1"
+          },
+          "cdr-processing-mode": {
+            "equalTo": "production"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*",
+          "cdr-document-uuid": "234-prod"
+        },
+        "base64Body": "IkJlIHlvdXJzZWxmOyBldmVyeW9uZSBlbHNlIGlzIGFscmVhZHkgdGFrZW4uIiAtIE9zY2FyIFdpbGRl"
+      }
+    },
+    {
+      "scenarioName": "Get the only File for connector 1 production",
+      "requiredScenarioState": "File Downloaded",
+      "newScenarioState": "Done",
+      "request": {
+        "method": "DELETE",
+        "url": "/documents/234-prod",
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "1"
+          },
+          "cdr-processing-mode": {
+            "equalTo": "production"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*"
+        }
+      }
+    },
+    {
+      "scenarioName": "Get the only File for connector 1 production",
+      "requiredScenarioState": "Done",
+      "newScenarioState": "Started",
+      "request": {
+        "method": "GET",
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "1"
+          },
+          "cdr-processing-mode": {
+            "equalTo": "production"
+          }
+        }
+      },
+      "response": {
+        "status": 204,
+        "headers": {
+          "Content-Type": "*/*"
+        }
+      }
+    }
+  ]
+}

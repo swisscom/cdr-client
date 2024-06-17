@@ -1,0 +1,21 @@
+client:
+  functionKey: none
+  local-folder: local
+  schedule-delay: PT1M
+  max-retries: 3
+  default-delay-ms: 100
+  retry-delay-seconds:
+    - 1
+    - 1
+    - 1
+  endpoint:
+    scheme: http
+    port: 80
+    host: localhost
+    base-path: documents
+  customer:
+    - connector-id: 1
+      content-type: application/forumdatenaustausch+xml;charset=UTF-8;version=4.5
+      target-folder: dummy
+      source-folder: source
+      mode: test
