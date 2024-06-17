@@ -22,8 +22,9 @@
       "response": {
         "status": 500,
         "headers": {
-          "Content-Type": "*/*"
-        }
+          "Content-Type": "application/problem+json; charset=utf-8"
+        },
+        "body": "{\"type\":\"about:blank\",\"title\":\"Internal Server Error\",\"status\":500,\"detail\":\"This will be repeated endlessly\"}"
       }
     }
   ]

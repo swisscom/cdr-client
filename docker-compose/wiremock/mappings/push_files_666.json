@@ -15,7 +15,7 @@
         "headers": {
           "Content-Type": "application/problem+json; charset=utf-8"
         },
-        "body": "{\"message\": \"The user is not authorized.\"}"
+        "body": "{\"type\":\"about:blank\",\"title\":\"Forbidden\",\"status\":403,\"detail\":\"The user is not authorized.\"}"
       }
     }
   ]
