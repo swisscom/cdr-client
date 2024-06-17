@@ -1,0 +1,26 @@
+client:
+  functionKey: ${cdrClient.functionKey}
+  local-folder: ${cdrClient.localFolder}
+  schedule-delay: PT10M
+  connection-timeout-ms: 5000
+  #we want the read timeout to be longer than a connection timeout between backend and db
+  read-timeout-ms: 35000
+  pull-thread-pool-size: 10
+  push-thread-pool-size: 10
+  retry-delay:
+    - 1s
+    - 2s
+    - 8s
+    - 32s
+    - 10m
+  endpoint:
+    scheme: https
+    port: 443
+    #       host: dev-cdr-functions.azurewebsites.net
+    base-path: documents
+  customer:
+  #  MUST BE SET IN ENVIRONMENT
+  #   - connector-id: 1
+  #     content-type: application/forumdatenaustausch+xml;charset=UTF-8;version=4.5
+  #     target-folder: /tmp/download
+  #     source-folder: /tmp/upload

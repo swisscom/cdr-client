@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true">
+
+    <logger name="org.springframework" level="INFO" />
+
+    <property name="LOG_LEVEL_PATTERN" value="%highlight(%level)" />
+    <property name="LOG_EXCEPTION_CONVERSION_WORD" value="%rEx" />
+
+    <springProfile name="!any">
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%highlight(%d{"yyyy-MM-dd'T'HH:mm:ss.SSSXXX", UTC}) | %highlight(${LOG_LEVEL_PATTERN:-%5p}) | %highlight(%magenta(${PID:- })) | %highlight(%yellow(%X{traceId:-None})) | %highlight([%15.15t]) | %highlight(%cyan(%-40.40logger{39})) | %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%ex}
+                </pattern>
+            </encoder>
+        </appender>
+        <root level="INFO">
+            <appender-ref ref="STDOUT" />
+        </root>
+    </springProfile>
+
+    <springProfile name="customer">
+        <appender name="ROLLING" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${LOGGING_FILE_NAME:-./cdr-client.log}</file>
+            <append>true</append>
+
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>${LOGGING_FILE_NAME:-./cdr-client.log}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+                <maxFileSize>${LOGGING_LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE:-100MB}</maxFileSize>
+                <maxHistory>${LOGGING_LOGBACK_ROLLINGPOLICY_MAX_HISTORY:-2}</maxHistory>
+            </rollingPolicy>
+
+            <encoder>
+                <pattern>%d{"yyyy-MM-dd'T'HH:mm:ss.SSSXXX", UTC} | ${%level:-%5p} | ${PID:- } | %X{traceId:-None} | [%15.15t] | %-40.40logger{39} | %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%ex}
+                </pattern>
+            </encoder>
+        </appender>
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <timestamp>
+                        <fieldName>timestamp</fieldName>
+                        <timeZone>UTC</timeZone>
+                    </timestamp>
+                    <loggerName>
+                        <fieldName>logger</fieldName>
+                    </loggerName>
+                    <logLevel>
+                        <fieldName>level</fieldName>
+                    </logLevel>
+                    <threadName>
+                        <fieldName>thread</fieldName>
+                    </threadName>
+                    <nestedField>
+                        <fieldName>mdc</fieldName>
+                        <providers>
+                            <mdc />
+                        </providers>
+                    </nestedField>
+                    <stackTrace>
+                        <fieldName>stackTrace</fieldName>
+                        <!-- maxLength - limit the length of the stack trace -->
+                        <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                            <maxDepthPerThrowable>200</maxDepthPerThrowable>
+                            <maxLength>14000</maxLength>
+                            <rootCauseFirst>true</rootCauseFirst>
+                        </throwableConverter>
+                    </stackTrace>
+                    <message />
+                    <throwableClassName>
+                        <fieldName>exceptionClass</fieldName>
+                    </throwableClassName>
+                </providers>
+            </encoder>
+        </appender>
+        <root level="INFO">
+            <appender-ref ref="ROLLING" />
+            <appender-ref ref="STDOUT" />
+        </root>
+    </springProfile>
+
+</configuration>

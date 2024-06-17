@@ -1,0 +1,30 @@
+{
+  "mappings":
+  [
+    {
+      "scenarioName": "Get Files for connector 666 - Internal Server Error",
+      "requiredScenarioState": "Started",
+      "newScenarioState": "Started",
+      "request": {
+        "method": "GET",
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "666"
+          }
+        }
+      },
+      "response": {
+        "status": 500,
+        "headers": {
+          "Content-Type": "*/*"
+        }
+      }
+    }
+  ]
+}

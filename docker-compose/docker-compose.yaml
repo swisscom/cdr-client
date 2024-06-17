@@ -1,0 +1,12 @@
+services:
+  wiremock:
+    image: local.wiremock.cdrapi
+    build: ./wiremock
+    mem_limit: 256m
+    ports:
+      - "9090:8080"
+      - "8443:8443"
+    environment:
+      - TZ=Europe/Zurich
+    command: ["--verbose", "--https-port", "8443", "--global-response-templating"]
+
