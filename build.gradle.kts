@@ -28,6 +28,14 @@ plugins {
     // KAPT is end of life, but KSP is not supported yet: https://github.com/spring-projects/spring-boot/issues/28046
     kotlin("kapt")
     `maven-publish`
+    idea
+}
+
+idea {
+    module {
+        isDownloadJavadoc = true
+        isDownloadSources = true
+    }
 }
 
 application {
