@@ -57,3 +57,17 @@ client:
       source-folder: /tmp/source/8000000000000
       mode: test
 ```
+
+## Running the Jar
+If the provided jar should be run directly, the following command can be used:
+```java -jar cdr-client.jar```
+The jar can be found in build/libs.
+
+Following environment variables need to be present (and correctly configured) so that the application can start successfully:
+```
+SPRING_CONFIG_ADDITIONAL_LOCATION={{ cdr_client_dir }}/config/application-customer.yaml"
+LOGGING_FILE_NAME={{ cdr_client_dir }}/logs/cdr-client.log"
+```
+The LOGGING_FILE_NAME is just so that the log file is not auto created where the jar is run from.
+
+See [Application Plugin](#application-plugin) regarding the content of the application-customer.yaml
