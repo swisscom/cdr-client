@@ -1,0 +1,2 @@
+# Only the specified owner can approve changes to workflow files
+/.github/workflows/ @swisscom/swisscom-health
