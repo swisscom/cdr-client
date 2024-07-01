@@ -1,0 +1,217 @@
+{
+  "mappings": [
+    {
+      "scenarioName": "Get all Files for connector 5",
+      "requiredScenarioState": "Started",
+      "newScenarioState": "File Downloaded 1",
+      "request": {
+        "method": "GET",
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*",
+          "cdr-document-uuid": "999"
+        },
+        "base64Body": "IlRoZSBjb3Ntb3MgaXMgd2l0aGluIHVzLiBXZSBhcmUgbWFkZSBvZiBzdGFyLXN0dWZmLiBXZSBhcmUgYSB3YXkgZm9yIHRoZSB1bml2ZXJzZSB0byBrbm93IGl0c2VsZi4iIC0gKENhcmwgU2FnYW4p"
+      }
+    },
+    {
+      "scenarioName": "Get all Files for connector 5",
+      "requiredScenarioState": "File Downloaded 1",
+      "newScenarioState": "Download File 2",
+      "request": {
+        "method": "DELETE",
+        "url": "/documents/999",
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*"
+        }
+      }
+    },
+    {
+      "scenarioName": "Get all Files for connector 5",
+      "requiredScenarioState": "Download File 2",
+      "newScenarioState": "File Downloaded 2",
+      "request": {
+        "method": "GET",
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*",
+          "cdr-document-uuid": "888"
+        },
+        "base64Body": "IkJlIHlvdXJzZWxmOyBldmVyeW9uZSBlbHNlIGlzIGFscmVhZHkgdGFrZW4uIiAtIE9zY2FyIFdpbGRl"
+      }
+    },
+    {
+      "scenarioName": "Get all Files for connector 5",
+      "requiredScenarioState": "File Downloaded 2",
+      "newScenarioState": "Download File 3",
+      "request": {
+        "method": "DELETE",
+        "url": "/documents/888",
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*"
+        }
+      }
+    },
+    {
+      "scenarioName": "Get all Files for connector 5",
+      "requiredScenarioState": "Download File 3",
+      "newScenarioState": "File Downloaded 3",
+      "request": {
+        "method": "GET",
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*",
+          "cdr-document-uuid": "777"
+        },
+        "base64Body": "IkEgcm9vbSB3aXRob3V0IGJvb2tzIGlzIGxpa2UgYSBib2R5IHdpdGhvdXQgYSBzb3VsLiIgLSBNYXJjdXMgVHVsbGl1cyBDaWNlcm8="
+      }
+    },
+    {
+      "scenarioName": "Get all Files for connector 5",
+      "requiredScenarioState": "File Downloaded 3",
+      "newScenarioState": "Download File 4",
+      "request": {
+        "method": "DELETE",
+        "url": "/documents/777",
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*"
+        }
+      }
+    },
+    {
+      "scenarioName": "Get all Files for connector 5",
+      "requiredScenarioState": "Download File 4",
+      "newScenarioState": "File Downloaded 4",
+      "request": {
+        "method": "GET",
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*",
+          "cdr-document-uuid": "666"
+        },
+        "base64Body": "IkJlIHRoZSBjaGFuZ2UgdGhhdCB5b3Ugd2lzaCB0byBzZWUgaW4gdGhlIHdvcmxkLiIgLSBNYWhhdG1hIEdhbmRoaQ=="
+      }
+    },
+    {
+      "scenarioName": "Get all Files for connector 5",
+      "requiredScenarioState": "File Downloaded 4",
+      "newScenarioState": "No more Files",
+      "request": {
+        "method": "DELETE",
+        "url": "/documents/666",
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*"
+        }
+      }
+    },
+    {
+      "scenarioName": "Get all Files for connector 5",
+      "requiredScenarioState": "No more Files",
+      "newScenarioState": "Started",
+      "request": {
+        "method": "GET",
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "5"
+          }
+        }
+      },
+      "response": {
+        "status": 204,
+        "headers": {
+          "Content-Type": "*/*"
+        }
+      }
+    }
+  ]
+}

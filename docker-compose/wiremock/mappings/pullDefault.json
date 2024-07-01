@@ -1,0 +1,57 @@
+{
+  "mappings": [
+    {
+      "scenarioName": "Default pull",
+      "requiredScenarioState": "Started",
+      "newScenarioState": "NoContent",
+      "request": {
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "method": "GET",
+        "headers": {
+          "cdr-connector-id": {
+            "doesNotMatch": "(1|5|666|1234|2345)"
+          }
+        }
+      },
+      "response": {
+        "transformers": ["random-value"],
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*",
+          "cdr-document-uuid": "{{randomValue length=10 type='ALPHANUMERIC'}}"
+        },
+        "base64Body": "IlRoZSBjb3Ntb3MgaXMgd2l0aGluIHVzLiBXZSBhcmUgbWFkZSBvZiBzdGFyLXN0dWZmLiBXZSBhcmUgYSB3YXkgZm9yIHRoZSB1bml2ZXJzZSB0byBrbm93IGl0c2VsZi4iIC0gKENhcmwgU2FnYW4p"
+      }
+    },
+    {
+      "scenarioName": "Default pull",
+      "requiredScenarioState": "NoContent",
+      "newScenarioState": "Started",
+      "request": {
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "method": "GET",
+        "headers": {
+          "cdr-connector-id": {
+            "doesNotMatch": "(1|5|666|1234|2345)"
+          }
+        }
+      },
+      "response": {
+        "status": 204,
+        "headers": {
+          "Content-Type": "*/*"
+        }
+      }
+    }
+  ]
+}

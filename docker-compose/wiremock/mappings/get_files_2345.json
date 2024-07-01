@@ -1,0 +1,52 @@
+{
+  "mappings": [
+    {
+      "scenarioName": "Get the only File for connector 2345",
+      "requiredScenarioState": "Started",
+      "newScenarioState": "File Downloaded",
+      "request": {
+        "method": "GET",
+        "urlPath": "/documents",
+        "queryParameters": {
+          "limit": {
+            "matches": "1"
+          }
+        },
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "2345"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "*/*",
+          "cdr-document-uuid": "456"
+        },
+        "base64Body": "IlRoZSBjb3Ntb3MgaXMgd2l0aGluIHVzLiBXZSBhcmUgbWFkZSBvZiBzdGFyLXN0dWZmLiBXZSBhcmUgYSB3YXkgZm9yIHRoZSB1bml2ZXJzZSB0byBrbm93IGl0c2VsZi4iIC0gKENhcmwgU2FnYW4p"
+      }
+    },
+    {
+      "scenarioName": "Get the only File for connector 2345",
+      "requiredScenarioState": "File Downloaded",
+      "newScenarioState": "Started",
+      "request": {
+        "method": "DELETE",
+        "url": "/documents/456",
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "2345"
+          }
+        }
+      },
+      "response": {
+        "status": 500,
+        "headers": {
+          "Content-Type": "application/problem+json; charset=utf-8"
+        },
+        "body": "{\"type\":\"about:blank\",\"title\":\"Internal Server Error\",\"status\":500,\"detail\":\"This will alternate with OK responses\"}"
+      }
+    }
+  ]
+}

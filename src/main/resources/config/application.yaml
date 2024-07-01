@@ -1,0 +1,44 @@
+spring:
+  main:
+    web-application-type: none
+  application:
+    name: CDR Client
+  output:
+    ansi:
+      enabled: detect
+  profiles:
+    include:
+      - client
+  task:
+    scheduling:
+      pool:
+        size: 2
+
+server:
+  address: 0.0.0.0
+  port: 8080
+  shutdown: "graceful"
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  tomcat:
+    connection-timeout: 1s
+    keep-alive-timeout: 30s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "actuator,health"
+    enabled-by-default: true
+
+logging:
+  pattern:
+    dateformat: "\"yyyy-MM-dd'T'HH:mm:ss.SSSXXX\", UTC"
+  level:
+    root: INFO
+    com.swisscom.health.des.cdr: INFO
+  charset:
+    console: UTF-8

@@ -1,0 +1,17 @@
+{
+  "request": {
+    "urlPattern": "/documents/([a-z0-9-]*)",
+    "method": "DELETE",
+    "headers": {
+      "cdr-connector-id": {
+        "doesNotMatch": "(1|5|666|1234|2345)"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "*/*"
+    }
+  }
+}

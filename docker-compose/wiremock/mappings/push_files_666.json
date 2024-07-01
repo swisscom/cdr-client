@@ -1,0 +1,22 @@
+{
+  "mappings": [
+    {
+      "request": {
+        "method": "POST",
+        "urlPath": "/documents",
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "666"
+          }
+        }
+      },
+      "response": {
+        "status": 403,
+        "headers": {
+          "Content-Type": "application/problem+json; charset=utf-8"
+        },
+        "body": "{\"type\":\"about:blank\",\"title\":\"Forbidden\",\"status\":403,\"detail\":\"The user is not authorized.\"}"
+      }
+    }
+  ]
+}
