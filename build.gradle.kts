@@ -1,8 +1,9 @@
 import io.gitlab.arturbosch.detekt.Detekt
 import org.springframework.boot.gradle.tasks.bundling.BootJar
+import java.net.URI
 
 group = "com.swisscom.health.des.cdr"
-version = "2.1.2-SNAPSHOT"
+version = "3.0.0-SNAPSHOT"
 java.sourceCompatibility = JavaVersion.VERSION_17
 
 val jvmVersion: String by project
@@ -181,6 +182,33 @@ project.afterEvaluate {
     configurations["detekt"].resolutionStrategy.eachDependency {
         if (requested.group == "org.jetbrains.kotlin") {
             useVersion(detektKotlinVersion)
+        }
+    }
+}
+
+tasks.register("publishVersion") {
+    group = "publishing"
+    description = "Publishes boot jar"
+    dependsOn(tasks.withType<PublishToMavenRepository>().matching {
+        it.repository == publishing.repositories["GitHubPackages"] && it.publication == publishing.publications["bootJava"]
+    })
+}
+
+
+publishing {
+    publications {
+        create<MavenPublication>("bootJava") {
+            artifact(tasks.named("bootJar"))
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = URI("https://maven.pkg.github.com/swisscom/cdr-client")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR")
+                password = System.getenv("GITHUB_TOKEN")
+            }
         }
     }
 }
