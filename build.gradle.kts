@@ -1,3 +1,4 @@
+import io.gitlab.arturbosch.detekt.Detekt
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.net.URI
 
@@ -13,7 +14,6 @@ val kotlinLoggingVersion: String by project
 val mockkVersion: String by project
 val logstashEncoderVersion: String by project
 val micrometerTracingVersion: String by project
-val detektKotlinVersion: String by project
 val kfsWatchVersion: String by project
 val kacheVersion: String by project
 val springMockkVersion: String by project
@@ -24,7 +24,7 @@ val outputDir: Provider<Directory> = layout.buildDirectory.dir(".")
 plugins {
     id("org.springframework.boot")
     id("io.spring.dependency-management")
-//    id("io.gitlab.arturbosch.detekt")
+    id("io.gitlab.arturbosch.detekt")
     jacoco
     application
     kotlin("jvm")
@@ -50,6 +50,14 @@ application {
 dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}")
+    }
+    // https://github.com/detekt/detekt/issues/6198#issuecomment-2265183695
+    configurations.matching { it.name == "detekt" }.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin") {
+                useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
+            }
+        }
     }
 }
 
@@ -158,39 +166,30 @@ tasks.processResources {
     }
 }
 
-//tasks.withType<Detekt> {
-//    baseline.set(File("${projectDir}/detekt_baseline.xml"))
-//    reports {
-//        xml {
-//            required.set(true)
-//            outputLocation.set(File("${outputDir.get().asFile.absolutePath}/reports/detekt.xml"))
-//        }
-//        html.required.set(false)
-//        sarif.required.set(false)
-//        txt.required.set(false)
-//    }
-//}
+tasks.withType<Detekt> {
+    baseline.set(File("${projectDir}/detekt_baseline.xml"))
+    reports {
+        xml {
+            required.set(true)
+            outputLocation.set(File("${outputDir.get().asFile.absolutePath}/reports/detekt.xml"))
+        }
+        html.required.set(false)
+        sarif.required.set(false)
+        txt.required.set(false)
+    }
+}
 
 /**
  * Detekt
  * See https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-gradle/
  */
-//detekt {
-//    buildUponDefaultConfig = false // preconfigure defaults
-//    allRules = true
-//    parallel = true
-//    config.setFrom(files("$rootDir/config/detekt.yml")) // Global Detekt rule set.
-//    baseline = file("$projectDir/detekt_baseline.xml") // Module specific suppression list.
-//}
-//
-//// https://github.com/detekt/detekt/issues/6198
-//project.afterEvaluate {
-//    configurations["detekt"].resolutionStrategy.eachDependency {
-//        if (requested.group == "org.jetbrains.kotlin") {
-//            useVersion(detektKotlinVersion)
-//        }
-//    }
-//}
+detekt {
+    buildUponDefaultConfig = false // preconfigure defaults
+    allRules = true
+    parallel = true
+    config.setFrom(files("$rootDir/config/detekt.yml")) // Global Detekt rule set.
+    baseline = file("$projectDir/detekt_baseline.xml") // Module specific suppression list.
+}
 
 tasks.register("publishVersion") {
     group = "publishing"

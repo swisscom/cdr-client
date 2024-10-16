@@ -69,8 +69,9 @@ class EventTriggerUploadScheduler(
 ) {
 
     @PostConstruct
+    @Suppress("UnusedPrivateMember")
     private fun failIfTelemetrySamplingIsEnabled() {
-        if (samplerProbability > 0.01) {
+        if (samplerProbability > ZERO_SAMPLING_THRESHOLD) {
             logger.error {
                 "Telemetry sampling is enabled (sampling probability is set to $samplerProbability). Currently we cannot support telemetry " +
                         "sampling without introducing a memory leak due to the lack of framework integration of micrometer/open-telemetry with Kotlin " +
@@ -166,8 +167,9 @@ class PollingUploadScheduler(
 ) {
 
     @PostConstruct
+    @Suppress("UnusedPrivateMember")
     private fun failIfTelemetrySamplingIsEnabled() {
-        if (samplerProbability > 0.01) {
+        if (samplerProbability > ZERO_SAMPLING_THRESHOLD) {
             logger.error {
                 "Telemetry sampling is enabled (sampling probability is set to $samplerProbability). Currently we cannot support telemetry " +
                         "sampling without introducing a memory leak due to the lack of framework integration of micrometer/open-telemetry with Kotlin " +
@@ -284,6 +286,8 @@ abstract class BaseUploadScheduler(
 
     protected companion object {
         protected const val EXTENSION_XML = "xml"
+        @JvmStatic
+        protected val ZERO_SAMPLING_THRESHOLD: Double = 0.0
     }
 
 }

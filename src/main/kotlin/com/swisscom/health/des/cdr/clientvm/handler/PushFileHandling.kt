@@ -45,6 +45,7 @@ class PushFileHandling(
     /**
      * Retries the upload of a file until it is successful or a 4xx error occurred.
      */
+    @Suppress("NestedBlockDepth")
     suspend fun uploadFile(file: Path, connector: CdrClientConfig.Connector) {
         logger.debug { "Push file '$file'" }
         var retryCount = 0
@@ -61,7 +62,9 @@ class PushFileHandling(
         } finally {
             processingInProgressCache.remove(file.absolutePathString()).also { removed ->
                 if (isNull(removed)) {
-                    logger.warn { "File '${file.absolutePathString()}' was not in the processing cache! It appears that we have a bug in our state management." }
+                    logger.warn {
+                        "File '${file.absolutePathString()}' was not in the processing cache! It appears that we have a bug in our state management."
+                    }
                 }
             }
         }
