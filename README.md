@@ -7,7 +7,9 @@ There is no endpoint (beside actuator/health) that are offered here.
 The CDR Client is triggered by a scheduler and synchronizes by the given delay time the files from the CDR API.
 
 ### Functionality
-For each defined connector the CDR Client calls the defined endpoints of the CDR API.
+For each defined connector the CDR Client calls the defined endpoint of the CDR API.
+
+#### Document Download
 
 For each connector one file after the other is pulled. Each file is written into a temporary folder defined as 'local-folder'.
 The file is named after the received 'cdr-document-uuid' header that is a unique identifier created by the CDR API.
@@ -17,13 +19,27 @@ After successfully deleting the file in the CDR API, the file is moved to the co
 The temporary folders need to be monitored by another tool to make sure that no files are forgotten (should only happen if the move
 to the destination folder is failing).
 
-For each connector one file after the other is pushed from the defined 'source-folder'. After the file is successfully uploaded it will be deleted.
+#### Document Upload
+
+Document upload uses a combination of directory polling and event driven uploads. The polling process inspects the 
+contents of every source folder at the configured interval and uploads all `.xml` files it finds to the CDR API. The 
+event driven process listens for filesystem events from the same directories and uploads all `.xml` files as they 
+are created. The two approaches are combined so
+
+* at start of the client all files that might have arrived while the client was not running are uploaded
+* folders on (remote) filesystems that do not support filesystem events can be used as source folders
+
+If the filesystem that hosts a source folder supports filesystem events, then the polling process normally won't find 
+any files to process and immediately goes back to sleep. If the polling process wakes up right at the moment a new file 
+arrives, it might happen that both processes pick up the same file for processing. However, only one of the two will 
+continue to process the file, depending on which one is first to register the file for processing.
+
+After the file is successfully uploaded it will be deleted.
 If the upload failed with a response code of 4xx the file will be appended with '.error' and an additional file with the same name as the sent file, but with
 the extension '.log' will be created and the received response body will be saved to this file.
-If the upload failed with a response code of 5xx the file will be retried a defined amount of times, 
-see retry-delay in the [application-client.yaml](./src/main/resources/config/application-client.yaml) file. After reaching the max retry count the file will 
-be appended with '.error' and an additional file with the same name as the sent file, but with the extension '.log' will be created and the received response 
-body will be saved to this file.
+If the upload failed with a response code of 5xx the file will be retried indefinitely, assuming the root cause is 
+an infrastructure issue that will ultimately be resolved (and uploading another file would fail too, for the same 
+reason). See retry-delay in the [application-client.yaml](./src/main/resources/config/application-client.yaml) file.
 
 ## Local development
 To test some usecases there is a [docker-compose.yaml](./docker-compose/docker-compose.yaml) with wiremock that simulates the CDR API. Run with ```docker-compose down && docker-compose up --build```.

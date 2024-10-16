@@ -1,14 +1,21 @@
 package com.swisscom.health.des.cdr.clientvm.config
 
+import com.mayakapps.kache.InMemoryKache
+import com.mayakapps.kache.KacheStrategy
+import com.mayakapps.kache.ObjectKache
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import okhttp3.OkHttpClient
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import java.util.concurrent.Executors
+import java.nio.file.Path
 import java.util.concurrent.TimeUnit
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * A Spring configuration class for creating and configuring beans used by the CDR client.
@@ -42,9 +49,32 @@ class CdrClientContext {
         return OkHttpClient.Builder()
     }
 
-    @Bean(name = ["pullDispatcher"])
-    fun pullDispatcher(config: CdrClientConfig): CoroutineDispatcher = Executors.newFixedThreadPool(config.pullThreadPoolSize).asCoroutineDispatcher()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Bean(name = ["limitedParallelismCdrUploadsDispatcher"])
+    fun limitedParallelCdrUploadsDispatcher(config: CdrClientConfig): CoroutineDispatcher {
+        return Dispatchers.IO.limitedParallelism(config.pushThreadPoolSize)
+    }
 
-    @Bean(name = ["pushDispatcher"])
-    fun pushDispatcher(config: CdrClientConfig): CoroutineDispatcher = Executors.newFixedThreadPool(config.pushThreadPoolSize).asCoroutineDispatcher()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Bean(name = ["limitedParallelismCdrDownloadsDispatcher"])
+    fun limitedParallelCdrDownloadsDispatcher(config: CdrClientConfig): CoroutineDispatcher {
+        return Dispatchers.IO.limitedParallelism(config.pullThreadPoolSize)
+    }
+
+    @Bean
+    fun processingInProgressCache(config: CdrClientConfig): ObjectKache<String, Path> =
+        InMemoryKache(maxSize = config.filesInProgressCacheSize.toBytes())
+        {
+            strategy = KacheStrategy.LRU
+            onEntryRemoved = { evicted: Boolean, key: String, _: Path, _: Path? ->
+                if (evicted) {
+                    logger.warn {
+                        "The file object with key '$key' has been evicted from the processing cache because the capacity limit of the cache " +
+                                "has been reached; this indicates a very large number of files in the source directories that cannot be processed. " +
+                                "Please investigate. "
+                    }
+                }
+            }
+        }
+
 }

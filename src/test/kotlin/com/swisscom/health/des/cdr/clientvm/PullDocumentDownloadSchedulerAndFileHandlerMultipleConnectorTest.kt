@@ -4,14 +4,14 @@ import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
 import com.swisscom.health.des.cdr.clientvm.handler.CONNECTOR_ID_HEADER
 import com.swisscom.health.des.cdr.clientvm.handler.PULL_RESULT_ID_HEADER
 import com.swisscom.health.des.cdr.clientvm.handler.PullFileHandling
-import com.swisscom.health.des.cdr.clientvm.handler.PushFileHandling
-import com.swisscom.health.des.cdr.clientvm.scheduling.Scheduler
+import com.swisscom.health.des.cdr.clientvm.scheduling.DocumentDownloadScheduler
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.TraceContext
 import io.micrometer.tracing.Tracer
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -21,19 +21,25 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.core.io.ClassPathResource
 import org.springframework.http.HttpStatus
-import java.io.File
+import org.springframework.http.MediaType
 import java.nio.charset.StandardCharsets
+import java.nio.file.Path
 import java.util.UUID
+import kotlin.io.path.createDirectories
+import kotlin.io.path.extension
+import kotlin.io.path.listDirectoryEntries
 
 @ExtendWith(MockKExtension::class)
-internal class PullSchedulerAndFileHandlerMultipleConnectorTest {
+internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest {
 
     @MockK
     private lateinit var config: CdrClientConfig
@@ -53,15 +59,12 @@ internal class PullSchedulerAndFileHandlerMultipleConnectorTest {
     @MockK
     private lateinit var traceContext: TraceContext
 
-    @MockK
-    private lateinit var pushFileHandling: PushFileHandling
-
     @TempDir
-    private lateinit var folder: File
+    private lateinit var tmpDir: Path
 
     private lateinit var cdrServiceMock: MockWebServer
 
-    private lateinit var scheduler: Scheduler
+    private lateinit var documentDownloadScheduler: DocumentDownloadScheduler
     private lateinit var pullFileHandling: PullFileHandling
 
     private var counterOne = 0
@@ -73,9 +76,10 @@ internal class PullSchedulerAndFileHandlerMultipleConnectorTest {
     private val connectorId1 = "1234"
     private val connectorId2 = "3456"
 
+    private val forumDatenaustauschMediaType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8;version=4.5")
+
     @BeforeEach
     fun setup() {
-        folder.mkdirs()
         cdrServiceMock = MockWebServer()
         cdrServiceMock.start()
 
@@ -88,35 +92,46 @@ internal class PullSchedulerAndFileHandlerMultipleConnectorTest {
         val connector1 =
             CdrClientConfig.Connector(
                 connectorId = connectorId1,
-                targetFolder = "${folder.absolutePath}${File.separator}$directory1",
-                sourceFolder = "${folder.absolutePath}${File.separator}$directory1/source",
-                contentType = "application/forumdatenaustausch+xml;charset=UTF-8;version=4.5",
+                targetFolder = tmpDir.resolve(directory1),
+                sourceFolder = tmpDir.resolve(directory1).resolve("source"),
+                contentType = forumDatenaustauschMediaType,
                 mode = CdrClientConfig.Mode.TEST
             )
         val connector2 =
             CdrClientConfig.Connector(
                 connectorId = connectorId2,
-                targetFolder = "${folder.absolutePath}${File.separator}$directory2",
-                sourceFolder = "${folder.absolutePath}${File.separator}$directory2/source",
-                contentType = "application/forumdatenaustausch+xml;charset=UTF-8;version=4.5",
+                targetFolder = tmpDir.resolve(directory2),
+                sourceFolder = tmpDir.resolve(directory2).resolve("source"),
+                contentType = forumDatenaustauschMediaType,
                 mode = CdrClientConfig.Mode.PRODUCTION
             )
-        File("${folder.absolutePath}${File.separator}$directory1").mkdirs()
-        File("${folder.absolutePath}${File.separator}$directory2").mkdirs()
-        File("${folder.absolutePath}${File.separator}$inflightFolder").mkdirs()
+        val localFolder = tmpDir.resolve(inflightFolder)
+
+        connector1.sourceFolder.createDirectories()
+        connector2.sourceFolder.createDirectories()
+        localFolder.createDirectories()
+
         every { config.customer } returns listOf(connector1, connector2)
         every { config.endpoint } returns endpoint
-        every { config.localFolder } returns "${folder.absolutePath}${File.separator}$inflightFolder"
+        every { config.localFolder } returns localFolder
         every { config.functionKey } returns "1"
+
         mockTracer()
 
         pullFileHandling = PullFileHandling(config, OkHttpClient.Builder().build(), tracer)
-        scheduler = Scheduler(
+        documentDownloadScheduler = DocumentDownloadScheduler(
             config,
             pullFileHandling,
-            pushFileHandling,
+            Dispatchers.IO,
         )
 
+    }
+
+    @AfterEach
+    fun tearDown() {
+        cdrServiceMock.shutdown()
+        counterOne = 0
+        counterTwo = 0
     }
 
     private fun mockTracer() {
@@ -181,14 +196,6 @@ internal class PullSchedulerAndFileHandlerMultipleConnectorTest {
         }
     }
 
-    @AfterEach
-    fun tearDown() {
-        folder.delete()
-        cdrServiceMock.shutdown()
-        counterOne = 0
-        counterTwo = 0
-    }
-
     @Test
     fun `test sync of multiple files to folder for two connectors`() = runTest {
         val practOneMaxCount = 75
@@ -199,37 +206,18 @@ internal class PullSchedulerAndFileHandlerMultipleConnectorTest {
             }
         }
 
-        scheduler.syncFilesToClientFolders()
+        documentDownloadScheduler.syncFilesToClientFolders()
 
 
-        Assertions.assertEquals(practTwoMaxCount * 2 + practOneMaxCount * 2 + 2, cdrServiceMock.requestCount)
+        assertEquals(practTwoMaxCount * 2 + practOneMaxCount * 2 + 2, cdrServiceMock.requestCount)
 
-        val listFiles = folder.listFiles()
-        Assertions.assertNotNull(listFiles)
-        listFiles!!
-        listFiles.let { Assertions.assertEquals(3, it.size) }
-        listFiles.filter { !it.endsWith(inflightFolder) }.forEach { Assertions.assertTrue(it.list().size > 5) }
-        listFiles.filter { it.endsWith(directory1) }[0].list().let {
-            if (it != null) {
-                Assertions.assertEquals(counterOne, it.size)
-            } else {
-                Assertions.fail("No file list for folder $directory1 found")
-            }
-        }
-        listFiles.filter { it.endsWith(directory2) }[0].list().let {
-            if (it != null) {
-                Assertions.assertEquals(counterTwo, it.size)
-            } else {
-                Assertions.fail("No file list for folder $directory2 found")
-            }
-        }
-        listFiles.filter { it.endsWith(inflightFolder) }[0].list().let {
-            if (it != null) {
-                Assertions.assertEquals(0, it.size)
-            } else {
-                Assertions.fail("No file list for folder $inflightFolder found")
-            }
-        }
+        val listFiles: List<Path> = tmpDir.listDirectoryEntries()
+        assertNotNull(listFiles)
+        assertEquals(3, listFiles.size)
+        assertTrue(listFiles.first { !it.endsWith(inflightFolder) }.listDirectoryEntries().size > 5)
+        assertEquals(counterOne, listFiles.first { it.endsWith(directory1) }.listDirectoryEntries().filter { it.extension == "xml" }.size)
+        assertEquals(counterTwo, listFiles.first { it.endsWith(directory2) }.listDirectoryEntries().filter { it.extension == "xml" }.size)
+        assertTrue(listFiles.first { it.endsWith(inflightFolder) }.listDirectoryEntries().isEmpty())
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -243,35 +231,14 @@ internal class PullSchedulerAndFileHandlerMultipleConnectorTest {
             }
         }
 
-        scheduler.syncFilesToClientFolders()
+        documentDownloadScheduler.syncFilesToClientFolders()
         advanceUntilIdle()
 
-        Assertions.assertEquals(practTwoMaxCount * 2 + practOneMaxCount * 2 + 2, cdrServiceMock.requestCount)
-        val listFiles = folder.listFiles()
-        Assertions.assertNotNull(listFiles)
-        listFiles!!
-        listFiles.let { Assertions.assertEquals(3, it.size) }
-        listFiles.filter { it.endsWith(directory1) }[0].list().let {
-            if (it != null) {
-                Assertions.assertEquals(counterOne, it.size)
-            } else {
-                Assertions.fail("No file list for folder $directory1 found")
-            }
-        }
-        listFiles.filter { it.endsWith(directory2) }[0].list().let {
-            if (it != null) {
-                Assertions.assertEquals(counterTwo, it.size)
-            } else {
-                Assertions.fail("No file list for folder $directory2 found")
-            }
-        }
-        listFiles.filter { it.endsWith(inflightFolder) }[0].list().let {
-            if (it != null) {
-                Assertions.assertEquals(0, it.size)
-            } else {
-                Assertions.fail("No file list for folder $inflightFolder found")
-            }
-        }
+        assertEquals(practTwoMaxCount * 2 + practOneMaxCount * 2 + 2, cdrServiceMock.requestCount)
+        val listFiles = tmpDir.listDirectoryEntries()
+        assertEquals(counterOne, listFiles.first { it.endsWith(directory1) }.listDirectoryEntries().filter { it.extension == "xml" }.size)
+        assertEquals(counterTwo, listFiles.first { it.endsWith(directory2) }.listDirectoryEntries().filter { it.extension == "xml" }.size)
+        assertTrue(listFiles.first { it.endsWith(inflightFolder) }.listDirectoryEntries().isEmpty())
     }
 
 }
