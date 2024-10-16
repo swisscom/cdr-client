@@ -1,12 +1,15 @@
 client:
-  functionKey: ${cdrClient.functionKey}
-  local-folder: ${cdrClient.localFolder}
+  function-key: ${cdrClient.functionKey:}
+  local-folder: ${cdrClient.localFolder:${java.io.tmpdir}/cdr_download}
   schedule-delay: PT10M
+  files-in-progress-cache-size: 10MB
   connection-timeout-ms: 5000
   #we want the read timeout to be longer than a connection timeout between backend and db
   read-timeout-ms: 35000
-  pull-thread-pool-size: 10
-  push-thread-pool-size: 10
+  # max number of connectors to be processed in parallel, one download per connector at any given time
+  pull-thread-pool-size: 5
+  # max number of parallel document uploads (independent of connector)
+  push-thread-pool-size: 5
   retry-delay:
     - 1s
     - 2s
@@ -24,3 +27,4 @@ client:
   #     content-type: application/forumdatenaustausch+xml;charset=UTF-8;version=4.5
   #     target-folder: /tmp/download
   #     source-folder: /tmp/upload
+  #     mode: test|production

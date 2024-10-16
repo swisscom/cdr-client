@@ -1,10 +1,10 @@
 package com.swisscom.health.des.cdr.clientvm.handler
 
+import com.mayakapps.kache.ObjectKache
 import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -18,6 +18,8 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
+import java.util.Objects.isNull
+import kotlin.io.path.absolutePathString
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.readBytes
 
@@ -35,67 +37,41 @@ private val logger = KotlinLogging.logger {}
 @Suppress("TooManyFunctions")
 class PushFileHandling(
     cdrClientConfig: CdrClientConfig,
-    private val httpClient: OkHttpClient,
     tracer: Tracer,
+    private val httpClient: OkHttpClient,
+    private val processingInProgressCache: ObjectKache<String, Path>,
 ) : FileHandlingBase(cdrClientConfig, tracer) {
 
     /**
-     * Uploads files for a specific customer.
-     * @param connector the connector to synchronize
+     * Retries the upload of a file until it is successful or a 4xx error occurred.
      */
-    suspend fun pushSyncConnector(connector: CdrClientConfig.Connector) {
-        traced("Push Sync Connector ${connector.connectorId}") {
-            logger.info { "Sync connector '${connector.connectorId}' (${connector.mode}) - pushing" }
-            val path = Path.of(connector.sourceFolder)
-            var counter = 0
-            if (pathIsDirectoryAndWritable(path, "uploaded", logger)) {
-                runCatching {
-                    Files.list(path).use { files ->
-                        files.filter { it.fileName.toString().endsWith(".xml") }
-                            .forEach { file ->
-                                runBlocking {
-                                    handleFile(file, connector, counter).let { newCount ->
-                                        counter = newCount
-                                    }
-                                }
-                            }
-                    }
-                }.onFailure {
-                    logger.info { "Synced '$counter' file(s) for connector '${connector.connectorId}' (${connector.mode}) before exception happened" }
-                    throw it
-                }
-            }
-            logger.info { "Sync connector done - '$counter' file(s) pushed" }
-        }
-    }
-
-    /**
-     * Retries the upload of a file until it is successful or a 4xx error occured.
-     */
-    private suspend fun handleFile(file: Path, connector: CdrClientConfig.Connector, counter: Int): Int {
+    suspend fun uploadFile(file: Path, connector: CdrClientConfig.Connector) {
         logger.debug { "Push file '$file'" }
-        var returnCount = counter
         var retryCount = 0
         var retryNeeded = true
-        while (retryNeeded) {
-            writeFileToApi(file, connector).use {
-                retryNeeded = handleResponseAndReturnTrueIfRetryIsNeeded(file, it, retryCount)
-                if (!retryNeeded && it.isSuccessful) {
-                    returnCount++
+        try {
+            while (retryNeeded) {
+                uploadFileToApi(file, connector).use { response: Response ->
+                    retryNeeded = handleResponseAndSignalIfRetryIsNeeded(file, response, retryCount)
+                    if (retryNeeded && retryCount < cdrClientConfig.retryDelay.size - 1) {
+                        retryCount++
+                    }
                 }
-                if (retryNeeded && retryCount < cdrClientConfig.retryDelay.size - 1) {
-                    retryCount++
+            }
+        } finally {
+            processingInProgressCache.remove(file.absolutePathString()).also { removed ->
+                if (isNull(removed)) {
+                    logger.warn { "File '${file.absolutePathString()}' was not in the processing cache! It appears that we have a bug in our state management." }
                 }
             }
         }
-        return returnCount
     }
 
-    private fun writeFileToApi(file: Path, connector: CdrClientConfig.Connector): Response {
+    private fun uploadFileToApi(file: Path, connector: CdrClientConfig.Connector): Response {
         // TODO: change this to handle big files
         return httpClient.newCall(
             createPostRequest(
-                file.readBytes().toRequestBody(connector.contentType.toMediaType()),
+                file.readBytes().toRequestBody(connector.contentType.toString().toMediaType()),
                 buildTargetUrl(cdrClientConfig.endpoint.basePath),
                 buildBaseHeaders(connector.connectorId, connector.mode)
             )
@@ -105,7 +81,7 @@ class PushFileHandling(
     /**
      * Checks the HTTP return status of the API and decides whether a retry is needed and/or an error needs to be logged.
      */
-    private suspend fun handleResponseAndReturnTrueIfRetryIsNeeded(file: Path, response: Response, retryCount: Int): Boolean {
+    private suspend fun handleResponseAndSignalIfRetryIsNeeded(file: Path, response: Response, retryCount: Int): Boolean {
         val responseStatus: HttpStatus? = HttpStatus.resolve(response.code)
         return if (responseStatus != null) {
             when {

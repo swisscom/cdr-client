@@ -6,15 +6,16 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication
 import org.springframework.scheduling.annotation.EnableScheduling
 
+
 /**
  * Spring Boot entry point
  */
 @SpringBootApplication
 @EnableConfigurationProperties(CdrClientConfig::class)
 @EnableScheduling
-class CdrClientVmApplication
+class CdrClientApplication
 
 @Suppress("SpreadOperator")
 fun main(args: Array<String>) {
-    runApplication<CdrClientVmApplication>(*args)
+    runApplication<CdrClientApplication>(*args)
 }

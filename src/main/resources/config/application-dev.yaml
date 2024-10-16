@@ -1,6 +1,4 @@
 client:
-  functionKey: ${cdrClient.functionKey}
-  local-folder: ${cdrClient.localFolder}
   schedule-delay: PT30S
   endpoint:
     scheme: http
