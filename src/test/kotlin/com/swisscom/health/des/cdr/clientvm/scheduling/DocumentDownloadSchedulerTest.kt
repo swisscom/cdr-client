@@ -50,7 +50,6 @@ internal class DocumentDownloadSchedulerTest {
     private val inflightFolder = "inflight"
     private val targetDirectory = "customer"
     private val sourceDirectory = "source"
-//    private lateinit var scheduler: Scheduler
 
     @BeforeEach
     fun setup() {
