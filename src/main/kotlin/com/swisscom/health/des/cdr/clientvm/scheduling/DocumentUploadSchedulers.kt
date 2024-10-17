@@ -181,6 +181,11 @@ class PollingUploadScheduler(
 
     @Scheduled(initialDelay = 0L, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFilePoller() {
+        config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let{ humanReadableDelay ->
+            config.customer.forEach {
+                logger.info { "Polling source folder for files every '$humanReadableDelay': '${it.sourceFolder}'" }
+            }
+        }
         withContext(Dispatchers.IO) {
             launch {
                 uploadFiles(pollForNewFilesToUpload())
@@ -195,7 +200,7 @@ class PollingUploadScheduler(
                     .asSequence()
                     .map {
                         startSpan(tracer, "poll directory ${it.sourceFolder}") {
-                            logger.info { "Polling source folder for files: ${it.sourceFolder}" }
+                            logger.debug { "Polling source folder for files: ${it.sourceFolder}" }
                             it.sourceFolder
                         }
                     }
