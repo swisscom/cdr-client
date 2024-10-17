@@ -13,18 +13,20 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.core.io.ClassPathResource
 import org.springframework.http.HttpStatus
-import java.io.File
+import org.springframework.http.MediaType
 import java.nio.charset.StandardCharsets
+import java.nio.file.Path
 import java.util.UUID
+import kotlin.io.path.createDirectories
+import kotlin.io.path.extension
+import kotlin.io.path.listDirectoryEntries
 
 @ExtendWith(MockKExtension::class)
 internal class PullFileHandlingTest {
@@ -47,7 +49,7 @@ internal class PullFileHandlingTest {
     private lateinit var traceContext: TraceContext
 
     @TempDir
-    private lateinit var folder: File
+    private lateinit var tmpDir: Path
 
     private lateinit var cdrServiceMock: MockWebServer
 
@@ -59,7 +61,6 @@ internal class PullFileHandlingTest {
 
     @BeforeEach
     fun setup() {
-        folder.mkdirs()
         cdrServiceMock = MockWebServer()
         cdrServiceMock.start()
         mockTracer()
@@ -71,10 +72,11 @@ internal class PullFileHandlingTest {
             port = cdrServiceMock.port,
         )
 
-        File("${folder.absolutePath}${File.separator}$targetDirectory").mkdirs()
-        File("${folder.absolutePath}${File.separator}$inflightFolder").mkdirs()
+        tmpDir.resolve(targetDirectory).also { it.createDirectories() }
+        val inflightDir = tmpDir.resolve(inflightFolder).also { it.createDirectories() }
+
         every { config.endpoint } returns endpoint
-        every { config.localFolder } returns "${folder.absolutePath}${File.separator}$inflightFolder"
+        every { config.localFolder } returns inflightDir
         every { config.functionKey } returns "1"
 
         pullFileHandling = PullFileHandling(config, OkHttpClient.Builder().build(), tracer)
@@ -82,7 +84,6 @@ internal class PullFileHandlingTest {
 
     @AfterEach
     fun tearDown() {
-        folder.delete()
         cdrServiceMock.shutdown()
     }
 
@@ -95,26 +96,16 @@ internal class PullFileHandlingTest {
             pullFileHandling.pullSyncConnector(createConnector("1-2-3-4"))
         }
 
-        assertEquals(3, cdrServiceMock.requestCount, "more requests where done than expected")
-        val listFiles = folder.listFiles()
-        assertNotNull(listFiles)
-        listFiles!!
+        assertEquals(3, cdrServiceMock.requestCount, "more requests were done than expected")
+        val listFiles = tmpDir.listDirectoryEntries()
         assertEquals(2, listFiles.size)
 
-        listFiles.filter { it.endsWith(targetDirectory) }[0].list().let {
-            if (it != null) {
-                assertEquals(1, it.size)
-                assertTrue(it[0].endsWith(".xml"), "File extension is not .xml")
-            } else {
-                fail("No file list for folder $targetDirectory found")
-            }
+        tmpDir.resolve(targetDirectory).listDirectoryEntries().let {
+            assertEquals(1, it.size)
+            assertTrue(it[0].extension == "xml", "File extension is not .xml")
         }
-        listFiles.filter { it.endsWith(inflightFolder) }[0].list().let {
-            if (it != null) {
-                assertEquals(0, it.size)
-            } else {
-                fail("A file was found in folder $inflightFolder, which shouldn't be there")
-            }
+        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+            assertTrue(it.isEmpty())
         }
     }
 
@@ -126,25 +117,13 @@ internal class PullFileHandlingTest {
             pullFileHandling.pullSyncConnector(createConnector("1-2-3-4"))
         }
 
-        assertEquals(1, cdrServiceMock.requestCount, "more requests where done than expected")
-        val listFiles = folder.listFiles()
-        assertNotNull(listFiles)
-        listFiles!!
-        assertEquals(2, listFiles.size)
+        assertEquals(1, cdrServiceMock.requestCount, "more requests were done than expected")
 
-        listFiles.filter { it.endsWith(targetDirectory) }[0].list().let {
-            if (it != null) {
-                assertEquals(0, it.size)
-            } else {
-                fail("A file was found in folder $targetDirectory, which shouldn't be there")
-            }
+        tmpDir.resolve(targetDirectory).listDirectoryEntries().let {
+            assertTrue(it.isEmpty())
         }
-        listFiles.filter { it.endsWith(inflightFolder) }[0].list().let {
-            if (it != null) {
-                assertEquals(0, it.size)
-            } else {
-                fail("A file was found in folder $inflightFolder, which shouldn't be there")
-            }
+        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+            assertTrue(it.isEmpty())
         }
     }
 
@@ -158,25 +137,13 @@ internal class PullFileHandlingTest {
             pullFileHandling.pullSyncConnector(createConnector("1-2-3-4"))
         }
 
-        assertEquals(2, cdrServiceMock.requestCount, "more requests where done than expected")
-        val listFiles = folder.listFiles()
-        assertNotNull(listFiles)
-        listFiles!!
-        assertEquals(2, listFiles.size)
+        assertEquals(2, cdrServiceMock.requestCount, "more requests were done than expected")
 
-        listFiles.filter { it.endsWith(targetDirectory) }[0].list().let {
-            if (it != null) {
-                assertEquals(0, it.size)
-            } else {
-                fail("No file list for folder $targetDirectory found")
-            }
+        tmpDir.resolve(targetDirectory).listDirectoryEntries().let {
+            assertTrue(it.isEmpty())
         }
-        listFiles.filter { it.endsWith(inflightFolder) }[0].list().let {
-            if (it != null) {
-                assertEquals(1, it.size)
-            } else {
-                fail("No file list for folder $inflightFolder found")
-            }
+        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+            assertEquals(1, it.size)
         }
     }
 
@@ -194,25 +161,13 @@ internal class PullFileHandlingTest {
         }
 
 
-        assertEquals(11, cdrServiceMock.requestCount, "more requests where done than expected")
-        val listFiles = folder.listFiles()
-        assertNotNull(listFiles)
-        listFiles!!
-        assertEquals(2, listFiles.size)
+        assertEquals(11, cdrServiceMock.requestCount, "more requests were done than expected")
 
-        listFiles.filter { it.endsWith(targetDirectory) }[0].list().let {
-            if (it != null) {
-                assertEquals(5, it.size)
-            } else {
-                fail("No file list for folder $targetDirectory found")
-            }
+        tmpDir.resolve(targetDirectory).listDirectoryEntries().let {
+            assertEquals(5, it.size)
         }
-        listFiles.filter { it.endsWith(inflightFolder) }[0].list().let {
-            if (it != null) {
-                assertEquals(0, it.size)
-            } else {
-                fail("No file list for folder $inflightFolder found")
-            }
+        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+            assertTrue(it.isEmpty())
         }
     }
 
@@ -229,38 +184,27 @@ internal class PullFileHandlingTest {
             pullFileHandling.pullSyncConnector(createConnector("1-2-3-4"))
         }
 
-        assertEquals(7, cdrServiceMock.requestCount, "more requests where done than expected")
-        val listFiles = folder.listFiles()
-        assertNotNull(listFiles)
-        listFiles!!
-        assertEquals(2, listFiles.size)
+        assertEquals(7, cdrServiceMock.requestCount, "more requests were done than expected")
 
-        listFiles.filter { it.endsWith(targetDirectory) }[0].list().let {
-            if (it != null) {
-                assertEquals(3, it.size)
-            } else {
-                fail("No file list for folder $targetDirectory found")
-            }
+
+        tmpDir.resolve(targetDirectory).listDirectoryEntries().let {
+            assertEquals(3, it.size)
         }
-        listFiles.filter { it.endsWith(inflightFolder) }[0].list().let {
-            if (it != null) {
-                assertEquals(0, it.size)
-            } else {
-                fail("No file list for folder $inflightFolder found")
-            }
+        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+            assertTrue(it.isEmpty())
         }
     }
 
     private fun createConnector(
         connectorId: String,
-        targetFolder: String = "${folder.absolutePath}${File.separator}$targetDirectory",
-        sourceFolder: String = "${folder.absolutePath}${File.separator}$sourceDirectory"
+        targetFolder: Path = tmpDir.resolve(targetDirectory),
+        sourceFolder: Path = tmpDir.resolve(sourceDirectory),
     ): CdrClientConfig.Connector =
         CdrClientConfig.Connector(
             connectorId = connectorId,
             targetFolder = targetFolder,
             sourceFolder = sourceFolder,
-            contentType = "application/forumdatenaustausch+xml;charset=UTF-8;version=4.5",
+            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8;version=4.5"),
             mode = CdrClientConfig.Mode.PRODUCTION
         )
 

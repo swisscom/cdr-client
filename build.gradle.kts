@@ -7,13 +7,17 @@ version = "3.0.1-SNAPSHOT"
 java.sourceCompatibility = JavaVersion.VERSION_17
 
 val jvmVersion: String by project
+val kotlinCoroutinesVersion: String by project
 val springCloudVersion: String by project
 val jacocoVersion: String by project
 val kotlinLoggingVersion: String by project
 val mockkVersion: String by project
 val logstashEncoderVersion: String by project
 val micrometerTracingVersion: String by project
-val detektKotlinVersion: String by project
+val kfsWatchVersion: String by project
+val kacheVersion: String by project
+val springMockkVersion: String by project
+val awaitilityVersion: String by project
 
 val outputDir: Provider<Directory> = layout.buildDirectory.dir(".")
 
@@ -47,27 +51,35 @@ dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}")
     }
+    // https://github.com/detekt/detekt/issues/6198#issuecomment-2265183695
+    configurations.matching { it.name == "detekt" }.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin") {
+                useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
+            }
+        }
+    }
 }
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-web-services")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.cloud:spring-cloud-commons")
     implementation("com.squareup.okhttp3:okhttp")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${kotlinCoroutinesVersion}")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:${kotlinCoroutinesVersion}") // to enable @Scheduled on Kotlin suspending functions
     implementation("io.github.oshai:kotlin-logging:${kotlinLoggingVersion}")
     implementation("net.logstash.logback:logstash-logback-encoder:${logstashEncoderVersion}")
     implementation("io.micrometer:micrometer-tracing:${micrometerTracingVersion}")
     implementation("io.micrometer:micrometer-tracing-bridge-otel:${micrometerTracingVersion}")
+    implementation("io.github.irgaly.kfswatch:kfswatch:$kfsWatchVersion")
+    implementation("com.mayakapps.kache:kache:$kacheVersion")
 
     kapt("org.springframework.boot:spring-boot-configuration-processor")
 
     testImplementation("org.jacoco:org.jacoco.core:${jacocoVersion}")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-webflux")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
     testImplementation("com.squareup.okhttp3:mockwebserver") {
         // Unfortunately we cannot exclude JUnit 4 as MockWebServer implements interfaces from that version
@@ -78,7 +90,9 @@ dependencies {
     }
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("io.micrometer:micrometer-tracing-test")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("com.ninja-squad:springmockk:${springMockkVersion}")
+    testImplementation("org.awaitility:awaitility:${awaitilityVersion}")
+
 }
 
 springBoot {
@@ -175,15 +189,6 @@ detekt {
     parallel = true
     config.setFrom(files("$rootDir/config/detekt.yml")) // Global Detekt rule set.
     baseline = file("$projectDir/detekt_baseline.xml") // Module specific suppression list.
-}
-
-// https://github.com/detekt/detekt/issues/6198
-project.afterEvaluate {
-    configurations["detekt"].resolutionStrategy.eachDependency {
-        if (requested.group == "org.jetbrains.kotlin") {
-            useVersion(detektKotlinVersion)
-        }
-    }
 }
 
 tasks.register("publishVersion") {

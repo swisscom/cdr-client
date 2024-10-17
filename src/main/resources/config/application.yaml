@@ -12,27 +12,31 @@ spring:
   task:
     scheduling:
       pool:
-        size: 2
+        size: 1 # only the pull sync requires a scheduling thread. The push sync variants are running on the Kotlin coroutine IO Dispatcher threads after their initial scheduling.
+  jmx:
+    enabled: false
 
-server:
-  address: 0.0.0.0
-  port: 8080
-  shutdown: "graceful"
-  servlet:
-    encoding:
-      charset: UTF-8
-      enabled: true
-      force: true
-  tomcat:
-    connection-timeout: 1s
-    keep-alive-timeout: 30s
+# You need to set the `web-application-type` to `servlet` or `reactive` to enable the web server (for actuators like `health`)
+#server:
+#  address: 0.0.0.0
+#  port: 8080
+#  shutdown: "graceful"
+#  servlet:
+#    encoding:
+#      charset: UTF-8
+#      enabled: true
+#      force: true
+#  tomcat:
+#    connection-timeout: 1s
+#    keep-alive-timeout: 30s
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: "actuator,health"
-    enabled-by-default: true
+# You need to set the `web-application-type` to `servlet` or `reactive` to enable the actuators
+#management:
+#  endpoints:
+#    web:
+#      exposure:
+#        include: "actuator,health"
+#    enabled-by-default: true
 
 logging:
   pattern:
@@ -42,3 +46,10 @@ logging:
     com.swisscom.health.des.cdr: INFO
   charset:
     console: UTF-8
+
+management:
+  tracing:
+    sampling:
+      # sampling has to be disabled; if enabled we create a memory leak as there is no way to guarantee a sampled span gets closed and releases its resources
+      # when used in asynchronous Kotlin flows/coroutines
+      probability: 0.0
