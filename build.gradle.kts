@@ -44,7 +44,7 @@ idea {
 }
 
 application {
-    mainClass = "com.swisscom.health.des.cdr.clientvm.CdrClientVmApplicationKt"
+    mainClass = "com.swisscom.health.des.cdr.clientvm.CdrClientApplicationKt"
     applicationDefaultJvmArgs = listOf("-Dspring.profiles.active=client,customer")
 }
 dependencyManagement {
