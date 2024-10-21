@@ -3,7 +3,7 @@ import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.net.URI
 
 group = "com.swisscom.health.des.cdr"
-version = "3.0.1-SNAPSHOT"
+version = "3.1.0"
 java.sourceCompatibility = JavaVersion.VERSION_17
 
 val jvmVersion: String by project
