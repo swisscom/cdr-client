@@ -76,7 +76,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
     private val connectorId1 = "1234"
     private val connectorId2 = "3456"
 
-    private val forumDatenaustauschMediaType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8;version=4.5")
+    private val forumDatenaustauschMediaType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
 
     @BeforeEach
     fun setup() {

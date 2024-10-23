@@ -62,7 +62,7 @@ internal class DocumentDownloadSchedulerTest {
                 connectorId = "1234",
                 targetFolder = targetDir,
                 sourceFolder = sourceDir,
-                contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8;version=4.5"),
+                contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
                 mode = CdrClientConfig.Mode.TEST
             )
         every { config.customer } returns listOf(connector)
