@@ -64,7 +64,7 @@ internal class EventPushFileHandlingTest {
 
     private val targetDirectory = "customer"
     private val sourceDirectory = "source"
-    private val forumDatenaustauschMediaType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8;version=4.5")
+    private val forumDatenaustauschMediaType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
 
     private lateinit var cdrServiceMock: MockWebServer
 

@@ -204,7 +204,7 @@ internal class PullFileHandlingTest {
             connectorId = connectorId,
             targetFolder = targetFolder,
             sourceFolder = sourceFolder,
-            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8;version=4.5"),
+            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
             mode = CdrClientConfig.Mode.PRODUCTION
         )
 

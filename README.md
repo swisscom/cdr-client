@@ -68,7 +68,7 @@ client:
     base-path: api/documents
   customer:
     - connector-id: 8000000000000
-      content-type: application/forumdatenaustausch+xml;charset=UTF-8;version=4.5
+      content-type: application/forumdatenaustausch+xml;charset=UTF-8
       target-folder: /tmp/download/8000000000000
       source-folder: /tmp/source/8000000000000
       mode: test
