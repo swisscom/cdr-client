@@ -1,6 +1,13 @@
 client:
   function-key:
+  idp-credentials:
+    tenant-id: tenant-id
+    client-id: 11111111111111111111
+    client-secret: secret
+    scopes:
+      - https://dev.identity.health.swisscom.ch}/CDR/CDR.ReadWrite/.default
   local-folder: ${java.io.tmpdir}/cdr_download}
+  idp-endpoint: https://localhost:80/mock-issuer/token
   schedule-delay: PT1S
   files-in-progress-cache-size: 1MB
   connection-timeout-ms: 500

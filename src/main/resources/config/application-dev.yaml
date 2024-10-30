@@ -1,5 +1,6 @@
 client:
   schedule-delay: PT30S
+  idp-endpoint: https://localhost:8444/mock-issuer/token
   endpoint:
     scheme: http
     port: 9090

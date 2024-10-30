@@ -5,6 +5,7 @@ import jakarta.annotation.PostConstruct
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
+import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
 import kotlin.io.path.createDirectories
@@ -21,15 +22,17 @@ private val logger = KotlinLogging.logger {}
  */
 @ConfigurationProperties("client")
 data class CdrClientConfig(
-    val functionKey: String,
-    val scheduleDelay: Duration,
-    val localFolder: Path,
-    val endpoint: Endpoint,
     val customer: List<Connector>,
+    val endpoint: Endpoint,
+    val filesInProgressCacheSize: DataSize,
+    val functionKey: String,
+    val idpCredentials: IdpCredentials,
+    val idpEndpoint: URL,
+    val localFolder: Path,
     val pullThreadPoolSize: Int,
     val pushThreadPoolSize: Int,
     val retryDelay: List<Duration>,
-    val filesInProgressCacheSize: DataSize
+    val scheduleDelay: Duration
 ) {
 
     /**
@@ -117,8 +120,19 @@ data class CdrClientConfig(
     }
 
     override fun toString(): String {
-        return "CdrClientConfig(functionKey='xxx', scheduleDelay='$scheduleDelay', localFolder='$localFolder', " +
-                "customer=$customer, endpoint=$endpoint)"
+        return "CdrClientConfig(idpCredentials='${idpCredentials}', idpEndpoint='${idpEndpoint}', localFolder='$localFolder', " +
+                "customer=$customer, endpoint=$endpoint, scheduleDelay='$scheduleDelay', retryDelay='${retryDelay.joinToString { it.toString() }}')"
+    }
+
+    data class IdpCredentials(
+        val tenantId: String,
+        val clientId: String,
+        val clientSecret: String,
+        val scopes: List<String>,
+    ) {
+        override fun toString(): String {
+            return "IdpCredentials(tenantId='$tenantId', clientId='$clientId', clientSecret='********', scopes=$scopes)"
+        }
     }
 
 }

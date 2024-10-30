@@ -1,0 +1,38 @@
+{
+  "interactiveLogin": false,
+  "httpServer": {
+    "type": "NettyWrapper",
+    "ssl": {
+      "keyPassword": "changeit",
+      "keystoreFile": "/app/mockoauth2server.p12",
+      "keystoreType": "PKCS12",
+      "keystorePassword": "changeit"
+    }
+  },
+  "tokenProvider" : {
+    "keyProvider" : {
+      "algorithm" : "ES256"
+    }
+  },
+  "tokenCallbacks": [
+    {
+      "issuerId": "mock-issuer",
+      "tokenExpiry":360,
+      "requestMappings": [
+        {
+          "requestParam": "scope",
+          "match": "*",
+          "claims": {
+            "sub": "${clientId}",
+            "aud": [
+              "CDR.ReadWrite"
+            ],
+            "roles": [
+              "CDR.ReadWrite.OwnedBy"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,15 @@
 package com.swisscom.health.des.cdr.clientvm.handler
 
+import com.microsoft.aad.msal4j.ClientCredentialParameters
+import com.microsoft.aad.msal4j.IAuthenticationResult
+import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
 import io.github.oshai.kotlinlogging.KLogger
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import okhttp3.Headers
+import org.springframework.http.HttpHeaders
+import org.springframework.retry.support.RetryTemplate
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
 import org.springframework.web.util.UriComponentsBuilder
@@ -11,7 +17,7 @@ import java.net.URL
 import java.nio.file.Files
 import java.nio.file.Path
 
-
+private val logger: KLogger = KotlinLogging.logger {}
 internal const val FUNCTION_KEY_HEADER = "x-functions-key"
 internal const val CONNECTOR_ID_HEADER = "cdr-connector-id"
 internal const val CDR_PROCESSING_MODE_HEADER = "cdr-processing-mode"
@@ -39,7 +45,13 @@ fun pathIsDirectoryAndWritable(path: Path, what: String, logger: KLogger): Boole
 /**
  * Basic functionality needed in all FileHandling classes
  */
-abstract class FileHandlingBase(protected val cdrClientConfig: CdrClientConfig, private val tracer: Tracer) {
+abstract class FileHandlingBase(
+    protected val cdrClientConfig: CdrClientConfig,
+    private val clientCredentialParams: ClientCredentialParameters,
+    private val retryIoErrorsThrice: RetryTemplate,
+    private val securedApp: IConfidentialClientApplication,
+    private val tracer: Tracer
+) {
 
     /**
      * Builds a target URL from an endpoint and a path.
@@ -61,16 +73,33 @@ abstract class FileHandlingBase(protected val cdrClientConfig: CdrClientConfig, 
     }
 
     /**
-     * Build headers with connector-id, function key, processing mode and trace id.
+     * Build headers with connector-id, access token, processing mode and trace id.
      */
     protected fun buildBaseHeaders(connectorId: String, mode: CdrClientConfig.Mode): Headers {
         val traceId = tracer.currentSpan()?.context()?.traceId() ?: ""
-        return Headers.Builder().run {
-            this[CONNECTOR_ID_HEADER] = connectorId
-            this[FUNCTION_KEY_HEADER] = cdrClientConfig.functionKey
-            this[CDR_PROCESSING_MODE_HEADER] = mode.value
-            this[AZURE_TRACE_ID_HEADER] = traceId
-            this.build()
+        // TODO: Remove this check once the token is required
+        val accessToken = if(cdrClientConfig.idpCredentials.tenantId != DEFAULT_TENANT_ID) {
+            getAccessToken().getOrNull()
+        } else {
+            null
+        }
+        if(accessToken != null) {
+            return Headers.Builder().run {
+                this[CONNECTOR_ID_HEADER] = connectorId
+                this[FUNCTION_KEY_HEADER] = cdrClientConfig.functionKey
+                this[CDR_PROCESSING_MODE_HEADER] = mode.value
+                this[AZURE_TRACE_ID_HEADER] = traceId
+                this[HttpHeaders.AUTHORIZATION] = "Bearer $accessToken"
+                this.build()
+            }
+        } else {
+            return Headers.Builder().run {
+                this[CONNECTOR_ID_HEADER] = connectorId
+                this[FUNCTION_KEY_HEADER] = cdrClientConfig.functionKey
+                this[CDR_PROCESSING_MODE_HEADER] = mode.value
+                this[AZURE_TRACE_ID_HEADER] = traceId
+                this.build()
+            }
         }
     }
 
@@ -82,6 +111,20 @@ abstract class FileHandlingBase(protected val cdrClientConfig: CdrClientConfig, 
         return tracer.withSpan(newSpan).use {
             block()
         }
+    }
+
+    private fun getAccessToken(): Result<String> = runCatching {
+        retryIoErrorsThrice.execute<String, Exception> { _ ->
+            val authResult: IAuthenticationResult = securedApp.acquireToken(clientCredentialParams).get()
+            logger.debug { "Token taken from ${authResult.metadata().tokenSource()}" }
+            authResult.accessToken()
+        }
+    }.onFailure { e ->
+        logger.error(e) { "Failed to get access token: ${e.message}" }
+    }
+
+    companion object {
+        private const val DEFAULT_TENANT_ID = "\$CDR_B2C_TENANT_ID"
     }
 
 }

@@ -6,18 +6,19 @@ group = "com.swisscom.health.des.cdr"
 version = "3.1.3-SNAPSHOT"
 java.sourceCompatibility = JavaVersion.VERSION_17
 
-val jvmVersion: String by project
-val kotlinCoroutinesVersion: String by project
-val springCloudVersion: String by project
+val awaitilityVersion: String by project
 val jacocoVersion: String by project
+val kacheVersion: String by project
+val kfsWatchVersion: String by project
+val kotlinCoroutinesVersion: String by project
 val kotlinLoggingVersion: String by project
-val mockkVersion: String by project
 val logstashEncoderVersion: String by project
 val micrometerTracingVersion: String by project
-val kfsWatchVersion: String by project
-val kacheVersion: String by project
+val mockkVersion: String by project
+val msal4jVersion: String by project
+val springCloudVersion: String by project
 val springMockkVersion: String by project
-val awaitilityVersion: String by project
+val jvmVersion: String by project
 
 val outputDir: Provider<Directory> = layout.buildDirectory.dir(".")
 
@@ -62,19 +63,21 @@ dependencyManagement {
 }
 
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("com.mayakapps.kache:kache:$kacheVersion")
+    implementation("com.microsoft.azure:msal4j:$msal4jVersion")
     implementation("com.squareup.okhttp3:okhttp")
+    implementation("io.github.irgaly.kfswatch:kfswatch:$kfsWatchVersion")
+    implementation("io.github.oshai:kotlin-logging:$kotlinLoggingVersion")
+    implementation("io.micrometer:micrometer-tracing:$micrometerTracingVersion")
+    implementation("io.micrometer:micrometer-tracing-bridge-otel:$micrometerTracingVersion")
+    implementation("net.logstash.logback:logstash-logback-encoder:$logstashEncoderVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${kotlinCoroutinesVersion}")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:${kotlinCoroutinesVersion}") // to enable @Scheduled on Kotlin suspending functions
-    implementation("io.github.oshai:kotlin-logging:${kotlinLoggingVersion}")
-    implementation("net.logstash.logback:logstash-logback-encoder:${logstashEncoderVersion}")
-    implementation("io.micrometer:micrometer-tracing:${micrometerTracingVersion}")
-    implementation("io.micrometer:micrometer-tracing-bridge-otel:${micrometerTracingVersion}")
-    implementation("io.github.irgaly.kfswatch:kfswatch:$kfsWatchVersion")
-    implementation("com.mayakapps.kache:kache:$kacheVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$kotlinCoroutinesVersion") // to enable @Scheduled on Kotlin suspending functions
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.retry:spring-retry")
 
     kapt("org.springframework.boot:spring-boot-configuration-processor")
 
@@ -118,6 +121,13 @@ val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("ja
          * Ensure tests cover at least 75% of the LoC.
          */
         rule {
+            classDirectories.setFrom(files(classDirectories.files.map {
+                fileTree(it) {
+                    setExcludes(listOf(
+                        "**/com/swisscom/health/des/cdr/clientvm/msal4j/*.class"
+                    ))
+                }
+            }))
             limit {
                 minimum = "0.75".toBigDecimal()
             }

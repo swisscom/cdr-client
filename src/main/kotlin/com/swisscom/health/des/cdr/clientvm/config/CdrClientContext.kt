@@ -3,6 +3,11 @@ package com.swisscom.health.des.cdr.clientvm.config
 import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy
 import com.mayakapps.kache.ObjectKache
+import com.microsoft.aad.msal4j.ClientCredentialFactory
+import com.microsoft.aad.msal4j.ClientCredentialParameters
+import com.microsoft.aad.msal4j.ConfidentialClientApplication
+import com.microsoft.aad.msal4j.IConfidentialClientApplication
+import com.swisscom.health.des.cdr.clientvm.msal4j.LocalhostHttpClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -12,8 +17,14 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Profile
+import org.springframework.retry.support.RetryTemplate
+import java.io.IOException
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.toJavaDuration
 
 private val logger = KotlinLogging.logger {}
 
@@ -76,5 +87,37 @@ class CdrClientContext {
                 }
             }
         }
+
+    @Bean
+    @Profile("dev", "test")
+    fun localhostConfidentialClientApp(config: CdrClientConfig): IConfidentialClientApplication =
+        ConfidentialClientApplication.builder(
+            config.idpCredentials.clientId,
+            ClientCredentialFactory.createFromSecret(config.idpCredentials.clientSecret)
+        ).authority(config.idpEndpoint.toString())
+            .httpClient(LocalhostHttpClient())
+            .build()
+
+    @Bean
+    @Profile("!dev & !test")
+    fun confidentialClientApp(config: CdrClientConfig): IConfidentialClientApplication =
+        ConfidentialClientApplication.builder(
+            config.idpCredentials.clientId,
+            ClientCredentialFactory.createFromSecret(config.idpCredentials.clientSecret)
+        ).authority(config.idpEndpoint.toString())
+            .build()
+
+    @Bean
+    fun clientCredentialParams(config: CdrClientConfig): ClientCredentialParameters =
+        ClientCredentialParameters.builder(config.idpCredentials.scopes.toSet()).build()
+
+    @Bean(name = ["retryIoErrorsThrice"])
+    @Suppress("MagicNumber")
+    fun retryIOExceptionsThreeTimesTemplate(): RetryTemplate = RetryTemplate.builder()
+        .maxAttempts(3)
+        .exponentialBackoff(100.milliseconds.toJavaDuration(), 5.0, 1.seconds.toJavaDuration(), true)
+        .retryOn(IOException::class.java)
+        .traversingCauses()
+        .build()
 
 }
