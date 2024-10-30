@@ -1,5 +1,9 @@
 client:
   schedule-delay: PT30S
+  idp-credentials:
+    tenant-id: tenant
+    client-id: client_id
+    client-secret: secret
   idp-endpoint: https://localhost:8444/mock-issuer/token
   endpoint:
     scheme: http

@@ -19,7 +19,7 @@ If you want/need to repeat the process:
     > organizationName        = supplied                 # Must match 'Simple Inc'
     > organizationalUnitName  = supplied              # Included if present
     ```
-3. follow the instructions to initialize the root and signing CAs
+3. follow the instructions to initialize the root and signing CAs (step 1 and 2)
 4. create a sub-folder `certs` 
 5. then generated a new key pair for the Oauth2 Mock Server like so (note that the `SAN` must match the service name in
    the [docker-compose.yml](../docker-compose.yaml)):
