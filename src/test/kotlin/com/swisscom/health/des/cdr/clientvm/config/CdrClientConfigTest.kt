@@ -276,7 +276,7 @@ class CdrClientConfigTest {
         const val FUNCTION_KEY = "functionKey123"
 
         @JvmStatic
-        val FORUM_DATENAUSTAUSCH_MEDIA_TYPE = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8;version=4.5")
+        val FORUM_DATENAUSTAUSCH_MEDIA_TYPE = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
 
     }
 
