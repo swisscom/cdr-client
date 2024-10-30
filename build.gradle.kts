@@ -12,6 +12,7 @@ val kacheVersion: String by project
 val kfsWatchVersion: String by project
 val kotlinCoroutinesVersion: String by project
 val kotlinLoggingVersion: String by project
+val mockkVersion: String by project
 val logstashEncoderVersion: String by project
 val micrometerTracingVersion: String by project
 val mockkVersion: String by project
