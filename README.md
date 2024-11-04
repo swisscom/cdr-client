@@ -52,9 +52,9 @@ Following environment variables need to be set:
 * cdrClient.localFolder=~/Documents/cdr/inflight
 * cdrClient.targetFolder=~/Documents/cdr/target
 * cdrClient.sourceFolder=~/Documents/cdr/source
-* CDR_B2C_TENANT_ID=some-tenant-id
-* CDR_CLIENT_ID=my-own-client-id
-* CDR_CLIENT_SECRET=my-own-client-secret
+* CDR_B2C_TENANT_ID=some-cdr-azure-ad-tenant
+* CDR_CLIENT_ID=oauth2-client-id
+* CDR_CLIENT_SECRET=oauth2-client-secret
 
 ## Application Plugin
 To create scripts to run the application locally one needs to run following gradle cmd: ```gradlew installDist```

@@ -78,28 +78,20 @@ abstract class FileHandlingBase(
     protected fun buildBaseHeaders(connectorId: String, mode: CdrClientConfig.Mode): Headers {
         val traceId = tracer.currentSpan()?.context()?.traceId() ?: ""
         // TODO: Remove this check once the token is required
-        val accessToken = if(cdrClientConfig.idpCredentials.tenantId != DEFAULT_TENANT_ID) {
-            getAccessToken().getOrNull()
+        val accessToken = if (cdrClientConfig.idpCredentials.tenantId != NO_TOKEN_TENANT_ID) {
+            getAccessToken()
         } else {
             null
         }
-        if(accessToken != null) {
-            return Headers.Builder().run {
-                this[CONNECTOR_ID_HEADER] = connectorId
-                this[FUNCTION_KEY_HEADER] = cdrClientConfig.functionKey
-                this[CDR_PROCESSING_MODE_HEADER] = mode.value
-                this[AZURE_TRACE_ID_HEADER] = traceId
+        return Headers.Builder().run {
+            this[CONNECTOR_ID_HEADER] = connectorId
+            this[FUNCTION_KEY_HEADER] = cdrClientConfig.functionKey
+            this[CDR_PROCESSING_MODE_HEADER] = mode.value
+            this[AZURE_TRACE_ID_HEADER] = traceId
+            if (accessToken != null) {
                 this[HttpHeaders.AUTHORIZATION] = "Bearer $accessToken"
-                this.build()
             }
-        } else {
-            return Headers.Builder().run {
-                this[CONNECTOR_ID_HEADER] = connectorId
-                this[FUNCTION_KEY_HEADER] = cdrClientConfig.functionKey
-                this[CDR_PROCESSING_MODE_HEADER] = mode.value
-                this[AZURE_TRACE_ID_HEADER] = traceId
-                this.build()
-            }
+            this.build()
         }
     }
 
@@ -113,18 +105,22 @@ abstract class FileHandlingBase(
         }
     }
 
-    private fun getAccessToken(): Result<String> = runCatching {
+    private fun getAccessToken(): String = runCatching {
         retryIoErrorsThrice.execute<String, Exception> { _ ->
             val authResult: IAuthenticationResult = securedApp.acquireToken(clientCredentialParams).get()
             logger.debug { "Token taken from ${authResult.metadata().tokenSource()}" }
             authResult.accessToken()
         }
-    }.onFailure { e ->
-        logger.error(e) { "Failed to get access token: ${e.message}" }
-    }
+    }.fold(
+        onSuccess = { token: String -> token },
+        onFailure = { e ->
+            logger.error(e) { "Failed to get access token: ${e.message}" }
+            ""
+        }
+    )
 
     companion object {
-        private const val DEFAULT_TENANT_ID = "\$CDR_B2C_TENANT_ID"
+        private const val NO_TOKEN_TENANT_ID = "no-token"
     }
 
 }

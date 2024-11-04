@@ -1,13 +1,17 @@
 client:
   function-key:
   idp-credentials:
-    tenant-id: tenant-id
-    client-id: 11111111111111111111
-    client-secret: secret
+    # if you change this value, you must also change it in the mock-oauth2-server/config.json file and caddy/Caddyfile
+    tenant-id: test-tenant-id
+    client-id: test-client-id
+    client-secret: test-client-secret
     scopes:
-      - https://dev.identity.health.swisscom.ch}/CDR/CDR.ReadWrite/.default
+      - https://graph.microsoft.com/.default
   local-folder: ${java.io.tmpdir}/cdr_download}
-  idp-endpoint: https://localhost:80/mock-issuer/token
+  # if you change the issuer host name, you also need to change add in caddy/Caddyfile and you need to add the new host to the `test_hosts` file;
+  # no matter what you change it to, unless you use one of the trusted issuer hosts (com.microsoft.aad.msal4j.AadInstanceDiscoveryProvider.TRUSTED_HOSTS_SET),
+  # msal4j's initial request will go to `login.microsoftonline.com` to retrieve some MS specific metadata; see wiremock/mappings/discovery.json
+  idp-endpoint: https://login.microsoftonline.com:8443/${app-mgr.idp-credentials.tenant-id}
   schedule-delay: PT1S
   files-in-progress-cache-size: 1MB
   connection-timeout-ms: 500

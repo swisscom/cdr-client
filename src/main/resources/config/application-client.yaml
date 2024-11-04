@@ -2,10 +2,9 @@ client:
   function-key: ${cdrClient.functionKey:}
   local-folder: ${cdrClient.localFolder:${java.io.tmpdir}/cdr_download}
   idp-credentials:
-    # TODO: make those mandatory as soon as a token is required (e.g. ${CDR_B2C_TENANT_ID:})
-    tenant-id: $CDR_B2C_TENANT_ID
-    client-id: $CDR_CLIENT_ID
-    client-secret: $CDR_CLIENT_SECRET
+    tenant-id: ${CDR_B2C_TENANT_ID:no-token}
+    client-id: ${CDR_CLIENT_ID:id}
+    client-secret: ${CDR_CLIENT_SECRET:dummy}
     scopes:
       - https://graph.microsoft.com/.default
   idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/

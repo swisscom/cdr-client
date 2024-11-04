@@ -1,10 +1,10 @@
 client:
   schedule-delay: PT30S
   idp-credentials:
-    tenant-id: tenant
-    client-id: client_id
-    client-secret: secret
-  idp-endpoint: https://localhost:8444/mock-issuer/token
+    tenant-id: ${CDR_B2C_TENANT_ID:no-token}
+    client-id: ${CDR_CLIENT_ID:id}
+    client-secret: ${CDR_CLIENT_SECRET:dummy}
+  idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/
   endpoint:
     scheme: http
     port: 9090

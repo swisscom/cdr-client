@@ -1,6 +1,7 @@
 import io.gitlab.arturbosch.detekt.Detekt
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.net.URI
+import java.time.Duration
 
 group = "com.swisscom.health.des.cdr"
 version = "3.1.3-SNAPSHOT"
@@ -23,6 +24,7 @@ val jvmVersion: String by project
 val outputDir: Provider<Directory> = layout.buildDirectory.dir(".")
 
 plugins {
+    id("com.avast.gradle.docker-compose") version "0.17.8"
     id("org.springframework.boot")
     id("io.spring.dependency-management")
     id("io.gitlab.arturbosch.detekt")
@@ -115,6 +117,12 @@ kotlin {
     }
 }
 
+tasks.test {
+    useJUnitPlatform {
+        excludeTags(Constants.INTEGRATION_TEST_TAG)
+    }
+}
+
 val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
     violationRules {
         /**
@@ -153,6 +161,11 @@ tasks.withType<Test> {
         includeEngines("junit-jupiter")
     }
     finalizedBy(jacocoTestReport)
+
+    jvmArgs(
+        // tests_hosts is used to redirect msal4j, which insists on talking to the Mothership, to our docker compose setup
+        "-Djdk.net.hosts.file=${layout.projectDirectory.file("src/test/resources/test_hosts").asFile.absolutePath}"
+    )
 }
 
 jacoco {
@@ -227,3 +240,32 @@ publishing {
         }
     }
 }
+
+/***********************
+ * Integration Testing *
+ ***********************/
+object Constants {
+    const val TASK_GROUP_VERIFICATION = "verification"
+    const val INTEGRATION_TEST_TAG = "integration-test"
+}
+
+tasks.register<Test>("integrationTest") {
+    group = Constants.TASK_GROUP_VERIFICATION
+    useJUnitPlatform {
+        includeTags(Constants.INTEGRATION_TEST_TAG)
+    }
+    shouldRunAfter(tasks.test)
+    // Ensure latest images get pulled
+    dependsOn(tasks.composePull)
+}
+
+dockerCompose {
+    dockerComposeWorkingDirectory.set(File("${rootProject.projectDir}/docker-compose"))
+    dockerComposeStopTimeout.set(Duration.ofSeconds(5))  // time before docker-compose sends SIGTERM to the running containers after the composeDown task has been started
+    ignorePullFailure.set(true)
+    isRequiredBy(tasks.getByName("integrationTest"))
+}
+
+/***************************
+ * END Integration Testing *
+ ***************************/

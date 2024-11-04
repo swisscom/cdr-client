@@ -1,13 +1,7 @@
 {
   "interactiveLogin": false,
   "httpServer": {
-    "type": "NettyWrapper",
-    "ssl": {
-      "keyPassword": "changeit",
-      "keystoreFile": "/app/mockoauth2server.p12",
-      "keystoreType": "PKCS12",
-      "keystorePassword": "changeit"
-    }
+    "type": "NettyWrapper"
   },
   "tokenProvider" : {
     "keyProvider" : {
@@ -16,19 +10,17 @@
   },
   "tokenCallbacks": [
     {
-      "issuerId": "mock-issuer",
+      "issuerId": "test-tenant-id/oauth2/v2.0",
       "tokenExpiry":360,
       "requestMappings": [
         {
-          "requestParam": "scope",
+          "requestParam": "client_id",
           "match": "*",
           "claims": {
             "sub": "${clientId}",
-            "aud": [
-              "CDR.ReadWrite"
-            ],
             "roles": [
-              "CDR.ReadWrite.OwnedBy"
+              "Application.ReadWrite.OwnedBy",
+              "AppRoleAssignment.ReadWrite.All"
             ]
           }
         }
