@@ -19,7 +19,7 @@
           "claims": {
             "sub": "${clientId}",
             "roles": [
-              "Application.ReadWrite.OwnedBy",
+              "CdrApi.ReadWrite.OwnedBy",
               "AppRoleAssignment.ReadWrite.All"
             ]
           }
