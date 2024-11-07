@@ -4,6 +4,8 @@ client:
     tenant-id: ${CDR_B2C_TENANT_ID:no-token}
     client-id: ${CDR_CLIENT_ID:id}
     client-secret: ${CDR_CLIENT_SECRET:dummy}
+    scopes:
+      - https://dev.identity.health.swisscom.ch/CdrApi/.default
   idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/
   endpoint:
     scheme: http
