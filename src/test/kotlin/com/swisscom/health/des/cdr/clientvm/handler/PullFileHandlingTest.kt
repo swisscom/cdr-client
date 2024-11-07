@@ -1,5 +1,7 @@
 package com.swisscom.health.des.cdr.clientvm.handler
 
+import com.microsoft.aad.msal4j.ClientCredentialParameters
+import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.TraceContext
@@ -21,6 +23,8 @@ import org.junit.jupiter.api.io.TempDir
 import org.springframework.core.io.ClassPathResource
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.retry.RetryCallback
+import org.springframework.retry.support.RetryTemplate
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.UUID
@@ -47,6 +51,15 @@ internal class PullFileHandlingTest {
 
     @MockK
     private lateinit var traceContext: TraceContext
+
+    @MockK
+    private lateinit var clientCredentialParams: ClientCredentialParameters
+
+    @MockK
+    private lateinit var retryIoErrorsThrice: RetryTemplate
+
+    @MockK
+    private lateinit var securedApp: IConfidentialClientApplication
 
     @TempDir
     private lateinit var tmpDir: Path
@@ -78,8 +91,11 @@ internal class PullFileHandlingTest {
         every { config.endpoint } returns endpoint
         every { config.localFolder } returns inflightDir
         every { config.functionKey } returns "1"
+        every { config.idpCredentials.tenantId } returns "something"
 
-        pullFileHandling = PullFileHandling(config, OkHttpClient.Builder().build(), tracer)
+        every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } returns "Mocked Result"
+
+        pullFileHandling = PullFileHandling(config, OkHttpClient.Builder().build(), clientCredentialParams, retryIoErrorsThrice, securedApp, tracer)
     }
 
     @AfterEach

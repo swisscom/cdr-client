@@ -52,6 +52,9 @@ Following environment variables need to be set:
 * cdrClient.localFolder=~/Documents/cdr/inflight
 * cdrClient.targetFolder=~/Documents/cdr/target
 * cdrClient.sourceFolder=~/Documents/cdr/source
+* CDR_B2C_TENANT_ID=some-cdr-azure-ad-tenant
+* CDR_CLIENT_ID=oauth2-client-id
+* CDR_CLIENT_SECRET=oauth2-client-secret
 
 ## Application Plugin
 To create scripts to run the application locally one needs to run following gradle cmd: ```gradlew installDist```
@@ -62,10 +65,8 @@ To run the application locally one can call ```./build/install/cdr-client/bin/cd
 With a minimum configuration that looks like this:
 ```
 client:
-  local-folder: /tmp/cdr
   endpoint:
     host: cdr.health.swisscom.com
-    base-path: api/documents
   customer:
     - connector-id: 8000000000000
       content-type: application/forumdatenaustausch+xml;charset=UTF-8

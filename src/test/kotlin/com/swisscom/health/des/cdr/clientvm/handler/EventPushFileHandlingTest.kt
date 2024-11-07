@@ -1,10 +1,15 @@
 package com.swisscom.health.des.cdr.clientvm.handler
 
 import com.mayakapps.kache.ObjectKache
+import com.microsoft.aad.msal4j.ClientCredentialParameters
+import com.microsoft.aad.msal4j.IAuthenticationResult
+import com.microsoft.aad.msal4j.IConfidentialClientApplication
+import com.microsoft.aad.msal4j.TokenSource
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.clientvm.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
 import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -28,6 +33,7 @@ import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.ExperimentalPathApi
@@ -52,6 +58,9 @@ internal class EventPushFileHandlingTest {
 
     @SpykBean
     private lateinit var config: CdrClientConfig
+
+    @SpykBean
+    private lateinit var securedApp: IConfidentialClientApplication
 
     @Autowired
     private lateinit var fileCache: ObjectKache<String, Path>
@@ -93,6 +102,13 @@ internal class EventPushFileHandlingTest {
                 mode = CdrClientConfig.Mode.TEST
             )
         )
+
+        val resultMock: CompletableFuture<IAuthenticationResult> = mockk()
+        val authMock: IAuthenticationResult = mockk()
+        every { resultMock.get() } returns authMock
+        every { authMock.metadata().tokenSource() } returns TokenSource.CACHE
+        every { authMock.accessToken() } returns "123"
+        every { securedApp.acquireToken(any<ClientCredentialParameters>()) } returns resultMock
 
         // The test is in a race condition with the code under test. The code under test starts a file watcher task with the help of the
         // `@Scheduled` annotation. I have found no deterministic way to either delay the scheduled task until we set the behavior on the

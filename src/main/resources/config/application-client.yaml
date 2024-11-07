@@ -1,6 +1,13 @@
 client:
   function-key: ${cdrClient.functionKey:}
   local-folder: ${cdrClient.localFolder:${java.io.tmpdir}/cdr_download}
+  idp-credentials:
+    tenant-id: ${CDR_B2C_TENANT_ID:no-token}
+    client-id: ${CDR_CLIENT_ID:id}
+    client-secret: ${CDR_CLIENT_SECRET:dummy}
+    scopes:
+      - https://graph.microsoft.com/.default
+  idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/
   schedule-delay: PT10M
   files-in-progress-cache-size: 10MB
   connection-timeout-ms: 5000

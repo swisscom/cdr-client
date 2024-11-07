@@ -1,6 +1,8 @@
 package com.swisscom.health.des.cdr.clientvm.handler
 
 import com.mayakapps.kache.ObjectKache
+import com.microsoft.aad.msal4j.ClientCredentialParameters
+import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
@@ -12,7 +14,9 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.HttpStatus
+import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
 import java.net.URL
 import java.nio.file.Files
@@ -34,13 +38,17 @@ private val logger = KotlinLogging.logger {}
  * Deletes the local file after successful upload.
  */
 @Component
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "LongParameterList")
 class PushFileHandling(
     cdrClientConfig: CdrClientConfig,
     tracer: Tracer,
     private val httpClient: OkHttpClient,
     private val processingInProgressCache: ObjectKache<String, Path>,
-) : FileHandlingBase(cdrClientConfig, tracer) {
+    clientCredentialParams: ClientCredentialParameters,
+    @Qualifier("retryIoErrorsThrice")
+    private val retryIoErrorsThrice: RetryTemplate,
+    securedApp: IConfidentialClientApplication,
+) : FileHandlingBase(cdrClientConfig, clientCredentialParams, retryIoErrorsThrice, securedApp, tracer) {
 
     /**
      * Retries the upload of a file until it is successful or a 4xx error occurred.

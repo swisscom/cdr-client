@@ -1,5 +1,7 @@
 package com.swisscom.health.des.cdr.clientvm.handler
 
+import com.microsoft.aad.msal4j.ClientCredentialParameters
+import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
@@ -7,7 +9,9 @@ import okhttp3.Headers
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.HttpStatus
+import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
 import org.springframework.util.LinkedMultiValueMap
 import java.io.IOException
@@ -30,8 +34,12 @@ internal const val PULL_RESULT_ID_HEADER = "cdr-document-uuid"
 class PullFileHandling(
     cdrClientConfig: CdrClientConfig,
     private val httpClient: OkHttpClient,
+    clientCredentialParams: ClientCredentialParameters,
+    @Qualifier("retryIoErrorsThrice")
+    private val retryIoErrorsThrice: RetryTemplate,
+    securedApp: IConfidentialClientApplication,
     tracer: Tracer,
-) : FileHandlingBase(cdrClientConfig, tracer) {
+) : FileHandlingBase(cdrClientConfig, clientCredentialParams, retryIoErrorsThrice, securedApp, tracer) {
     /**
      * Downloads files for a specific customer.
      *

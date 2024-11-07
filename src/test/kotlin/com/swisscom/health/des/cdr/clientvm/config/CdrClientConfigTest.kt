@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.clientvm.config
 
+import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig.IdpCredentials
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
@@ -7,6 +8,7 @@ import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
+import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
 
@@ -134,7 +136,14 @@ class CdrClientConfigTest {
             pullThreadPoolSize = 1,
             pushThreadPoolSize = 1,
             retryDelay = listOf(Duration.ofSeconds(1)),
-            filesInProgressCacheSize = DataSize.ofMegabytes(1)
+            filesInProgressCacheSize = DataSize.ofMegabytes(1),
+            idpCredentials = IdpCredentials(
+                tenantId = "tenantId",
+                clientId = "clientId",
+                clientSecret = "secret",
+                scopes = listOf("CDR")
+            ),
+            idpEndpoint = URL("http://localhost")
         )
     }
 

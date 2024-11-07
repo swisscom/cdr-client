@@ -1,0 +1,12 @@
+{
+	http_port 8080
+	https_port 8443
+}
+localhost {
+    reverse_proxy /isalive mock-oauth2-server:8080
+}
+login.microsoftonline.com {
+    tls internal
+    reverse_proxy /common/discovery/* wiremock:8080
+    reverse_proxy /test-tenant-id/* mock-oauth2-server:8080
+}
