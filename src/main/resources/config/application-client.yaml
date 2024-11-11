@@ -6,7 +6,7 @@ client:
     client-id: ${CDR_CLIENT_ID:id}
     client-secret: ${CDR_CLIENT_SECRET:dummy}
     scopes:
-      - https://graph.microsoft.com/.default
+      - https://${CDR_CLIENT_SCOPE_PREFIX:}identity.health.swisscom.ch/CdrApi/.default
   idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/
   schedule-delay: PT10M
   files-in-progress-cache-size: 10MB
