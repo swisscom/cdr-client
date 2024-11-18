@@ -1,23 +1,30 @@
 import io.gitlab.arturbosch.detekt.Detekt
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.net.URI
+import java.time.Duration
 
 group = "com.swisscom.health.des.cdr"
-version = "3.0.0"
+version = "3.2.0"
 java.sourceCompatibility = JavaVersion.VERSION_17
 
-val jvmVersion: String by project
-val springCloudVersion: String by project
+val awaitilityVersion: String by project
 val jacocoVersion: String by project
+val kacheVersion: String by project
+val kfsWatchVersion: String by project
+val kotlinCoroutinesVersion: String by project
 val kotlinLoggingVersion: String by project
-val mockkVersion: String by project
 val logstashEncoderVersion: String by project
 val micrometerTracingVersion: String by project
-val detektKotlinVersion: String by project
+val mockkVersion: String by project
+val msal4jVersion: String by project
+val springCloudVersion: String by project
+val springMockkVersion: String by project
+val jvmVersion: String by project
 
 val outputDir: Provider<Directory> = layout.buildDirectory.dir(".")
 
 plugins {
+    id("com.avast.gradle.docker-compose") version "0.17.8"
     id("org.springframework.boot")
     id("io.spring.dependency-management")
     id("io.gitlab.arturbosch.detekt")
@@ -40,34 +47,44 @@ idea {
 }
 
 application {
-    mainClass = "com.swisscom.health.des.cdr.clientvm.CdrClientVmApplicationKt"
+    mainClass = "com.swisscom.health.des.cdr.clientvm.CdrClientApplicationKt"
     applicationDefaultJvmArgs = listOf("-Dspring.profiles.active=client,customer")
 }
 dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}")
     }
+    // https://github.com/detekt/detekt/issues/6198#issuecomment-2265183695
+    configurations.matching { it.name == "detekt" }.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin") {
+                useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
+            }
+        }
+    }
 }
 
 dependencies {
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.boot:spring-boot-starter-web-services")
-    implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.cloud:spring-cloud-commons")
+    implementation("com.mayakapps.kache:kache:$kacheVersion")
+    implementation("com.microsoft.azure:msal4j:$msal4jVersion")
     implementation("com.squareup.okhttp3:okhttp")
+    implementation("io.github.irgaly.kfswatch:kfswatch:$kfsWatchVersion")
+    implementation("io.github.oshai:kotlin-logging:$kotlinLoggingVersion")
+    implementation("io.micrometer:micrometer-tracing:$micrometerTracingVersion")
+    implementation("io.micrometer:micrometer-tracing-bridge-otel:$micrometerTracingVersion")
+    implementation("net.logstash.logback:logstash-logback-encoder:$logstashEncoderVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
-    implementation("io.github.oshai:kotlin-logging:${kotlinLoggingVersion}")
-    implementation("net.logstash.logback:logstash-logback-encoder:${logstashEncoderVersion}")
-    implementation("io.micrometer:micrometer-tracing:${micrometerTracingVersion}")
-    implementation("io.micrometer:micrometer-tracing-bridge-otel:${micrometerTracingVersion}")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$kotlinCoroutinesVersion") // to enable @Scheduled on Kotlin suspending functions
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.retry:spring-retry")
 
     kapt("org.springframework.boot:spring-boot-configuration-processor")
 
     testImplementation("org.jacoco:org.jacoco.core:${jacocoVersion}")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-webflux")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
     testImplementation("com.squareup.okhttp3:mockwebserver") {
         // Unfortunately we cannot exclude JUnit 4 as MockWebServer implements interfaces from that version
@@ -78,7 +95,9 @@ dependencies {
     }
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("io.micrometer:micrometer-tracing-test")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("com.ninja-squad:springmockk:${springMockkVersion}")
+    testImplementation("org.awaitility:awaitility:${awaitilityVersion}")
+
 }
 
 springBoot {
@@ -98,12 +117,25 @@ kotlin {
     }
 }
 
+tasks.test {
+    useJUnitPlatform {
+        excludeTags(Constants.INTEGRATION_TEST_TAG)
+    }
+}
+
 val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
     violationRules {
         /**
          * Ensure tests cover at least 75% of the LoC.
          */
         rule {
+            classDirectories.setFrom(files(classDirectories.files.map {
+                fileTree(it) {
+                    setExcludes(listOf(
+                        "**/com/swisscom/health/des/cdr/clientvm/msal4j/*.class"
+                    ))
+                }
+            }))
             limit {
                 minimum = "0.75".toBigDecimal()
             }
@@ -129,6 +161,11 @@ tasks.withType<Test> {
         includeEngines("junit-jupiter")
     }
     finalizedBy(jacocoTestReport)
+
+    jvmArgs(
+        // tests_hosts is used to redirect msal4j, which insists on talking to the Mothership, to our docker compose setup
+        "-Djdk.net.hosts.file=${layout.projectDirectory.file("src/test/resources/test_hosts").asFile.absolutePath}"
+    )
 }
 
 jacoco {
@@ -177,15 +214,6 @@ detekt {
     baseline = file("$projectDir/detekt_baseline.xml") // Module specific suppression list.
 }
 
-// https://github.com/detekt/detekt/issues/6198
-project.afterEvaluate {
-    configurations["detekt"].resolutionStrategy.eachDependency {
-        if (requested.group == "org.jetbrains.kotlin") {
-            useVersion(detektKotlinVersion)
-        }
-    }
-}
-
 tasks.register("publishVersion") {
     group = "publishing"
     description = "Publishes boot jar"
@@ -212,3 +240,32 @@ publishing {
         }
     }
 }
+
+/***********************
+ * Integration Testing *
+ ***********************/
+object Constants {
+    const val TASK_GROUP_VERIFICATION = "verification"
+    const val INTEGRATION_TEST_TAG = "integration-test"
+}
+
+tasks.register<Test>("integrationTest") {
+    group = Constants.TASK_GROUP_VERIFICATION
+    useJUnitPlatform {
+        includeTags(Constants.INTEGRATION_TEST_TAG)
+    }
+    shouldRunAfter(tasks.test)
+    // Ensure latest images get pulled
+    dependsOn(tasks.composePull)
+}
+
+dockerCompose {
+    dockerComposeWorkingDirectory.set(File("${rootProject.projectDir}/docker-compose"))
+    dockerComposeStopTimeout.set(Duration.ofSeconds(5))  // time before docker-compose sends SIGTERM to the running containers after the composeDown task has been started
+    ignorePullFailure.set(true)
+    isRequiredBy(tasks.getByName("integrationTest"))
+}
+
+/***************************
+ * END Integration Testing *
+ ***************************/

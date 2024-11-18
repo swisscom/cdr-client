@@ -3,8 +3,16 @@ package com.swisscom.health.des.cdr.clientvm.config
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PostConstruct
 import org.springframework.boot.context.properties.ConfigurationProperties
-import java.io.File
+import org.springframework.http.MediaType
+import org.springframework.util.unit.DataSize
+import java.net.URL
+import java.nio.file.Path
 import java.time.Duration
+import kotlin.io.path.createDirectories
+import kotlin.io.path.exists
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isReadable
+import kotlin.io.path.isWritable
 
 
 private val logger = KotlinLogging.logger {}
@@ -14,14 +22,17 @@ private val logger = KotlinLogging.logger {}
  */
 @ConfigurationProperties("client")
 data class CdrClientConfig(
-    val functionKey: String,
-    val scheduleDelay: String,
-    val localFolder: String,
-    val endpoint: Endpoint,
     val customer: List<Connector>,
+    val endpoint: Endpoint,
+    val filesInProgressCacheSize: DataSize,
+    val functionKey: String,
+    val idpCredentials: IdpCredentials,
+    val idpEndpoint: URL,
+    val localFolder: Path,
     val pullThreadPoolSize: Int,
     val pushThreadPoolSize: Int,
-    val retryDelay: Array<Duration>,
+    val retryDelay: List<Duration>,
+    val scheduleDelay: Duration
 ) {
 
     /**
@@ -29,9 +40,9 @@ data class CdrClientConfig(
      */
     data class Connector(
         val connectorId: String,
-        val targetFolder: String,
-        val sourceFolder: String,
-        val contentType: String,
+        val targetFolder: Path,
+        val sourceFolder: Path,
+        val contentType: MediaType,
         val mode: Mode,
     )
 
@@ -52,33 +63,76 @@ data class CdrClientConfig(
     @PostConstruct
     fun checkAndReport() {
         if (customer.isEmpty()) {
-            error("There where no customer entries configured")
+            error("There were no customer entries configured")
         }
+        sourceTargetFolderOverlap()
         // we don't check target folder for duplicate as this can be configured deliberately by customers
-        if (duplicateFolderUsage() || duplicateUsage(Connector::sourceFolder)) {
-            error("Duplicate folder usage detected. Please make sure that each customer has a unique source and that no target folder is used " +
-                    "at the same time as source folder.")
-        }
+        duplicateSourceFolders()
         checkNoConnectorIdHasTheSameModeDefinedTwice()
-        File(localFolder).mkdirs()
+        allFoldersAreReadWriteable()
+
+        if (localFolder.exists() && !localFolder.isDirectory()) {
+            error("Local folder is not a directory: '$localFolder'")
+        }
+
+        if (!localFolder.exists()) {
+            localFolder.createDirectories()
+        }
+
         logger.debug { "Client configuration: $this" }
     }
 
-    private fun duplicateFolderUsage(): Boolean = customer.map { it.sourceFolder }.intersect(customer.map { it.targetFolder }.toSet()).isNotEmpty()
-
-    private fun <T> duplicateUsage(selector: (Connector) -> T): Boolean =
-        customer.map(selector).distinct().size != customer.size
-
-    private fun checkNoConnectorIdHasTheSameModeDefinedTwice(): Unit =
-        customer.groupBy { it.connectorId }.filter { cd -> cd.value.size > 1 }.values.forEach { connector ->
-            val modeConnectorsMap: Map<Mode, List<Connector>> = connector.groupBy { cr -> cr.mode }
-            if (modeConnectorsMap.values.any { it.size > 1 }) {
-                error("A single connector ID has production or test defined twice.")
+    private fun sourceTargetFolderOverlap(): Unit =
+        customer.map { it.sourceFolder }.intersect(customer.map { it.targetFolder }.toSet()).let { sourceAsTargetAndViceVersa ->
+            if (sourceAsTargetAndViceVersa.isNotEmpty()) {
+                error("The following directories are configured as both source and target directories: $sourceAsTargetAndViceVersa")
             }
         }
 
-    override fun toString(): String {
-        return "CdrClientConfig(functionKey='xxx', scheduleDelay='$scheduleDelay', localFolder='$localFolder', " +
-                "customer=$customer, endpoint=$endpoint)"
+    private fun duplicateSourceFolders(): Unit =
+        customer.groupingBy { it.sourceFolder }.eachCount().filter { it.value > 1 }.let { duplicateSources ->
+            if (duplicateSources.keys.isNotEmpty()) {
+                error("Duplicate source folders detected: ${duplicateSources.keys}")
+            }
+
+        }
+
+    private fun checkNoConnectorIdHasTheSameModeDefinedTwice(): Unit =
+        customer.groupBy { it.connectorId }.filter { cd -> cd.value.size > 1 }.values.forEach { connector ->
+            if (connector.groupingBy { cr -> cr.mode }.eachCount().any { it.value > 1 }) {
+                error("A connector has `production` or `test` mode defined defined twice: ${connector[0].connectorId}")
+            }
+        }
+
+    private fun allFoldersAreReadWriteable() {
+        val allFolders: List<Path> = customer.flatMap { listOf(it.sourceFolder, it.targetFolder) }
+        allFolders.forEach { folder ->
+            if (!folder.isDirectory()) {
+                error("Configured path '$folder' is not a directory or does not exist.")
+            }
+            if (!folder.isWritable()) {
+                error("Configured path '$folder' isn't writable by running user.")
+            }
+            if (!folder.isReadable()) {
+                error("Configured path '$folder' isn't readable by running user.")
+            }
+        }
     }
+
+    override fun toString(): String {
+        return "CdrClientConfig(idpCredentials='${idpCredentials}', idpEndpoint='${idpEndpoint}', localFolder='$localFolder', " +
+                "customer=$customer, endpoint=$endpoint, scheduleDelay='$scheduleDelay', retryDelay='${retryDelay.joinToString { it.toString() }}')"
+    }
+
+    data class IdpCredentials(
+        val tenantId: String,
+        val clientId: String,
+        val clientSecret: String,
+        val scopes: List<String>,
+    ) {
+        override fun toString(): String {
+            return "IdpCredentials(tenantId='$tenantId', clientId='$clientId', clientSecret='********', scopes=$scopes)"
+        }
+    }
+
 }

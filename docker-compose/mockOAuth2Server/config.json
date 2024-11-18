@@ -1,0 +1,30 @@
+{
+  "interactiveLogin": false,
+  "httpServer": {
+    "type": "NettyWrapper"
+  },
+  "tokenProvider" : {
+    "keyProvider" : {
+      "algorithm" : "ES256"
+    }
+  },
+  "tokenCallbacks": [
+    {
+      "issuerId": "test-tenant-id/oauth2/v2.0",
+      "tokenExpiry":360,
+      "requestMappings": [
+        {
+          "requestParam": "client_id",
+          "match": "*",
+          "claims": {
+            "sub": "${clientId}",
+            "roles": [
+              "CdrApi.ReadWrite.OwnedBy",
+              "AppRoleAssignment.ReadWrite.All"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

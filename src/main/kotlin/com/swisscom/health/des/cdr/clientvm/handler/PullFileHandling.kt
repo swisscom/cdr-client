@@ -1,5 +1,7 @@
 package com.swisscom.health.des.cdr.clientvm.handler
 
+import com.microsoft.aad.msal4j.ClientCredentialParameters
+import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
@@ -7,10 +9,11 @@ import okhttp3.Headers
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.HttpStatus
+import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Component
 import org.springframework.util.LinkedMultiValueMap
-import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.net.URL
@@ -31,8 +34,12 @@ internal const val PULL_RESULT_ID_HEADER = "cdr-document-uuid"
 class PullFileHandling(
     cdrClientConfig: CdrClientConfig,
     private val httpClient: OkHttpClient,
+    clientCredentialParams: ClientCredentialParameters,
+    @Qualifier("retryIoErrorsThrice")
+    private val retryIoErrorsThrice: RetryTemplate,
+    securedApp: IConfidentialClientApplication,
     tracer: Tracer,
-) : FileHandlingBase(cdrClientConfig, tracer) {
+) : FileHandlingBase(cdrClientConfig, clientCredentialParams, retryIoErrorsThrice, securedApp, tracer) {
     /**
      * Downloads files for a specific customer.
      *
@@ -57,7 +64,7 @@ class PullFileHandling(
     }
 
     private fun checkDirectoryAndProcessFile(connector: CdrClientConfig.Connector): Boolean =
-        if (pathIsDirectoryAndWritable(Path.of(connector.targetFolder), "pulled", logger)) {
+        if (pathIsDirectoryAndWritable(connector.targetFolder, "pulled", logger)) {
             requestFileAndDecideIfNextFileShouldBeCalled(connector)
         } else {
             false
@@ -160,7 +167,7 @@ class PullFileHandling(
      * @param pullResultId the ID to identify the pulled file
      */
     private fun syncFileToLocalFolder(inputStream: InputStream, pullResultId: String) =
-        Path.of(cdrClientConfig.localFolder, getTempFileName(pullResultId)).outputStream().use { output -> inputStream.copyTo(output) }
+        cdrClientConfig.localFolder.resolve(getTempFileName(pullResultId)).outputStream().use { output -> inputStream.copyTo(output) }
 
     /**
      * Reports the success of the transaction to the connectors' endpoint.
@@ -193,7 +200,6 @@ class PullFileHandling(
 
     /**
      * Moves the file from the local folder to the connectors target folder.
-     * If the target folder does not exist, it will be created.
      * If the file already exists in the target folder, it will be overwritten.
      * The file that is currently on the local file system, without file extension, will be moved to the target folder, also with no file extension.
      * The file extension is changed from .tmp to .xml after a successful file copy.
@@ -205,24 +211,31 @@ class PullFileHandling(
         return try {
             logger.debug { "Move file to target directory start" }
             val tmpFileName = getTempFileName(pullResultId)
-            val sourceFile = File(cdrClientConfig.localFolder, tmpFileName)
-            val targetFolder = File(connector.targetFolder)
-            targetFolder.mkdirs()
-            val targetFile = File(targetFolder, tmpFileName)
+            val sourceFile = cdrClientConfig.localFolder.resolve(tmpFileName)
+            val targetFolder = connector.targetFolder
+            val targetTmpFile = targetFolder.resolve(tmpFileName)
             Files.move(
-                sourceFile.toPath(),
-                targetFile.toPath(),
+                sourceFile,
+                targetTmpFile,
                 StandardCopyOption.REPLACE_EXISTING
             )
             logger.debug { "Move file to target directory done" }
             // be aware, that this is not an atomic operation on Windows operating system (but it is on Unix-based systems)
-            if (targetFile.renameTo(targetFile.toPath().resolveSibling("$pullResultId.xml").toFile())) {
-                logger.debug { "Rename file in target directory done" }
-            } else {
-                logger.error { "Unable to rename file for transactionId '$pullResultId'" }
-                return false
-            }
-            true
+            val success: Boolean = runCatching {
+                Files.move(
+                    targetTmpFile,
+                    targetTmpFile.resolveSibling("$pullResultId.xml"),
+                    StandardCopyOption.REPLACE_EXISTING,
+                )
+            }.fold(
+                onSuccess = { path: Path ->
+                    true.also { logger.debug { "Renamed file '$targetTmpFile' to '$path'" } }
+                },
+                onFailure = { t: Throwable ->
+                    false.also { logger.error { "Unable to rename file '$targetTmpFile' for transactionId '$pullResultId': ${t.message}" } }
+                }
+            )
+            success
         } catch (e: IOException) {
             logger.error { "Unable to move file for transactionId '$pullResultId': ${e.message}" }
             false
