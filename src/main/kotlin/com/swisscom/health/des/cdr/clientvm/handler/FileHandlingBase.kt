@@ -89,7 +89,9 @@ abstract class FileHandlingBase(
             this[CDR_PROCESSING_MODE_HEADER] = mode.value
             this[AZURE_TRACE_ID_HEADER] = traceId
             if (accessToken != null) {
-                this[HttpHeaders.AUTHORIZATION] = "Bearer $accessToken"
+                this[HttpHeaders.AUTHORIZATION] = "Bearer $accessToken".also { header: String ->
+                    logger.trace { "Authorization header set: $header " }
+                }
             }
             this.build()
         }
@@ -109,6 +111,7 @@ abstract class FileHandlingBase(
         retryIoErrorsThrice.execute<String, Exception> { _ ->
             val authResult: IAuthenticationResult = securedApp.acquireToken(clientCredentialParams).get()
             logger.debug { "Token taken from ${authResult.metadata().tokenSource()}" }
+            logger.trace { "Token: ${authResult.accessToken()}" }
             authResult.accessToken()
         }
     }.fold(
