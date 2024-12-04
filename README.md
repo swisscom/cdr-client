@@ -17,9 +17,10 @@ An example can be found [here](#application-customer-yaml-example).
 
 Open a terminal and navigate to the directory where the jar file is located.
 Run the following command to start the client (check the jar name and replace it in the command or rename the jar itself):
-> The -D parameters need to be placed before the "cdr-client.jar"
+> The -D parameters need to be placed before the "-jar cdr-client.jar".<p>
+> The quotes are necessary for Windows, but not for Unix systems
 ```shell
-java -jar -Dspring.profiles.active=client,customer -Dspring.config.additional-location=./application-customer.yaml cdr-client.jar 
+java "-Dspring.profiles.active=client,customer" "-Dspring.config.additional-location=./application-customer.yaml" -jar cdr-client.jar
 ```
 
 Check that no error messages are present in the terminal (or have a look at the "cdr-client.log" file that is created in the same folder as you've placed tha jar file) 
