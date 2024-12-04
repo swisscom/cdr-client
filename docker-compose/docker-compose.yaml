@@ -37,8 +37,8 @@ services:
     depends_on:
       wiremock:
         condition: service_healthy
-    image: local.caddy.cdrappmgr
-    container_name: caddy-app-mgr
+    image: local.caddy.cdrclient
+    container_name: caddy-cdr-client
     build: ./caddy
     mem_limit: 256m
     ports:

@@ -1,9 +1,9 @@
-package com.swisscom.health.des.cdr.clientvm.handler
+package com.swisscom.health.des.cdr.client.handler
 
 import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
-import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import io.github.oshai.kotlinlogging.KLogger
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer

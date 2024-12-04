@@ -1,4 +1,4 @@
-package com.swisscom.health.des.cdr.clientvm.handler
+package com.swisscom.health.des.cdr.client.handler
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.junit.jupiter.api.Assertions

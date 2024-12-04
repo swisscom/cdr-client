@@ -1,4 +1,4 @@
-package com.swisscom.health.des.cdr.clientvm.config
+package com.swisscom.health.des.cdr.client.config
 
 import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy

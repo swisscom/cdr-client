@@ -1,6 +1,6 @@
-package com.swisscom.health.des.cdr.clientvm
+package com.swisscom.health.des.cdr.client
 
-import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication

@@ -1,14 +1,14 @@
-package com.swisscom.health.des.cdr.clientvm
+package com.swisscom.health.des.cdr.client
 
 import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.microsoft.aad.msal4j.TokenSource
-import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
-import com.swisscom.health.des.cdr.clientvm.handler.CONNECTOR_ID_HEADER
-import com.swisscom.health.des.cdr.clientvm.handler.PULL_RESULT_ID_HEADER
-import com.swisscom.health.des.cdr.clientvm.handler.PullFileHandling
-import com.swisscom.health.des.cdr.clientvm.scheduling.DocumentDownloadScheduler
+import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.handler.CONNECTOR_ID_HEADER
+import com.swisscom.health.des.cdr.client.handler.PULL_RESULT_ID_HEADER
+import com.swisscom.health.des.cdr.client.handler.PullFileHandling
+import com.swisscom.health.des.cdr.client.scheduling.DocumentDownloadScheduler
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.TraceContext
 import io.micrometer.tracing.Tracer

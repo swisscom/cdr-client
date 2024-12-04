@@ -1,7 +1,7 @@
-package com.swisscom.health.des.cdr.clientvm.scheduling
+package com.swisscom.health.des.cdr.client.scheduling
 
-import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
-import com.swisscom.health.des.cdr.clientvm.handler.PullFileHandling
+import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.TraceContext
 import io.micrometer.tracing.Tracer
