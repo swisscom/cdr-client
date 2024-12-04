@@ -1,10 +1,10 @@
-package com.swisscom.health.des.cdr.clientvm.scheduling
+package com.swisscom.health.des.cdr.client.scheduling
 
 import com.mayakapps.kache.ObjectKache
-import com.swisscom.health.des.cdr.clientvm.TraceSupport.continueSpan
-import com.swisscom.health.des.cdr.clientvm.TraceSupport.startSpan
-import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
-import com.swisscom.health.des.cdr.clientvm.handler.PushFileHandling
+import com.swisscom.health.des.cdr.client.TraceSupport.continueSpan
+import com.swisscom.health.des.cdr.client.TraceSupport.startSpan
+import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.handler.PushFileHandling
 import io.github.irgaly.kfswatch.KfsDirectoryWatcher
 import io.github.irgaly.kfswatch.KfsDirectoryWatcherEvent
 import io.github.irgaly.kfswatch.KfsEvent
