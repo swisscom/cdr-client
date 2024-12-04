@@ -1,8 +1,34 @@
 # CDR Client
 The Swisscom Health Confidential Data Routing (CDR) Client
 
+## Installation / Run the client
+> Improvements for the installation are planned. For now, the client is only available as a jar file with manual steps required for the installation.
+
+Pre-Requirements:
+* Java 17 (or higher) installed
+
+Go to the [releases](https://github.com/swisscom/cdr-client/releases) github page and click on the maven assets for the newest release:
+![releases assets overview](./installation/releases-overview.png)
+Download the jar file:
+![release jar download](./installation/single-release-overview.png)
+Place a file named application-customer.yaml in the same directory as the jar file.
+The application-customer.yaml file should contain the configuration for the client. 
+An example can be found [here](#application-customer-yaml-example).
+
+Open a terminal and navigate to the directory where the jar file is located.
+Run the following command to start the client (check the jar name and replace it in the command or rename the jar itself):
+> The -D parameters need to be placed before the "cdr-client.jar"
+```shell
+java -jar -Dspring.profiles.active=client,customer -Dspring.config.additional-location=./application-customer.yaml cdr-client.jar 
+```
+
+Check that no error messages are present in the terminal (or have a look at the "cdr-client.log" file that is created in the same folder as you've placed tha jar file) 
+and that the client is running.
+
+Configure an OS appropriate service to run the client as a background service.
+
 ## API
-There is no endpoint (beside actuator/health) that are offered here.
+There is no endpoint offered here.
 
 The CDR Client is triggered by a scheduler and synchronizes by the given delay time the files from the CDR API.
 
@@ -62,18 +88,7 @@ To create scripts to run the application locally one needs to run following grad
 This creates a folder ```build/install/cdr-client``` with scripts for windows and unix servers in the ```bin``` folder.
 
 To run the application locally one can call ```./build/install/cdr-client/bin/cdr-client```. It is required to have a ```application-customer.yaml``` and link it by adding following command line: ```JVM_OPTS="-Dspring.config.additional-location=./application-customer.yaml"```.
-With a minimum configuration that looks like this:
-```
-client:
-  endpoint:
-    host: cdr.health.swisscom.com
-  customer:
-    - connector-id: 8000000000000
-      content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: /tmp/download/8000000000000
-      source-folder: /tmp/source/8000000000000
-      mode: test
-```
+With a configuration that looks like [this](#application-customer-yaml-example).
 
 ## Running the Jar
 If the provided jar should be run directly, the following command can be used:
@@ -88,3 +103,31 @@ LOGGING_FILE_NAME={{ cdr_client_dir }}/logs/cdr-client.log"
 The LOGGING_FILE_NAME is just so that the log file is not auto created where the jar is run from.
 
 See [Application Plugin](#application-plugin) regarding the content of the application-customer.yaml
+
+## application-customer yaml example
+```
+client:
+  local-folder: /tmp/download/in-flight # temporary folder for files that are currently downloaded from CDR API
+  idp-credentials:
+    tenant-id: swisscom-health-tenant-id # provided by Swisscom Health
+    client-id: my-client-id # Self created through CDR UI
+    client-secret: my-secret # Self created through CDR UI
+  endpoint:
+    host: cdr.health.swisscom.ch
+  customer:
+    - connector-id: 8000000000000 # provided by Swisscom Health
+      content-type: application/forumdatenaustausch+xml;charset=UTF-8
+      target-folder: /tmp/download/test/8000000000000
+      source-folder: /tmp/upload/test/8000000000000
+      mode: test
+    - connector-id: 8000000000000 # provided by Swisscom Health
+      content-type: application/forumdatenaustausch+xml;charset=UTF-8
+      target-folder: /tmp/download/8000000000000
+      source-folder: /tmp/upload/8000000000000
+      mode: production
+
+```
+
+Some information can also be set as environment variables. See [application-client.yaml](./src/main/resources/config/application-client.yaml) for variable names.
+
+If the host is not set to production, but to stg instead, then the CDR_CLIENT_SCOPE_PREFIX environment variable needs to be set to "tst.".
