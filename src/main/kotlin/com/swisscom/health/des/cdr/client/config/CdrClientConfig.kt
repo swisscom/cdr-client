@@ -1,4 +1,4 @@
-package com.swisscom.health.des.cdr.clientvm.config
+package com.swisscom.health.des.cdr.client.config
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PostConstruct

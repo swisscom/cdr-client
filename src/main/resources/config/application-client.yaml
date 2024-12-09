@@ -27,7 +27,7 @@ client:
     scheme: https
     port: 443
     #       host: dev-cdr-functions.azurewebsites.net
-    base-path: documents
+    base-path: api/documents
   customer:
   #  MUST BE SET IN ENVIRONMENT
   #   - connector-id: 1

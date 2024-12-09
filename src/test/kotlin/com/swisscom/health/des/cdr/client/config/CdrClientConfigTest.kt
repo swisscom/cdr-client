@@ -1,6 +1,6 @@
-package com.swisscom.health.des.cdr.clientvm.config
+package com.swisscom.health.des.cdr.client.config
 
-import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig.IdpCredentials
+import com.swisscom.health.des.cdr.client.config.CdrClientConfig.IdpCredentials
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
