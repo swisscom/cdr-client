@@ -20,7 +20,7 @@ Run the following command to start the client (check the jar name and replace it
 > The -D parameters need to be placed before the "-jar cdr-client.jar".<p>
 > The quotes are necessary for Windows, but not for Unix systems
 ```shell
-java "-Dspring.profiles.active=client,customer" "-Dspring.config.additional-location=./application-customer.yaml" -jar cdr-client.jar
+java "-Dspring.profiles.active=customer" "-Dspring.config.additional-location=./application-customer.yaml" -jar cdr-client.jar
 ```
 
 Check that no error messages are present in the terminal (or have a look at the "cdr-client.log" file that is created in the same folder as you've placed tha jar file) 
@@ -31,7 +31,8 @@ Configure an OS appropriate service to run the client as a background service.
 ## API
 There is no endpoint offered here.
 
-The CDR Client is triggered by a scheduler and synchronizes by the given delay time the files from the CDR API.
+The CDR Client is triggered by a scheduler and downloads by the given delay time the files from the CDR API.
+File uploads are triggered by the file system events.
 
 ### Functionality
 For each defined connector the CDR Client calls the defined endpoint of the CDR API.
