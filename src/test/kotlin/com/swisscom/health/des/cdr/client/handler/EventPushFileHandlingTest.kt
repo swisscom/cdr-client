@@ -1,4 +1,4 @@
-package com.swisscom.health.des.cdr.clientvm.handler
+package com.swisscom.health.des.cdr.client.handler
 
 import com.mayakapps.kache.ObjectKache
 import com.microsoft.aad.msal4j.ClientCredentialParameters
@@ -6,8 +6,8 @@ import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.microsoft.aad.msal4j.TokenSource
 import com.ninjasquad.springmockk.SpykBean
-import com.swisscom.health.des.cdr.clientvm.AlwaysSameTempDirFactory
-import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
+import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -16,6 +16,7 @@ import okhttp3.mockwebserver.MockWebServer
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -24,6 +25,9 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
+import org.springframework.scheduling.config.OneTimeTask
+import org.springframework.scheduling.config.ScheduledTaskHolder
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
@@ -31,8 +35,10 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.createDirectories
+import kotlin.io.path.deleteRecursively
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.nameWithoutExtension
@@ -42,14 +48,13 @@ import kotlin.io.path.walk
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = [
-        "spring.main.lazy-initialization=false",
         "spring.jmx.enabled=false",
     ]
 )
-// only test polling, not filesystem event handling
-@ActiveProfiles("test", "noEventTriggerUploadScheduler", "noDownloadScheduler")
-@DirtiesContext(classMode = ClassMode.BEFORE_CLASS)
-internal class PollingPushFileHandlingTest {
+// only test filesystem event handling, no polling
+@ActiveProfiles("test", "noPollingUploadScheduler", "noDownloadScheduler")
+@DirtiesContext(classMode = ClassMode.AFTER_CLASS)
+internal class EventPushFileHandlingTest {
 
     @SpykBean
     private lateinit var config: CdrClientConfig
@@ -60,26 +65,28 @@ internal class PollingPushFileHandlingTest {
     @Autowired
     private lateinit var fileCache: ObjectKache<String, Path>
 
-    @TempDir
-    private lateinit var tmpDir: Path
+    @Autowired
+    private lateinit var scheduledTaskHolder: ScheduledTaskHolder
 
-    private val inflightFolder = "inflight"
+    @Autowired
+    private lateinit var threadPoolTaskScheduler: ThreadPoolTaskScheduler
+
     private val targetDirectory = "customer"
     private val sourceDirectory = "source"
     private val forumDatenaustauschMediaType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
 
     private lateinit var cdrServiceMock: MockWebServer
 
+    private val isFirstTest: AtomicBoolean = AtomicBoolean(true)
+
     @BeforeEach
     fun setup() {
         cdrServiceMock = MockWebServer()
         cdrServiceMock.start()
 
-        val inflightDir = tmpDir.resolve(inflightFolder).also { it.createDirectories() }
         val sourceFolder = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
         val targetFolder = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
 
-        every { config.localFolder } returns inflightDir
         every { config.endpoint } returns CdrClientConfig.Endpoint(
             host = cdrServiceMock.hostName,
             basePath = "documents",
@@ -102,14 +109,40 @@ internal class PollingPushFileHandlingTest {
         every { authMock.metadata().tokenSource() } returns TokenSource.CACHE
         every { authMock.accessToken() } returns "123"
         every { securedApp.acquireToken(any<ClientCredentialParameters>()) } returns resultMock
+
+        // The test is in a race condition with the code under test. The code under test starts a file watcher task with the help of the
+        // `@Scheduled` annotation. I have found no deterministic way to either delay the scheduled task until we set the behavior on the
+        // spy of the CdrClientConfig bean, to not run it at all, or to cancel it if it is already running.
+        // So we hope for the best (original task has started before we set the spy behavior) and then re-submit the task after setting the
+        // spy's behavior. That we have two instances of the watcher task running, but only one of them is watching the directory we use
+        // in this test.
+        if (isFirstTest.compareAndSet(true, false)) {
+            val oneTimeTasks = scheduledTaskHolder.scheduledTasks.filter { it.task is OneTimeTask }
+            // as we disabled all other schedulers via profiles, we expect exactly the one task we are testing in the list
+            assertEquals(1, oneTimeTasks.size)
+            // re-submit the file watcher task; effectively there will be two instances of the task running:
+            // the original one and the copy we just submitted, but only the second one will receive the events from the source directory created by the test
+            oneTimeTasks.forEach { ott ->
+                val future = threadPoolTaskScheduler.submit(ott.task.runnable)
+                await().until { future.isDone || future.isCancelled }
+                assertTrue(future.isDone)
+            }
+        }
+
     }
 
+    @OptIn(ExperimentalPathApi::class)
     @AfterEach
     fun tearDown() {
         cdrServiceMock.shutdown()
 
         runBlocking {
             fileCache.clear()
+        }
+
+        // do not delete the source folder itself; the file watcher task does not survive if its watched directory gets deleted (and re-created)
+        tmpDir.resolve(sourceDirectory).listDirectoryEntries().forEach {
+            it.deleteRecursively()
         }
     }
 
@@ -145,6 +178,9 @@ internal class PollingPushFileHandlingTest {
 
         // processed files should be removed from cache
         await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
+
+        // processed files should be removed from source directory
+        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.isEmpty() }
     }
 
     @Test
@@ -166,7 +202,7 @@ internal class PollingPushFileHandlingTest {
         assertEquals(0, cdrServiceMock.requestCount)
 
         // ignored files don't get processed and thus are not supposed to be in the processing cache
-        await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
+        await().during(100L, TimeUnit.MILLISECONDS).until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
     }
 
     @Test
@@ -206,8 +242,11 @@ internal class PollingPushFileHandlingTest {
         // should still be 6 (2 successful and four failed requests)
         await().during(100, TimeUnit.MILLISECONDS).until(cdrServiceMock::requestCount) { it == 6 }
 
-        // ignored files like the error and response file don't get processed and thus are not supposed to be in the processing cache
-        await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
+        // ignored files like the error and response files don't get processed and thus are not supposed to be in the processing cache
+        await().during(100L, TimeUnit.MILLISECONDS).until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
+
+        // error and response files remain in source directory
+        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.size == 2 }
     }
 
     @Test
@@ -244,8 +283,11 @@ internal class PollingPushFileHandlingTest {
         // should still be 6 (2 successful and four failed requests)
         await().during(100, TimeUnit.MILLISECONDS).until(cdrServiceMock::requestCount) { it == 3 }
 
-        // ignored files like the error and response file don't get processed and thus are not supposed to be in the processing cache
-        await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
+        // ignored files like the error and response files don't get processed and thus are not supposed to be in the processing cache
+        await().during(100L, TimeUnit.MILLISECONDS).until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
+
+        // error and response files remain in source directory
+        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.size == 2 }
     }
 
     private companion object {
@@ -254,6 +296,10 @@ internal class PollingPushFileHandlingTest {
         @JvmStatic
         @Suppress("unused")
         private lateinit var inflightDirInApplicationTestYaml: Path
+
+        @TempDir
+        @JvmStatic
+        private lateinit var tmpDir: Path
 
     }
 

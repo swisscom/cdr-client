@@ -47,7 +47,7 @@ idea {
 }
 
 application {
-    mainClass = "com.swisscom.health.des.cdr.clientvm.CdrClientApplicationKt"
+    mainClass = "com.swisscom.health.des.cdr.client.CdrClientApplicationKt"
     applicationDefaultJvmArgs = listOf("-Dspring.profiles.active=client,customer")
 }
 dependencyManagement {
@@ -132,7 +132,7 @@ val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("ja
             classDirectories.setFrom(files(classDirectories.files.map {
                 fileTree(it) {
                     setExcludes(listOf(
-                        "**/com/swisscom/health/des/cdr/clientvm/msal4j/*.class"
+                        "**/com/swisscom/health/des/cdr/client/msal4j/*.class"
                     ))
                 }
             }))

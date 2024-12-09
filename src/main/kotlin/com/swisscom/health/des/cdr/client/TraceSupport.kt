@@ -1,4 +1,4 @@
-package com.swisscom.health.des.cdr.clientvm
+package com.swisscom.health.des.cdr.client
 
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.Tracer

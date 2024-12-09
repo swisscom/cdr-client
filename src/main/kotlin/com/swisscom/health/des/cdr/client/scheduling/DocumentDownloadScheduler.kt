@@ -1,8 +1,8 @@
-package com.swisscom.health.des.cdr.clientvm.scheduling
+package com.swisscom.health.des.cdr.client.scheduling
 
-import com.swisscom.health.des.cdr.clientvm.config.CdrClientConfig
-import com.swisscom.health.des.cdr.clientvm.handler.PullFileHandling
-import com.swisscom.health.des.cdr.clientvm.handler.pathIsDirectoryAndWritable
+import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.handler.PullFileHandling
+import com.swisscom.health.des.cdr.client.handler.pathIsDirectoryAndWritable
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.launch

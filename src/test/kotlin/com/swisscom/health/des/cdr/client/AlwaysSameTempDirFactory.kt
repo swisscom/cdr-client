@@ -1,4 +1,4 @@
-package com.swisscom.health.des.cdr.clientvm
+package com.swisscom.health.des.cdr.client
 
 import org.junit.jupiter.api.extension.AnnotatedElementContext
 import org.junit.jupiter.api.extension.ExtensionContext
