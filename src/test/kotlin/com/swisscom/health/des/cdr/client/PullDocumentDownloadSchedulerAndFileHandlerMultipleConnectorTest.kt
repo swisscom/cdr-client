@@ -150,6 +150,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
             config,
             pullFileHandling,
             Dispatchers.IO,
+            mockk()
         )
 
     }

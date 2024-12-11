@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.scheduling
 
+import com.swisscom.health.des.cdr.client.config.BeanReloader
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import com.swisscom.health.des.cdr.client.handler.pathIsDirectoryAndWritable
@@ -25,7 +26,8 @@ class DocumentDownloadScheduler(
     private val cdrClientConfig: CdrClientConfig,
     private val pullFileHandling: PullFileHandling,
     @Qualifier("limitedParallelismCdrDownloadsDispatcher")
-    private val cdrDownloadsDispatcher: CoroutineDispatcher
+    private val cdrDownloadsDispatcher: CoroutineDispatcher,
+    private val beanReloader: BeanReloader
 ) {
 
     /**
@@ -35,6 +37,14 @@ class DocumentDownloadScheduler(
     suspend fun syncFilesToClientFolders() {
         logger.info { "Triggered pull sync" }
         callPullFileHandling()
+    }
+
+    @Scheduled(fixedDelay = 15000, initialDelay = 15000)
+    suspend fun rebootApplicationToReloadConfigFile() {
+        logger.info { "Reboot" }
+        withContext(cdrDownloadsDispatcher) {
+            beanReloader.refreshAndReloadBeans()
+        }
     }
 
     /**

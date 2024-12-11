@@ -10,6 +10,7 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
+import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
@@ -94,6 +95,7 @@ internal class DocumentDownloadSchedulerTest {
             cdrClientConfig = config,
             pullFileHandling = pullFileHandling,
             cdrDownloadsDispatcher = Dispatchers.IO,
+            mockk(),
         )
 
         documentDownloadScheduler.syncFilesToClientFolders()
@@ -110,6 +112,7 @@ internal class DocumentDownloadSchedulerTest {
             cdrClientConfig = config,
             pullFileHandling = pullFileHandling,
             cdrDownloadsDispatcher = Dispatchers.IO,
+            mockk(),
         )
 
         documentDownloadScheduler.syncFilesToClientFolders()
