@@ -1,5 +1,4 @@
 client:
-  function-key: ${cdrClient.functionKey:}
   local-folder: ${cdrClient.localFolder:${java.io.tmpdir}/cdr_download}
   idp-credentials:
     tenant-id: ${CDR_B2C_TENANT_ID:no-token}

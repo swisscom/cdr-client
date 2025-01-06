@@ -18,7 +18,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 private val logger: KLogger = KotlinLogging.logger {}
-internal const val FUNCTION_KEY_HEADER = "x-functions-key"
 internal const val CONNECTOR_ID_HEADER = "cdr-connector-id"
 internal const val CDR_PROCESSING_MODE_HEADER = "cdr-processing-mode"
 internal const val AZURE_TRACE_ID_HEADER = "x-ms-request-id"
@@ -85,7 +84,6 @@ abstract class FileHandlingBase(
         }
         return Headers.Builder().run {
             this[CONNECTOR_ID_HEADER] = connectorId
-            this[FUNCTION_KEY_HEADER] = cdrClientConfig.functionKey
             this[CDR_PROCESSING_MODE_HEADER] = mode.value
             this[AZURE_TRACE_ID_HEADER] = traceId
             if (accessToken != null) {

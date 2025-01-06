@@ -1,7 +1,6 @@
 package com.swisscom.health.des.cdr.client.config
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.IdpCredentials
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
@@ -92,7 +91,6 @@ class CdrClientConfigTest {
         )
 
         assertDoesNotThrow { cdrClientConfig.checkAndReport() }
-        assertFalse(cdrClientConfig.toString().contains(FUNCTION_KEY))
     }
 
     @Test
@@ -123,7 +121,6 @@ class CdrClientConfigTest {
 
     private fun createCdrClientConfig(customers: List<CdrClientConfig.Connector>): CdrClientConfig {
         return CdrClientConfig(
-            functionKey = FUNCTION_KEY,
             scheduleDelay = Duration.ofSeconds(1),
             localFolder = localFolder,
             endpoint = CdrClientConfig.Endpoint(
@@ -282,11 +279,8 @@ class CdrClientConfigTest {
     )
 
     companion object {
-        const val FUNCTION_KEY = "functionKey123"
-
         @JvmStatic
         val FORUM_DATENAUSTAUSCH_MEDIA_TYPE = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
-
     }
 
 }
