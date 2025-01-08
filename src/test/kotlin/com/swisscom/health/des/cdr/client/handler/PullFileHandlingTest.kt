@@ -90,7 +90,6 @@ internal class PullFileHandlingTest {
 
         every { config.endpoint } returns endpoint
         every { config.localFolder } returns inflightDir
-        every { config.functionKey } returns "1"
         every { config.idpCredentials.tenantId } returns "something"
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } returns "Mocked Result"

@@ -25,7 +25,6 @@ data class CdrClientConfig(
     val customer: List<Connector>,
     val endpoint: Endpoint,
     val filesInProgressCacheSize: DataSize,
-    val functionKey: String,
     val idpCredentials: IdpCredentials,
     val idpEndpoint: URL,
     val localFolder: Path,
