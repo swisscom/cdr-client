@@ -131,7 +131,6 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         every { config.customer } returns listOf(connector1, connector2)
         every { config.endpoint } returns endpoint
         every { config.localFolder } returns localFolder
-        every { config.functionKey } returns "1"
         every { config.idpCredentials.tenantId } returns "something"
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } answers { "Mocked Result" }
