@@ -131,9 +131,11 @@ val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("ja
         rule {
             classDirectories.setFrom(files(classDirectories.files.map {
                 fileTree(it) {
-                    setExcludes(listOf(
-                        "**/com/swisscom/health/des/cdr/client/msal4j/*.class"
-                    ))
+                    setExcludes(
+                        listOf(
+                            "**/com/swisscom/health/des/cdr/client/msal4j/*.class"
+                        )
+                    )
                 }
             }))
             limit {
@@ -269,3 +271,93 @@ dockerCompose {
 /***************************
  * END Integration Testing *
  ***************************/
+
+tasks.named<Jar>("jar") {
+    enabled = false
+}
+
+val packagePrepare = "jpackage-prepare"
+
+tasks.register<Delete>("clearPackagePrepare") {
+    delete(file("${outputDir.get().asFile.absolutePath}/$packagePrepare"))
+}
+
+tasks.register<Exec>("jpackageAppPrepareDebian") {
+    dependsOn("clearPackagePrepare")
+    executable = "jpackage"
+    args(
+        "--type", "app-image",
+        "--name", project.name,
+        "--input", "${outputDir.get().asFile.absolutePath}/libs",
+        "--main-jar", "${project.name}-${project.version}.jar",
+  //      "--main-class", "com.swisscom.health.des.cdr.client.CdrClientApplicationKt",
+        "--app-version", project.version.toString(),
+        "--vendor", "Swisscom (Schweiz) AG",
+        "--copyright", "Copyright 2025, All rights reserved",
+        "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
+        "--java-options", "-Dfile.encoding=UTF-8",
+        "--java-options", "-Dspring.profiles.active=customer",
+        "--java-options", "-Dspring.config.additional-location=\$APPDIR/application-customer.yaml"
+    )
+    doLast{
+        copy {
+            from("resources") {
+                include("application-customer.yaml")
+                include("updateConfig.sh")
+            }
+            into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
+        }
+    }
+}
+
+tasks.register<Exec>("jpackageAppFinishDebian") {
+    dependsOn("jpackageAppPrepareDebian")
+    executable = "jpackage"
+    args(
+        "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",
+        "--dest", "${outputDir.get().asFile.absolutePath}/jpackage",
+        "--app-version", project.version.toString(),
+        "--resource-dir", "resources/debian",
+        "--verbose"
+    )
+}
+
+tasks.register<Exec>("jpackageAppPrepareWindows") {
+    dependsOn("clearPackagePrepare")
+    executable = "jpackage"
+    args(
+        "--type", "app-image",
+        "--name", project.name,
+        "--input", "${outputDir.get().asFile.absolutePath}/libs",
+        "--main-jar", "${project.name}-${project.version}.jar",
+        //      "--main-class", "com.swisscom.health.des.cdr.client.CdrClientApplicationKt",
+        "--app-version", project.version.toString(),
+        "--vendor", "Swisscom (Schweiz) AG",
+        "--copyright", "Copyright 2025, All rights reserved",
+        "--win-console",
+        "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
+        "--java-options", "-Dfile.encoding=UTF-8",
+        "--java-options", "-Dspring.profiles.active=customer",
+        "--java-options", "-Dspring.config.additional-location=\$APPDIR/application-customer.yaml"
+    )
+    doLast{
+        copy {
+            from("resources") {
+                include("application-customer.yaml")
+                include("updateConfig.bat")
+            }
+            into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
+        }
+    }
+}
+
+tasks.register<Exec>("jpackageAppFinishWindows") {
+    dependsOn("jpackageAppPrepareWindows")
+    executable = "jpackage"
+    args(
+        "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",
+        "--dest", "${outputDir.get().asFile.absolutePath}/jpackage",
+        "--app-version", project.version.toString(),
+        "--verbose"
+    )
+}

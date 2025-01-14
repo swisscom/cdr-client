@@ -2,9 +2,11 @@ package com.swisscom.health.des.cdr.client.config
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PostConstruct
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
+import java.io.File
 import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
@@ -13,6 +15,7 @@ import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.isWritable
+import kotlin.system.exitProcess
 
 
 private val logger = KotlinLogging.logger {}
@@ -33,6 +36,9 @@ data class CdrClientConfig(
     val retryDelay: List<Duration>,
     val scheduleDelay: Duration
 ) {
+
+    @Value("\${spring.config.additional-location}")
+    private lateinit var configLocation: String
 
     /**
      * Clients identified by their customer id
@@ -77,8 +83,56 @@ data class CdrClientConfig(
         if (!localFolder.exists()) {
             localFolder.createDirectories()
         }
+        if (idpCredentials.tenantId == "not-set") {
+            openConsole()
+        }
 
         logger.debug { "Client configuration: $this" }
+    }
+
+    private fun openConsole() {
+        val os = System.getProperty("os.name").lowercase()
+        val script = if (os.contains("win")) {
+            "updateConfig.bat"
+        } else {
+            "updateConfig.sh"
+        }
+        val configDirectory = File(configLocation).parent
+        val scriptFile = File("$configDirectory/$script")
+
+        val yamlFile = File(configLocation)
+
+        if (!yamlFile.exists()) {
+            error("YAML file not found: $configLocation")
+        }
+
+    /*    val terminalEmulators = listOf("x-terminal-emulator", "gnome-terminal", "konsole", "xfce4-terminal", "xterm")
+        val terminal = terminalEmulators.firstOrNull { Runtime.getRuntime().exec(arrayOf("which", it)).waitFor() == 0 }
+            ?: error("No supported terminal emulator found")
+
+        val processBuilder = if (os.contains("win")) {
+            ProcessBuilder("cmd.exe", "/c", "start", "cmd.exe", "/k", scriptFile.absolutePath, configLocation)
+        } else {
+            ProcessBuilder(terminal, "-e", "bash", "-c", "${scriptFile.absolutePath} $configLocation; exec bash")
+        } */
+
+
+        val processBuilder = ProcessBuilder(scriptFile.absolutePath, configLocation)
+        processBuilder.inheritIO()
+        scriptFile.setExecutable(true)
+        val process = processBuilder.start()
+        process.waitFor() // Wait for the script to complete
+
+       // Runtime.getRuntime().exec(arrayOf(scriptFile.absolutePath, yamlFilePath))
+
+        val exitCode = process.exitValue()
+        if (exitCode == 0) {
+            logger.info { "Script executed successfully, shutting down the application." }
+            exitProcess(0)
+        } else {
+            logger.error { "Script execution failed with exit code $exitCode." }
+            exitProcess(exitCode)
+        }
     }
 
     private fun sourceTargetFolderOverlap(): Unit =
