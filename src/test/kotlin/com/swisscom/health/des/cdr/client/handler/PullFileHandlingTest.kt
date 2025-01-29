@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -67,6 +68,9 @@ internal class PullFileHandlingTest {
     private lateinit var cdrServiceMock: MockWebServer
 
     private lateinit var pullFileHandling: PullFileHandling
+
+    private lateinit var cdrApiClient: CdrApiClient
+
     private val inflightFolder = "inflight"
     private val targetDirectory = "customer"
     private val sourceDirectory = "source"
@@ -78,23 +82,24 @@ internal class PullFileHandlingTest {
         cdrServiceMock.start()
         mockTracer()
 
-        endpoint = CdrClientConfig.Endpoint(
-            host = cdrServiceMock.hostName,
-            basePath = "documents",
-            scheme = "http",
-            port = cdrServiceMock.port,
-        )
+        endpoint = CdrClientConfig.Endpoint().apply {
+            host = cdrServiceMock.hostName
+            basePath = "documents"
+            scheme = "http"
+            port = cdrServiceMock.port
+        }
 
         tmpDir.resolve(targetDirectory).also { it.createDirectories() }
         val inflightDir = tmpDir.resolve(inflightFolder).also { it.createDirectories() }
 
-        every { config.endpoint } returns endpoint
+        every { config.cdrApi } returns endpoint
         every { config.localFolder } returns inflightDir
         every { config.idpCredentials.tenantId } returns "something"
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } returns "Mocked Result"
 
-        pullFileHandling = PullFileHandling(config, OkHttpClient.Builder().build(), clientCredentialParams, retryIoErrorsThrice, securedApp, tracer)
+        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), clientCredentialParams, retryIoErrorsThrice, securedApp, ObjectMapper())
+        pullFileHandling = PullFileHandling(tracer, cdrApiClient)
     }
 
     @AfterEach
@@ -211,17 +216,17 @@ internal class PullFileHandlingTest {
     }
 
     private fun createConnector(
-        connectorId: String,
-        targetFolder: Path = tmpDir.resolve(targetDirectory),
-        sourceFolder: Path = tmpDir.resolve(sourceDirectory),
+        connectorId0: String,
+        targetFolder0: Path = tmpDir.resolve(targetDirectory),
+        sourceFolder0: Path = tmpDir.resolve(sourceDirectory),
     ): CdrClientConfig.Connector =
-        CdrClientConfig.Connector(
-            connectorId = connectorId,
-            targetFolder = targetFolder,
-            sourceFolder = sourceFolder,
-            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
+        CdrClientConfig.Connector().apply {
+            connectorId = connectorId0
+            targetFolder = targetFolder0
+            sourceFolder = sourceFolder0
+            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
             mode = CdrClientConfig.Mode.PRODUCTION
-        )
+        }
 
     private fun enqueueFileResponseWithReportResponse() {
         enqueueFileResponse()
@@ -230,14 +235,16 @@ internal class PullFileHandlingTest {
 
     private fun enqueueFileResponse() {
         val pullRequestId = UUID.randomUUID().toString()
-        val mockResponse = MockResponse().setResponseCode(HttpStatus.OK.value())
+        val mockResponse = MockResponse()
+            .setResponseCode(HttpStatus.OK.value())
             .setHeader(PULL_RESULT_ID_HEADER, pullRequestId)
             .setBody(String(ClassPathResource("messages/dummy.txt").inputStream.readAllBytes(), StandardCharsets.UTF_8))
         cdrServiceMock.enqueue(mockResponse)
     }
 
     private fun enqueueFileResponseNoHeader() {
-        val mockResponse = MockResponse().setResponseCode(HttpStatus.OK.value())
+        val mockResponse = MockResponse()
+            .setResponseCode(HttpStatus.OK.value())
             .setBody(String(ClassPathResource("messages/dummy.txt").inputStream.readAllBytes(), StandardCharsets.UTF_8))
         cdrServiceMock.enqueue(mockResponse)
     }

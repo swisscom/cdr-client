@@ -56,7 +56,7 @@ class EventTriggerUploadScheduler(
     private val tracer: Tracer,
     @Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
-    @Value("\${management.tracing.sampling.probability:1.0}")
+    @Value("\${management.tracing.sampling.probability:0.0}")
     private val samplerProbability: Double,
     pushFileHandling: PushFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
@@ -181,7 +181,7 @@ class PollingUploadScheduler(
 
     @Scheduled(initialDelay = 0L, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFilePoller() {
-        config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let{ humanReadableDelay ->
+        config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let { humanReadableDelay ->
             config.customer.forEach {
                 logger.info { "Polling source folder for files every '$humanReadableDelay': '${it.sourceFolder}'" }
             }
@@ -218,7 +218,7 @@ class PollingUploadScheduler(
             }
         }
             .onCompletion { error: Throwable? ->
-                logger.info { "File system polling flow terminated ${if (error == null) "." else "with error: '${error.message}'"}" }
+                logger.info { "File system polling flow terminated${if (error == null) "." else " with error: '${error.message}'"}" }
             }
             .buffer(capacity = 100, onBufferOverflow = BufferOverflow.SUSPEND)
             .shareIn(
@@ -291,6 +291,7 @@ abstract class BaseUploadScheduler(
 
     protected companion object {
         protected const val EXTENSION_XML = "xml"
+
         @JvmStatic
         protected val ZERO_SAMPLING_THRESHOLD: Double = 0.0
     }

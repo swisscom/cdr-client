@@ -14,13 +14,13 @@ import java.time.Duration
 class CdrClientConfigTest {
 
     @TempDir
-    private lateinit var localFolder: Path
+    private lateinit var localFolder0: Path
 
     @TempDir
-    private lateinit var sourceFolder: Path
+    private lateinit var sourceFolder0: Path
 
     @TempDir
-    private lateinit var targetFolder: Path
+    private lateinit var targetFolder0: Path
 
     @TempDir
     private lateinit var sourceFolder1: Path
@@ -52,41 +52,41 @@ class CdrClientConfigTest {
     fun `test bluesky configuration`() {
         cdrClientConfig = createCdrClientConfig(
             listOf(
-                CdrClientConfig.Connector(
-                    connectorId = "connectorId",
-                    targetFolder = targetFolder,
-                    sourceFolder = sourceFolder,
-                    contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+                CdrClientConfig.Connector().apply {
+                    connectorId = "connectorId"
+                    targetFolder = targetFolder0
+                    sourceFolder = sourceFolder0
+                    contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                     mode = CdrClientConfig.Mode.TEST
-                ),
-                CdrClientConfig.Connector(
-                    connectorId = "connectorId",
-                    targetFolder = targetFolder1,
-                    sourceFolder = sourceFolder1,
-                    contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+                },
+                CdrClientConfig.Connector().apply {
+                    connectorId = "connectorId"
+                    targetFolder = targetFolder1
+                    sourceFolder = sourceFolder1
+                    contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                     mode = CdrClientConfig.Mode.PRODUCTION
-                ),
-                CdrClientConfig.Connector(
-                    connectorId = "connectorId2",
-                    targetFolder = targetFolder,
-                    sourceFolder = sourceFolder2,
-                    contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+                },
+                CdrClientConfig.Connector().apply {
+                    connectorId = "connectorId2"
+                    targetFolder = targetFolder0
+                    sourceFolder = sourceFolder2
+                    contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                     mode = CdrClientConfig.Mode.TEST
-                ),
-                CdrClientConfig.Connector(
-                    connectorId = "connectorId3",
-                    targetFolder = targetFolder,
-                    sourceFolder = sourceFolder3,
-                    contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+                },
+                CdrClientConfig.Connector().apply {
+                    connectorId = "connectorId3"
+                    targetFolder = targetFolder0
+                    sourceFolder = sourceFolder3
+                    contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                     mode = CdrClientConfig.Mode.PRODUCTION
-                ),
-                CdrClientConfig.Connector(
-                    connectorId = "connectorId4",
-                    targetFolder = targetFolder4,
-                    sourceFolder = sourceFolder4,
-                    contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+                },
+                CdrClientConfig.Connector().apply {
+                    connectorId = "connectorId4"
+                    targetFolder = targetFolder4
+                    sourceFolder = sourceFolder4
+                    contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                     mode = CdrClientConfig.Mode.TEST
-                )
+                }
             )
         )
 
@@ -120,161 +120,161 @@ class CdrClientConfigTest {
 
 
     private fun createCdrClientConfig(customers: List<CdrClientConfig.Connector>): CdrClientConfig {
-        return CdrClientConfig(
-            scheduleDelay = Duration.ofSeconds(1),
-            localFolder = localFolder,
-            endpoint = CdrClientConfig.Endpoint(
-                scheme = "http",
-                host = "localhost",
-                port = 8080,
+        return CdrClientConfig().apply {
+            scheduleDelay = Duration.ofSeconds(1)
+            localFolder = localFolder0
+            cdrApi = CdrClientConfig.Endpoint().apply {
+                scheme = "http"
+                host = "localhost"
+                port = 8080
                 basePath = "/api"
-            ),
-            customer = customers,
-            pullThreadPoolSize = 1,
-            pushThreadPoolSize = 1,
-            retryDelay = listOf(Duration.ofSeconds(1)),
-            filesInProgressCacheSize = DataSize.ofMegabytes(1),
-            idpCredentials = IdpCredentials(
-                tenantId = "tenantId",
-                clientId = "clientId",
-                clientSecret = "secret",
+            }
+            customer = customers
+            pullThreadPoolSize = 1
+            pushThreadPoolSize = 1
+            retryDelay = listOf(Duration.ofSeconds(1))
+            filesInProgressCacheSize = DataSize.ofMegabytes(1)
+            idpCredentials = IdpCredentials().apply {
+                tenantId = "tenantId"
+                clientId = "clientId"
+                clientSecret = "secret"
                 scopes = listOf("CDR")
-            ),
+            }
             idpEndpoint = URL("http://localhost")
-        )
+        }
     }
 
     @Suppress("LongMethod")
     private fun provideSameFolderConnectors() = listOf(
         listOf(
-            CdrClientConfig.Connector(
-                connectorId = "connectorId",
-                targetFolder = targetFolder,
-                sourceFolder = sourceFolder,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId"
+                targetFolder = targetFolder0
+                sourceFolder = sourceFolder0
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.TEST
-            ),
-            CdrClientConfig.Connector(
-                connectorId = "connectorId",
-                targetFolder = targetFolder,
-                sourceFolder = sourceFolder,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            },
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId"
+                targetFolder = targetFolder0
+                sourceFolder = sourceFolder0
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.PRODUCTION
-            )
+            }
         ),
         listOf(
-            CdrClientConfig.Connector(
-                connectorId = "connectorId2",
-                targetFolder = targetFolder2,
-                sourceFolder = targetFolder2,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId2"
+                targetFolder = targetFolder2
+                sourceFolder = targetFolder2
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.TEST
-            ),
-            CdrClientConfig.Connector(
-                connectorId = "connectorId3",
-                targetFolder = targetFolder3,
-                sourceFolder = sourceFolder3,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            },
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId3"
+                targetFolder = targetFolder3
+                sourceFolder = sourceFolder3
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.PRODUCTION
-            )
+            }
         ),
         listOf(
-            CdrClientConfig.Connector(
-                connectorId = "connectorId2",
-                targetFolder = targetFolder,
-                sourceFolder = sourceFolder,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId2"
+                targetFolder = targetFolder0
+                sourceFolder = sourceFolder0
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.TEST
-            ),
-            CdrClientConfig.Connector(
-                connectorId = "connectorId3",
-                targetFolder = sourceFolder,
-                sourceFolder = targetFolder2,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            },
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId3"
+                targetFolder = sourceFolder0
+                sourceFolder = targetFolder2
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.PRODUCTION
-            )
+            }
         ),
         listOf(
-            CdrClientConfig.Connector(
-                connectorId = "connectorId2",
-                targetFolder = targetFolder,
-                sourceFolder = sourceFolder,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId2"
+                targetFolder = targetFolder0
+                sourceFolder = sourceFolder0
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.TEST
-            ),
-            CdrClientConfig.Connector(
-                connectorId = "connectorId3",
-                targetFolder = sourceFolder2,
-                sourceFolder = targetFolder,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            },
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId3"
+                targetFolder = sourceFolder2
+                sourceFolder = targetFolder0
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.PRODUCTION
-            )
+            }
         )
     )
 
     @Suppress("LongMethod")
     private fun provideSameModeConnectors() = listOf(
         listOf(
-            CdrClientConfig.Connector(
-                connectorId = "connectorId",
-                targetFolder = targetFolder,
-                sourceFolder = sourceFolder,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId"
+                targetFolder = targetFolder0
+                sourceFolder = sourceFolder0
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.TEST
-            ),
-            CdrClientConfig.Connector(
-                connectorId = "connectorId",
-                targetFolder = targetFolder2,
-                sourceFolder = sourceFolder2,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            },
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId"
+                targetFolder = targetFolder2
+                sourceFolder = sourceFolder2
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.TEST
-            )
+            }
         ),
         listOf(
-            CdrClientConfig.Connector(
-                connectorId = "connectorId2",
-                targetFolder = targetFolder2,
-                sourceFolder = sourceFolder2,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId2"
+                targetFolder = targetFolder2
+                sourceFolder = sourceFolder2
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.PRODUCTION
-            ),
-            CdrClientConfig.Connector(
-                connectorId = "connectorId2",
-                targetFolder = targetFolder,
-                sourceFolder = sourceFolder,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            },
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId2"
+                targetFolder = targetFolder0
+                sourceFolder = sourceFolder0
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.PRODUCTION
-            )
+            }
         ),
         listOf(
-            CdrClientConfig.Connector(
-                connectorId = "connectorId2",
-                targetFolder = targetFolder2,
-                sourceFolder = sourceFolder2,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId2"
+                targetFolder = targetFolder2
+                sourceFolder = sourceFolder2
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.PRODUCTION
-            ),
-            CdrClientConfig.Connector(
-                connectorId = "connectorId2",
-                targetFolder = targetFolder,
-                sourceFolder = sourceFolder,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            },
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId2"
+                targetFolder = targetFolder0
+                sourceFolder = sourceFolder0
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.PRODUCTION
-            ),
-            CdrClientConfig.Connector(
-                connectorId = "connectorId2",
-                targetFolder = targetFolder3,
-                sourceFolder = sourceFolder3,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            },
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId2"
+                targetFolder = targetFolder3
+                sourceFolder = sourceFolder3
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.TEST
-            ),
-            CdrClientConfig.Connector(
-                connectorId = "connectorId2",
-                targetFolder = targetFolder4,
-                sourceFolder = sourceFolder4,
-                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            },
+            CdrClientConfig.Connector().apply {
+                connectorId = "connectorId2"
+                targetFolder = targetFolder4
+                sourceFolder = sourceFolder4
+                contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE
                 mode = CdrClientConfig.Mode.PRODUCTION
-            )
+            }
         )
     )
 
