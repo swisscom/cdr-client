@@ -30,7 +30,7 @@ class PullFileHandling(
      * @param connector the connector to synchronize
      */
     suspend fun pullSyncConnector(connector: CdrClientConfig.Connector) {
-        traced(tracer, "Pull Sync Connector ${connector.connectorId}") {
+        tracer.withSpan("Pull Sync Connector ${connector.connectorId}") {
             logger.info { "Sync connector '${connector.connectorId}' (${connector.mode}) - pulling" }
             var counter = 0
             runCatching {

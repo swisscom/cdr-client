@@ -141,6 +141,9 @@ class CdrClientConfigTest {
                 scopes = listOf("CDR")
             }
             idpEndpoint = URL("http://localhost")
+            fileBusyTestStrategy = CdrClientConfig.FileBusyTestStrategy.FILE_SIZE_CHANGED
+            fileBusyTestInterval = Duration.ofMillis(250)
+            fileBusyTestTimeout = Duration.ofSeconds(1)
         }
     }
 

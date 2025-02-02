@@ -1,6 +1,5 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import com.mayakapps.kache.ObjectKache
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentResult
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -10,8 +9,6 @@ import org.springframework.stereotype.Component
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
-import java.util.Objects.isNull
-import kotlin.io.path.absolutePathString
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.nameWithoutExtension
 
@@ -31,7 +28,6 @@ class PushFileHandling(
     private val cdrClientConfig: CdrClientConfig,
     private val tracer: Tracer,
     private val cdrApiClient: CdrApiClient,
-    private val processingInProgressCache: ObjectKache<String, Path>,
 ) {
 
     /**
@@ -39,69 +35,60 @@ class PushFileHandling(
      */
     @Suppress("NestedBlockDepth")
     suspend fun uploadFile(file: Path, connector: CdrClientConfig.Connector) {
-        logger.debug { "Push file '$file'" }
+        logger.debug { "Uploading file '$file'" }
         var retryCount = -1
         var retryNeeded = false
 
-        try {
-            do {
-                if (retryNeeded) {
-                    delay(cdrClientConfig.retryDelay[retryCount].toMillis())
+        do {
+            if (retryNeeded) {
+                // FIXME: Cannot use delay() here because we might continue on another thread and we would either loose or continue with the wrong span (thread local)
+                delay(cdrClientConfig.retryDelay[retryCount].toMillis())
+            }
+
+            val response: UploadDocumentResult = cdrApiClient.uploadDocument(
+                contentType = connector.contentType.toString(),
+                file = file,
+                connectorId = connector.connectorId,
+                mode = connector.mode,
+                traceId = tracer.currentSpan()?.context()?.traceId() ?: ""
+            )
+
+            retryNeeded = when (response) {
+                is UploadDocumentResult.Success -> {
+                    if (!file.deleteIfExists()) {
+                        logger.warn { "Tried to delete the file '$file' but it was already gone" }
+                    }
+                    false
                 }
 
-                val response: UploadDocumentResult = cdrApiClient.uploadDocument(
-                    contentType = connector.contentType.toString(),
-                    file = file,
-                    connectorId = connector.connectorId,
-                    mode = connector.mode,
-                    traceId = tracer.currentSpan()?.context()?.traceId() ?: ""
-                )
-
-                retryNeeded = when (response) {
-                    is UploadDocumentResult.Success -> {
-                        if (!file.deleteIfExists()) {
-                            logger.warn { "Tried to delete the file '$file' but it was already gone" }
-                        }
-                        false
+                is UploadDocumentResult.UploadClientErrorResponse -> {
+                    logger.error {
+                        "File synchronization failed for '${file.fileName}'. Received a 4xx client error (response code: '${response.code}'). " +
+                                "No retry will be attempted due to client-side issue."
                     }
-
-                    is UploadDocumentResult.UploadClientErrorResponse -> {
-                        logger.error {
-                            "File synchronization failed for '${file.fileName}'. Received a 4xx client error (response code: '${response.code}'). " +
-                                    "No retry will be attempted due to client-side issue."
-                        }
-                        renameFileToErrorAndCreateLogFile(file, response.responseBody)
-                        false
-                    }
-
-                    is UploadDocumentResult.UploadServerErrorResponse -> {
-                        logger.error {
-                            "Failed to sync file '${file.fileName}', retry will be attempted in '${cdrClientConfig.retryDelay[retryCount + 1]}' - " +
-                                    "server response: '${response.responseBody}'"
-                        }
-                        true
-                    }
-
-                    is UploadDocumentResult.UploadError -> {
-                        logger.error {
-                            "Failed to sync file '${file.fileName}', retry will be attempted in '${cdrClientConfig.retryDelay[retryCount + 1]}' - " +
-                                    "exception message: '${response.t?.message}'"
-                        }
-                        true
-                    }
+                    renameFileToErrorAndCreateLogFile(file, response.responseBody)
+                    false
                 }
 
-                retryCount++
-            } while (retryNeeded && retryCount < cdrClientConfig.retryDelay.size)
-        } finally {
-            processingInProgressCache.remove(file.absolutePathString()).also { removed ->
-                if (isNull(removed)) {
-                    logger.warn {
-                        "File '${file.absolutePathString()}' was not in the processing cache! It appears that we have a bug in our state management."
+                is UploadDocumentResult.UploadServerErrorResponse -> {
+                    logger.error {
+                        "Failed to sync file '${file.fileName}', retry will be attempted in '${cdrClientConfig.retryDelay[retryCount + 1]}' - " +
+                                "server response: '${response.responseBody}'"
                     }
+                    true
+                }
+
+                is UploadDocumentResult.UploadError -> {
+                    logger.error {
+                        "Failed to sync file '${file.fileName}', retry will be attempted in '${cdrClientConfig.retryDelay[retryCount + 1]}' - " +
+                                "exception message: '${response.t?.message}'"
+                    }
+                    true
                 }
             }
-        }
+
+            retryCount++
+        } while (retryNeeded && retryCount < cdrClientConfig.retryDelay.size)
     }
 
     /**
