@@ -18,9 +18,9 @@
           "match": "*",
           "claims": {
             "sub": "${clientId}",
+            "azp": "${clientId}",
             "roles": [
-              "CdrApi.ReadWrite.OwnedBy",
-              "AppRoleAssignment.ReadWrite.All"
+              "CdrApi.ReadWrite.OwnedBy"
             ]
           }
         }

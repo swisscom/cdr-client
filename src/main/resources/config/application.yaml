@@ -12,7 +12,10 @@ spring:
   task:
     scheduling:
       pool:
-        size: 1 # only the pull sync requires a scheduling thread. The push sync variants are running on the Kotlin coroutine IO Dispatcher threads after their initial scheduling.
+        # Only the pull sync requires a scheduling thread. The push sync variants are running on the Kotlin coroutine IO Dispatcher threads after their
+        # initial scheduling. Client credential renewal is running on the scheduler thread as well, but it either completes fast or fails fast, thus not
+        # blocking document pull in any significant way (plus it runs only once after start-up and then every 365 days).
+        size: 1
   jmx:
     enabled: false
 
@@ -30,13 +33,18 @@ spring:
 #    connection-timeout: 1s
 #    keep-alive-timeout: 30s
 
+management:
 # You need to set the `web-application-type` to `servlet` or `reactive` to enable the actuators
-#management:
 #  endpoints:
 #    web:
 #      exposure:
 #        include: "actuator,health"
 #    enabled-by-default: true
+  tracing:
+    sampling:
+      # sampling has to be disabled; if enabled we create a memory leak as there is no way to guarantee a sampled span gets closed and releases its resources
+      # when used in asynchronous Kotlin flows/coroutines
+      probability: 0.0
 
 logging:
   pattern:
@@ -46,10 +54,3 @@ logging:
     com.swisscom.health.des.cdr: INFO
   charset:
     console: UTF-8
-
-management:
-  tracing:
-    sampling:
-      # sampling has to be disabled; if enabled we create a memory leak as there is no way to guarantee a sampled span gets closed and releases its resources
-      # when used in asynchronous Kotlin flows/coroutines
-      probability: 0.0

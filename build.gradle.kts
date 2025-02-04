@@ -19,12 +19,13 @@ val mockkVersion: String by project
 val msal4jVersion: String by project
 val springCloudVersion: String by project
 val springMockkVersion: String by project
+val okHttpVersion: String by project
 val jvmVersion: String by project
 
 val outputDir: Provider<Directory> = layout.buildDirectory.dir(".")
 
 plugins {
-    id("com.avast.gradle.docker-compose") version "0.17.8"
+    id("com.avast.gradle.docker-compose") version "0.17.12"
     id("org.springframework.boot")
     id("io.spring.dependency-management")
     id("io.gitlab.arturbosch.detekt")
@@ -46,10 +47,37 @@ idea {
     }
 }
 
+tasks.bootRun {
+    environment["JDK_JAVA_OPTIONS"] =
+        listOfNotNull(
+            environment["JDK_JAVA_OPTIONS"],
+            "-Djavax.net.ssl.trustStore=src/main/resources/caddy_truststore.p12",
+            "-Djavax.net.ssl.trustStorePassword=changeit",
+            "-Djdk.net.hosts.file=src/main/resources/msal4j_hosts"
+        ).joinToString(" ")
+}
+
 application {
     mainClass = "com.swisscom.health.des.cdr.client.CdrClientApplicationKt"
-    applicationDefaultJvmArgs = listOf("-Dspring.profiles.active=client,customer")
 }
+
+gradle.taskGraph.whenReady(
+    closureOf<TaskExecutionGraph> {
+        println("Tasks to be executed: ${this.allTasks}")
+        application {
+            applicationDefaultJvmArgs =
+                if (gradle.taskGraph.hasTask(":bootRun")) {
+                    // when running the client locally via the `bootRun` target
+                    listOf("-Dspring.profiles.active=client,dev")
+                } else {
+                    // gets picked up by application plugin when building the distribution as the
+                    // value of `DEFAULT_JVM_OPTS` in the generated start script
+                    listOf("-Dspring.profiles.active=client,customer")
+                }
+        }
+    }
+)
+
 dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}")
@@ -67,7 +95,7 @@ dependencyManagement {
 dependencies {
     implementation("com.mayakapps.kache:kache:$kacheVersion")
     implementation("com.microsoft.azure:msal4j:$msal4jVersion")
-    implementation("com.squareup.okhttp3:okhttp")
+    implementation("com.squareup.okhttp3:okhttp:$okHttpVersion")
     implementation("io.github.irgaly.kfswatch:kfswatch:$kfsWatchVersion")
     implementation("io.github.oshai:kotlin-logging:$kotlinLoggingVersion")
     implementation("io.micrometer:micrometer-tracing:$micrometerTracingVersion")
@@ -80,13 +108,18 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.retry:spring-retry")
+    implementation("org.springframework.cloud:spring-cloud-context")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
 
+    // Note: At the time of writing the configuration processor seems to be broken; might be related to the upgrade to Kotlin 2.x
+    // Enable annotation processing via menu File | Settings | Build, Execution, Deployment
+    // | Compiler | Annotation Processors | Enable annotation processing
     kapt("org.springframework.boot:spring-boot-configuration-processor")
 
     testImplementation("org.jacoco:org.jacoco.core:${jacocoVersion}")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
-    testImplementation("com.squareup.okhttp3:mockwebserver") {
+    testImplementation("com.squareup.okhttp3:mockwebserver:$okHttpVersion") {
         // Unfortunately we cannot exclude JUnit 4 as MockWebServer implements interfaces from that version
 //        exclude(group = "junit", config = "junit")
     }
@@ -98,6 +131,12 @@ dependencies {
     testImplementation("com.ninja-squad:springmockk:${springMockkVersion}")
     testImplementation("org.awaitility:awaitility:${awaitilityVersion}")
 
+}
+
+kapt {
+    correctErrorTypes = true
+    mapDiagnosticLocations = true
+    includeCompileClasspath = false
 }
 
 springBoot {
@@ -131,9 +170,12 @@ val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("ja
         rule {
             classDirectories.setFrom(files(classDirectories.files.map {
                 fileTree(it) {
-                    setExcludes(listOf(
-                        "**/com/swisscom/health/des/cdr/client/msal4j/*.class"
-                    ))
+                    setExcludes(
+                        // CdrApiClient is tested with integration tests; need to find out how to merge the jacoco reports of the two test types
+                        listOf(
+                            "**/com/swisscom/health/des/cdr/client/handler/CdrApiClient*"
+                        )
+                    )
                 }
             }))
             limit {
@@ -190,7 +232,6 @@ tasks.processResources {
 }
 
 tasks.withType<Detekt> {
-    baseline.set(File("${projectDir}/detekt_baseline.xml"))
     reports {
         xml {
             required.set(true)
@@ -211,7 +252,6 @@ detekt {
     allRules = true
     parallel = true
     config.setFrom(files("$rootDir/config/detekt.yml")) // Global Detekt rule set.
-    baseline = file("$projectDir/detekt_baseline.xml") // Module specific suppression list.
 }
 
 tasks.register("publishVersion") {
@@ -254,6 +294,13 @@ tasks.register<Test>("integrationTest") {
     useJUnitPlatform {
         includeTags(Constants.INTEGRATION_TEST_TAG)
     }
+    environment["JDK_JAVA_OPTIONS"] =
+        listOfNotNull(
+            environment["JDK_JAVA_OPTIONS"],
+            "-Djavax.net.ssl.trustStore=src/main/resources/caddy_truststore.p12",
+            "-Djavax.net.ssl.trustStorePassword=changeit",
+            "-Djdk.net.hosts.file=src/main/resources/msal4j_hosts"
+        ).joinToString(" ")
     shouldRunAfter(tasks.test)
     // Ensure latest images get pulled
     dependsOn(tasks.composePull)
@@ -265,7 +312,6 @@ dockerCompose {
     ignorePullFailure.set(true)
     isRequiredBy(tasks.getByName("integrationTest"))
 }
-
 /***************************
  * END Integration Testing *
  ***************************/

@@ -12,17 +12,17 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
+import org.springframework.cloud.context.config.annotation.RefreshScope
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.retry.support.RetryTemplate
 import java.io.IOException
 import java.nio.file.Path
+import java.time.Duration
 import java.util.concurrent.TimeUnit
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.toJavaDuration
 
 private val logger = KotlinLogging.logger {}
 
@@ -44,7 +44,22 @@ class CdrClientContext {
         @Value("\${client.connection-timeout-ms}") timeout: Long,
         @Value("\${client.read-timeout-ms}") readTimeout: Long
     ): OkHttpClient =
-        builder.connectTimeout(timeout, TimeUnit.MILLISECONDS).readTimeout(readTimeout, TimeUnit.MILLISECONDS)
+        builder
+            .connectTimeout(timeout, TimeUnit.MILLISECONDS).readTimeout(readTimeout, TimeUnit.MILLISECONDS)
+            .addInterceptor { chain ->
+                val response: Response = chain.proceed(chain.request())
+
+                @Suppress("MagicNumber")
+                if (response.code in 500..599) {
+                    throw HttpServerErrorException(
+                        message = "Received error status code '${response.code}'.",
+                        statusCode = response.code,
+                        responseBody = response.body?.string() ?: ""
+                    )
+                }
+
+                response
+            }
             .build()
 
     /**
@@ -58,18 +73,28 @@ class CdrClientContext {
         return OkHttpClient.Builder()
     }
 
+    /**
+     * Creates a coroutine dispatcher for blocking I/O operations with limited parallelism.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Bean(name = ["limitedParallelismCdrUploadsDispatcher"])
     fun limitedParallelCdrUploadsDispatcher(config: CdrClientConfig): CoroutineDispatcher {
         return Dispatchers.IO.limitedParallelism(config.pushThreadPoolSize)
     }
 
+    /**
+     * Creates a coroutine dispatcher for blocking I/O operations with limited parallelism.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Bean(name = ["limitedParallelismCdrDownloadsDispatcher"])
     fun limitedParallelCdrDownloadsDispatcher(config: CdrClientConfig): CoroutineDispatcher {
         return Dispatchers.IO.limitedParallelism(config.pullThreadPoolSize)
     }
 
+    /**
+     * Creates a cache to store fully qualified file names of files that are currently being processed
+     * in order to avoid a race condition between processing files by the polling and event trigger processes.
+     */
     @Bean
     fun processingInProgressCache(config: CdrClientConfig): ObjectKache<String, Path> =
         InMemoryKache(maxSize = config.filesInProgressCacheSize.toBytes())
@@ -86,6 +111,10 @@ class CdrClientContext {
             }
         }
 
+    /**
+     * Creates and returns an instance of the MSAL4J client object through which we can obtain an OAuth2 token.
+     */
+    @RefreshScope
     @Bean
     fun confidentialClientApp(config: CdrClientConfig): IConfidentialClientApplication =
         ConfidentialClientApplication.builder(
@@ -94,17 +123,35 @@ class CdrClientContext {
         ).authority(config.idpEndpoint.toString())
             .build()
 
+    /**
+     * Creates and returns an instance of credentials to be used with the MSAL4J client to obtain an OAuth2 token.
+     */
     @Bean
     fun clientCredentialParams(config: CdrClientConfig): ClientCredentialParameters =
         ClientCredentialParameters.builder(config.idpCredentials.scopes.toSet()).build()
 
-    @Bean(name = ["retryIoErrorsThrice"])
+    /**
+     * Creates and returns a spring retry-template that retries on IOExceptions up to three times before bailing out.
+     */
+    @Bean(name = ["retryIoAndServerErrors"])
     @Suppress("MagicNumber")
-    fun retryIOExceptionsThreeTimesTemplate(): RetryTemplate = RetryTemplate.builder()
-        .maxAttempts(3)
-        .exponentialBackoff(100.milliseconds.toJavaDuration(), 5.0, 1.seconds.toJavaDuration(), true)
+    fun retryIOExceptionsAndServerErrorsTemplate(
+        @Value("\${client.retry-template.retries}")
+        retries: Int,
+        @Value("\${client.retry-template.initial-delay}")
+        initialDelay: Duration,
+        @Value("\${client.retry-template.multiplier}")
+        multiplier: Double,
+        @Value("\${client.retry-template.max-delay}")
+        maxDelay: Duration
+    ): RetryTemplate = RetryTemplate.builder()
+        .maxAttempts(retries) // 1 initial attempt + retries
+        .exponentialBackoff(initialDelay, multiplier, maxDelay, true)
         .retryOn(IOException::class.java)
+        .retryOn(HttpServerErrorException::class.java)
         .traversingCauses()
         .build()
 
 }
+
+internal class HttpServerErrorException(message: String, val statusCode: Int, val responseBody: String) : RuntimeException(message)

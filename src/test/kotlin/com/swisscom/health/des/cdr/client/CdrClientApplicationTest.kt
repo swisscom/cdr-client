@@ -17,7 +17,11 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 @SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.NONE
+    webEnvironment = SpringBootTest.WebEnvironment.NONE,
+    properties = [
+        "spring.jmx.enabled=false",
+        "client.idp-credentials.renew-credential-at-startup=true",
+    ]
 )
 @ActiveProfiles("test")
 @Tag("integration-test")

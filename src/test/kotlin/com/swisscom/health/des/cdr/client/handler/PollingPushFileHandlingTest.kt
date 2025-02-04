@@ -5,6 +5,7 @@ import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.microsoft.aad.msal4j.TokenSource
+import com.ninjasquad.springmockk.MockkBean
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -44,6 +45,7 @@ import kotlin.io.path.walk
     properties = [
         "spring.main.lazy-initialization=false",
         "spring.jmx.enabled=false",
+        "client.idp-credentials.renew-credential-at-startup=false",
     ]
 )
 // only test polling, not filesystem event handling
@@ -54,7 +56,7 @@ internal class PollingPushFileHandlingTest {
     @SpykBean
     private lateinit var config: CdrClientConfig
 
-    @SpykBean
+    @MockkBean
     private lateinit var securedApp: IConfidentialClientApplication
 
     @Autowired
@@ -76,24 +78,24 @@ internal class PollingPushFileHandlingTest {
         cdrServiceMock.start()
 
         val inflightDir = tmpDir.resolve(inflightFolder).also { it.createDirectories() }
-        val sourceFolder = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
-        val targetFolder = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
+        val sourceFolder0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
+        val targetFolder0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
 
         every { config.localFolder } returns inflightDir
-        every { config.endpoint } returns CdrClientConfig.Endpoint(
-            host = cdrServiceMock.hostName,
-            basePath = "documents",
-            scheme = "http",
-            port = cdrServiceMock.port,
-        )
+        every { config.cdrApi } returns CdrClientConfig.Endpoint().apply {
+            host = cdrServiceMock.hostName
+            basePath = "documents"
+            scheme = "http"
+            port = cdrServiceMock.port
+        }
         every { config.customer } returns listOf(
-            CdrClientConfig.Connector(
-                connectorId = "2345",
-                targetFolder = targetFolder,
-                sourceFolder = sourceFolder,
-                contentType = forumDatenaustauschMediaType,
+            CdrClientConfig.Connector().apply {
+                connectorId = "2345"
+                targetFolder = targetFolder0
+                sourceFolder = sourceFolder0
+                contentType = forumDatenaustauschMediaType
                 mode = CdrClientConfig.Mode.TEST
-            )
+            }
         )
 
         val resultMock: CompletableFuture<IAuthenticationResult> = mockk()
@@ -116,9 +118,9 @@ internal class PollingPushFileHandlingTest {
     @OptIn(ExperimentalPathApi::class)
     @Test
     fun `test successfully write two files to API`() {
-        val mockResponse = MockResponse().setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
+        val mockResponse = MockResponse()
             .setResponseCode(HttpStatus.OK.value())
+            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
             .setBody("{\"message\": \"Upload successful\"}")
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
@@ -171,7 +173,8 @@ internal class PollingPushFileHandlingTest {
 
     @Test
     fun `test successfully write two files to API fail with third`() {
-        val mockResponse = MockResponse().setResponseCode(HttpStatus.OK.value())
+        val mockResponse = MockResponse()
+            .setResponseCode(HttpStatus.OK.value())
             .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
             .setBody("{\"message\": \"Upload successful\"}")
         cdrServiceMock.enqueue(mockResponse)
@@ -212,7 +215,8 @@ internal class PollingPushFileHandlingTest {
 
     @Test
     fun `test successfully write two files to API fail with third do not retry`() {
-        val mockResponse = MockResponse().setResponseCode(HttpStatus.OK.value())
+        val mockResponse = MockResponse()
+            .setResponseCode(HttpStatus.OK.value())
             .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
             .setBody("{\"message\": \"Upload successful\"}")
         cdrServiceMock.enqueue(mockResponse)
