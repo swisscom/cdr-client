@@ -196,7 +196,8 @@ sealed class FileBusyTester {
     class FileSizeChanged(private val testInterval: Duration) : FileBusyTester() {
         override suspend fun isBusy(file: Path): Boolean = runCatching {
             val startSize = file.fileSize()
-            // FIXME: Cannot use delay() here because we might continue on another thread and we would either loose or continue with the wrong span (thread local)
+            // FIXME: Cannot use delay() here because we might continue on another thread and we would either loose the span id or continue with
+            //  the wrong span id (thread local)
             delay(testInterval)
             startSize != file.fileSize()
         }.fold(

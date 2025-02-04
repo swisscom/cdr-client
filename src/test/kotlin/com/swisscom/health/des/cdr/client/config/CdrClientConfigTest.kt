@@ -49,7 +49,7 @@ class CdrClientConfigTest {
     private lateinit var cdrClientConfig: CdrClientConfig
 
     @Test
-    fun `test bluesky configuration`() {
+    fun `test blue sky configuration`() {
         cdrClientConfig = createCdrClientConfig(
             listOf(
                 CdrClientConfig.Connector().apply {
@@ -127,7 +127,13 @@ class CdrClientConfigTest {
                 scheme = "http"
                 host = "localhost"
                 port = 8080
-                basePath = "/api"
+                basePath = "api"
+            }
+            credentialApi = CdrClientConfig.Endpoint().apply {
+                scheme = "http"
+                host = "localhost"
+                port = 8080
+                basePath = "client-credentials"
             }
             customer = customers
             pullThreadPoolSize = 1
@@ -144,6 +150,12 @@ class CdrClientConfigTest {
             fileBusyTestStrategy = CdrClientConfig.FileBusyTestStrategy.FILE_SIZE_CHANGED
             fileBusyTestInterval = Duration.ofMillis(250)
             fileBusyTestTimeout = Duration.ofSeconds(1)
+            retryTemplate = CdrClientConfig.RetryTemplateConfig().apply {
+                retries = 3
+                initialDelay = Duration.ofSeconds(5)
+                maxDelay = Duration.ofSeconds(5)
+                multiplier = 2.0
+            }
         }
     }
 

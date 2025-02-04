@@ -212,7 +212,10 @@ class CdrClientConfig {
             error("fileBusyTestTimeout must be greater than fileBusyTestInterval")
         }
 
-        logger.info { "Client configuration: $this" }
+        // throws exception if any lateinit var (used in toString()) has not been initialized -- we have no optional configuration items
+        val asString = toString()
+
+        logger.info { "Client configuration: $asString" }
     }
 
     private fun sourceTargetFolderOverlap(): Unit =
