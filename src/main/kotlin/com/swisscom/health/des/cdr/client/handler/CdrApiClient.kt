@@ -6,6 +6,7 @@ import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.HttpServerErrorException
+import com.swisscom.health.des.cdr.client.getRootestCause
 import io.github.oshai.kotlinlogging.KotlinLogging
 import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaType
@@ -18,6 +19,7 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.retry.RetryContext
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Service
 import org.springframework.util.LinkedMultiValueMap
@@ -46,7 +48,17 @@ class CdrApiClient(
     fun renewClientCredential(traceId: String): RenewClientSecretResult = runCatching {
         logger.debug { "Renewing client secret" }
         val accessToken = getAccessToken()
-        retryIOExceptionsAndServerErrors.execute<Response, Exception> { _ ->
+        retryIOExceptionsAndServerErrors.execute<Response, Exception> { retry: RetryContext ->
+            if (retry.retryCount > 0) {
+                logger.debug {
+                    "Operation targeting '${buildClientCredentialUrl(cdrClientConfig.idpCredentials.clientId)}' has failed; exception: " +
+                            "'${retry.lastThrowable?.let { getRootestCause(it)::class.java }}'; message: '${retry.lastThrowable?.message}'"
+                }
+                logger.info {
+                    "Retry attempt '#${retry.retryCount}' of 'renew client credential' operation targeting " +
+                            "'${buildClientCredentialUrl(cdrClientConfig.idpCredentials.clientId)}'"
+                }
+            }
             httpClient.newCall(
                 Request.Builder()
                     .url(buildClientCredentialUrl(cdrClientConfig.idpCredentials.clientId))
@@ -154,7 +166,7 @@ class CdrApiClient(
     @Suppress("MagicNumber")
     fun uploadDocument(contentType: String, file: Path, connectorId: String, mode: CdrClientConfig.Mode, traceId: String): UploadDocumentResult =
         runCatching {
-            logger.debug { "Upload file start" }
+            logger.debug { "Upload '$file' start" }
             httpClient
                 .newCall(
                     createPostRequest(
@@ -167,21 +179,21 @@ class CdrApiClient(
                 .use { response: Response ->
                     when {
                         response.isSuccessful -> UploadDocumentResult.Success.also { _ ->
-                            logger.debug { "Upload file done" }
+                            logger.debug { "Upload '$file' done" }
                         }
 
                         response.code in 400..499 -> UploadDocumentResult.UploadClientErrorResponse(
                             code = response.code,
                             responseBody = response.body?.string() ?: "no response body"
                         ).also { result ->
-                            logger.warn { "Upload file encountered client error: '$result'" }
+                            logger.info { "Upload '$file' encountered client error: '$result'" }
                         }
 
                         else -> UploadDocumentResult.UploadServerErrorResponse(
                             code = response.code,
                             responseBody = response.body?.string() ?: "no response body"
                         ).also { result ->
-                            logger.warn { "Upload file encountered server error: '$result'" }
+                            logger.info { "Upload '$file' encountered server error: '$result'" }
                         }
                     }
                 }
@@ -271,7 +283,7 @@ class CdrApiClient(
      */
     fun acknowledgeDocumentDownload(connectorId: String, mode: CdrClientConfig.Mode, downloadId: String, traceId: String): DownloadDocumentResult =
         runCatching {
-            logger.debug { "Acknowledge pulled file start" }
+            logger.debug { "Acknowledging pulled file with id '$downloadId' start" }
             httpClient.newCall(
                 createDeleteRequest(
                     buildDocumentTargetUrl("${cdrClientConfig.cdrApi.basePath}/$downloadId"),
@@ -282,21 +294,21 @@ class CdrApiClient(
                     response.isSuccessWithContent() -> DownloadDocumentResult.Success(
                         pullResultId = downloadId
                     ).also { _ ->
-                        logger.info { "Acknowledge pulled file done" }
+                        logger.debug { "Pulled file with id '$downloadId' acknowledged" }
                     }
 
                     else -> DownloadDocumentResult.DownloadError(
                         code = response.code,
                         message = response.body?.string() ?: "no response body"
                     ).also { result ->
-                        logger.warn { "Acknowledge pulled file encountered error: '$result'" }
+                        logger.info { "Acknowledging pulled file with id '$downloadId' encountered a http error: '$result'" }
                     }
                 }
             }
         }.fold(
             onSuccess = { it },
             onFailure = { t ->
-                logger.error(t) { "Acknowledge pulled file failed: '${t.message}'" }
+                logger.error(t) { "Acknowledging pulled file with id '$downloadId' failed: '${t.message}'" }
                 DownloadDocumentResult.DownloadError(message = t.message ?: "Unknown error", t = t)
             }
         )
@@ -400,7 +412,17 @@ class CdrApiClient(
      *
      */
     private fun getAccessToken(): String = runCatching {
-        retryIOExceptionsAndServerErrors.execute<String, Exception> { _ ->
+        retryIOExceptionsAndServerErrors.execute<String, Exception> { retry: RetryContext ->
+            if (retry.retryCount > 0) {
+                logger.debug {
+                    "Operation targeting '${cdrClientConfig.idpEndpoint}' has failed; exception: " +
+                            "'${retry.lastThrowable?.let { getRootestCause(it)::class.java }}'; message: '${retry.lastThrowable?.message}'"
+                }
+                logger.info {
+                    "Retry attempt '#${retry.retryCount}' of 'get access token' operation targeting " +
+                            "'${cdrClientConfig.idpEndpoint}'"
+                }
+            }
             val authResult: IAuthenticationResult = securedApp.acquireToken(clientCredentialParams).get()
             logger.debug { "Token taken from ${authResult.metadata().tokenSource()}" }
             authResult.accessToken()

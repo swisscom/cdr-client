@@ -24,9 +24,9 @@ fun pathIsDirectoryAndWritable(path: Path, what: String, logger: KLogger): Boole
         else -> true
     }
 
-inline fun <A> traced(tracer: Tracer, spanName: String, block: () -> A): A {
-    val newSpan = tracer.spanBuilder().name(spanName).start()
-    return tracer.withSpan(newSpan).use {
+inline fun <A> Tracer.withSpan(spanName: String, block: () -> A): A {
+    val newSpan = this.spanBuilder().name(spanName).start()
+    return this.withSpan(newSpan).use {
         block()
     }
 }

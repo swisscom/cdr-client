@@ -23,6 +23,9 @@ client:
     - 8s
     - 32s
     - 10m
+  file-busy-test-interval: 250ms
+  file-busy-test-timeout: 30s
+  file-busy-test-strategy: never_busy # valid values are `never_busy`, `file_size_changed`, `always_busy`
   retry-template:
     retries: 5
     initial-delay: 250ms

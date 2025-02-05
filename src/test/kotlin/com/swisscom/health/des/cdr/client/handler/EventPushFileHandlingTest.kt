@@ -17,7 +17,6 @@ import okhttp3.mockwebserver.MockWebServer
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -26,9 +25,9 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
-import org.springframework.scheduling.config.OneTimeTask
 import org.springframework.scheduling.config.ScheduledTaskHolder
+import org.springframework.scheduling.config.TaskExecutionOutcome.Status.NONE
+import org.springframework.scheduling.config.TaskExecutionOutcome.Status.STARTED
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
@@ -70,16 +69,11 @@ internal class EventPushFileHandlingTest {
     @Autowired
     private lateinit var scheduledTaskHolder: ScheduledTaskHolder
 
-    @Autowired
-    private lateinit var threadPoolTaskScheduler: ThreadPoolTaskScheduler
-
     private val targetDirectory = "customer"
     private val sourceDirectory = "source"
     private val forumDatenaustauschMediaType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
 
     private lateinit var cdrServiceMock: MockWebServer
-
-    private val isFirstTest: AtomicBoolean = AtomicBoolean(true)
 
     @BeforeEach
     fun setup() {
@@ -112,25 +106,19 @@ internal class EventPushFileHandlingTest {
         every { authMock.accessToken() } returns "123"
         every { securedApp.acquireToken(any<ClientCredentialParameters>()) } returns resultMock
 
-        // The test is in a race condition with the code under test. The code under test starts a file watcher task with the help of the
-        // `@Scheduled` annotation. I have found no deterministic way to either delay the scheduled task until we set the behavior on the
-        // spy of the CdrClientConfig bean, to not run it at all, or to cancel it if it is already running.
-        // So we hope for the best (original task has started before we set the spy behavior) and then re-submit the task after setting the
-        // spy's behavior. That we have two instances of the watcher task running, but only one of them is watching the directory we use
-        // in this test.
+        // The test is racing the code under test. We need to make sure that the event watcher task
+        // is not yet started to be sure that when it starts, it picks up the configuration we injected
+        // above in the @SpykBean.
         if (isFirstTest.compareAndSet(true, false)) {
-            val oneTimeTasks = scheduledTaskHolder.scheduledTasks.filter { it.task is OneTimeTask }
-            // as we disabled all other schedulers via profiles, we expect exactly the one task we are testing in the list
-            assertEquals(1, oneTimeTasks.size)
-            // re-submit the file watcher task; effectively there will be two instances of the task running:
-            // the original one and the copy we just submitted, but only the second one will receive the events from the source directory created by the test
-            oneTimeTasks.forEach { ott ->
-                val future = threadPoolTaskScheduler.submit(ott.task.runnable)
-                await().until { future.isDone || future.isCancelled }
-                assertTrue(future.isDone)
+            val eventWatcher = scheduledTaskHolder.scheduledTasks.filter { it.task.toString().endsWith("launchFileWatcher") }
+            assertEquals(1, eventWatcher.size)
+            assertEquals(NONE, eventWatcher.first().task.lastExecutionOutcome.status) {
+                "we cannot be sure whether we won or lost the race against the event watcher task; so let's bail out to err on the safe side"
             }
+            await().until { eventWatcher.first().task.lastExecutionOutcome.status == STARTED }
+            // give the event watcher task some time to start up
+            Thread.sleep(1_000L)
         }
-
     }
 
     @OptIn(ExperimentalPathApi::class)
@@ -304,6 +292,9 @@ internal class EventPushFileHandlingTest {
         @TempDir
         @JvmStatic
         private lateinit var tmpDir: Path
+
+        @JvmStatic
+        private val isFirstTest: AtomicBoolean = AtomicBoolean(true)
 
     }
 

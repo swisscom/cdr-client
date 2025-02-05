@@ -25,6 +25,9 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.scheduling.config.ScheduledTaskHolder
+import org.springframework.scheduling.config.TaskExecutionOutcome.Status.STARTED
+import org.springframework.scheduling.config.TaskExecutionOutcome.Status.NONE
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
@@ -32,6 +35,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.createDirectories
 import kotlin.io.path.isRegularFile
@@ -61,6 +65,9 @@ internal class PollingPushFileHandlingTest {
 
     @Autowired
     private lateinit var fileCache: ObjectKache<String, Path>
+
+    @Autowired
+    private lateinit var scheduledTaskHolder: ScheduledTaskHolder
 
     @TempDir
     private lateinit var tmpDir: Path
@@ -104,6 +111,17 @@ internal class PollingPushFileHandlingTest {
         every { authMock.metadata().tokenSource() } returns TokenSource.CACHE
         every { authMock.accessToken() } returns "123"
         every { securedApp.acquireToken(any<ClientCredentialParameters>()) } returns resultMock
+
+        if (isFirstTest.compareAndSet(true, false)) {
+            val filePoller = scheduledTaskHolder.scheduledTasks.filter { it.task.toString().endsWith("launchFilePoller") }
+            assertEquals(1, filePoller.size)
+            assertEquals(NONE, filePoller.first().task.lastExecutionOutcome.status) {
+                "we cannot be sure whether we won or lost the race against the event watcher task; so let's bail out to err on the safe side"
+            }
+            await().until { filePoller.first().task.lastExecutionOutcome.status == STARTED }
+            // give the file polling task some time to start up
+            Thread.sleep(1_000L)
+        }
     }
 
     @AfterEach
@@ -258,6 +276,9 @@ internal class PollingPushFileHandlingTest {
         @JvmStatic
         @Suppress("unused")
         private lateinit var inflightDirInApplicationTestYaml: Path
+
+        @JvmStatic
+        private val isFirstTest: AtomicBoolean = AtomicBoolean(true)
 
     }
 

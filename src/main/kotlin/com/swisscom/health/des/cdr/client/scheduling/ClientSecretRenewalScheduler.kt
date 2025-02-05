@@ -2,7 +2,7 @@ package com.swisscom.health.des.cdr.client.scheduling
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.handler.ClientSecretRenewalService
-import com.swisscom.health.des.cdr.client.handler.traced
+import com.swisscom.health.des.cdr.client.handler.withSpan
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import jakarta.annotation.PostConstruct
@@ -28,7 +28,7 @@ class ClientSecretRenewalScheduler(
     fun reportIn() = logger.info { "Automatic client secret renewal is '${if (config.idpCredentials.renewCredentialAtStartup) "on" else "off"}'" }
 
     @Scheduled(fixedDelayString = "365d", initialDelayString = "1s")
-    fun renewClientSecret(): Unit = traced(tracer, "Renew Client Secret") {
+    fun renewClientSecret(): Unit = tracer.withSpan("Renew Client Secret") {
         logger.info { "Renewing client secret..." }
         val result = clientSecretRenewalService.renewClientSecret()
         when (result) {

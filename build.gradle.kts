@@ -14,7 +14,6 @@ val kfsWatchVersion: String by project
 val kotlinCoroutinesVersion: String by project
 val kotlinLoggingVersion: String by project
 val logstashEncoderVersion: String by project
-val micrometerTracingVersion: String by project
 val mockkVersion: String by project
 val msal4jVersion: String by project
 val springCloudVersion: String by project
@@ -98,8 +97,8 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:$okHttpVersion")
     implementation("io.github.irgaly.kfswatch:kfswatch:$kfsWatchVersion")
     implementation("io.github.oshai:kotlin-logging:$kotlinLoggingVersion")
-    implementation("io.micrometer:micrometer-tracing:$micrometerTracingVersion")
-    implementation("io.micrometer:micrometer-tracing-bridge-otel:$micrometerTracingVersion")
+    implementation("io.micrometer:micrometer-tracing")
+    implementation("io.micrometer:micrometer-tracing-bridge-otel")
     implementation("net.logstash.logback:logstash-logback-encoder:$logstashEncoderVersion")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlin:kotlin-stdlib")
@@ -199,6 +198,9 @@ val jacocoTestReport = tasks.named<JacocoReport>("jacocoTestReport") {
 }
 
 tasks.withType<Test> {
+    // show log output produced by tests in console
+    testLogging.showStandardStreams = false
+
     useJUnitPlatform {
         includeEngines("junit-jupiter")
     }
