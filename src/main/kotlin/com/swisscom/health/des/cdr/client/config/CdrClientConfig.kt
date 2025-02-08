@@ -8,8 +8,11 @@ import org.springframework.util.unit.DataSize
 import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlin.io.path.createDirectories
 import kotlin.io.path.exists
+import kotlin.io.path.fileStore
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.isWritable
@@ -89,11 +92,78 @@ class CdrClientConfig {
         /** Media type to set for file uploads; currently only `application/forumdatenaustausch+xml;charset=UTF-8` is supported. */
         lateinit var contentType: MediaType
 
+        /**
+         * Whether to enable the archiving of successfully uploaded files. If not enabled files that have been uploaded get deleted.
+         * If you enable archiving, beware that the client does not perform any housekeeping of the archive. Housekeeping is the
+         * responsibility of the system's administrator.
+         *
+         * Defaults to `false`
+         *
+         * @see sourceArchiveFolder
+         * @see effectiveSourceArchiveFolder
+         */
+        var sourceArchiveEnabled: Boolean = false
+
+        /**
+         * Folder to archive uploaded files to. The folder will be created for you if it does not exist yet if [sourceArchiveEnabled]
+         * is set to `true`. If you specify a relative path it will be resolved relative to the source folder.
+         *
+         * Beware: On Linux both `.` and `./` resolve to the current working directory, while `./archive` (and just `archive`) resolve
+         * to `<source_dir>/archive`.
+         *
+         * Default is an empty path, which resolves to the source folder itself.
+         *
+         * @see sourceArchiveEnabled
+         * @see effectiveSourceArchiveFolder
+         * @see sourceFolder
+         */
+        var sourceArchiveFolder: Path = EMPTY_PATH
+
+        /**
+         * Folder to move documents to for which the upload has failed. If you specify a relative path it will be resolved relative
+         * to the source folder.
+         *
+         * Beware: On Linux both `.` and `./` resolve to the current working directory, while `./error` (and just `error`) resolve
+         * to `<source_dir>/error`.
+         *
+         * Default is an empty path, which resolves to the source folder itself.
+         *
+         * @see effectiveSourceErrorFolder
+         * @see sourceFolder
+         */
+        var sourceErrorFolder: Path = EMPTY_PATH
+
         /** Mode of the connector; either `test` or `production`; attempting to upload documents with a mismatching mode attribute value will fail. */
         lateinit var mode: Mode
 
+        /**
+         * If [sourceArchiveEnabled] is set to `true` returns the archive folder resolved against the source folder with a subdirectory
+         * for the current date. The directories will be created if they do not exist. If [sourceArchiveEnabled] is `false` returns an
+         * empty path.
+         *
+         * @see sourceArchiveEnabled
+         * @see sourceArchiveFolder
+         * @see sourceFolder
+         */
+        val effectiveSourceArchiveFolder: Path
+            get() = if (sourceArchiveEnabled) sourceFolder.resolve(sourceArchiveFolder.resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)))
+                .also { it.createDirectories() } else EMPTY_PATH
+
+        /**
+         * Returns the error folder resolved against the source folder with a subdirectory for the current date. The directories will be
+         * created if they do not exist.
+         *
+         * @see sourceErrorFolder
+         * @see sourceFolder
+         */
+        val effectiveSourceErrorFolder: Path
+            get() = sourceFolder.resolve(sourceErrorFolder.resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE))).also { it.createDirectories() }
+
         override fun toString(): String {
-            return "Connector(connectorId='$connectorId', targetFolder=$targetFolder, sourceFolder=$sourceFolder, contentType=$contentType, mode=$mode)"
+            return "Connector(connectorId='$connectorId', targetFolder=$targetFolder, sourceFolder=$sourceFolder, contentType=$contentType, " +
+                    "uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
+                    "effectiveSourceArchiveFolder=$effectiveSourceArchiveFolder, sourceErrorFolder=$sourceErrorFolder, " +
+                    "effectiveSourceErrorFolder=$effectiveSourceErrorFolder mode=$mode)"
         }
     }
 
@@ -240,16 +310,31 @@ class CdrClientConfig {
         }
 
     private fun allFoldersAreReadWriteable() {
-        val allFolders: List<Path> = customer.flatMap { listOf(it.sourceFolder, it.targetFolder) }
-        allFolders.forEach { folder ->
+        val allFolders: List<Pair<String, Path>> = customer.flatMap {
+            val archiveFolder: Pair<String, Path>? =
+                if (it.sourceArchiveEnabled) "connector '${it.connectorId}' source archive" to it.effectiveSourceArchiveFolder else null
+            val errorFolder: Pair<String, Path>? =
+                if (it.sourceErrorFolder != EMPTY_PATH) "connector '${it.connectorId}' source error" to it.effectiveSourceErrorFolder else null
+            listOfNotNull(
+                "connector '${it.connectorId}' source" to it.sourceFolder,
+                "connector '${it.connectorId}' source error" to it.effectiveSourceErrorFolder,
+                archiveFolder,
+                errorFolder,
+                "connector '${it.connectorId}' target" to it.targetFolder
+            )
+        }
+        allFolders.forEach { (name, folder) ->
             if (!folder.isDirectory()) {
-                error("Configured path '$folder' is not a directory or does not exist.")
+                error("$name path '$folder' is not a directory or does not exist.")
             }
             if (!folder.isWritable()) {
-                error("Configured path '$folder' isn't writable by running user.")
+                error("$name path '$folder' isn't writable by running user.")
             }
             if (!folder.isReadable()) {
-                error("Configured path '$folder' isn't readable by running user.")
+                error("$name path '$folder' isn't readable by running user.")
+            }
+            if (DataSize.ofBytes(folder.fileStore().usableSpace) < FREE_DISK_SPACE_WARNING_THRESHOLD) {
+                logger.warn { "Filesystem of $name path '$folder' has less than ${FREE_DISK_SPACE_WARNING_THRESHOLD.toMegabytes()}mb of free space." }
             }
         }
     }
@@ -264,6 +349,12 @@ class CdrClientConfig {
     private companion object {
         private const val DEFAULT_SCHEDULER_POOL_SIZE = 1
         private const val DEFAULT_ENDPOINT_PORT = 443
+
+        @JvmStatic
+        private val FREE_DISK_SPACE_WARNING_THRESHOLD = DataSize.ofMegabytes(100L)
+
+        @JvmStatic
+        val EMPTY_PATH: Path = Path.of("")
     }
 
 }

@@ -33,6 +33,8 @@ import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -48,6 +50,7 @@ import kotlin.io.path.walk
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = [
+        "spring.main.lazy-initialization=true",
         "spring.jmx.enabled=false",
         "client.idp-credentials.renew-credential-at-startup=false",
     ]
@@ -209,6 +212,7 @@ internal class EventPushFileHandlingTest {
         cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.BAD_REQUEST.value()).setBody("{\"message\": \"Exception\"}"))
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
+        val errorDir = sourceDir.resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE))
 
         val payload1 = sourceDir.resolve("dummy.xml.tmp")
         payload1.outputStream().use { it.write("Hello".toByteArray()) }
@@ -224,10 +228,10 @@ internal class EventPushFileHandlingTest {
         Files.move(payload3, payload3.resolveSibling(payload3.nameWithoutExtension))
 
         await().during(1, TimeUnit.SECONDS).until(cdrServiceMock::requestCount) { it == 6 }
-        await().during(100L, TimeUnit.MILLISECONDS).until { sourceDir.listDirectoryEntries("*response").size == 1 }
+        await().during(100L, TimeUnit.MILLISECONDS).until { errorDir.listDirectoryEntries("*response").size == 1 }
 
-        assertEquals(1, sourceDir.listDirectoryEntries("*error").size)
-        assertEquals(1, sourceDir.listDirectoryEntries("*response").size)
+        assertEquals(1, errorDir.listDirectoryEntries("*error").size)
+        assertEquals(1, errorDir.listDirectoryEntries("*response").size)
 
         // but no additional requests for the error and response file should have been made, i.e. the request count
         // should still be 6 (2 successful and four failed requests)
@@ -236,8 +240,9 @@ internal class EventPushFileHandlingTest {
         // ignored files like the error and response files don't get processed and thus are not supposed to be in the processing cache
         await().during(100L, TimeUnit.MILLISECONDS).until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
 
-        // error and response files remain in source directory
-        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.size == 2 }
+        // error and response files are written to a subdirectory of the source directory
+        await().during(100L, TimeUnit.MILLISECONDS).until(errorDir::listDirectoryEntries) { it.size == 2 }
+        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.none { it.isRegularFile() } }
     }
 
     @Test
@@ -251,6 +256,7 @@ internal class EventPushFileHandlingTest {
         cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.BAD_REQUEST.value()).setBody("{\"message\": \"Exception\"}"))
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
+        val errorDir = sourceDir.resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE))
 
         val payload1 = sourceDir.resolve("dummy.xml.tmp")
         payload1.outputStream().use { it.write("Hello".toByteArray()) }
@@ -266,10 +272,10 @@ internal class EventPushFileHandlingTest {
         Files.move(payload3, payload3.resolveSibling(payload3.nameWithoutExtension))
 
         await().during(1, TimeUnit.SECONDS).until(cdrServiceMock::requestCount) { it == 3 }
-        await().during(100L, TimeUnit.MILLISECONDS).until { sourceDir.listDirectoryEntries("*response").size == 1 }
+        await().during(100L, TimeUnit.MILLISECONDS).until { errorDir.listDirectoryEntries("*response").size == 1 }
 
-        assertEquals(1, sourceDir.listDirectoryEntries("*error").size)
-        assertEquals(1, sourceDir.listDirectoryEntries("*response").size)
+        assertEquals(1, errorDir.listDirectoryEntries("*error").size)
+        assertEquals(1, errorDir.listDirectoryEntries("*response").size)
 
         // but no additional requests for the error and response file should have been made, i.e. the request count
         // should still be 6 (2 successful and four failed requests)
@@ -278,8 +284,9 @@ internal class EventPushFileHandlingTest {
         // ignored files like the error and response files don't get processed and thus are not supposed to be in the processing cache
         await().during(100L, TimeUnit.MILLISECONDS).until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
 
-        // error and response files remain in source directory
-        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.size == 2 }
+        // error and response files are written to a subdirectory of the source directory
+        await().during(100L, TimeUnit.MILLISECONDS).until(errorDir::listDirectoryEntries) { it.size == 2 }
+        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.none { it.isRegularFile() } }
     }
 
     private companion object {

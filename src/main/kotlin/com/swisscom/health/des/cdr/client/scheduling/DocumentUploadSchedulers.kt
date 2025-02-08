@@ -5,7 +5,7 @@ import com.swisscom.health.des.cdr.client.TraceSupport.continueSpan
 import com.swisscom.health.des.cdr.client.TraceSupport.startSpan
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.FileBusyTester
-import com.swisscom.health.des.cdr.client.handler.RetryUploadFile
+import com.swisscom.health.des.cdr.client.handler.RetryUploadFileHandling
 import io.github.irgaly.kfswatch.KfsDirectoryWatcher
 import io.github.irgaly.kfswatch.KfsDirectoryWatcherEvent
 import io.github.irgaly.kfswatch.KfsEvent
@@ -62,12 +62,12 @@ class EventTriggerUploadScheduler(
     private val cdrUploadsDispatcher: CoroutineDispatcher,
     @Value("\${management.tracing.sampling.probability:0.0}")
     private val samplerProbability: Double,
-    retryUploadFile: RetryUploadFile,
+    retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
     fileBusyTester: FileBusyTester
 ) : BaseUploadScheduler(
     config = config,
-    retryUploadFile = retryUploadFile,
+    retryUploadFileHandling = retryUploadFileHandling,
     cdrUploadsDispatcher = cdrUploadsDispatcher,
     processingInProgressCache = processingInProgressCache,
     tracer = tracer,
@@ -185,12 +185,12 @@ class PollingUploadScheduler(
     private val cdrUploadsDispatcher: CoroutineDispatcher,
     @Value("\${management.tracing.sampling.probability:1.0}")
     private val samplerProbability: Double,
-    retryUploadFile: RetryUploadFile,
+    retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
     fileBusyTester: FileBusyTester,
 ) : BaseUploadScheduler(
     config = config,
-    retryUploadFile = retryUploadFile,
+    retryUploadFileHandling = retryUploadFileHandling,
     cdrUploadsDispatcher = cdrUploadsDispatcher,
     processingInProgressCache = processingInProgressCache,
     tracer = tracer,
@@ -284,7 +284,7 @@ class PollingUploadScheduler(
 
 abstract class BaseUploadScheduler(
     private val config: CdrClientConfig,
-    private val retryUploadFile: RetryUploadFile,
+    private val retryUploadFileHandling: RetryUploadFileHandling,
     @Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
     private val processingInProgressCache: ObjectKache<String, Path>,
@@ -338,7 +338,7 @@ abstract class BaseUploadScheduler(
                         runCatching {
                             dispatchForUpload(file)
                         }.fold(
-                            onSuccess = { uploaded -> logger.info { "'$file' ${if (uploaded) "successfully uploaded" else "not uploaded"}" } },
+                            onSuccess = { uploaded -> logger.info { "'$file' ${if (uploaded) "uploaded or error handled" else "not uploaded"}" } },
                             onFailure = { t: Throwable ->
                                 when (t) {
                                     is CancellationException -> throw t
@@ -372,7 +372,7 @@ abstract class BaseUploadScheduler(
     private suspend fun dispatchForUpload(file: Path): Boolean =
         config.customer.first { it.sourceFolder == file.parent }.let { connector ->
             if (!file.isBusy()) {
-                retryUploadFile.uploadRetrying(file, connector)
+                retryUploadFileHandling.uploadRetrying(file, connector)
                 true
             } else {
                 logger.warn { "'$file' is still busy after '${config.fileBusyTestTimeout}'; giving up; file will be picked up again on next poll" }

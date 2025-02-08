@@ -47,4 +47,7 @@ client:
   #     content-type: application/forumdatenaustausch+xml;charset=UTF-8
   #     target-folder: /tmp/download
   #     source-folder: /tmp/upload
+  #     upload-archive-enabled: true
+  #     upload-archive-folder: /tmp/upload/success
+  #     upload-error-folder: /tmp/upload/error
   #     mode: test|production
