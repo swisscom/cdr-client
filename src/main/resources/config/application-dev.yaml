@@ -12,6 +12,8 @@ client:
     base-path: documents
   credential-api:
     base-path: client-credentials
+  retry-template:
+    retries: 1
   customer:
     - connector-id: 1
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
