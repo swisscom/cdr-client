@@ -9,8 +9,10 @@ import org.springframework.stereotype.Component
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
+import java.util.UUID
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.moveTo
+import kotlin.io.path.name
 import kotlin.io.path.nameWithoutExtension
 
 
@@ -25,7 +27,7 @@ private val logger = KotlinLogging.logger {}
  */
 @Component
 @Suppress("TooManyFunctions", "LongParameterList")
-class RetryUploadFile(
+class RetryUploadFileHandling(
     private val cdrClientConfig: CdrClientConfig,
     private val tracer: Tracer,
     private val cdrApiClient: CdrApiClient,
@@ -41,7 +43,7 @@ class RetryUploadFile(
         var retryNeeded = false
 
         // a successful rename of the file to upload should guarantee that we can also delete it after a successful upload,
-        // and thus prevent duplicate uploads of files we fail to delete
+        // and thus prevent duplicate uploads of a file if we fail to delete or archive it after a successful upload
         val uploadFile = file.moveTo(file.resolveSibling("${file.nameWithoutExtension}.upload"))
 
         do {
@@ -61,9 +63,8 @@ class RetryUploadFile(
 
             retryNeeded = when (response) {
                 is UploadDocumentResult.Success -> {
-                    if (!uploadFile.deleteIfExists()) {
-                        logger.warn { "Tried to delete the file '$uploadFile' but it was already gone" }
-                    }
+                    logger.debug { "File '${uploadFile.fileName}' successfully synchronized." }
+                    deleteOrArchiveFile(uploadFile)
                     false
                 }
 
@@ -97,16 +98,42 @@ class RetryUploadFile(
         } while (retryNeeded && retryCount < cdrClientConfig.retryDelay.size)
     }
 
-    /**
-     * For an error case and to prevent a failed file to be uploaded again it renames the file to '.error' and creates a file with the response body.
-     */
-    private fun renameFileToErrorAndCreateLogFile(file: Path, responseBdy: String) {
-        val errorFile = file.resolveSibling("${file.nameWithoutExtension}.error")
-        val logFile = file.resolveSibling("${file.nameWithoutExtension}.response")
-        if (!file.toFile().renameTo(errorFile.toFile())) {
-            logger.error { "Failed to rename file '${file}'" }
+    private fun deleteOrArchiveFile(file: Path): Unit = runCatching {
+        cdrClientConfig.customer.first { it.sourceFolder == file.parent }.let { connector ->
+            if (connector.sourceArchiveEnabled) {
+                file.moveTo(
+                    connector.effectiveSourceArchiveFolder.resolve("${file.nameWithoutExtension}_${UUID.randomUUID()}.xml")
+                )
+            } else {
+                if (!file.deleteIfExists()) {
+                    logger.warn { "Tried to delete the file '$file' but it was already gone" }
+                }
+            }
         }
+    }.fold(
+        onSuccess = {},
+        onFailure = { t: Throwable -> logger.error { "Error during handling of successful upload of '${file}': '$t'" } }
+    )
+
+    /**
+     * For an error case renames the file to '.error' and creates a file with the response body.
+     */
+    private fun renameFileToErrorAndCreateLogFile(file: Path, responseBdy: String): Unit = runCatching {
+        val uuidString = UUID.randomUUID().toString()
+        val errorFile = file.resolveSibling("${file.nameWithoutExtension}_$uuidString.error")
+        val logFile = file.resolveSibling("${file.nameWithoutExtension}_$uuidString.response")
+        file.moveTo(errorFile)
         Files.write(logFile, responseBdy.toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
-    }
+
+        cdrClientConfig.customer.first { it.sourceFolder == file.parent }.let { connector ->
+            if (connector.effectiveSourceErrorFolder != file.parent) {
+                errorFile.moveTo(connector.effectiveSourceErrorFolder.resolve(errorFile.name))
+                logFile.moveTo(connector.effectiveSourceErrorFolder.resolve(logFile.name))
+            }
+        }
+    }.fold(
+        onSuccess = {},
+        onFailure = { t: Throwable -> logger.error { "Error during handling of failed upload of '${file}': '$t'" } }
+    )
 
 }

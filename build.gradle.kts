@@ -309,7 +309,7 @@ tasks.register<Test>("integrationTest") {
 }
 
 dockerCompose {
-    dockerComposeWorkingDirectory.set(File("${rootProject.projectDir}/docker-compose"))
+    dockerComposeWorkingDirectory.set(layout.projectDirectory.file("docker-compose").asFile)
     dockerComposeStopTimeout.set(Duration.ofSeconds(5))  // time before docker-compose sends SIGTERM to the running containers after the composeDown task has been started
     ignorePullFailure.set(true)
     isRequiredBy(tasks.getByName("integrationTest"))
