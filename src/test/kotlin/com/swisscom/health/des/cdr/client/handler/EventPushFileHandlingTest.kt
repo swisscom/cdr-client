@@ -5,6 +5,7 @@ import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.microsoft.aad.msal4j.TokenSource
+import com.ninjasquad.springmockk.MockkBean
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -16,7 +17,6 @@ import okhttp3.mockwebserver.MockWebServer
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -25,14 +25,16 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler
-import org.springframework.scheduling.config.OneTimeTask
 import org.springframework.scheduling.config.ScheduledTaskHolder
+import org.springframework.scheduling.config.TaskExecutionOutcome.Status.NONE
+import org.springframework.scheduling.config.TaskExecutionOutcome.Status.STARTED
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -48,7 +50,9 @@ import kotlin.io.path.walk
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = [
+        "spring.main.lazy-initialization=true",
         "spring.jmx.enabled=false",
+        "client.idp-credentials.renew-credential-at-startup=false",
     ]
 )
 // only test filesystem event handling, no polling
@@ -59,7 +63,7 @@ internal class EventPushFileHandlingTest {
     @SpykBean
     private lateinit var config: CdrClientConfig
 
-    @SpykBean
+    @MockkBean
     private lateinit var securedApp: IConfidentialClientApplication
 
     @Autowired
@@ -68,39 +72,34 @@ internal class EventPushFileHandlingTest {
     @Autowired
     private lateinit var scheduledTaskHolder: ScheduledTaskHolder
 
-    @Autowired
-    private lateinit var threadPoolTaskScheduler: ThreadPoolTaskScheduler
-
     private val targetDirectory = "customer"
     private val sourceDirectory = "source"
     private val forumDatenaustauschMediaType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
 
     private lateinit var cdrServiceMock: MockWebServer
 
-    private val isFirstTest: AtomicBoolean = AtomicBoolean(true)
-
     @BeforeEach
     fun setup() {
         cdrServiceMock = MockWebServer()
         cdrServiceMock.start()
 
-        val sourceFolder = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
-        val targetFolder = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
+        val sourceFolder0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
+        val targetFolder0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
 
-        every { config.endpoint } returns CdrClientConfig.Endpoint(
-            host = cdrServiceMock.hostName,
-            basePath = "documents",
-            scheme = "http",
-            port = cdrServiceMock.port,
-        )
+        every { config.cdrApi } returns CdrClientConfig.Endpoint().apply {
+            host = cdrServiceMock.hostName
+            basePath = "documents"
+            scheme = "http"
+            port = cdrServiceMock.port
+        }
         every { config.customer } returns listOf(
-            CdrClientConfig.Connector(
-                connectorId = "2345",
-                targetFolder = targetFolder,
-                sourceFolder = sourceFolder,
-                contentType = forumDatenaustauschMediaType,
+            CdrClientConfig.Connector().apply {
+                connectorId = "2345"
+                targetFolder = targetFolder0
+                sourceFolder = sourceFolder0
+                contentType = forumDatenaustauschMediaType
                 mode = CdrClientConfig.Mode.TEST
-            )
+            }
         )
 
         val resultMock: CompletableFuture<IAuthenticationResult> = mockk()
@@ -110,25 +109,19 @@ internal class EventPushFileHandlingTest {
         every { authMock.accessToken() } returns "123"
         every { securedApp.acquireToken(any<ClientCredentialParameters>()) } returns resultMock
 
-        // The test is in a race condition with the code under test. The code under test starts a file watcher task with the help of the
-        // `@Scheduled` annotation. I have found no deterministic way to either delay the scheduled task until we set the behavior on the
-        // spy of the CdrClientConfig bean, to not run it at all, or to cancel it if it is already running.
-        // So we hope for the best (original task has started before we set the spy behavior) and then re-submit the task after setting the
-        // spy's behavior. That we have two instances of the watcher task running, but only one of them is watching the directory we use
-        // in this test.
+        // The test is racing the code under test. We need to make sure that the event watcher task
+        // is not yet started to be sure that when it starts, it picks up the configuration we injected
+        // above in the @SpykBean.
         if (isFirstTest.compareAndSet(true, false)) {
-            val oneTimeTasks = scheduledTaskHolder.scheduledTasks.filter { it.task is OneTimeTask }
-            // as we disabled all other schedulers via profiles, we expect exactly the one task we are testing in the list
-            assertEquals(1, oneTimeTasks.size)
-            // re-submit the file watcher task; effectively there will be two instances of the task running:
-            // the original one and the copy we just submitted, but only the second one will receive the events from the source directory created by the test
-            oneTimeTasks.forEach { ott ->
-                val future = threadPoolTaskScheduler.submit(ott.task.runnable)
-                await().until { future.isDone || future.isCancelled }
-                assertTrue(future.isDone)
+            val eventWatcher = scheduledTaskHolder.scheduledTasks.filter { it.task.toString().endsWith("launchFileWatcher") }
+            assertEquals(1, eventWatcher.size)
+            assertEquals(NONE, eventWatcher.first().task.lastExecutionOutcome.status) {
+                "we cannot be sure whether we won or lost the race against the event watcher task; so let's bail out to err on the safe side"
             }
+            await().until { eventWatcher.first().task.lastExecutionOutcome.status == STARTED }
+            // give the event watcher task some time to start up
+            Thread.sleep(1_000L)
         }
-
     }
 
     @OptIn(ExperimentalPathApi::class)
@@ -149,9 +142,9 @@ internal class EventPushFileHandlingTest {
     @OptIn(ExperimentalPathApi::class)
     @Test
     fun `test successfully write two files to API`() {
-        val mockResponse = MockResponse().setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
+        val mockResponse = MockResponse()
             .setResponseCode(HttpStatus.OK.value())
+            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
             .setBody("{\"message\": \"Upload successful\"}")
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
@@ -207,7 +200,8 @@ internal class EventPushFileHandlingTest {
 
     @Test
     fun `test successfully write two files to API fail with third`() {
-        val mockResponse = MockResponse().setResponseCode(HttpStatus.OK.value())
+        val mockResponse = MockResponse()
+            .setResponseCode(HttpStatus.OK.value())
             .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
             .setBody("{\"message\": \"Upload successful\"}")
         cdrServiceMock.enqueue(mockResponse)
@@ -218,6 +212,7 @@ internal class EventPushFileHandlingTest {
         cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.BAD_REQUEST.value()).setBody("{\"message\": \"Exception\"}"))
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
+        val errorDir = sourceDir.resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE))
 
         val payload1 = sourceDir.resolve("dummy.xml.tmp")
         payload1.outputStream().use { it.write("Hello".toByteArray()) }
@@ -233,10 +228,10 @@ internal class EventPushFileHandlingTest {
         Files.move(payload3, payload3.resolveSibling(payload3.nameWithoutExtension))
 
         await().during(1, TimeUnit.SECONDS).until(cdrServiceMock::requestCount) { it == 6 }
-        await().during(100L, TimeUnit.MILLISECONDS).until { sourceDir.listDirectoryEntries("*response").size == 1 }
+        await().during(100L, TimeUnit.MILLISECONDS).until { errorDir.listDirectoryEntries("*response").size == 1 }
 
-        assertEquals(1, sourceDir.listDirectoryEntries("*error").size)
-        assertEquals(1, sourceDir.listDirectoryEntries("*response").size)
+        assertEquals(1, errorDir.listDirectoryEntries("*error").size)
+        assertEquals(1, errorDir.listDirectoryEntries("*response").size)
 
         // but no additional requests for the error and response file should have been made, i.e. the request count
         // should still be 6 (2 successful and four failed requests)
@@ -245,13 +240,15 @@ internal class EventPushFileHandlingTest {
         // ignored files like the error and response files don't get processed and thus are not supposed to be in the processing cache
         await().during(100L, TimeUnit.MILLISECONDS).until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
 
-        // error and response files remain in source directory
-        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.size == 2 }
+        // error and response files are written to a subdirectory of the source directory
+        await().during(100L, TimeUnit.MILLISECONDS).until(errorDir::listDirectoryEntries) { it.size == 2 }
+        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.none { it.isRegularFile() } }
     }
 
     @Test
     fun `test successfully write two files to API fail with third do not retry`() {
-        val mockResponse = MockResponse().setResponseCode(HttpStatus.OK.value())
+        val mockResponse = MockResponse()
+            .setResponseCode(HttpStatus.OK.value())
             .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
             .setBody("{\"message\": \"Upload successful\"}")
         cdrServiceMock.enqueue(mockResponse)
@@ -259,6 +256,7 @@ internal class EventPushFileHandlingTest {
         cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.BAD_REQUEST.value()).setBody("{\"message\": \"Exception\"}"))
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
+        val errorDir = sourceDir.resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE))
 
         val payload1 = sourceDir.resolve("dummy.xml.tmp")
         payload1.outputStream().use { it.write("Hello".toByteArray()) }
@@ -274,10 +272,10 @@ internal class EventPushFileHandlingTest {
         Files.move(payload3, payload3.resolveSibling(payload3.nameWithoutExtension))
 
         await().during(1, TimeUnit.SECONDS).until(cdrServiceMock::requestCount) { it == 3 }
-        await().during(100L, TimeUnit.MILLISECONDS).until { sourceDir.listDirectoryEntries("*response").size == 1 }
+        await().during(100L, TimeUnit.MILLISECONDS).until { errorDir.listDirectoryEntries("*response").size == 1 }
 
-        assertEquals(1, sourceDir.listDirectoryEntries("*error").size)
-        assertEquals(1, sourceDir.listDirectoryEntries("*response").size)
+        assertEquals(1, errorDir.listDirectoryEntries("*error").size)
+        assertEquals(1, errorDir.listDirectoryEntries("*response").size)
 
         // but no additional requests for the error and response file should have been made, i.e. the request count
         // should still be 6 (2 successful and four failed requests)
@@ -286,8 +284,9 @@ internal class EventPushFileHandlingTest {
         // ignored files like the error and response files don't get processed and thus are not supposed to be in the processing cache
         await().during(100L, TimeUnit.MILLISECONDS).until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
 
-        // error and response files remain in source directory
-        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.size == 2 }
+        // error and response files are written to a subdirectory of the source directory
+        await().during(100L, TimeUnit.MILLISECONDS).until(errorDir::listDirectoryEntries) { it.size == 2 }
+        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.none { it.isRegularFile() } }
     }
 
     private companion object {
@@ -300,6 +299,9 @@ internal class EventPushFileHandlingTest {
         @TempDir
         @JvmStatic
         private lateinit var tmpDir: Path
+
+        @JvmStatic
+        private val isFirstTest: AtomicBoolean = AtomicBoolean(true)
 
     }
 

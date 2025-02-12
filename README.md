@@ -70,19 +70,33 @@ an infrastructure issue that will ultimately be resolved (and uploading another 
 reason). See retry-delay in the [application-client.yaml](./src/main/resources/config/application-client.yaml) file.
 
 ## Local development
-To test some usecases there is a [docker-compose.yaml](./docker-compose/docker-compose.yaml) with wiremock that simulates the CDR API. Run with ```docker-compose down && docker-compose up --build```.
+To test some use cases there is a [docker-compose.yaml](./docker-compose/docker-compose.yaml) with wiremock that 
+simulates the CDR API. Run with ```docker-compose down && docker-compose up --build```.
 
 If you want to work with a deployed CDR API you need to change the [application-dev.yaml](./src/main/resources/config/application-dev.yaml)
 
 Set the following spring profile to active: dev
 
-Following environment variables need to be set:
-* cdrClient.localFolder=~/Documents/cdr/inflight
-* cdrClient.targetFolder=~/Documents/cdr/target
-* cdrClient.sourceFolder=~/Documents/cdr/source
-* CDR_B2C_TENANT_ID=some-cdr-azure-ad-tenant
-* CDR_CLIENT_ID=oauth2-client-id
-* CDR_CLIENT_SECRET=oauth2-client-secret
+Following environment variables can be set (to override their `dev` profile defaults):
+
+| Variable                 | Default Value                |
+|--------------------------|------------------------------|
+| CDR_CLIENT_LOCAL_FOLDER  | $HOME/Documents/cdr/inflight |
+| CDR_CLIENT_TARGET_FOLDER | $HOME/Documents/cdr/target   |
+| CDR_CLIENT_SOURCE_FOLDER | $HOME/Documents/cdr/source   |
+| CDR_B2C_TENANT_ID        | test-tenant-id               |
+| CDR_CLIENT_ID            | fake-id                      |
+| CDR_CLIENT_SECRET        | Placeholder_dummy            |
+
+The application JRE has to be started with the following system properties:
+
+* `-Djdk.net.hosts.file=src/main/resources/msal4j_hosts`
+* `-Djavax.net.ssl.trustStore=src/main/resources/caddy_truststore.p12`
+* `-Djavax.net.ssl.trustStorePassword=changeit`
+
+The first property sets a custom hosts file to resolve external servers that MSAL4J has hardcoded as valid IdPs and 
+redirect them to `localhost`. The other properties are used to make the JRE trust the SSL certificate presented by the  
+[caddy proxy](https://caddyserver.com/) server that we use to impersonate those servers. 
 
 ## Application Plugin
 To create scripts to run the application locally one needs to run following gradle cmd: ```gradlew installDist```
@@ -114,7 +128,7 @@ client:
     tenant-id: swisscom-health-tenant-id # provided by Swisscom Health
     client-id: my-client-id # Self created through CDR UI
     client-secret: my-secret # Self created through CDR UI
-  endpoint:
+  cdr-api:
     host: cdr.health.swisscom.ch
   customer:
     - connector-id: 8000000000000 # provided by Swisscom Health

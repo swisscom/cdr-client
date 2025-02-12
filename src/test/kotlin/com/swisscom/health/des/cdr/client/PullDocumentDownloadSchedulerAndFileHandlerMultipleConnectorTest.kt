@@ -1,11 +1,13 @@
 package com.swisscom.health.des.cdr.client
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.microsoft.aad.msal4j.TokenSource
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
-import com.swisscom.health.des.cdr.client.handler.CONNECTOR_ID_HEADER
+import com.swisscom.health.des.cdr.client.handler.CdrApiClient
+import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CONNECTOR_ID_HEADER
 import com.swisscom.health.des.cdr.client.handler.PULL_RESULT_ID_HEADER
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import com.swisscom.health.des.cdr.client.scheduling.DocumentDownloadScheduler
@@ -83,6 +85,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
     private lateinit var documentDownloadScheduler: DocumentDownloadScheduler
     private lateinit var pullFileHandling: PullFileHandling
+    private lateinit var cdrApiClient: CdrApiClient
 
     private var counterOne = 0
     private var counterTwo = 0
@@ -100,28 +103,28 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         cdrServiceMock = MockWebServer()
         cdrServiceMock.start()
 
-        val endpoint = CdrClientConfig.Endpoint(
-            host = cdrServiceMock.hostName,
-            basePath = "documents",
-            scheme = "http",
-            port = cdrServiceMock.port,
-        )
+        val endpoint = CdrClientConfig.Endpoint().apply {
+            host = cdrServiceMock.hostName
+            basePath = "documents"
+            scheme = "http"
+            port = cdrServiceMock.port
+        }
         val connector1 =
-            CdrClientConfig.Connector(
-                connectorId = connectorId1,
-                targetFolder = tmpDir.resolve(directory1),
-                sourceFolder = tmpDir.resolve(directory1).resolve("source"),
-                contentType = forumDatenaustauschMediaType,
+            CdrClientConfig.Connector().apply {
+                connectorId = connectorId1
+                targetFolder = tmpDir.resolve(directory1)
+                sourceFolder = tmpDir.resolve(directory1).resolve("source")
+                contentType = forumDatenaustauschMediaType
                 mode = CdrClientConfig.Mode.TEST
-            )
+            }
         val connector2 =
-            CdrClientConfig.Connector(
-                connectorId = connectorId2,
-                targetFolder = tmpDir.resolve(directory2),
-                sourceFolder = tmpDir.resolve(directory2).resolve("source"),
-                contentType = forumDatenaustauschMediaType,
+            CdrClientConfig.Connector().apply {
+                connectorId = connectorId2
+                targetFolder = tmpDir.resolve(directory2)
+                sourceFolder = tmpDir.resolve(directory2).resolve("source")
+                contentType = forumDatenaustauschMediaType
                 mode = CdrClientConfig.Mode.PRODUCTION
-            )
+            }
         val localFolder = tmpDir.resolve(inflightFolder)
 
         connector1.sourceFolder.createDirectories()
@@ -129,7 +132,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         localFolder.createDirectories()
 
         every { config.customer } returns listOf(connector1, connector2)
-        every { config.endpoint } returns endpoint
+        every { config.cdrApi } returns endpoint
         every { config.localFolder } returns localFolder
         every { config.idpCredentials.tenantId } returns "something"
 
@@ -144,7 +147,8 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
         mockTracer()
 
-        pullFileHandling = PullFileHandling(config, OkHttpClient.Builder().build(), clientCredentialParams, retryIoErrorsThrice, securedApp, tracer)
+        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), clientCredentialParams, retryIoErrorsThrice, securedApp, ObjectMapper())
+        pullFileHandling = PullFileHandling(tracer, cdrApiClient)
         documentDownloadScheduler = DocumentDownloadScheduler(
             config,
             pullFileHandling,
@@ -203,7 +207,8 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
     private fun handleConnectorOne(maxCount: Int): MockResponse {
         return if (counterOne < maxCount) {
             counterOne++
-            MockResponse().setResponseCode(HttpStatus.OK.value())
+            MockResponse()
+                .setResponseCode(HttpStatus.OK.value())
                 .setHeader(PULL_RESULT_ID_HEADER, UUID.randomUUID().toString())
                 .setBody(String(ClassPathResource("messages/dummy.txt").inputStream.readAllBytes(), StandardCharsets.UTF_8))
         } else {
@@ -214,7 +219,8 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
     private fun handleConnectorTwo(maxCount: Int): MockResponse {
         return if (counterTwo < maxCount) {
             counterTwo++
-            MockResponse().setResponseCode(HttpStatus.OK.value())
+            MockResponse()
+                .setResponseCode(HttpStatus.OK.value())
                 .setHeader(PULL_RESULT_ID_HEADER, UUID.randomUUID().toString())
                 .setBody(String(ClassPathResource("messages/dummy.txt").inputStream.readAllBytes(), StandardCharsets.UTF_8))
         } else {

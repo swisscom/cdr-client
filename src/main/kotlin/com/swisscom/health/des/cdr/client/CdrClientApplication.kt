@@ -19,3 +19,10 @@ class CdrClientApplication
 fun main(args: Array<String>) {
     runApplication<CdrClientApplication>(*args)
 }
+
+internal tailrec fun getRootestCause(e: Throwable): Throwable =
+    if (e.cause == null)
+        e
+    else {
+        getRootestCause(e.cause!!)
+    }
