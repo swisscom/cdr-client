@@ -4,7 +4,7 @@ import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentResult
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
 import org.springframework.stereotype.Component
 import java.nio.file.Files
 import java.nio.file.Path
@@ -14,6 +14,9 @@ import kotlin.io.path.deleteIfExists
 import kotlin.io.path.moveTo
 import kotlin.io.path.name
 import kotlin.io.path.nameWithoutExtension
+import kotlin.math.min
+import kotlinx.coroutines.time.delay
+import kotlin.io.path.exists
 
 
 private val logger = KotlinLogging.logger {}
@@ -36,66 +39,79 @@ class RetryUploadFileHandling(
     /**
      * Retries the upload of a file until it is successful or a 4xx error occurred.
      */
-    @Suppress("NestedBlockDepth")
+    @Suppress("NestedBlockDepth", "LongMethod")
     suspend fun uploadRetrying(file: Path, connector: CdrClientConfig.Connector) {
         logger.debug { "Uploading file '$file'" }
-        var retryCount = -1
+        var retryCount = 0
         var retryNeeded = false
 
         // a successful rename of the file to upload should guarantee that we can also delete it after a successful upload,
         // and thus prevent duplicate uploads of a file if we fail to delete or archive it after a successful upload
         val uploadFile = file.moveTo(file.resolveSibling("${file.nameWithoutExtension}.upload"))
 
-        do {
-            if (retryNeeded) {
-                // FIXME: Cannot use delay() here because we might continue on another thread and we would either loose the span id or continue with
-                //  the wrong span id (thread local)
-                delay(cdrClientConfig.retryDelay[retryCount].toMillis())
+        runCatching {
+            do {
+                val retryIndex = min(retryCount, cdrClientConfig.retryDelay.size - 1)
+
+                val response: UploadDocumentResult = cdrApiClient.uploadDocument(
+                    contentType = connector.contentType.toString(),
+                    file = uploadFile,
+                    connectorId = connector.connectorId,
+                    mode = connector.mode,
+                    traceId = tracer.currentSpan()?.context()?.traceId() ?: ""
+                )
+
+                retryNeeded = when (response) {
+                    is UploadDocumentResult.Success -> {
+                        logger.debug { "File '${uploadFile.fileName}' successfully synchronized." }
+                        deleteOrArchiveFile(uploadFile)
+                        false
+                    }
+
+                    is UploadDocumentResult.UploadClientErrorResponse -> {
+                        logger.error {
+                            "File synchronization failed for '${uploadFile.fileName}'. Received a 4xx client error (response code: '${response.code}'). " +
+                                    "No retry will be attempted due to client-side issue."
+                        }
+                        renameFileToErrorAndCreateLogFile(uploadFile, response.responseBody)
+                        false
+                    }
+
+                    is UploadDocumentResult.UploadServerErrorResponse -> {
+                        logger.error {
+                            "Failed to sync file '${uploadFile.fileName}', retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}' - " +
+                                    "server response: '${response.responseBody}'"
+                        }
+                        true
+                    }
+
+                    is UploadDocumentResult.UploadError -> {
+                        logger.error {
+                            "Failed to sync file '${uploadFile.fileName}', retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}' - " +
+                                    "exception message: '${response.t?.message}'"
+                        }
+                        true
+                    }
+                }
+
+                if (retryNeeded) {
+                    // FIXME: Cannot use delay() here because we might continue on another thread and we would either loose the span id or continue with
+                    //  the wrong span id (thread local)
+                    delay(cdrClientConfig.retryDelay[retryIndex])
+                    retryCount++
+                    logger.info { "Retry attempt '#$retryCount' for file '${uploadFile.fileName}'" }
+                }
+            } while (retryNeeded)
+        }.fold(
+            onSuccess = { it },
+            onFailure = { t: Throwable ->
+                if (t is CancellationException) {
+                    // we are getting shut down; moving the file back to its original location so it gets picked up again on restart
+                    runCatching {if (uploadFile.exists())  uploadFile.moveTo(file) }
+                }
+                throw t
             }
-
-            val response: UploadDocumentResult = cdrApiClient.uploadDocument(
-                contentType = connector.contentType.toString(),
-                file = uploadFile,
-                connectorId = connector.connectorId,
-                mode = connector.mode,
-                traceId = tracer.currentSpan()?.context()?.traceId() ?: ""
-            )
-
-            retryNeeded = when (response) {
-                is UploadDocumentResult.Success -> {
-                    logger.debug { "File '${uploadFile.fileName}' successfully synchronized." }
-                    deleteOrArchiveFile(uploadFile)
-                    false
-                }
-
-                is UploadDocumentResult.UploadClientErrorResponse -> {
-                    logger.error {
-                        "File synchronization failed for '${uploadFile.fileName}'. Received a 4xx client error (response code: '${response.code}'). " +
-                                "No retry will be attempted due to client-side issue."
-                    }
-                    renameFileToErrorAndCreateLogFile(uploadFile, response.responseBody)
-                    false
-                }
-
-                is UploadDocumentResult.UploadServerErrorResponse -> {
-                    logger.error {
-                        "Failed to sync file '${uploadFile.fileName}', retry will be attempted in '${cdrClientConfig.retryDelay[retryCount + 1]}' - " +
-                                "server response: '${response.responseBody}'"
-                    }
-                    true
-                }
-
-                is UploadDocumentResult.UploadError -> {
-                    logger.error {
-                        "Failed to sync file '${uploadFile.fileName}', retry will be attempted in '${cdrClientConfig.retryDelay[retryCount + 1]}' - " +
-                                "exception message: '${response.t?.message}'"
-                    }
-                    true
-                }
-            }
-
-            retryCount++
-        } while (retryNeeded && retryCount < cdrClientConfig.retryDelay.size)
+        )
     }
 
     private fun deleteOrArchiveFile(file: Path): Unit = runCatching {

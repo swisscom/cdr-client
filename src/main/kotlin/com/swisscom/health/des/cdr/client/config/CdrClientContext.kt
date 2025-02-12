@@ -79,6 +79,11 @@ class CdrClientContext {
 
     /**
      * Creates a coroutine dispatcher for blocking I/O operations with limited parallelism.
+     *
+     * Note: As we use the non-blocking `delay()` to wait for the file-size-growth test and
+     * to wait in case a re-try of an upload is required, a lot more files than the configured
+     * thread pool size can be enrolled in the upload process at the same time. Only the
+     * blocking i/o operations are limited to the configured thread pool size.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Bean(name = ["limitedParallelismCdrUploadsDispatcher"])
