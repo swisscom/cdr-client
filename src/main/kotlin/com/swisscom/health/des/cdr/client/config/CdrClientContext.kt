@@ -11,24 +11,28 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.time.delay
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.cloud.context.config.annotation.RefreshScope
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.retry.support.RetryTemplate
 import java.io.IOException
 import java.nio.file.Path
+import java.time.Duration
 import java.util.concurrent.TimeUnit
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.toJavaDuration
+import kotlin.io.path.fileSize
 
 private val logger = KotlinLogging.logger {}
 
 /**
  * A Spring configuration class for creating and configuring beans used by the CDR client.
  */
+@Suppress("TooManyFunctions")
 @Configuration
 class CdrClientContext {
 
@@ -44,7 +48,22 @@ class CdrClientContext {
         @Value("\${client.connection-timeout-ms}") timeout: Long,
         @Value("\${client.read-timeout-ms}") readTimeout: Long
     ): OkHttpClient =
-        builder.connectTimeout(timeout, TimeUnit.MILLISECONDS).readTimeout(readTimeout, TimeUnit.MILLISECONDS)
+        builder
+            .connectTimeout(timeout, TimeUnit.MILLISECONDS).readTimeout(readTimeout, TimeUnit.MILLISECONDS)
+            .addInterceptor { chain ->
+                val response: Response = chain.proceed(chain.request())
+
+                @Suppress("MagicNumber")
+                if (response.code in 500..599) {
+                    throw HttpServerErrorException(
+                        message = "Received error status code '${response.code}'.",
+                        statusCode = response.code,
+                        responseBody = response.body?.string() ?: ""
+                    )
+                }
+
+                response
+            }
             .build()
 
     /**
@@ -58,18 +77,33 @@ class CdrClientContext {
         return OkHttpClient.Builder()
     }
 
+    /**
+     * Creates a coroutine dispatcher for blocking I/O operations with limited parallelism.
+     *
+     * Note: As we use the non-blocking `delay()` to wait for the file-size-growth test and
+     * to wait in case a re-try of an upload is required, a lot more files than the configured
+     * thread pool size can be enrolled in the upload process at the same time. Only the
+     * blocking i/o operations are limited to the configured thread pool size.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Bean(name = ["limitedParallelismCdrUploadsDispatcher"])
     fun limitedParallelCdrUploadsDispatcher(config: CdrClientConfig): CoroutineDispatcher {
         return Dispatchers.IO.limitedParallelism(config.pushThreadPoolSize)
     }
 
+    /**
+     * Creates a coroutine dispatcher for blocking I/O operations with limited parallelism.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Bean(name = ["limitedParallelismCdrDownloadsDispatcher"])
     fun limitedParallelCdrDownloadsDispatcher(config: CdrClientConfig): CoroutineDispatcher {
         return Dispatchers.IO.limitedParallelism(config.pullThreadPoolSize)
     }
 
+    /**
+     * Creates a cache to store fully qualified file names of files that are currently being processed
+     * in order to avoid a race condition between processing files by the polling and event trigger processes.
+     */
     @Bean
     fun processingInProgressCache(config: CdrClientConfig): ObjectKache<String, Path> =
         InMemoryKache(maxSize = config.filesInProgressCacheSize.toBytes())
@@ -86,6 +120,10 @@ class CdrClientContext {
             }
         }
 
+    /**
+     * Creates and returns an instance of the MSAL4J client object through which we can obtain an OAuth2 token.
+     */
+    @RefreshScope
     @Bean
     fun confidentialClientApp(config: CdrClientConfig): IConfidentialClientApplication =
         ConfidentialClientApplication.builder(
@@ -94,17 +132,92 @@ class CdrClientContext {
         ).authority(config.idpEndpoint.toString())
             .build()
 
+    /**
+     * Creates and returns an instance of credentials to be used with the MSAL4J client to obtain an OAuth2 token.
+     */
     @Bean
     fun clientCredentialParams(config: CdrClientConfig): ClientCredentialParameters =
         ClientCredentialParameters.builder(config.idpCredentials.scopes.toSet()).build()
 
-    @Bean(name = ["retryIoErrorsThrice"])
+    /**
+     * Creates and returns a spring retry-template that retries on IOExceptions up to three times before bailing out.
+     */
+    @Bean(name = ["retryIoAndServerErrors"])
     @Suppress("MagicNumber")
-    fun retryIOExceptionsThreeTimesTemplate(): RetryTemplate = RetryTemplate.builder()
-        .maxAttempts(3)
-        .exponentialBackoff(100.milliseconds.toJavaDuration(), 5.0, 1.seconds.toJavaDuration(), true)
+    fun retryIOExceptionsAndServerErrorsTemplate(
+        @Value("\${client.retry-template.retries}")
+        retries: Int,
+        @Value("\${client.retry-template.initial-delay}")
+        initialDelay: Duration,
+        @Value("\${client.retry-template.multiplier}")
+        multiplier: Double,
+        @Value("\${client.retry-template.max-delay}")
+        maxDelay: Duration
+    ): RetryTemplate = RetryTemplate.builder()
+        .maxAttempts(retries) // 1 initial attempt + retries
+        .exponentialBackoff(initialDelay, multiplier, maxDelay, true)
         .retryOn(IOException::class.java)
+        .retryOn(HttpServerErrorException::class.java)
         .traversingCauses()
         .build()
+
+    @Bean
+    @ConditionalOnProperty(prefix = "client", name = ["file-busy-test-strategy"], havingValue = "FILE_SIZE_CHANGED")
+    fun fileSizeChanged(@Value("\${client.file-size-busy-test-interval:PT0.25S}") testInterval: Duration): FileBusyTester =
+        require(!testInterval.isZero && !testInterval.isNegative).run {
+            FileBusyTester.FileSizeChanged(testInterval)
+                .also { logger.info { "Using file-busy-test strategy 'FILE_SIZE_CHANGED', sampling file at interval '$testInterval'" } }
+        }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "client", name = ["file-busy-test-strategy"], havingValue = "ALWAYS_BUSY")
+    fun alwaysBusyFileTester(): FileBusyTester = FileBusyTester.AlwaysBusy.also { logger.info { "Using file-busy-test strategy 'ALWAYS_BUSY'" } }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "client", name = ["file-busy-test-strategy"], havingValue = "NEVER_BUSY")
+    fun neverBusyFileTester(): FileBusyTester = FileBusyTester.NeverBusy.also { logger.info { "Using file-busy-test strategy 'NEVER_BUSY'" } }
+
+    @Bean
+    @ConditionalOnMissingBean(FileBusyTester::class)
+    fun defaultBusyFileTester(): FileBusyTester =
+        FileBusyTester.NeverBusy.also { logger.warn { "No file-busy-test strategy defined, defaulting to 'NEVER_BUSY'" } }
+
+}
+
+internal class HttpServerErrorException(message: String, val statusCode: Int, val responseBody: String) : RuntimeException(message)
+
+sealed class FileBusyTester {
+    abstract suspend fun isBusy(file: Path): Boolean
+
+    object NeverBusy : FileBusyTester() {
+        override suspend fun isBusy(file: Path): Boolean = false
+    }
+
+    // Only useful for testing
+    object AlwaysBusy : FileBusyTester() {
+        override suspend fun isBusy(file: Path): Boolean = true
+    }
+
+    class FileSizeChanged(private val testInterval: Duration) : FileBusyTester() {
+        override suspend fun isBusy(file: Path): Boolean = runCatching {
+            val startSize = file.fileSize()
+            // FIXME: Cannot use delay() here because we might continue on another thread and we would either loose the span id or continue with
+            //  the wrong span id (thread local)
+            delay(testInterval)
+            startSize != file.fileSize()
+        }.fold(
+            onSuccess = { it },
+            onFailure = { t: Throwable ->
+                when (t) {
+                    is IOException -> {
+                        logger.warn { "Failed to determine file size for file '$file': ${t.message}" }
+                        false
+                    }
+
+                    else -> throw t
+                }
+            }
+        )
+    }
 
 }

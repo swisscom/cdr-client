@@ -37,7 +37,7 @@
         }
       },
       "response": {
-        "status": 200,
+        "status": 202,
         "headers": {
           "Content-Type": "application/json; charset=utf-8"
         },

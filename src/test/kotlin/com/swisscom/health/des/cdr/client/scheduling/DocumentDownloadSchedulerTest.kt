@@ -54,17 +54,17 @@ internal class DocumentDownloadSchedulerTest {
     @BeforeEach
     fun setup() {
         val inflightDir = tmpDir.resolve(inflightFolder).also { it.createDirectories() }
-        val targetDir = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
-        val sourceDir = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
+        val targetDir0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
+        val sourceDir0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
 
         val connector =
-            CdrClientConfig.Connector(
-                connectorId = "1234",
-                targetFolder = targetDir,
-                sourceFolder = sourceDir,
-                contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
+            CdrClientConfig.Connector().apply {
+                connectorId = "1234"
+                targetFolder = targetDir0
+                sourceFolder = sourceDir0
+                contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
                 mode = CdrClientConfig.Mode.TEST
-            )
+            }
         every { config.customer } returns listOf(connector)
         every { config.localFolder } returns inflightDir
         mockTracer()

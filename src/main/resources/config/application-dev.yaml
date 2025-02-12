@@ -1,45 +1,47 @@
 client:
   schedule-delay: PT30S
+  local-folder: ${CDR_CLIENT_LOCAL_FOLDER:${HOME}/Documents/cdr/inflight}
   idp-credentials:
-    tenant-id: ${CDR_B2C_TENANT_ID:no-token}
-    client-id: ${CDR_CLIENT_ID:id}
-    client-secret: ${CDR_CLIENT_SECRET:dummy}
     scopes:
       - https://dev.identity.health.swisscom.ch/CdrApi/.default
-  idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/
-  endpoint:
+    renew-credential-at-startup: false
+  cdr-api:
     scheme: http
     port: 9090
     host: localhost
     base-path: documents
+  credential-api:
+    base-path: client-credentials
+  retry-template:
+    retries: 1
   customer:
     - connector-id: 1
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${cdrClient.targetFolder}/${client.customer[0].connector-id}/test
-      source-folder: ${cdrClient.sourceFolder}/${client.customer[0].connector-id}/test
+      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[0].connector-id}/test
+      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[0].connector-id}/test
       mode: test
     - connector-id: 1
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${cdrClient.targetFolder}/${client.customer[1].connector-id}
-      source-folder: ${cdrClient.sourceFolder}/${client.customer[1].connector-id}
+      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[1].connector-id}
+      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[1].connector-id}
       mode: production
     - connector-id: 1234
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${cdrClient.targetFolder}/${client.customer[2].connector-id}
-      source-folder: ${cdrClient.sourceFolder}/${client.customer[2].connector-id}
+      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[2].connector-id}
+      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[2].connector-id}
       mode: test
     - connector-id: 5
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${cdrClient.targetFolder}/${client.customer[3].connector-id}
-      source-folder: ${cdrClient.sourceFolder}/${client.customer[3].connector-id}
+      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[3].connector-id}
+      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[3].connector-id}
       mode: test
     - connector-id: 666
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${cdrClient.targetFolder}/${client.customer[4].connector-id}
-      source-folder: ${cdrClient.sourceFolder}/${client.customer[4].connector-id}
+      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[4].connector-id}
+      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[4].connector-id}
       mode: production
     - connector-id: 2345
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${cdrClient.targetFolder}/${client.customer[5].connector-id}
-      source-folder: ${cdrClient.sourceFolder}/${client.customer[5].connector-id}
+      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[5].connector-id}
+      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[5].connector-id}
       mode: production

@@ -12,7 +12,15 @@ spring:
   task:
     scheduling:
       pool:
-        size: 1 # only the pull sync requires a scheduling thread. The push sync variants are running on the Kotlin coroutine IO Dispatcher threads after their initial scheduling.
+        size: 5
+      shutdown:
+        # Spring's default shutdown behavior is to wait for scheduled tasks to finish and once all tasks have finished, to shut down the task executor.
+        # In the absence of exceptions our scheduled tasks never finish as they are the source of a "hot" kotlin flow. In order to avoid the delay in
+        # the application shutdown while Spring waits for the task executor to shut down (and a stacktrace in the logs at the end of the wait time),
+        # we need to tell Spring to cancel the tasks themselves, and to do so immediately.
+        # In our case this means cancellation of the CoroutineScope we are running the tasks in; this should translate into a graceful shutdown of the client.
+        await-termination-period: 0s
+        await-termination: true
   jmx:
     enabled: false
 
@@ -30,13 +38,18 @@ spring:
 #    connection-timeout: 1s
 #    keep-alive-timeout: 30s
 
+management:
 # You need to set the `web-application-type` to `servlet` or `reactive` to enable the actuators
-#management:
 #  endpoints:
 #    web:
 #      exposure:
 #        include: "actuator,health"
 #    enabled-by-default: true
+  tracing:
+    sampling:
+      # sampling has to be disabled; if enabled we create a memory leak as there is no way to guarantee a sampled span gets closed and releases its resources
+      # when used in asynchronous Kotlin flows/coroutines
+      probability: 0.0
 
 logging:
   pattern:
@@ -46,10 +59,3 @@ logging:
     com.swisscom.health.des.cdr: INFO
   charset:
     console: UTF-8
-
-management:
-  tracing:
-    sampling:
-      # sampling has to be disabled; if enabled we create a memory leak as there is no way to guarantee a sampled span gets closed and releases its resources
-      # when used in asynchronous Kotlin flows/coroutines
-      probability: 0.0
