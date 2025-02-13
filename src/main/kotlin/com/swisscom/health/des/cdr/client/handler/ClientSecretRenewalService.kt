@@ -7,6 +7,7 @@ import io.micrometer.tracing.Tracer
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.origin.Origin
 import org.springframework.boot.origin.OriginLookup
+import org.springframework.boot.origin.PropertySourceOrigin
 import org.springframework.boot.origin.TextResourceOrigin
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.core.io.FileSystemResource
@@ -44,12 +45,22 @@ class ClientSecretRenewalService(
             onFailure = { error: Throwable -> RenewClientSecretResult.RenewError(error) }
         )
 
+    /**
+     * Currently it is not possible to determine the "effective origin" of a property value based on the precedence rules
+     * for property sources in SpringBoot. But it might be in the future: [ticket](https://github.com/spring-projects/spring-boot/issues/21613)
+     *
+     * As we cannot determine the effective origin and then check whether it is an updatable text resource we search all
+     * available property sources for the client secret property and fail if we find more than one origin or none at all.
+     */
     private fun findSecretOrigin(): Origin {
         @Suppress("UNCHECKED_CAST")
         val clientCredentialOrigins = context.environment.propertySources
             // at the time of writing there exist only OriginLookup<String> implementations on the classpath
             .mapNotNull { if (it is OriginLookup<*>) it as OriginLookup<String> else null }
             .mapNotNull { it.getOrigin(CLIENT_SECRET_PROPERTY_PATH) }
+            // if configuration files are added via the `spring.config.additional-local` property, then a property from an additional,
+            // location ends up in two origins, a property source origin that encapsulates the actual origin, and that origin directly.
+            .map { if (it is PropertySourceOrigin) it.origin else it }
             .toSet()
 
         when {
