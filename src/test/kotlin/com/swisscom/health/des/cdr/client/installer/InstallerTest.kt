@@ -51,10 +51,29 @@ class InstallerTest {
         val configFile = File(createTempDirectory.toString() + File.separator + Installer.CONFIG_FILE)
         assertTrue(configFile.exists(), "Config file should exist")
         val configContent = configFile.readText()
-        assertTrue(configContent.contains("tenant-id=tenantId"), "Config file should contain tenant-id")
-        assertTrue(configContent.contains("client-id=clientId"), "Config file should contain client-id")
-        assertTrue(configContent.contains("client-secret=clientSecret"), "Config file should contain client-secret")
-        assertTrue(configContent.contains("client.customer[0].connector-id=connectorId"), "Config file should contain customer[0].connector-id")
-        assertTrue(configContent.contains("client.customer[1].connector-id=connectorId"), "Config file should contain customer[1].connector-id")
+        assertTrue(
+            configContent.contains("client.local-folder=${createTempDirectory.toString().replace("\\", "/")}"),
+            "Config file should contain local-folder"
+        )
+        assertTrue(
+            configContent.contains("client.idp-credentials.tenant-id=tenantId"),
+            "Config file should contain tenant-id"
+        )
+        assertTrue(
+            configContent.contains("client.idp-credentials.client-id=clientId"),
+            "Config file should contain client-id"
+        )
+        assertTrue(
+            configContent.contains("client.idp-credentials.client-secret=clientSecret"),
+            "Config file should contain client-secret"
+        )
+        assertTrue(
+            configContent.contains("client.customer[0].connector-id=connectorId"),
+            "Config file should contain customer[0].connector-id"
+        )
+        assertTrue(
+            configContent.contains("client.customer[1].connector-id=connectorId"),
+            "Config file should contain customer[1].connector-id"
+        )
     }
 }

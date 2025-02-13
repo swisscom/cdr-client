@@ -68,17 +68,15 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
 
     private fun setBaseConfig(
         tenantId: String,
-        connectorId: String,
         clientId: String,
         clientSecret: String,
     ): String {
         val folderPath = getInstallDir().replace("\\", "/")
         return ""
-            .plus("local-folder=$folderPath/download/inflight\n")
-            .plus("$CONF_TENANT_ID=$tenantId\n")
-            .plus("$CONF_CONNECTOR_ID=$connectorId\n")
-            .plus("$CONF_CLIENT_ID=$clientId\n")
-            .plus("$CONF_CLIENT_SECRET=$clientSecret\n")
+            .plus("client.local-folder=$folderPath/download/inflight\n")
+            .plus("client.idp-credentials.$CONF_TENANT_ID=$tenantId\n")
+            .plus("client.idp-credentials.$CONF_CLIENT_ID=$clientId\n")
+            .plus("client.idp-credentials.$CONF_CLIENT_SECRET=$clientSecret\n")
     }
 
     private fun setBaseConfigAndAddConnector(
@@ -90,7 +88,6 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         val folderPath = getInstallDir().replace("\\", "/")
         return setBaseConfig(
             tenantId = tenantId,
-            connectorId = connectorId,
             clientId = clientId,
             clientSecret = clientSecret
         )
@@ -194,7 +191,6 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
     companion object {
         const val CONFIG_FILE = "application-customer.properties"
         const val CONF_TENANT_ID = "tenant-id"
-        const val CONF_CONNECTOR_ID = "connector-id"
         const val CONF_CLIENT_ID = "client-id"
         const val CONF_CLIENT_SECRET = "client-secret"
 

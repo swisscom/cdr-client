@@ -348,7 +348,6 @@ tasks.register<Exec>("jpackageAppPrepareDebian") {
     doLast{
         copy {
             from("resources") {
-                include("application-customer.properties")
                 include("updateConfig.sh")
             }
             into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
@@ -389,10 +388,6 @@ tasks.register<Exec>("jpackageAppPrepareWindows") {
     )
     doLast{
         copy {
-            from("resources") {
-                include("application-customer.properties")
-                include("updateConfig.bat")
-            }
             from("resources/windows") {
                 include("cdrClient.exe")
                 include("cdrClientw.exe")
