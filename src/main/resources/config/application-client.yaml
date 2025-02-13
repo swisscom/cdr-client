@@ -27,7 +27,7 @@ client:
     - 10m
   file-busy-test-interval: 250ms
   file-busy-test-timeout: 30s
-  file-busy-test-strategy: never_busy # valid values are `never_busy`, `file_size_changed`, `always_busy`
+  file-busy-test-strategy: file_size_changed # valid values are `never_busy`, `file_size_changed`, `always_busy`
   retry-template:
     retries: 5
     initial-delay: 250ms
@@ -36,7 +36,7 @@ client:
   cdr-api:
     scheme: https
     port: 443
-    #       host: dev-cdr-functions.azurewebsites.net
+    host: cdr.health.swisscom.ch
     base-path: api/documents
   credential-api:
     scheme: ${client.cdr-api.scheme}

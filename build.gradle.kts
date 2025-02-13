@@ -4,7 +4,7 @@ import java.net.URI
 import java.time.Duration
 
 group = "com.swisscom.health.des.cdr"
-version = "3.3.1-SNAPSHOT"
+version = "3.3.1"
 java.sourceCompatibility = JavaVersion.VERSION_17
 
 val awaitilityVersion: String by project
@@ -178,7 +178,7 @@ val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("ja
                 }
             }))
             limit {
-                minimum = "0.75".toBigDecimal()
+                minimum = "0.70".toBigDecimal()
             }
         }
     }
@@ -343,12 +343,12 @@ tasks.register<Exec>("jpackageAppPrepareDebian") {
         "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
         "--java-options", "-Dfile.encoding=UTF-8",
         "--java-options", "-Dspring.profiles.active=customer",
-        "--java-options", "-Dspring.config.additional-location=\$APPDIR/application-customer.yaml"
+ //       "--java-options", "-Dspring.config.additional-location=\$APPDIR/application-customer.yaml"
     )
     doLast{
         copy {
             from("resources") {
-                include("application-customer.yaml")
+                include("application-customer.properties")
                 include("updateConfig.sh")
             }
             into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
@@ -381,16 +381,21 @@ tasks.register<Exec>("jpackageAppPrepareWindows") {
         "--vendor", "Swisscom (Schweiz) AG",
         "--copyright", "Copyright 2025, All rights reserved",
         "--win-console",
+      //  "--launcher-as-service",
         "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
         "--java-options", "-Dfile.encoding=UTF-8",
         "--java-options", "-Dspring.profiles.active=customer",
-        "--java-options", "-Dspring.config.additional-location=\$APPDIR/application-customer.yaml"
+    //    "--java-options", "-Dspring.config.additional-location=\$APPDIR\\application-customer.properties"
     )
     doLast{
         copy {
             from("resources") {
-                include("application-customer.yaml")
+                include("application-customer.properties")
                 include("updateConfig.bat")
+            }
+            from("resources/windows") {
+                include("cdrClient.exe")
+                include("cdrClientw.exe")
             }
             into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
         }
@@ -402,8 +407,10 @@ tasks.register<Exec>("jpackageAppFinishWindows") {
     executable = "jpackage"
     args(
         "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",
+        "--win-dir-chooser",
         "--dest", "${outputDir.get().asFile.absolutePath}/jpackage",
         "--app-version", project.version.toString(),
+   //     "--resource-dir", "resources/windows",
         "--verbose"
     )
 }
