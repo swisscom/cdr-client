@@ -2,7 +2,8 @@
 The Swisscom Health Confidential Data Routing (CDR) Client
 
 ## Installation / Run the client
-> Improvements for the installation are planned. For now, the client is only available as a jar file with manual steps required for the installation.
+> Improvements for the installation are planned. For now, the client is only available as a jar file with manual steps 
+> required for the installation.
 
 Pre-Requirements:
 * Java 17 (or higher) installed
@@ -16,26 +17,43 @@ The application-customer.yaml file should contain the configuration for the clie
 An example can be found [here](#application-customer-yaml-example).
 
 Open a terminal and navigate to the directory where the jar file is located.
-Run the following command to start the client (check the jar name and replace it in the command or rename the jar itself):
+Run the following command to start the client (check the jar name and replace it in the command or rename the jar 
+itself):
 > The -D parameters need to be placed before the "-jar cdr-client.jar".<p>
 > The quotes are necessary for Windows, but not for Unix systems
 ```shell
 java "-Dspring.profiles.active=customer" "-Dspring.config.additional-location=./application-customer.yaml" -jar cdr-client.jar
 ```
 
-Check that no error messages are present in the terminal (or have a look at the "cdr-client.log" file that is created in the same folder as you've placed tha jar file) 
-and that the client is running.
+Check that no error messages are present in the terminal (or have a look at the "cdr-client.log" file that is created 
+in the same folder as you've placed tha jar file) and that the client is running.
 
 Configure an OS appropriate service to run the client as a background service.
 
 ## API
-There is no endpoint offered here.
 
-The CDR Client is triggered by a scheduler and downloads by the given delay time the files from the CDR API.
-File uploads are triggered by the file system events.
+Document downloads from the CDR API are triggered by a scheduler. Document uploads are triggered by file system 
+events (if available) and a scheduler.
 
 ### Functionality
-For each defined connector the CDR Client calls the defined endpoint of the CDR API.
+For each defined connector the CDR Client calls the CDR API endpoints for document download and document upload.
+
+Optionally the client can be configured to renew its client credential on startup.
+
+#### Client Credential Renewal
+
+The client can be configured to renew its credential on startup. The default behavior is to not renew the credential.
+
+Credential renewal only works if the client credential is configured in a properties or YAML file. If the client 
+detects multiple sources (system property, environment variable, etc.) for the credential or the source is not of 
+either of the two file types, then credential renewal won't be attempted. Likewise, if the user that runs the client 
+process does not have write permissions on the file.
+
+During a successful client credential renewal all pre-existing client credentials are deleted. So, if you source the 
+client credential from a secure location (Hashicorp Vault, Azure Keyvault, etc., like you should) as part of your 
+deployment process, then, obviously, you should not enable credential renewal. A re-deployment would restore a 
+previous  credential that is no longer valid, and you would be locked out of the client account until you manually  
+re-create a credential on the CDR website.
 
 #### Document Download
 
@@ -44,7 +62,7 @@ The file is named after the received 'cdr-document-uuid' header that is a unique
 After saving the file to the temporary folder, a delete request for the given 'cdr-document-uuid' is sent to the CDR API.
 After successfully deleting the file in the CDR API, the file is moved to the connector defined 'target-folder'.
 
-The temporary folders need to be monitored by another tool to make sure that no files are forgotten (should only happen if the move
+The temporary folders need to be monitored make sure that no files get stranded there (should only happen if the move
 to the destination folder is failing).
 
 #### Document Upload
@@ -54,7 +72,7 @@ contents of every source folder at the configured interval and uploads all `.xml
 event driven process listens for filesystem events from the same directories and uploads all `.xml` files as they 
 are created. The two approaches are combined so
 
-* at start of the client all files that might have arrived while the client was not running are uploaded
+* at the start of the client all files are uploaded that might have arrived while the client was not running
 * folders on (remote) filesystems that do not support filesystem events can be used as source folders
 
 If the filesystem that hosts a source folder supports filesystem events, then the polling process normally won't find 
@@ -62,9 +80,10 @@ any files to process and immediately goes back to sleep. If the polling process 
 arrives, it might happen that both processes pick up the same file for processing. However, only one of the two will 
 continue to process the file, depending on which one is first to register the file for processing.
 
-After the file is successfully uploaded it will be deleted.
-If the upload failed with a response code of 4xx the file will be appended with '.error' and an additional file with the same name as the sent file, but with
-the extension '.log' will be created and the received response body will be saved to this file.
+After the file is successfully uploaded it is either deleted or archived, depending on the connector configuration.
+If the upload failed with a response code of 4xx the file will be appended with '.error' and an additional file with
+the same name as the file sent, but with
+the extension '.log', will be created and the received response body will be saved to this file.
 If the upload failed with a response code of 5xx the file will be retried indefinitely, assuming the root cause is 
 an infrastructure issue that will ultimately be resolved (and uploading another file would fail too, for the same 
 reason). See retry-delay in the [application-client.yaml](./src/main/resources/config/application-client.yaml) file.
@@ -126,10 +145,18 @@ client:
   local-folder: /tmp/download/in-flight # temporary folder for files that are currently downloaded from CDR API
   idp-credentials:
     tenant-id: swisscom-health-tenant-id # provided by Swisscom Health
-    client-id: my-client-id # Self created through CDR UI
-    client-secret: my-secret # Self created through CDR UI
+    client-id: my-client-id # Self-service on CDR website
+    client-secret: my-secret # Self-service on CDR website
+    renew-credential-at-startup: false
   cdr-api:
     host: cdr.health.swisscom.ch
+  retry-delay: 
+    - 1s # delay on first retry
+    - 2s
+    - 8s
+    - 32s
+    - 10m # delay after fifth retry and all following retries
+  file-busy-test-strategy: never_busy # valid values are `never_busy` and `file_size_changed`
   customer:
     - connector-id: 8000000000000 # provided by Swisscom Health
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
@@ -141,7 +168,6 @@ client:
       target-folder: /tmp/download/8000000000000
       source-folder: /tmp/upload/8000000000000
       mode: production
-
 ```
 
 Some information can also be set as environment variables. See [application-client.yaml](./src/main/resources/config/application-client.yaml) for variable names.

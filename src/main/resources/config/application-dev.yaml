@@ -5,6 +5,7 @@ client:
     scopes:
       - https://dev.identity.health.swisscom.ch/CdrApi/.default
     renew-credential-at-startup: false
+    client-secret: ${CDR_CLIENT_SECRET:Placeholder_test-secret}
   cdr-api:
     scheme: http
     port: 9090
@@ -12,6 +13,8 @@ client:
     base-path: documents
   credential-api:
     base-path: client-credentials
+  retry-template:
+    retries: 1
   customer:
     - connector-id: 1
       content-type: application/forumdatenaustausch+xml;charset=UTF-8

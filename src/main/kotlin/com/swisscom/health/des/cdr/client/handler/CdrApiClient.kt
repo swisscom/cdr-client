@@ -145,7 +145,7 @@ class CdrApiClient(
                 }
 
                 else -> {
-                    logger.error(t) { "Renewing client secret for client id '${cdrClientConfig.idpCredentials.clientId}' failed: ${t.message}" }
+                    logger.error { "Renewing client secret for client id '${cdrClientConfig.idpCredentials.clientId}' failed: '$t'" }
                     RenewClientSecretResult.RenewError(message = t.message ?: "Unknown error", cause = t)
                 }
             }
@@ -200,7 +200,7 @@ class CdrApiClient(
         }.fold(
             onSuccess = { it },
             onFailure = { t ->
-                logger.error(t) { "Upload file '$file' failed: ${t.message}" }
+                logger.error { "Upload file '$file' failed: ${t.message}" }
                 UploadDocumentResult.UploadError(message = t.message ?: "Unknown error", t = t)
             }
         )
@@ -264,7 +264,7 @@ class CdrApiClient(
     }.fold(
         onSuccess = { it },
         onFailure = { t ->
-            logger.error(t) { "Request file failed: ${t.message}" }
+            logger.error { "Request file failed: $t" }
             DownloadDocumentResult.DownloadError(message = t.message ?: "Unknown error", t = t)
         }
     )
@@ -308,7 +308,7 @@ class CdrApiClient(
         }.fold(
             onSuccess = { it },
             onFailure = { t ->
-                logger.error(t) { "Acknowledging pulled file with id '$downloadId' failed: '${t.message}'" }
+                logger.error { "Acknowledging pulled file with id '$downloadId' failed: '$t'" }
                 DownloadDocumentResult.DownloadError(message = t.message ?: "Unknown error", t = t)
             }
         )
@@ -430,7 +430,7 @@ class CdrApiClient(
     }.fold(
         onSuccess = { token: String -> token },
         onFailure = { e ->
-            logger.error(e) { "Failed to get access token: ${e.message}" }
+            logger.error { "Failed to get access token: $e" }
             ""
         }
     )
