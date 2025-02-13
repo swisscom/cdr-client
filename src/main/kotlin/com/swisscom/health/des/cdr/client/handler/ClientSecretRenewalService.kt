@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import io.micrometer.tracing.Tracer
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
-import org.springframework.boot.env.OriginTrackedMapPropertySource
 import org.springframework.boot.origin.Origin
+import org.springframework.boot.origin.OriginLookup
 import org.springframework.boot.origin.TextResourceOrigin
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.core.io.FileSystemResource
@@ -45,9 +45,11 @@ class ClientSecretRenewalService(
         )
 
     private fun findSecretOrigin(): Origin {
-        val clientCredentialOrigins: Set<Origin> = context.environment.propertySources
-            .filter { it is OriginTrackedMapPropertySource }
-            .mapNotNull { (it as OriginTrackedMapPropertySource).getOrigin(CLIENT_SECRET_PROPERTY_PATH) }
+        @Suppress("UNCHECKED_CAST")
+        val clientCredentialOrigins = context.environment.propertySources
+            // at the time of writing there exist only OriginLookup<String> implementations on the classpath
+            .mapNotNull { if (it is OriginLookup<*>) it as OriginLookup<String> else null }
+            .mapNotNull { it.getOrigin(CLIENT_SECRET_PROPERTY_PATH) }
             .toSet()
 
         when {
