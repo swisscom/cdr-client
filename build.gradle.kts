@@ -4,7 +4,7 @@ import java.net.URI
 import java.time.Duration
 
 group = "com.swisscom.health.des.cdr"
-version = "3.3.1-SNAPSHOT"
+version = "3.3.2-SNAPSHOT"
 java.sourceCompatibility = JavaVersion.VERSION_17
 
 val awaitilityVersion: String by project
