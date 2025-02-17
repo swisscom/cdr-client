@@ -332,14 +332,6 @@ tasks.register<Exec>("jpackageAppPrepareDebian") {
         "--java-options", "-Dspring.profiles.active=customer",
  //       "--java-options", "-Dspring.config.additional-location=\$APPDIR/application-customer.yaml"
     )
-    doLast{
-        copy {
-            from("resources") {
-                include("updateConfig.sh")
-            }
-            into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
-        }
-    }
 }
 
 tasks.register<Exec>("jpackageAppFinishDebian") {
@@ -349,7 +341,6 @@ tasks.register<Exec>("jpackageAppFinishDebian") {
         "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",
         "--dest", "${outputDir.get().asFile.absolutePath}/jpackage",
         "--app-version", project.version.toString(),
-        "--resource-dir", "resources/debian",
         "--verbose"
     )
 }
