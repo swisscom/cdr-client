@@ -9,8 +9,16 @@ import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationListener
 import org.springframework.context.event.ContextClosedEvent
+import org.springframework.core.io.ClassPathResource
 import org.springframework.scheduling.annotation.EnableScheduling
+import java.awt.AWTException
+import java.awt.PopupMenu
+import java.awt.SystemTray
+import java.awt.Toolkit
+import java.awt.TrayIcon
+import java.awt.MenuItem
 import java.io.File
+import kotlin.system.exitProcess
 
 private val logger = KotlinLogging.logger {}
 
@@ -28,6 +36,17 @@ fun main(args: Array<String>) {
         startSpringBootApp(args)
     } else {
         Installer().install()
+    }
+}
+
+fun isUiAvailable(): Boolean {
+    val osName = System.getProperty("os.name").lowercase()
+    return if (osName.contains("win")) {
+        val sessionName = System.getenv("SESSIONNAME")
+        !sessionName.isNullOrEmpty() && sessionName.equals("Console", ignoreCase = true)
+    } else {
+        val display = System.getenv("DISPLAY")
+        !display.isNullOrEmpty()
     }
 }
 
@@ -99,14 +118,17 @@ fun startSpringBootApp(args: Array<String>) {
         }
     }
     app.addListeners(ApplicationListener<ApplicationReadyEvent> {
-        //     initSystemTray()
+        if (isUiAvailable()) {
+            System.setProperty("java.awt.headless", "false") // for system tray only
+            initSystemTray()
+        }
     })
     app.addListeners(ApplicationListener<ContextClosedEvent> {
-       // SystemTray.getSystemTray().trayIcons.forEach { SystemTray.getSystemTray().remove(it) }
+        SystemTray.getSystemTray().trayIcons.forEach { SystemTray.getSystemTray().remove(it) }
     })
     app.run(*args)
 }
-/*
+
 fun initSystemTray() {
     if (!SystemTray.isSupported()) {
         logger.warn { "System tray is not supported" }
@@ -114,8 +136,8 @@ fun initSystemTray() {
     }
 
     val tray = SystemTray.getSystemTray()
-    val imageUri = Res.getUri("drawable/swisscom-logo-lifeform-180x180.png")
-    val image = Toolkit.getDefaultToolkit().getImage(URI(imageUri).toURL())
+    val imageFile = ClassPathResource("icon.png")
+    val image = Toolkit.getDefaultToolkit().createImage(imageFile.inputStream.readAllBytes())
     val trayIcon = TrayIcon(image, "Swisscom CDR Client")
     trayIcon.isImageAutoSize = true
     trayIcon.toolTip = "Swisscom CDR Client"
@@ -132,9 +154,9 @@ fun initSystemTray() {
     try {
         tray.add(trayIcon)
     } catch (e: AWTException) {
-        logger.error { "TrayIcon could not be added." }
+        logger.error { "TrayIcon could not be added: ${e.message}" }
     }
-}*/
+}
 
 fun isSkipInstallerProfile(): Boolean {
     val activeProfile = activeProfiles()

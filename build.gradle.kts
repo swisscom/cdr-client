@@ -323,14 +323,13 @@ tasks.register<Exec>("jpackageAppPrepareDebian") {
         "--name", project.name,
         "--input", "${outputDir.get().asFile.absolutePath}/libs",
         "--main-jar", "${project.name}-${project.version}.jar",
-  //      "--main-class", "com.swisscom.health.des.cdr.client.CdrClientApplicationKt",
         "--app-version", project.version.toString(),
         "--vendor", "Swisscom (Schweiz) AG",
         "--copyright", "Copyright 2025, All rights reserved",
+        "--icon", "resources/icon.png",
         "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
         "--java-options", "-Dfile.encoding=UTF-8",
         "--java-options", "-Dspring.profiles.active=customer",
- //       "--java-options", "-Dspring.config.additional-location=\$APPDIR/application-customer.yaml"
     )
 }
 
@@ -353,22 +352,21 @@ tasks.register<Exec>("jpackageAppPrepareWindows") {
         "--name", project.name,
         "--input", "${outputDir.get().asFile.absolutePath}/libs",
         "--main-jar", "${project.name}-${project.version}.jar",
-        //      "--main-class", "com.swisscom.health.des.cdr.client.CdrClientApplicationKt",
         "--app-version", project.version.toString(),
         "--vendor", "Swisscom (Schweiz) AG",
         "--copyright", "Copyright 2025, All rights reserved",
+        "--icon", "resources/windows/icon.ico",
         "--win-console",
-      //  "--launcher-as-service",
         "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
         "--java-options", "-Dfile.encoding=UTF-8",
         "--java-options", "-Dspring.profiles.active=customer",
-    //    "--java-options", "-Dspring.config.additional-location=\$APPDIR\\application-customer.properties"
     )
     doLast{
         copy {
             from("resources/windows") {
                 include("cdrClient.exe")
                 include("cdrClientw.exe")
+                include("icon.ico")
             }
             into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
         }
@@ -383,7 +381,6 @@ tasks.register<Exec>("jpackageAppFinishWindows") {
         "--win-dir-chooser",
         "--dest", "${outputDir.get().asFile.absolutePath}/jpackage",
         "--app-version", project.version.toString(),
-   //     "--resource-dir", "resources/windows",
         "--verbose"
     )
 }
