@@ -325,7 +325,7 @@ tasks.register<Exec>("jpackageAppPrepareDebian") {
         "--main-jar", "${project.name}-${project.version}.jar",
         "--app-version", project.version.toString(),
         "--vendor", "Swisscom (Schweiz) AG",
-        "--copyright", "Copyright 2025, All rights reserved",
+     //   "--copyright", "Copyright 2025, All rights reserved",
         "--icon", "resources/icon.png",
         "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
         "--java-options", "-Dfile.encoding=UTF-8",
@@ -354,7 +354,7 @@ tasks.register<Exec>("jpackageAppPrepareWindows") {
         "--main-jar", "${project.name}-${project.version}.jar",
         "--app-version", project.version.toString(),
         "--vendor", "Swisscom (Schweiz) AG",
-        "--copyright", "Copyright 2025, All rights reserved",
+  //      "--copyright", "Copyright 2025, All rights reserved",
         "--icon", "resources/windows/icon.ico",
         "--win-console",
         "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
@@ -367,6 +367,7 @@ tasks.register<Exec>("jpackageAppPrepareWindows") {
                 include("cdrClient.exe")
                 include("cdrClientw.exe")
                 include("icon.ico")
+                include("stop.bat")
             }
             into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
         }

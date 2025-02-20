@@ -9,7 +9,18 @@ import kotlin.io.path.exists
 
 private val logger = KotlinLogging.logger {}
 
-private val configEnvironmentVars = listOf("CDR_B2C_TENANT_ID", "CDR_CLIENT_ID", "client.idp-credentials.client-secret")
+// if one client.customer configuration is completely present, we assume that all are configured
+// through environment variables
+private val configEnvironmentVars = listOf(
+    "CDR_B2C_TENANT_ID",
+    "CDR_CLIENT_ID",
+    "client.idp-credentials.client-secret",
+    "client.customer[0].connector-id",
+    "client.customer[0].content-type",
+    "client.customer[0].target-folder",
+    "client.customer[0].source-folder",
+    "client.customer[0].mode"
+)
 private val skipInstallerProfiles = listOf("dev", "test")
 
 /**
@@ -80,7 +91,7 @@ internal fun checkIfInstallationIsRequired(args: Array<String>): Boolean =
         if (!additionalLocation.exists()) {
             logger.info { "No configuration file does exist at any given location: '$additionalLocation'" }
 
-            val missingEnvVars = configEnvironmentVars.filter { System.getenv(it).isNullOrEmpty() }
+            val missingEnvVars = getMissingEnvVars()
             if (missingEnvVars.isNotEmpty()) {
                 logger.info { "Missing required environment variables: ${missingEnvVars.joinToString(", ")}" }
                 logger.info { "Installation is required" }
@@ -93,18 +104,36 @@ internal fun checkIfInstallationIsRequired(args: Array<String>): Boolean =
         }
     }
 
-private fun getSystemAdditionalLocations() = (System.getProperty("spring.config.additional-location")?.let { Path.of(it) }
-    ?: System.getenv("SPRING_CONFIG_ADDITIONAL_LOCATION")?.let { Path.of(it) })
+private fun getEnvVar(name: String): String? {
+    val normalized = name.uppercase()
+        .replace("].", "_")
+        .replace(".", "_")
+        .replace("-", "_")
+        .replace("[", "_")
+        .replace("]", "_")
+    return System.getenv(name) ?: System.getenv(normalized)
+}
+
+private fun getMissingEnvVars(): List<String> = configEnvironmentVars.filter { getEnvVar(it).isNullOrEmpty() }
+
+private fun getSystemAdditionalLocations() =
+    (System.getProperty("spring.config.additional-location")?.let { Path.of(it) }
+        ?: System.getenv("SPRING_CONFIG_ADDITIONAL_LOCATION")?.let { Path.of(it) })
 
 /**
  * Checks if the application is running from a jpackage installation.
  * This is the best guess, as we can't be sure if the jar is started from the jpackage installation or not.
- * In the jpackage installation we don't set the "spring.config.additional-location" property, and we don't have the minimal set of environment variables set.
+ * In the jpackage installation we don't set the "spring.config.additional-location" property, and we don't have the
+ * minimal set of environment variables set. As we take the values from a configuration file, we don't set all the
+ * environment variables either.
  */
 internal fun isRunningFromJpackageInstallation(): Boolean =
-    getSystemAdditionalLocations() == null && configEnvironmentVars.any { System.getenv(it).isNullOrEmpty() }
+    getSystemAdditionalLocations() == null && configEnvironmentVars.any {
+        System.getenv(it).isNullOrEmpty()
+    } && getMissingEnvVars().isNotEmpty()
 
 internal fun isSkipInstaller(args: Array<String>): Boolean {
     val activeProfile = System.getProperty("spring.profiles.active")
-    return args.contains("--skip-installer") || activeProfile != null && activeProfile.split(",").any { skipInstallerProfiles.contains(it) }
+    return args.contains("--skip-installer") || activeProfile != null && activeProfile.split(",")
+        .any { skipInstallerProfiles.contains(it) }
 }

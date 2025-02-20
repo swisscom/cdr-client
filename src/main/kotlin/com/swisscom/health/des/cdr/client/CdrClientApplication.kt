@@ -5,7 +5,6 @@ import com.swisscom.health.des.cdr.client.installer.Installer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.builder.SpringApplicationBuilder
-import org.springframework.boot.context.ApplicationPidFileWriter
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationListener
@@ -52,12 +51,6 @@ private fun startSpringBootApp(args: Array<String>) {
         .listeners(ApplicationListener<ContextClosedEvent> {
             SystemTray.getSystemTray().trayIcons.forEach { SystemTray.getSystemTray().remove(it) }
         })
-        .let {
-            if (osIsWindows()) {
-                it.listeners(ApplicationPidFileWriter(getInstallDir().resolve("client.pid").toFile()))
-            }
-            it
-        }
     if (isRunningFromJpackageInstallation() && (!isSkipInstaller(args))) {
         System.getProperty("LOGGING_FILE_NAME") ?: run {
             logger.debug { "setting loggin_file_name" }
@@ -66,7 +59,7 @@ private fun startSpringBootApp(args: Array<String>) {
                 "${getInstallDir().resolve("logs").resolve("cdr-client.log")}"
             )
         }
-        logger.debug { "setting spring.config.additional-location" }
+        logger.info { "setting spring.config.additional-location" }
         System.getProperty("spring.config.additional-location") ?: run {
             System.setProperty(
                 "spring.config.additional-location",

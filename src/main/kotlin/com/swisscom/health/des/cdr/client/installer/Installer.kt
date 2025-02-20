@@ -7,12 +7,13 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import java.io.File
 import java.nio.file.Path
 import java.util.Scanner
 import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
+
+fun Path.toSpringConfigString(): String = this.toString().replace("\\", "/")
 
 class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
 
@@ -79,7 +80,7 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         clientId: String,
         clientSecret: String,
     ): String {
-        val folderPath = getInstallDir()
+        val folderPath = getInstallDir().toSpringConfigString()
         return ""
             .plus("client.local-folder=$folderPath/download/inflight\n")
             .plus("client.idp-credentials.$CONF_TENANT_ID=$tenantId\n")
@@ -124,11 +125,11 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         entryNumber: Int
     ): String {
         val download = folderPath.resolve("download")
-        val downloadProduction = download.resolve(connectorId)
-        val downloadTest = download.resolve("test").resolve(connectorId)
+        val downloadProduction = download.resolve(connectorId).toSpringConfigString()
+        val downloadTest = download.resolve("test").resolve(connectorId).toSpringConfigString()
         val upload = folderPath.resolve("upload")
-        val uploadProduction = upload.resolve(connectorId)
-        val uploadTest = upload.resolve("test").resolve(connectorId)
+        val uploadProduction = upload.resolve(connectorId).toSpringConfigString()
+        val uploadTest = upload.resolve("test").resolve(connectorId).toSpringConfigString()
         StringBuilder().apply {
             append("client.customer[$entryNumber].connector-id=$connectorId\n")
             append("client.customer[$entryNumber].content-type=application/forumdatenaustausch+xml;charset=UTF-8\n")
@@ -151,15 +152,18 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
     @Suppress("MagicNumber")
     private fun executeApacheDaemon(connectorId: String) {
         val processBuilder = ProcessBuilder(
-            "${getInstallDir()}$RESOURCE_DIR_PART${File.separator}cdrClient.exe",
+            "${getInstallDir().resolve(RESOURCE_DIR_PART).resolve("cdrClient.exe")}",
             "//IS/cdrClient-$connectorId",
             "--Description=Swisscom AG CDR Client",
             "--StartPath=\"${getInstallDir()}\"",
             "--StartMode=exe",
-            "--StartImage=\"${getInstallDir()}${File.separator}cdr-client.exe\"",
+            "--StartImage=\"${getInstallDir().resolve("cdr-client.exe")}\"",
             "--Startup=auto",
             "--Jvm=auto",
-            "--LogPath=\"${getInstallDir()}${File.separator}logs\""
+            "--LogPath=\"${getInstallDir().resolve("logs")}\"",
+            "--PidFile=client.pid",
+            "--StopMode=exe",
+            "--StopImage=\"${getInstallDir().resolve(RESOURCE_DIR_PART).resolve("stop.bat")}\"",
         )
         processBuilder.inheritIO()
         logger.info { "Create service command: ${processBuilder.command()}" }
