@@ -1,10 +1,16 @@
 package com.swisscom.health.des.cdr.client.installer
 
+import com.swisscom.health.des.cdr.client.CONFIG_FILE
 import com.swisscom.health.des.cdr.client.getInstallDir
+import com.swisscom.health.des.cdr.client.osIsWindows
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import java.io.File
+import java.nio.file.Path
 import java.util.Scanner
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
 
@@ -15,7 +21,7 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         println("###############################################")
         println("###############################################")
         println("")
-        println("Configuration was not found. Please provide the following information: ")
+        println("Configuration was not found. Please provide the following information (obtainable from the CDR customer website): ")
         print("Tenant-ID: ")
         val tenantId = scanner.nextLine()
         print("Client-ID: ")
@@ -24,8 +30,13 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         val clientSecret = scanner.nextLine()
         print("Connector-ID: ")
         val connectorId = scanner.nextLine()
-        print("Create Service Account? (y/N): ")
-        val createServiceAccount = scanner.nextLine()
+        val createServiceAccount: String? =
+            if (osIsWindows()) {
+                print("Create Service Account? (y/N): ")
+                scanner.nextLine()
+            } else {
+                null
+            }
 
         updateConfigFile(
             tenantId = tenantId,
@@ -33,12 +44,12 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
             clientId = clientId,
             clientSecret = clientSecret
         )
-        if (createServiceAccount == "Y" || createServiceAccount.lowercase() == "y") {
+        if (createServiceAccount?.lowercase() in listOf("y", "yes", "true")) {
             createService(connectorId)
         }
 
         println("All done! The application is now ready to be started.")
-        println("Please close the window and start the application again.")
+        println("Please start the application again.")
     }
 
     private fun updateConfigFile(
@@ -46,24 +57,21 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         connectorId: String,
         clientId: String,
         clientSecret: String
-    ): Pair<Boolean, String> {
-        val configFile = File(getInstallDir() + File.separator + CONFIG_FILE)
+    ) {
+        val configFile = getInstallDir().resolve(CONFIG_FILE).toFile()
         val trimmedTenantId = tenantId.trim()
         val trimmedConnectorId = connectorId.trim()
         val trimmedClientId = clientId.trim()
         val trimmedClientSecret = clientSecret.trim()
 
-        runBlocking {
-            val newContent = setBaseConfigAndAddConnector(
-                tenantId = trimmedTenantId,
-                connectorId = trimmedConnectorId,
-                clientId = trimmedClientId,
-                clientSecret = trimmedClientSecret,
-            )
-            logger.info { "write new config file to '$configFile'" }
-            configFile.writeText(newContent, Charsets.UTF_8)
-        }
-        return true to "Configuration updated successfully\nPlease restart the application"
+        val newContent = setBaseConfigAndAddConnector(
+            tenantId = trimmedTenantId,
+            connectorId = trimmedConnectorId,
+            clientId = trimmedClientId,
+            clientSecret = trimmedClientSecret,
+        )
+        logger.info { "write new config file to '$configFile'" }
+        configFile.writeText(newContent, Charsets.UTF_8)
     }
 
     private fun setBaseConfig(
@@ -71,7 +79,7 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         clientId: String,
         clientSecret: String,
     ): String {
-        val folderPath = getInstallDir().replace("\\", "/")
+        val folderPath = getInstallDir()
         return ""
             .plus("client.local-folder=$folderPath/download/inflight\n")
             .plus("client.idp-credentials.$CONF_TENANT_ID=$tenantId\n")
@@ -85,7 +93,7 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         clientId: String,
         clientSecret: String,
     ): String {
-        val folderPath = getInstallDir().replace("\\", "/")
+        val folderPath = getInstallDir()
         return setBaseConfig(
             tenantId = tenantId,
             clientId = clientId,
@@ -111,16 +119,16 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
 
     private fun createConnector(
         connectorId: String,
-        folderPath: String,
+        folderPath: Path,
         isProduction: Boolean,
         entryNumber: Int
     ): String {
-        val download = "$folderPath/download"
-        val downloadProduction = "$download/$connectorId"
-        val downloadTest = "$download/test/$connectorId"
-        val upload = "$folderPath/upload"
-        val uploadProduction = "$upload/$connectorId"
-        val uploadTest = "$upload/test/$connectorId"
+        val download = folderPath.resolve("download")
+        val downloadProduction = download.resolve(connectorId)
+        val downloadTest = download.resolve("test").resolve(connectorId)
+        val upload = folderPath.resolve("upload")
+        val uploadProduction = upload.resolve(connectorId)
+        val uploadTest = upload.resolve("test").resolve(connectorId)
         StringBuilder().apply {
             append("client.customer[$entryNumber].connector-id=$connectorId\n")
             append("client.customer[$entryNumber].content-type=application/forumdatenaustausch+xml;charset=UTF-8\n")
@@ -132,24 +140,10 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
     }
 
     private fun createService(connectorId: String) {
-        val osName = System.getProperty("os.name").lowercase()
-        when {
-            osName.contains("win") -> {
-                logger.info { "Running on Windows" }
-                executeApacheDaemon(connectorId)
-            }
-
-            osName.contains("nix") || osName.contains("nux") || osName.contains("aix") -> {
-                logger.info { "Running on Linux/Unix - please create a daemon service for this application" }
-            }
-
-            osName.contains("mac") -> {
-                logger.info { "Running on Mac OS - please create a daemon service for this application" }
-            }
-
-            else -> {
-                logger.info { "Unknown operating system" }
-            }
+        if (osIsWindows()) {
+            executeApacheDaemon(connectorId)
+        } else {
+            logger.info { "Operating system not eligible for service creation" }
         }
     }
 
@@ -169,8 +163,12 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         )
         processBuilder.inheritIO()
         logger.info { "Create service command: ${processBuilder.command()}" }
-        val process = processBuilder.start()
-        when (val exitValue = process.waitFor()) {
+        val exitCode: Int = runBlocking(Dispatchers.Default) {
+            withTimeout(10.seconds) {
+                processBuilder.start().waitFor()
+            }
+        }
+        when (exitCode) {
             0 -> {
                 logger.info { "Service created successfully" }
             }
@@ -178,24 +176,23 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
             5 -> {
                 logger.info {
                     "Failed to create service. Access denied. Did you run the Application as Administrator? " +
-                            "Exit value: $exitValue"
+                            "Exit code: $exitCode"
                 }
             }
 
             else -> {
-                logger.info { "Failed to create service. Exit value: $exitValue" }
+                logger.info { "Failed to create service. Exit code: $exitCode" }
             }
         }
     }
 
     companion object {
-        const val CONFIG_FILE = "application-customer.properties"
         const val CONF_TENANT_ID = "tenant-id"
         const val CONF_CLIENT_ID = "client-id"
         const val CONF_CLIENT_SECRET = "client-secret"
 
         @JvmStatic
-        val RESOURCE_DIR_PART = File.separator + "lib" + File.separator + "app"
+        val RESOURCE_DIR_PART: Path = Path.of("lib", "app")
     }
 
 }

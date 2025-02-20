@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.installer
 
+import com.swisscom.health.des.cdr.client.CONFIG_FILE
 import com.swisscom.health.des.cdr.client.getInstallDir
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -41,14 +42,14 @@ class InstallerTest {
 
     @Test
     fun `test install method`() {
-        mockkStatic("com.swisscom.health.des.cdr.client.CdrClientApplicationKt")
+        mockkStatic("com.swisscom.health.des.cdr.client.StartupHelperKt")
         println("createTempDirectory: $createTempDirectory, ${createTempDirectory.toUri().rawPath}")
-        every { getInstallDir() } returns createTempDirectory.toString()
+        every { getInstallDir() } returns createTempDirectory
         every { scanner.nextLine() } returns "tenantId" andThen "clientId" andThen "clientSecret" andThen "connectorId" andThen "n"
 
         installer.install()
 
-        val configFile = File(createTempDirectory.toString() + File.separator + Installer.CONFIG_FILE)
+        val configFile = File(createTempDirectory.toString() + File.separator + CONFIG_FILE)
         assertTrue(configFile.exists(), "Config file should exist")
         val configContent = configFile.readText()
         assertTrue(

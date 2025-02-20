@@ -3,8 +3,9 @@ package com.swisscom.health.des.cdr.client
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.installer.Installer
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.springframework.boot.SpringApplication
 import org.springframework.boot.autoconfigure.SpringBootApplication
+import org.springframework.boot.builder.SpringApplicationBuilder
+import org.springframework.boot.context.ApplicationPidFileWriter
 import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.ApplicationListener
@@ -12,15 +13,15 @@ import org.springframework.context.event.ContextClosedEvent
 import org.springframework.core.io.ClassPathResource
 import org.springframework.scheduling.annotation.EnableScheduling
 import java.awt.AWTException
+import java.awt.MenuItem
 import java.awt.PopupMenu
 import java.awt.SystemTray
 import java.awt.Toolkit
 import java.awt.TrayIcon
-import java.awt.MenuItem
-import java.io.File
 import kotlin.system.exitProcess
 
 private val logger = KotlinLogging.logger {}
+internal const val CONFIG_FILE = "application-customer.properties"
 
 /**
  * Spring Boot entry point
@@ -32,104 +33,52 @@ class CdrClientApplication
 
 @Suppress("SpreadOperator")
 fun main(args: Array<String>) {
-    if (checkSpringProperties()) {
-        startSpringBootApp(args)
-    } else {
+    if (checkIfInstallationIsRequired(args)) {
         Installer().install()
-    }
-}
-
-fun isUiAvailable(): Boolean {
-    val osName = System.getProperty("os.name").lowercase()
-    return if (osName.contains("win")) {
-        val sessionName = System.getenv("SESSIONNAME")
-        !sessionName.isNullOrEmpty() && sessionName.equals("Console", ignoreCase = true)
     } else {
-        val display = System.getenv("DISPLAY")
-        !display.isNullOrEmpty()
+        startSpringBootApp(args)
     }
 }
 
-fun checkSpringProperties(): Boolean {
-    val activeProfile = activeProfiles()
-    // TODO: get secret and/or client-id from environment variables
-
-    if (activeProfile != null && activeProfile.split(",").any { it == "customer" }) {
-        val systemAdditionalLocations = System.getProperty("spring.config.additional-location")
-        logger.info { "AdditionalLocations when checking: '$systemAdditionalLocations'" }
-        val additionalLocation = systemAdditionalLocations ?: (getInstallDir() + "/application-customer.properties")
-
-        var nonExistentFiles = true
-        additionalLocation.split(",").forEach {
-            val configFile = File(it)
-            if (configFile.exists()) {
-                nonExistentFiles = false
+@Suppress("SpreadOperator", "ComplexCondition")
+private fun startSpringBootApp(args: Array<String>) {
+    val app = SpringApplicationBuilder(CdrClientApplication::class.java)
+        .listeners(ApplicationListener<ApplicationReadyEvent> {
+            if (isUiAvailable()) {
+                System.setProperty("java.awt.headless", "false") // for system tray only
+                initSystemTray()
             }
+        })
+        .listeners(ApplicationListener<ContextClosedEvent> {
+            SystemTray.getSystemTray().trayIcons.forEach { SystemTray.getSystemTray().remove(it) }
+        })
+        .let {
+            if (osIsWindows()) {
+                it.listeners(ApplicationPidFileWriter(getInstallDir().resolve("client.pid").toFile()))
+            }
+            it
         }
-
-        if (nonExistentFiles) {
-            logger.info { "Error: No configuration file does not exist at any given location: '$additionalLocation'" }
-            return false
+    if (isRunningFromJpackageInstallation() && (!isSkipInstaller(args))) {
+        System.getProperty("LOGGING_FILE_NAME") ?: run {
+            logger.debug { "setting loggin_file_name" }
+            System.setProperty(
+                "LOGGING_FILE_NAME",
+                "${getInstallDir().resolve("logs").resolve("cdr-client.log")}"
+            )
         }
-    } else if (isSkipInstallerProfile()) {
-        logger.info { "local development or testing" }
-    } else {
-        error("Error: spring.profiles.active is not set or does not contain 'customer'")
-    }
-
-    return true
-}
-
-fun getInstallDir(): String {
-    val osName = System.getProperty("os.name").lowercase()
-    var file = File(System.getProperty("java.class.path"))
-    while (file.parentFile != null && file.name.endsWith(".jar").not()) {
-        file = file.parentFile
-    }
-    val installDir = if (osName.contains("win")) {
-        file.parentFile.parent // Windows: 'cdr-client\app\xyz.jar'
-    } else {
-        file.parentFile.parentFile.parent // Unix: 'cdr-client/lib/app/xyz.jar'
-    }
-    logger.debug { "Install dir: $installDir" }
-    return installDir
-}
-
-fun activeProfiles(): String? {
-    return System.getProperty("spring.profiles.active")
-}
-
-@Suppress("SpreadOperator")
-fun startSpringBootApp(args: Array<String>) {
-    val app = SpringApplication(CdrClientApplication::class.java)
-    // TODO: if active profiles are not active, should we fail or set the 'customer' profile?
-    if (activeProfiles() == null || !isSkipInstallerProfile()) {
+        logger.debug { "setting spring.config.additional-location" }
         System.getProperty("spring.config.additional-location") ?: run {
             System.setProperty(
                 "spring.config.additional-location",
-                "${getInstallDir()}${File.separator}application-customer.properties"
-            )
-        }
-        System.getProperty("LOGGING_FILE_NAME") ?: run {
-            System.setProperty(
-                "LOGGING_FILE_NAME",
-                "${getInstallDir()}${File.separator}logs${File.separator}cdr-client.log"
+                "${getInstallDir().resolve(CONFIG_FILE)}"
             )
         }
     }
-    app.addListeners(ApplicationListener<ApplicationReadyEvent> {
-        if (isUiAvailable()) {
-            System.setProperty("java.awt.headless", "false") // for system tray only
-            initSystemTray()
-        }
-    })
-    app.addListeners(ApplicationListener<ContextClosedEvent> {
-        SystemTray.getSystemTray().trayIcons.forEach { SystemTray.getSystemTray().remove(it) }
-    })
+
     app.run(*args)
 }
 
-fun initSystemTray() {
+private fun initSystemTray() {
     if (!SystemTray.isSupported()) {
         logger.warn { "System tray is not supported" }
         return
@@ -156,11 +105,6 @@ fun initSystemTray() {
     } catch (e: AWTException) {
         logger.error { "TrayIcon could not be added: ${e.message}" }
     }
-}
-
-fun isSkipInstallerProfile(): Boolean {
-    val activeProfile = activeProfiles()
-    return activeProfile != null && activeProfile.split(",").any { it == "dev" || it == "test" }
 }
 
 internal tailrec fun getRootestCause(e: Throwable): Throwable =
