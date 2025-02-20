@@ -325,12 +325,20 @@ tasks.register<Exec>("jpackageAppPrepareDebian") {
         "--main-jar", "${project.name}-${project.version}.jar",
         "--app-version", project.version.toString(),
         "--vendor", "Swisscom (Schweiz) AG",
-     //   "--copyright", "Copyright 2025, All rights reserved",
+        "--copyright", "Copyright 2025, All rights reserved",
         "--icon", "resources/icon.png",
         "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
         "--java-options", "-Dfile.encoding=UTF-8",
         "--java-options", "-Dspring.profiles.active=customer",
     )
+    doLast{
+        copy {
+            from("."){
+                include("LICENSE")
+            }
+            into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
+        }
+    }
 }
 
 tasks.register<Exec>("jpackageAppFinishDebian") {
@@ -339,6 +347,8 @@ tasks.register<Exec>("jpackageAppFinishDebian") {
     args(
         "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",
         "--dest", "${outputDir.get().asFile.absolutePath}/jpackage",
+        "--license-file", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app/LICENSE",
+        "--copyright", "Copyright 2025, All rights reserved",
         "--app-version", project.version.toString(),
         "--verbose"
     )
@@ -354,7 +364,7 @@ tasks.register<Exec>("jpackageAppPrepareWindows") {
         "--main-jar", "${project.name}-${project.version}.jar",
         "--app-version", project.version.toString(),
         "--vendor", "Swisscom (Schweiz) AG",
-  //      "--copyright", "Copyright 2025, All rights reserved",
+        "--copyright", "Copyright 2025, All rights reserved",
         "--icon", "resources/windows/icon.ico",
         "--win-console",
         "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
@@ -369,6 +379,9 @@ tasks.register<Exec>("jpackageAppPrepareWindows") {
                 include("icon.ico")
                 include("stop.bat")
             }
+            from("."){
+                include("LICENSE")
+            }
             into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
         }
     }
@@ -380,6 +393,8 @@ tasks.register<Exec>("jpackageAppFinishWindows") {
     args(
         "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",
         "--win-dir-chooser",
+        "--license-file", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app/LICENSE",
+        "--copyright", "Copyright 2025, All rights reserved",
         "--dest", "${outputDir.get().asFile.absolutePath}/jpackage",
         "--app-version", project.version.toString(),
         "--verbose"
