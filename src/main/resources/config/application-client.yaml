@@ -8,7 +8,7 @@ client:
     # locations, which currently also fails the update
     scopes:
       - https://${CDR_CLIENT_SCOPE_PREFIX:}identity.health.swisscom.ch/CdrApi/.default
-    renew-credential-at-startup: ${CDR_CLIENT_RENEW_CREDENTIAL_AT_STARTUP:false}
+    renew-credential-at-startup: ${CDR_CLIENT_RENEW_CREDENTIAL_AT_STARTUP:true}
   idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/
   schedule-delay: PT10M
   files-in-progress-cache-size: 10MB

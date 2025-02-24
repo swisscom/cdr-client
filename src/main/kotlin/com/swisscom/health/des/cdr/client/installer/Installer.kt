@@ -31,6 +31,8 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         val clientSecret = scanner.nextLine()
         print("Connector-ID: ")
         val connectorId = scanner.nextLine()
+        print("Automatically update credentials (recommended: Y)? (Y/n): ")
+        val updateCredentials: String = scanner.nextLine()
         val createServiceAccount: String? =
             if (osIsWindows()) {
                 print("Create Service Account? (y/N): ")
@@ -43,7 +45,8 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
             tenantId = tenantId,
             connectorId = connectorId,
             clientId = clientId,
-            clientSecret = clientSecret
+            clientSecret = clientSecret,
+            updateCredentials = updateCredentials
         )
         if (createServiceAccount?.lowercase() in listOf("y", "yes", "true")) {
             createService(connectorId)
@@ -57,19 +60,22 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         tenantId: String,
         connectorId: String,
         clientId: String,
-        clientSecret: String
+        clientSecret: String,
+        updateCredentials: String,
     ) {
         val configFile = getInstallDir().resolve(CONFIG_FILE).toFile()
         val trimmedTenantId = tenantId.trim()
         val trimmedConnectorId = connectorId.trim()
         val trimmedClientId = clientId.trim()
         val trimmedClientSecret = clientSecret.trim()
+        val trimmedUpdateCredentials = updateCredentials.trim()
 
         val newContent = setBaseConfigAndAddConnector(
             tenantId = trimmedTenantId,
             connectorId = trimmedConnectorId,
             clientId = trimmedClientId,
             clientSecret = trimmedClientSecret,
+            updateCredentials = trimmedUpdateCredentials,
         )
         logger.info { "write new config file to '$configFile'" }
         configFile.writeText(newContent, Charsets.UTF_8)
@@ -79,6 +85,7 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         tenantId: String,
         clientId: String,
         clientSecret: String,
+        updateCredentials: String,
     ): String {
         val folderPath = getInstallDir().toSpringConfigString()
         return ""
@@ -86,6 +93,20 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
             .plus("client.idp-credentials.$CONF_TENANT_ID=$tenantId\n")
             .plus("client.idp-credentials.$CONF_CLIENT_ID=$clientId\n")
             .plus("client.idp-credentials.$CONF_CLIENT_SECRET=$clientSecret\n")
+            .let {
+                if (updateCredentials.lowercase() in listOf("n", "no", "non", "nein", "false")) {
+                    it.plus("client.idp-credentials.renew-credential-at-startup=false\n")
+                } else {
+                    it
+                }
+            }
+            .let {
+                if (tenantId.startsWith(TST_TENANT_ID_START)) {
+                    it.plus("client.cdr-api.host=stg.cdr.health.swisscom.ch")
+                } else {
+                    it
+                }
+            }
     }
 
     private fun setBaseConfigAndAddConnector(
@@ -93,12 +114,14 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         connectorId: String,
         clientId: String,
         clientSecret: String,
+        updateCredentials: String,
     ): String {
         val folderPath = getInstallDir()
         return setBaseConfig(
             tenantId = tenantId,
             clientId = clientId,
-            clientSecret = clientSecret
+            clientSecret = clientSecret,
+                    updateCredentials= updateCredentials,
         )
             .plus(
                 createConnector(
@@ -194,6 +217,7 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         const val CONF_TENANT_ID = "tenant-id"
         const val CONF_CLIENT_ID = "client-id"
         const val CONF_CLIENT_SECRET = "client-secret"
+        const val TST_TENANT_ID_START = "dc"
 
         @JvmStatic
         val RESOURCE_DIR_PART: Path = Path.of("lib", "app")
