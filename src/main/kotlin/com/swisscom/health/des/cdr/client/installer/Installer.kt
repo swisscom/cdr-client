@@ -53,7 +53,8 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         }
 
         println("All done! The application is now ready to be started.")
-        println("Please start the application again.")
+        println("Please press Enter to close the console. You will need to manually start the application again.")
+        scanner.nextLine()
     }
 
     private fun updateConfigFile(
