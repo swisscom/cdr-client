@@ -5,18 +5,18 @@ import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentRes
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.time.delay
 import org.springframework.stereotype.Component
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import java.util.UUID
 import kotlin.io.path.deleteIfExists
+import kotlin.io.path.exists
 import kotlin.io.path.moveTo
 import kotlin.io.path.name
 import kotlin.io.path.nameWithoutExtension
 import kotlin.math.min
-import kotlinx.coroutines.time.delay
-import kotlin.io.path.exists
 
 
 private val logger = KotlinLogging.logger {}
@@ -95,8 +95,6 @@ class RetryUploadFileHandling(
                 }
 
                 if (retryNeeded) {
-                    // FIXME: Cannot use delay() here because we might continue on another thread and we would either loose the span id or continue with
-                    //  the wrong span id (thread local)
                     delay(cdrClientConfig.retryDelay[retryIndex])
                     retryCount++
                     logger.info { "Retry attempt '#$retryCount' for file '${uploadFile.fileName}'" }
@@ -107,7 +105,7 @@ class RetryUploadFileHandling(
             onFailure = { t: Throwable ->
                 if (t is CancellationException) {
                     // we are getting shut down; moving the file back to its original location so it gets picked up again on restart
-                    runCatching {if (uploadFile.exists())  uploadFile.moveTo(file) }
+                    runCatching { if (uploadFile.exists()) uploadFile.moveTo(file) }
                 }
                 throw t
             }

@@ -3,9 +3,11 @@ package com.swisscom.health.des.cdr.client
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.Tracer
 import io.micrometer.tracing.Tracer.SpanInScope
+import kotlinx.coroutines.ThreadContextElement
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
+import kotlin.coroutines.CoroutineContext
 
 
 object TraceSupport {
@@ -25,9 +27,7 @@ object TraceSupport {
 //            "Expected an OpenTelemetry `PropagatedSpan` (which is a noop implementation) but got a ${span.javaClass.canonicalName} instead."
 //        }
 
-        val spanInScope: SpanInScope = tracer.withSpan(span)
-
-        return spanInScope.use { _ ->
+        return tracer.withSpan(span).use { _ ->
             block()
         } to span
     }
@@ -38,11 +38,25 @@ object TraceSupport {
             callsInPlace(block, InvocationKind.EXACTLY_ONCE)
         }
 
-        val spanInScope: SpanInScope = tracer.withSpan(span)
-
-        return spanInScope.use { _ ->
+        return tracer.withSpan(span).use { _ ->
             block()
         } to span
+    }
+
+}
+
+internal class SpanContextElement(private val span: Span, private val tracer: Tracer) : ThreadContextElement<SpanInScope> {
+    override val key: CoroutineContext.Key<SpanContextElement>
+        get() = Key
+
+    override fun updateThreadContext(context: CoroutineContext): SpanInScope = tracer.withSpan(span)
+
+    override fun restoreThreadContext(context: CoroutineContext, oldState: SpanInScope) = oldState.close()
+
+    override fun toString(): String = "$Key=$span"
+
+    companion object Key : CoroutineContext.Key<SpanContextElement> {
+        override fun toString(): String = "SpanInScope"
     }
 
 }

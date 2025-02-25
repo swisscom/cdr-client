@@ -11,11 +11,13 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.io.path.createDirectories
+import kotlin.io.path.deleteExisting
 import kotlin.io.path.exists
 import kotlin.io.path.fileStore
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.isWritable
+import kotlin.io.path.listDirectoryEntries
 
 
 private val logger = KotlinLogging.logger {}
@@ -286,6 +288,10 @@ class CdrClientConfig {
         val asString = toString()
 
         logger.info { "Client configuration: $asString" }
+
+        // the error folders have been created automatically when we checked the configuration --> delete them again, if they are empty,
+        // to not pollute the filesystem with directories, that hopefully stay empty, on every (re)start of the client
+        customer.forEach { if(it.effectiveSourceErrorFolder.listDirectoryEntries().isEmpty()) it.effectiveSourceErrorFolder.deleteExisting() }
     }
 
     private fun sourceTargetFolderOverlap(): Unit =
