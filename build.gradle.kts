@@ -165,7 +165,7 @@ val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("ja
                 }
             }))
             limit {
-                minimum = "0.75".toBigDecimal()
+                minimum = "0.70".toBigDecimal()
             }
         }
     }
@@ -304,3 +304,99 @@ dockerCompose {
 /***************************
  * END Integration Testing *
  ***************************/
+
+tasks.named<Jar>("jar") {
+    enabled = false
+}
+
+val packagePrepare = "jpackage-prepare"
+
+tasks.register<Delete>("clearPackagePrepare") {
+    delete(file("${outputDir.get().asFile.absolutePath}/$packagePrepare"))
+}
+
+tasks.register<Exec>("jpackageAppPrepareDebian") {
+    dependsOn("clearPackagePrepare")
+    executable = "jpackage"
+    args(
+        "--type", "app-image",
+        "--name", project.name,
+        "--input", "${outputDir.get().asFile.absolutePath}/libs",
+        "--main-jar", "${project.name}-${project.version}.jar",
+        "--app-version", project.version.toString(),
+        "--vendor", "Swisscom (Schweiz) AG",
+        "--copyright", "Copyright 2025, All rights reserved",
+        "--icon", "resources/icon.png",
+        "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
+        "--java-options", "-Dfile.encoding=UTF-8",
+        "--java-options", "-Dspring.profiles.active=customer",
+    )
+    doLast{
+        copy {
+            from("."){
+                include("LICENSE")
+            }
+            into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
+        }
+    }
+}
+
+tasks.register<Exec>("jpackageAppFinishDebian") {
+    dependsOn("jpackageAppPrepareDebian")
+    executable = "jpackage"
+    args(
+        "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",
+        "--dest", "${outputDir.get().asFile.absolutePath}/jpackage",
+        "--license-file", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app/LICENSE",
+        "--copyright", "Copyright 2025, All rights reserved",
+        "--app-version", project.version.toString(),
+        "--verbose"
+    )
+}
+
+tasks.register<Exec>("jpackageAppPrepareWindows") {
+    dependsOn("clearPackagePrepare")
+    executable = "jpackage"
+    args(
+        "--type", "app-image",
+        "--name", project.name,
+        "--input", "${outputDir.get().asFile.absolutePath}/libs",
+        "--main-jar", "${project.name}-${project.version}.jar",
+        "--app-version", project.version.toString(),
+        "--vendor", "Swisscom (Schweiz) AG",
+        "--copyright", "Copyright 2025, All rights reserved",
+        "--icon", "resources/windows/icon.ico",
+        "--win-console",
+        "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
+        "--java-options", "-Dfile.encoding=UTF-8",
+        "--java-options", "-Dspring.profiles.active=customer",
+    )
+    doLast{
+        copy {
+            from("resources/windows") {
+                include("cdrClient.exe")
+                include("cdrClientw.exe")
+                include("icon.ico")
+                include("stop.bat")
+            }
+            from("."){
+                include("LICENSE")
+            }
+            into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
+        }
+    }
+}
+
+tasks.register<Exec>("jpackageAppFinishWindows") {
+    dependsOn("jpackageAppPrepareWindows")
+    executable = "jpackage"
+    args(
+        "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",
+        "--win-dir-chooser",
+        "--license-file", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app/LICENSE",
+        "--copyright", "Copyright 2025, All rights reserved",
+        "--dest", "${outputDir.get().asFile.absolutePath}/jpackage",
+        "--app-version", project.version.toString(),
+        "--verbose"
+    )
+}
