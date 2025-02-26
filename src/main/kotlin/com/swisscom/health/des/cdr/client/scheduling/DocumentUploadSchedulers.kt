@@ -343,7 +343,6 @@ abstract class BaseUploadScheduler(
                 continueSpan(tracer, span) {
                     logger.info { "queuing '${file}' for upload" }
                     launch(cdrUploadsDispatcher + SpanContextElement(span, tracer)) {
-                        logger.error{"Test!!!"}
                         runCatching {
                             dispatchForUpload(file)
                         }.fold(

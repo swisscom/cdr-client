@@ -58,6 +58,9 @@ logging:
     dateformat: "\"yyyy-MM-dd'T'HH:mm:ss.SSSXXX\", UTC"
   level:
     root: INFO
-    com.swisscom.health.des.cdr: INFO
   charset:
     console: UTF-8
+    file: UTF-8
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
