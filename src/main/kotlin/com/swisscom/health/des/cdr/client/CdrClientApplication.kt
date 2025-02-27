@@ -1,6 +1,7 @@
 package com.swisscom.health.des.cdr.client
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import org.springframework.boot.actuate.autoconfigure.scheduling.ScheduledTasksObservabilityAutoConfiguration
 import com.swisscom.health.des.cdr.client.installer.Installer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.autoconfigure.SpringBootApplication
@@ -25,7 +26,7 @@ internal const val CONFIG_FILE = "application-customer.properties"
 /**
  * Spring Boot entry point
  */
-@SpringBootApplication
+@SpringBootApplication(exclude = [ScheduledTasksObservabilityAutoConfiguration::class])
 @EnableConfigurationProperties(CdrClientConfig::class)
 @EnableScheduling
 class CdrClientApplication

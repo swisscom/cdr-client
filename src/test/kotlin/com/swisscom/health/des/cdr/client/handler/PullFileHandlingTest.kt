@@ -271,7 +271,6 @@ internal class PullFileHandlingTest {
         every { span.name(any()) } returns span
         every { span.start() } returns span
         every { span.event(any()) } returns span
-        every { span.end() } returns Unit
         every { span.tag(any(), any<String>()) } returns span
         every { span.context() } returns traceContext
         every { spanInScope.close() } returns Unit
