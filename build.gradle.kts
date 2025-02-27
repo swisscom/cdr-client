@@ -4,7 +4,7 @@ import java.net.URI
 import java.time.Duration
 
 group = "com.swisscom.health.des.cdr"
-version = "3.3.2-SNAPSHOT"
+version = "3.4.1-SNAPSHOT"
 
 val outputDir: Provider<Directory> = layout.buildDirectory.dir(".")
 
