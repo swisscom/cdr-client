@@ -13,25 +13,10 @@
     </springProfile>
 
     <springProfile name="!(dev | test)">
-        <logger name="org.springframework" level="INFO"/>
+        <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+        <include resource="org/springframework/boot/logging/logback/file-appender.xml"/>
 
-        <property name="LOG_LEVEL_PATTERN" value="%highlight(%level)"/>
         <property name="LOG_EXCEPTION_CONVERSION_WORD" value="%rEx"/>
-
-        <appender name="ROLLING" class="ch.qos.logback.core.rolling.RollingFileAppender">
-            <file>${LOGGING_FILE_NAME:-./cdr-client.log}</file>
-            <append>true</append>
-
-            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-                <fileNamePattern>${LOGGING_FILE_NAME:-./cdr-client.log}.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-                <maxFileSize>${LOGGING_LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE:-100MB}</maxFileSize>
-                <maxHistory>${LOGGING_LOGBACK_ROLLINGPOLICY_MAX_HISTORY:-2}</maxHistory>
-            </rollingPolicy>
-
-            <encoder>
-                <pattern>%d{"yyyy-MM-dd'T'HH:mm:ss.SSSXXX", UTC} | ${%level:-%5p} | ${PID:- } | %X{traceId:-None}-%X{spanId:-None} | [%15.15t] | %-40.40logger{39} | %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%ex}</pattern>
-            </encoder>
-        </appender>
 
         <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
             <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
@@ -72,7 +57,7 @@
             </encoder>
         </appender>
         <root level="INFO">
-            <appender-ref ref="ROLLING"/>
+            <appender-ref ref="FILE"/>
             <appender-ref ref="STDOUT"/>
         </root>
     </springProfile>

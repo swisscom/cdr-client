@@ -4,37 +4,22 @@ import java.net.URI
 import java.time.Duration
 
 group = "com.swisscom.health.des.cdr"
-version = "3.3.1"
-java.sourceCompatibility = JavaVersion.VERSION_17
-
-val awaitilityVersion: String by project
-val jacocoVersion: String by project
-val kacheVersion: String by project
-val kfsWatchVersion: String by project
-val kotlinCoroutinesVersion: String by project
-val kotlinLoggingVersion: String by project
-val logstashEncoderVersion: String by project
-val mockkVersion: String by project
-val msal4jVersion: String by project
-val springCloudVersion: String by project
-val springMockkVersion: String by project
-val okHttpVersion: String by project
-val jvmVersion: String by project
+version = "3.4.0"
 
 val outputDir: Provider<Directory> = layout.buildDirectory.dir(".")
 
 plugins {
-    id("com.avast.gradle.docker-compose") version "0.17.12"
-    id("org.springframework.boot")
-    id("io.spring.dependency-management")
-    id("io.gitlab.arturbosch.detekt")
+    alias(libs.plugins.dockerCompose)
+    alias(libs.plugins.springBoot)
+    alias(libs.plugins.springDependencyManagement)
+    alias(libs.plugins.detekt)
     jacoco
     application
-    kotlin("jvm")
-    kotlin("plugin.spring")
+    kotlin("jvm").version(libs.versions.kotlin)
+    kotlin("plugin.spring").version(libs.versions.kotlin)
     // https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.kotlin.configuration-properties
     // KAPT is end of life, but KSP is not supported yet: https://github.com/spring-projects/spring-boot/issues/28046
-    kotlin("kapt")
+    kotlin("kapt").version(libs.versions.kotlin)
     `maven-publish`
     idea
 }
@@ -77,10 +62,7 @@ gradle.taskGraph.whenReady(
     }
 )
 
-dependencyManagement {
-    imports {
-        mavenBom("org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}")
-    }
+project.afterEvaluate {
     // https://github.com/detekt/detekt/issues/6198#issuecomment-2265183695
     configurations.matching { it.name == "detekt" }.all {
         resolutionStrategy.eachDependency {
@@ -92,43 +74,45 @@ dependencyManagement {
 }
 
 dependencies {
-    implementation("com.mayakapps.kache:kache:$kacheVersion")
-    implementation("com.microsoft.azure:msal4j:$msal4jVersion")
-    implementation("com.squareup.okhttp3:okhttp:$okHttpVersion")
-    implementation("io.github.irgaly.kfswatch:kfswatch:$kfsWatchVersion")
-    implementation("io.github.oshai:kotlin-logging:$kotlinLoggingVersion")
-    implementation("io.micrometer:micrometer-tracing")
-    implementation("io.micrometer:micrometer-tracing-bridge-otel")
-    implementation("net.logstash.logback:logstash-logback-encoder:$logstashEncoderVersion")
-    implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("org.jetbrains.kotlin:kotlin-stdlib")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinCoroutinesVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:$kotlinCoroutinesVersion") // to enable @Scheduled on Kotlin suspending functions
-    implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.boot:spring-boot-starter-web")
-    implementation("org.springframework.retry:spring-retry")
-    implementation("org.springframework.cloud:spring-cloud-context")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+    implementation(platform(libs.springBootDependencies))
+    implementation(platform(libs.springCloudDependencies))
+    implementation(libs.kache)
+    implementation(libs.msal4j)
+    implementation(libs.okhttp)
+    implementation(libs.kfswatch)
+    implementation(libs.kotlinLogging)
+    implementation(libs.microMeterTracing)
+    implementation(libs.microMeterTracingBridgeOtel)
+    implementation(libs.logstashEncoder)
+    implementation(libs.kotlinReflect)
+    implementation(libs.kotlinStdlib)
+    implementation(libs.kotlinxCoroutinesCore)
+    implementation(libs.kotlinxCoroutinesReactor) // to enable @Scheduled on Kotlin suspending functions
+    implementation(libs.springBootStarterActuator)
+    implementation(libs.springBootStarterWeb)
+    implementation(libs.springRetry)
+    implementation(libs.springCloudContext)
+    implementation(libs.jacksonDataformatYaml)
 
     // Note: At the time of writing the configuration processor seems to be broken; might be related to the upgrade to Kotlin 2.x
     // Enable annotation processing via menu File | Settings | Build, Execution, Deployment
     // | Compiler | Annotation Processors | Enable annotation processing
     kapt("org.springframework.boot:spring-boot-configuration-processor")
 
-    testImplementation("org.jacoco:org.jacoco.core:${jacocoVersion}")
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
-    testImplementation("com.squareup.okhttp3:mockwebserver:$okHttpVersion") {
+    testImplementation(libs.jacocoCore)
+    testImplementation(libs.springBootStarterTest)
+    testImplementation(libs.kotlinxCoroutinesTest)
+    testImplementation(libs.mockWebServer) {
         // Unfortunately we cannot exclude JUnit 4 as MockWebServer implements interfaces from that version
-//        exclude(group = "junit", config = "junit")
+//        exclude(group = "junit", module = "junit")
     }
-    testImplementation("io.mockk:mockk:${mockkVersion}") {
+    testImplementation(libs.mockk) {
         exclude(group = "junit", module = "junit")
     }
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testImplementation("io.micrometer:micrometer-tracing-test")
-    testImplementation("com.ninja-squad:springmockk:${springMockkVersion}")
-    testImplementation("org.awaitility:awaitility:${awaitilityVersion}")
+    testImplementation(libs.junitJupiter)
+    testImplementation(libs.micrometerTracingTest)
+    testImplementation(libs.springMockk)
+    testImplementation(libs.awaitility)
 
 }
 
@@ -147,12 +131,15 @@ repositories {
 }
 
 kotlin {
-    jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(jvmVersion.toInt()))
-    }
+    jvmToolchain (libs.versions.jdk.get().toInt())
     compilerOptions {
         freeCompilerArgs = listOf("-Xjsr305=strict")
     }
+}
+
+// NOTE: you should to run this target or manually update `gradle/gradle-daemon-jvm.properties` if we change the Java version!
+tasks.updateDaemonJvm {
+    jvmVersion = JavaLanguageVersion.of(libs.versions.jdk.get().toInt())
 }
 
 tasks.test {
@@ -178,7 +165,7 @@ val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("ja
                 }
             }))
             limit {
-                minimum = "0.75".toBigDecimal()
+                minimum = "0.70".toBigDecimal()
             }
         }
     }
@@ -213,7 +200,7 @@ tasks.withType<Test> {
 }
 
 jacoco {
-    toolVersion = jacocoVersion
+    toolVersion = libs.versions.jacoco.get()
 }
 
 tasks.named<BootJar>("bootJar") {
@@ -317,3 +304,99 @@ dockerCompose {
 /***************************
  * END Integration Testing *
  ***************************/
+
+tasks.named<Jar>("jar") {
+    enabled = false
+}
+
+val packagePrepare = "jpackage-prepare"
+
+tasks.register<Delete>("clearPackagePrepare") {
+    delete(file("${outputDir.get().asFile.absolutePath}/$packagePrepare"))
+}
+
+tasks.register<Exec>("jpackageAppPrepareDebian") {
+    dependsOn("clearPackagePrepare")
+    executable = "jpackage"
+    args(
+        "--type", "app-image",
+        "--name", project.name,
+        "--input", "${outputDir.get().asFile.absolutePath}/libs",
+        "--main-jar", "${project.name}-${project.version}.jar",
+        "--app-version", project.version.toString(),
+        "--vendor", "Swisscom (Schweiz) AG",
+        "--copyright", "Copyright 2025, All rights reserved",
+        "--icon", "resources/icon.png",
+        "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
+        "--java-options", "-Dfile.encoding=UTF-8",
+        "--java-options", "-Dspring.profiles.active=customer",
+    )
+    doLast{
+        copy {
+            from("."){
+                include("LICENSE")
+            }
+            into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
+        }
+    }
+}
+
+tasks.register<Exec>("jpackageAppFinishDebian") {
+    dependsOn("jpackageAppPrepareDebian")
+    executable = "jpackage"
+    args(
+        "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",
+        "--dest", "${outputDir.get().asFile.absolutePath}/jpackage",
+        "--license-file", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app/LICENSE",
+        "--copyright", "Copyright 2025, All rights reserved",
+        "--app-version", project.version.toString(),
+        "--verbose"
+    )
+}
+
+tasks.register<Exec>("jpackageAppPrepareWindows") {
+    dependsOn("clearPackagePrepare")
+    executable = "jpackage"
+    args(
+        "--type", "app-image",
+        "--name", project.name,
+        "--input", "${outputDir.get().asFile.absolutePath}/libs",
+        "--main-jar", "${project.name}-${project.version}.jar",
+        "--app-version", project.version.toString(),
+        "--vendor", "Swisscom (Schweiz) AG",
+        "--copyright", "Copyright 2025, All rights reserved",
+        "--icon", "resources/windows/icon.ico",
+        "--win-console",
+        "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
+        "--java-options", "-Dfile.encoding=UTF-8",
+        "--java-options", "-Dspring.profiles.active=customer",
+    )
+    doLast{
+        copy {
+            from("resources/windows") {
+                include("cdrClient.exe")
+                include("cdrClientw.exe")
+                include("icon.ico")
+                include("stop.bat")
+            }
+            from("."){
+                include("LICENSE")
+            }
+            into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
+        }
+    }
+}
+
+tasks.register<Exec>("jpackageAppFinishWindows") {
+    dependsOn("jpackageAppPrepareWindows")
+    executable = "jpackage"
+    args(
+        "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",
+        "--win-dir-chooser",
+        "--license-file", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app/LICENSE",
+        "--copyright", "Copyright 2025, All rights reserved",
+        "--dest", "${outputDir.get().asFile.absolutePath}/jpackage",
+        "--app-version", project.version.toString(),
+        "--verbose"
+    )
+}

@@ -1,6 +1,7 @@
 package com.swisscom.health.des.cdr.client.scheduling
 
 import com.mayakapps.kache.ObjectKache
+import com.swisscom.health.des.cdr.client.SpanContextElement
 import com.swisscom.health.des.cdr.client.TraceSupport.continueSpan
 import com.swisscom.health.des.cdr.client.TraceSupport.startSpan
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.time.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
@@ -106,8 +108,9 @@ class EventTriggerUploadScheduler(
     }.fold(
         onSuccess = { },
         onFailure = { t: Throwable ->
+            tracer.withSpan(null)
             when (t) {
-                is CancellationException -> logger.info { "Shutting down file watcher process." }.also { throw t }
+                is CancellationException -> logger.info { "Shutting down file watcher task." }.also { throw t }
                 else -> {
                     logger.error { "File watcher process terminated with error: $t" }
                     logger.info { "Restarting file watcher process in $DEFAULT_RESTART_DELAY_SECONDS seconds..." }
@@ -121,12 +124,13 @@ class EventTriggerUploadScheduler(
 
         return watcher.onEventFlow
             .onCompletion { error: Throwable? ->
+                tracer.withSpan(null)
                 when (error) {
                     !is CancellationException -> logger.error {
                         "File system event flow terminated${if (error != null) " with error: '${error::class}'; message: '${error.message}'" else "."}"
                     }
 
-                    else -> logger.info { "File system event flow terminated." }
+                    else -> logger.debug { "File system event flow terminated." }
                 }
             }
             .map { event: KfsDirectoryWatcherEvent ->
@@ -221,14 +225,17 @@ class PollingUploadScheduler(
             }
         }
         coroutineScope {
-            launch(Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 val fileFlow = pollForNewFilesToUpload(this)
-                uploadFiles(fileFlow)
+                launch {
+                    uploadFiles(fileFlow)
+                }
             }
         }
     }.fold(
         onSuccess = { },
         onFailure = { t: Throwable ->
+            tracer.withSpan(null)
             when (t) {
                 is CancellationException -> logger.info { "Shutting down file polling task." }.also { throw t }
                 else -> {
@@ -255,7 +262,7 @@ class PollingUploadScheduler(
                             .listDirectoryEntries()
                             .asSequence()
                             .sortedBy { Files.readAttributes(it, BasicFileAttributes::class.java).lastModifiedTime() }
-                            .map { path -> path to span }
+                            .map { path -> path to tracer.nextSpan(span)!! }
                     }.forEach { (path, span) ->
                         emit(path.absolute() to span)
                     }
@@ -264,13 +271,14 @@ class PollingUploadScheduler(
             }
         }
             .onCompletion { error: Throwable? ->
+                tracer.withSpan(null)
                 // `shareIn(..)` makes this a hot flow which never terminates unless an error occurs, or it is explicitly cancelled
                 when (error) {
                     !is CancellationException -> logger.error {
                         "File system polling flow terminated${if (error != null) " with error: '${error::class}'; message: '${error.message}'" else "."}"
                     }
 
-                    else -> logger.info { "File system polling flow terminated." }
+                    else -> logger.debug { "File system polling flow terminated." }
                 }
             }
             .buffer(capacity = 100, onBufferOverflow = BufferOverflow.SUSPEND)
@@ -332,9 +340,9 @@ abstract class BaseUploadScheduler(
                 }.first
             }
             .onEach { (file: Path, span) ->
-                logger.info { "queuing '${file}' for upload" }
-                launch(cdrUploadsDispatcher) {
-                    continueSpan(tracer, span) {
+                continueSpan(tracer, span) {
+                    logger.info { "queuing '${file}' for upload" }
+                    launch(cdrUploadsDispatcher + SpanContextElement(span, tracer)) {
                         runCatching {
                             dispatchForUpload(file)
                         }.fold(
@@ -358,12 +366,13 @@ abstract class BaseUploadScheduler(
                 }
             }
             .onCompletion { error: Throwable? ->
+                tracer.withSpan(null)
                 when (error) {
                     !is CancellationException -> logger.error {
                         "Upload flow subscription terminated${if (error != null) " with error: '${error::class}'; message: '${error.message}'" else "."}"
                     }
 
-                    else -> logger.info { "Upload flow subscription terminated." }
+                    else -> logger.debug { "Upload flow subscription terminated." }
                 }
             }
             .collect()
@@ -385,8 +394,6 @@ abstract class BaseUploadScheduler(
             withTimeout(config.fileBusyTestTimeout.toMillis()) {
                 while (fileBusyTester.isBusy(this@isBusy)) {
                     logger.debug { "'${this@isBusy}' is still busy; waiting '${config.fileBusyTestInterval}' for it to become available" }
-                    // FIXME: Cannot use delay() here because we might continue on another thread and we would either loose the span id or continue
-                    //  with the wrong span id (thread local)
                     delay(config.fileBusyTestInterval)
                 }
                 false
@@ -395,7 +402,8 @@ abstract class BaseUploadScheduler(
             onSuccess = { it },
             onFailure = { t: Throwable ->
                 when (t) {
-                    is TimeoutCancellationException -> true
+                    is TimeoutCancellationException -> true // file is still busy
+                    is CancellationException -> throw t
                     else -> {
                         logger.error { "Error while checking whether '${this@isBusy}' is still busy: : '${t.message}'" }
                         throw t

@@ -21,7 +21,7 @@ import kotlin.io.path.writeText
 class FileBusyTesterTest {
 
     @TempDir
-    lateinit var tempDir: Path
+    private lateinit var tempDir: Path
 
     @Test
     fun `never_busy is always false`() = runTest { assertFalse(FileBusyTester.NeverBusy.isBusy(Path.of("/i/dont/even/exist"))) }
@@ -30,13 +30,13 @@ class FileBusyTesterTest {
     fun `always_busy is always true`() = runTest { assertTrue(FileBusyTester.AlwaysBusy.isBusy(Path.of("/i/dont/even/exist"))) }
 
     @Test
-    fun `file size growth test`() = runBlocking {
+    fun `file size growth test`() = runBlocking(Dispatchers.IO) {
         val tester = FileBusyTester.FileSizeChanged(testInterval = Duration.ofMillis(50L))
         val file = tempDir
             .resolve("size-changed.txt")
             .createFile()
 
-        val writeFileJob = launch(Dispatchers.IO) {
+        val writeFileJob = launch {
             while (true) {
                 file.writeText("a", UTF_8, WRITE, APPEND)
                 delay(10L)
