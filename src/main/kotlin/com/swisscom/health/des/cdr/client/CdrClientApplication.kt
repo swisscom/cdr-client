@@ -50,7 +50,9 @@ private fun startSpringBootApp(args: Array<String>) {
             }
         })
         .listeners(ApplicationListener<ContextClosedEvent> {
-            SystemTray.getSystemTray().trayIcons.forEach { SystemTray.getSystemTray().remove(it) }
+            if (isUiAvailable()) {
+                SystemTray.getSystemTray().trayIcons.forEach { SystemTray.getSystemTray().remove(it) }
+            }
         })
     if (isRunningFromJpackageInstallation() && (!isSkipInstaller(args))) {
         System.getProperty("LOGGING_FILE_NAME") ?: run {
