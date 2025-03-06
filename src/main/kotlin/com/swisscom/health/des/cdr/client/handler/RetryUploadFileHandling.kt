@@ -1,6 +1,7 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.getConnectorForSourceFile
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentResult
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
@@ -101,7 +102,7 @@ class RetryUploadFileHandling(
                 }
             } while (retryNeeded)
         }.fold(
-            onSuccess = { it },
+            onSuccess = {},
             onFailure = { t: Throwable ->
                 if (t is CancellationException) {
                     // we are getting shut down; moving the file back to its original location so it gets picked up again on restart
@@ -113,10 +114,10 @@ class RetryUploadFileHandling(
     }
 
     private fun deleteOrArchiveFile(file: Path): Unit = runCatching {
-        cdrClientConfig.customer.first { it.sourceFolder == file.parent }.let { connector ->
+        cdrClientConfig.customer.getConnectorForSourceFile(file).let { connector ->
             if (connector.sourceArchiveEnabled) {
                 file.moveTo(
-                    connector.effectiveSourceArchiveFolder.resolve("${file.nameWithoutExtension}_${UUID.randomUUID()}.xml")
+                    connector.getEffectiveSourceArchiveFolder(file).resolve("${file.nameWithoutExtension}_${UUID.randomUUID()}.xml")
                 )
             } else {
                 if (!file.deleteIfExists()) {
@@ -139,10 +140,10 @@ class RetryUploadFileHandling(
         file.moveTo(errorFile)
         Files.write(logFile, responseBdy.toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
 
-        cdrClientConfig.customer.first { it.sourceFolder == file.parent }.let { connector ->
-            if (connector.effectiveSourceErrorFolder != file.parent) {
-                errorFile.moveTo(connector.effectiveSourceErrorFolder.resolve(errorFile.name))
-                logFile.moveTo(connector.effectiveSourceErrorFolder.resolve(logFile.name))
+        cdrClientConfig.customer.getConnectorForSourceFile(file).let { connector ->
+            if (connector.getEffectiveSourceErrorFolder(file) != file.parent) {
+                errorFile.moveTo(connector.getEffectiveSourceErrorFolder(file).resolve(errorFile.name))
+                logFile.moveTo(connector.getEffectiveSourceErrorFolder(file).resolve(logFile.name))
             }
         }
     }.fold(

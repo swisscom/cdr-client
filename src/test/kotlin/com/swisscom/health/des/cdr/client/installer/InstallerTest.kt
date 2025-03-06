@@ -19,7 +19,7 @@ import java.util.Scanner
 import kotlin.io.path.exists
 
 @ExtendWith(MockKExtension::class)
-class InstallerTest {
+internal class InstallerTest {
 
     private lateinit var installer: Installer
 
@@ -46,7 +46,7 @@ class InstallerTest {
         mockkStatic("com.swisscom.health.des.cdr.client.StartupHelperKt")
         println("createTempDirectory: $createTempDirectory, ${createTempDirectory.toUri().rawPath}")
         every { getInstallDir() } returns createTempDirectory
-        every { scanner.nextLine() } returns "tenantId" andThen "clientId" andThen "clientSecret" andThen "connectorId" andThen "" andThen "n"
+        every { scanner.nextLine() } returns "clientId" andThen "clientSecret" andThen "tenantId" andThen "connectorId" andThen "" andThen "n"
 
         installer.install()
 
@@ -86,7 +86,7 @@ class InstallerTest {
         mockkStatic("com.swisscom.health.des.cdr.client.StartupHelperKt")
         println("createTempDirectory: $createTempDirectory, ${createTempDirectory.toUri().rawPath}")
         every { getInstallDir() } returns createTempDirectory
-        every { scanner.nextLine() } returns "dc-tenantId" andThen "clientId" andThen "clientSecret" andThen "connectorId" andThen "n" andThen "N"
+        every { scanner.nextLine() } returns "clientId" andThen "clientSecret" andThen "dc-tenantId" andThen "connectorId" andThen "n" andThen "N"
 
         installer.install()
 
@@ -112,6 +112,10 @@ class InstallerTest {
         assertTrue(
             configContent.contains("client.idp-credentials.renew-credential-at-startup=false"),
             "Config file should contain renew-credential-at-startup set to false"
+        )
+        assertTrue(
+            configContent.contains("client.idp-credentials.scopes=https://tst.identity.health.swisscom.ch/CdrApi/.default"),
+            "Config file should contain idp-credentials.scopes set to stage"
         )
         assertTrue(
             configContent.contains("client.cdr-api.host=stg.cdr.health.swisscom.ch"),
