@@ -129,7 +129,8 @@ class CdrClientConfig {
 
         /**
          * Folder to archive uploaded files to. The folder will be created for you if it does not exist yet if [sourceArchiveEnabled]
-         * is set to `true`. If you specify a relative path it will be resolved relative to the source folder.
+         * is set to `true`. If you specify a relative path it will be resolved relative to the source folder. If you specify an absolute path,
+         * the path will be used as is for all archive folders, such as for all [typeFolders].
          *
          * Beware: On Linux both `.` and `./` resolve to the current working directory, while `./archive` (and just `archive`) resolve
          * to `<source_dir>/archive`.
@@ -144,7 +145,7 @@ class CdrClientConfig {
 
         /**
          * Folder to move documents to for which the upload has failed. If you specify a relative path it will be resolved relative
-         * to the source folder.
+         * to the source folder. If you specify an absolute path, the path will be used as is for all error folders, such as for all [typeFolders].
          *
          * Beware: On Linux both `.` and `./` resolve to the current working directory, while `./error` (and just `error`) resolve
          * to `<source_dir>/error`.
@@ -231,11 +232,23 @@ class CdrClientConfig {
             get() = sourceFolder.resolve(sourceErrorFolder.resolve(getDateNow())).also { createDirectoryIfNeeded(it) }
 
         override fun toString(): String {
-            // TODO: only base path archive and error folder are printed
             return "Connector(connectorId='$connectorId', targetFolder=$targetFolder, sourceFolder=$sourceFolder, contentType=$contentType, " +
                     "uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
-                    "effectiveSourceArchiveFolder=${effectiveConnectorSourceArchiveFolder}, sourceErrorFolder=$sourceErrorFolder, " +
-                    "effectiveSourceErrorFolder=${effectiveConnectorSourceErrorFolder} mode=$mode)"
+                    "effectiveSourceArchiveFolder=${effectiveConnectorSourceArchiveFolder}, " +
+                    if (sourceArchiveEnabled && typeFolders.isNotEmpty() && typeFolders.entries.any { it.value.sourceFolder != null })
+                        "additionalEffectiveSourceArchiveFolders=[${
+                            typeFolders.entries.filter { it.value.sourceFolder != null }
+                                .joinToString { "${it.key}=${getEffectiveSourceArchiveFolder(it.value.sourceFolder!!)}" }
+                        }], "
+                    else "" +
+                            "sourceErrorFolder=$sourceErrorFolder, effectiveSourceErrorFolder=${effectiveConnectorSourceErrorFolder} " +
+                            if (typeFolders.isNotEmpty() && typeFolders.entries.any { it.value.sourceFolder != null })
+                                "additionalEffectiveSourceErrorFolders=[${
+                                    typeFolders.entries.filter { it.value.sourceFolder != null }
+                                        .joinToString { "${it.key}=${getEffectiveSourceErrorFolder(it.value.sourceFolder!!)}" }
+                                }], "
+                            else "" +
+                                    "mode=$mode)"
         }
 
         /**
@@ -387,7 +400,7 @@ class CdrClientConfig {
         val baseTargetFolders = customer.map { it.targetFolder }
         val allTargetTypeFolders = getAllTargetTypeFolders()
 
-        if((baseSourceFolders + allSourceTypeFolders + baseTargetFolders + allTargetTypeFolders).contains(localFolder)) {
+        if ((baseSourceFolders + allSourceTypeFolders + baseTargetFolders + allTargetTypeFolders).contains(localFolder)) {
             error("The local folder '$localFolder' is configured as source or target folder for a connector")
         }
 
@@ -434,11 +447,11 @@ class CdrClientConfig {
     private fun allFoldersAreReadWriteable() {
         val allFolders: List<Pair<String, Path>> = customer.flatMap {
             // we only check the base connector archive folders, as all type error folders are created in a folder where the process already needs to have
-            // write access to read/remove files
+            // write access to read/delete files
             val archiveFolder: Pair<String, Path>? =
                 if (it.sourceArchiveEnabled) "connector '${it.connectorId}' source archive" to it.effectiveConnectorSourceArchiveFolder else null
             // we only check the base connector error folders, as all type error folders are created in a folder where the process already needs to have
-            // write access to read/remove files
+            // write access to read/delete files
             val errorFolder: Pair<String, Path>? =
                 if (it.sourceErrorFolder != EMPTY_PATH) "connector '${it.connectorId}' source error" to it.effectiveConnectorSourceErrorFolder else null
             listOfNotNull(
