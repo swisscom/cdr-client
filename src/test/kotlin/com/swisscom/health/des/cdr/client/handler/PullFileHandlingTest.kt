@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
-import com.swisscom.health.des.cdr.client.xml.MessageType
-import com.swisscom.health.des.cdr.client.xml.XmlParser
+import com.swisscom.health.des.cdr.client.xml.DocumentType
+import com.swisscom.health.des.cdr.client.xml.XmlUtil
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.TraceContext
 import io.micrometer.tracing.Tracer
@@ -101,7 +101,7 @@ internal class PullFileHandlingTest {
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } returns "Mocked Result"
 
         cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), clientCredentialParams, retryIoErrorsThrice, securedApp, ObjectMapper())
-        pullFileHandling = PullFileHandling(tracer, cdrApiClient, XmlParser())
+        pullFileHandling = PullFileHandling(tracer, cdrApiClient, XmlUtil())
     }
 
     @AfterEach
@@ -144,7 +144,7 @@ internal class PullFileHandlingTest {
             sourceFolder = tmpDir.resolve(sourceDirectory)
             contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
             mode = CdrClientConfig.Mode.PRODUCTION
-            typeFolders = mapOf(MessageType.INVOICE to CdrClientConfig.Connector.TypeFolders().apply {
+            docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply {
                 targetFolder = invoiceFolder
             })
         }
@@ -180,7 +180,7 @@ internal class PullFileHandlingTest {
             sourceFolder = tmpDir.resolve(sourceDirectory)
             contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
             mode = CdrClientConfig.Mode.PRODUCTION
-            typeFolders = mapOf(MessageType.INVOICE to CdrClientConfig.Connector.TypeFolders().apply {
+            docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply {
                 targetFolder = invoiceFolder
             })
         }
@@ -216,7 +216,7 @@ internal class PullFileHandlingTest {
             sourceFolder = tmpDir.resolve(sourceDirectory)
             contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
             mode = CdrClientConfig.Mode.PRODUCTION
-            typeFolders = mapOf(MessageType.INVOICE to CdrClientConfig.Connector.TypeFolders().apply {
+            docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply {
                 targetFolder = invoiceFolder
             })
         }

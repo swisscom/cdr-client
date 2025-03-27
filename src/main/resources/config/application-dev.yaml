@@ -22,10 +22,12 @@ client:
       source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[0].connector-id}/test
       source-error-folder: errors
       mode: test
-      type-folders:
+      doc-type-folders:
         invoice:
           target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[0].connector-id}/test/invoice
           source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[0].connector-id}/test/invoice
+        credit:
+          source-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[0].connector-id}/test/credit
     - connector-id: 1
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
       target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[1].connector-id}
@@ -38,7 +40,7 @@ client:
       source-archive-enabled: true
       source-archive-folder: archive
       mode: test
-      type-folders:
+      doc-type-folders:
         invoice:
           source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[2].connector-id}/invoice
     - connector-id: 5

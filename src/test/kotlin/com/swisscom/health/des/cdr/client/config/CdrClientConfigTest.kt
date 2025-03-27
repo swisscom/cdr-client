@@ -1,7 +1,7 @@
 package com.swisscom.health.des.cdr.client.config
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.IdpCredentials
-import com.swisscom.health.des.cdr.client.xml.MessageType
+import com.swisscom.health.des.cdr.client.xml.DocumentType
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -184,23 +184,23 @@ class CdrClientConfigTest {
                 FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                 CdrClientConfig.Mode.TEST,
                 mapOf(
-                    MessageType.CONTAINER to CdrClientConfig.Connector.TypeFolders().apply { targetFolder = targetFolder0 },
-                    MessageType.CREDIT to CdrClientConfig.Connector.TypeFolders().apply { targetFolder = targetFolder0 },
-                    MessageType.FORM to CdrClientConfig.Connector.TypeFolders().apply { targetFolder = targetFolder0 },
-                    MessageType.HOSPITAL_MCD to CdrClientConfig.Connector.TypeFolders().apply { targetFolder = targetFolder0 },
-                    MessageType.INVOICE to CdrClientConfig.Connector.TypeFolders().apply { targetFolder = targetFolder0 },
-                    MessageType.NOTIFICATION to CdrClientConfig.Connector.TypeFolders().apply { targetFolder = targetFolder0 },
+                    DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
+                    DocumentType.CREDIT to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
+                    DocumentType.FORM to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
+                    DocumentType.HOSPITAL_MCD to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
+                    DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
+                    DocumentType.NOTIFICATION to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
                 )
             ),
             createConnector(
                 "connectorId", targetFolder1, sourceFolder1, FORUM_DATENAUSTAUSCH_MEDIA_TYPE, CdrClientConfig.Mode.PRODUCTION,
                 mapOf(
-                    MessageType.CONTAINER to CdrClientConfig.Connector.TypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub") },
-                    MessageType.CREDIT to CdrClientConfig.Connector.TypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub1") },
-                    MessageType.FORM to CdrClientConfig.Connector.TypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub2") },
-                    MessageType.HOSPITAL_MCD to CdrClientConfig.Connector.TypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub3") },
-                    MessageType.INVOICE to CdrClientConfig.Connector.TypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub4") },
-                    MessageType.NOTIFICATION to CdrClientConfig.Connector.TypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub5") },
+                    DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub") },
+                    DocumentType.CREDIT to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub1") },
+                    DocumentType.FORM to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub2") },
+                    DocumentType.HOSPITAL_MCD to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub3") },
+                    DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub4") },
+                    DocumentType.NOTIFICATION to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub5") },
                 )
             ),
             createConnector("connectorId2", targetFolder2, sourceFolder2, FORUM_DATENAUSTAUSCH_MEDIA_TYPE, CdrClientConfig.Mode.TEST),
@@ -277,7 +277,7 @@ class CdrClientConfigTest {
                         sourceFolder0,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.TEST,
-                        createTypeFolders(targetFolder0, sourceFolder0)
+                        createDocTypeFolders(targetFolder0, sourceFolder0)
                     ),
                 ),
                 DUPLICATE_SOURCE_FOLDER_ERROR_MESSAGE_PART
@@ -290,7 +290,7 @@ class CdrClientConfigTest {
                         sourceFolder0,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.TEST,
-                        createTypeFolders(sourceFolder0, sourceFolder1)
+                        createDocTypeFolders(sourceFolder0, sourceFolder1)
                     ),
                 ),
                 USED_FOR_BOTH_ERROR_MESSAGE_PART
@@ -303,7 +303,7 @@ class CdrClientConfigTest {
                         sourceFolder0,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.TEST,
-                        createTypeFolders(targetFolder0, sourceFolder1)
+                        createDocTypeFolders(targetFolder0, sourceFolder1)
                     ),
                     createConnector(
                         "connectorId2",
@@ -311,7 +311,7 @@ class CdrClientConfigTest {
                         sourceFolder2,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.PRODUCTION,
-                        createTypeFolders(targetFolder1, sourceFolder0)
+                        createDocTypeFolders(targetFolder1, sourceFolder0)
                     )
                 ),
                 DUPLICATE_SOURCE_FOLDER_ERROR_MESSAGE_PART
@@ -324,7 +324,7 @@ class CdrClientConfigTest {
                         sourceFolder0,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.TEST,
-                        createTypeFolders(targetFolder0, sourceFolder1)
+                        createDocTypeFolders(targetFolder0, sourceFolder1)
                     ),
                     createConnector(
                         "connectorId",
@@ -332,7 +332,7 @@ class CdrClientConfigTest {
                         sourceFolder2,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.PRODUCTION,
-                        createTypeFolders(targetFolder1, sourceFolder0)
+                        createDocTypeFolders(targetFolder1, sourceFolder0)
                     )
                 ),
                 DUPLICATE_SOURCE_FOLDER_ERROR_MESSAGE_PART
@@ -345,7 +345,7 @@ class CdrClientConfigTest {
                         sourceFolder0,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.TEST,
-                        createTypeFolders(targetFolder0, sourceFolder1)
+                        createDocTypeFolders(targetFolder0, sourceFolder1)
                     ),
                     createConnector(
                         "connectorId2",
@@ -353,7 +353,7 @@ class CdrClientConfigTest {
                         sourceFolder2,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.PRODUCTION,
-                        createTypeFolders(targetFolder1, sourceFolder1)
+                        createDocTypeFolders(targetFolder1, sourceFolder1)
                     )
                 ),
                 DUPLICATE_SOURCE_FOLDER_ERROR_MESSAGE_PART
@@ -366,7 +366,7 @@ class CdrClientConfigTest {
                         sourceFolder0,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.TEST,
-                        createTypeFolders(targetFolder0, sourceFolder1)
+                        createDocTypeFolders(targetFolder0, sourceFolder1)
                     ),
                     createConnector(
                         "connectorId2",
@@ -374,7 +374,7 @@ class CdrClientConfigTest {
                         sourceFolder2,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.PRODUCTION,
-                        createTypeFolders(sourceFolder0, sourceFolder2)
+                        createDocTypeFolders(sourceFolder0, sourceFolder2)
                     )
                 ),
                 USED_FOR_BOTH_ERROR_MESSAGE_PART
@@ -387,7 +387,7 @@ class CdrClientConfigTest {
                         sourceFolder0,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.TEST,
-                        createTypeFolders(targetFolder0, sourceFolder1)
+                        createDocTypeFolders(targetFolder0, sourceFolder1)
                     ),
                     createConnector(
                         "connectorId2",
@@ -395,7 +395,7 @@ class CdrClientConfigTest {
                         sourceFolder2,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.PRODUCTION,
-                        createTypeFolders(sourceFolder1, sourceFolder3)
+                        createDocTypeFolders(sourceFolder1, sourceFolder3)
                     )
                 ),
                 USED_FOR_BOTH_ERROR_MESSAGE_PART
@@ -408,7 +408,7 @@ class CdrClientConfigTest {
                         sourceFolder0,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.TEST,
-                        createTypeFolders(targetFolder0, sourceFolder1)
+                        createDocTypeFolders(targetFolder0, sourceFolder1)
                     ),
                     createConnector(
                         "connectorId",
@@ -416,7 +416,7 @@ class CdrClientConfigTest {
                         sourceFolder2,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.PRODUCTION,
-                        createTypeFolders(targetFolder1, sourceFolder3)
+                        createDocTypeFolders(targetFolder1, sourceFolder3)
                     ),
                     createConnector(
                         "connectorId2",
@@ -424,7 +424,7 @@ class CdrClientConfigTest {
                         sourceFolder4,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.PRODUCTION,
-                        createTypeFolders(sourceFolder1, null, MessageType.FORM)
+                        createDocTypeFolders(sourceFolder1, null, DocumentType.FORM)
                     )
                 ),
                 USED_FOR_BOTH_ERROR_MESSAGE_PART
@@ -437,7 +437,7 @@ class CdrClientConfigTest {
                         sourceFolder0,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.TEST,
-                        createTypeFolders(targetFolder0, sourceFolder1)
+                        createDocTypeFolders(targetFolder0, sourceFolder1)
                     ),
                     createConnector(
                         "connectorId",
@@ -445,7 +445,7 @@ class CdrClientConfigTest {
                         sourceFolder2,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.PRODUCTION,
-                        createTypeFolders(targetFolder1, sourceFolder3)
+                        createDocTypeFolders(targetFolder1, sourceFolder3)
                     ),
                     createConnector(
                         "connectorId2",
@@ -453,7 +453,7 @@ class CdrClientConfigTest {
                         sourceFolder4,
                         FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                         CdrClientConfig.Mode.PRODUCTION,
-                        createTypeFolders(targetFolder2, sourceFolder1, MessageType.FORM)
+                        createDocTypeFolders(targetFolder2, sourceFolder1, DocumentType.FORM)
                     )
                 ),
                 DUPLICATE_SOURCE_FOLDER_ERROR_MESSAGE_PART
@@ -467,7 +467,7 @@ class CdrClientConfigTest {
             sourceFolder: Path,
             contentType: MediaType,
             mode: CdrClientConfig.Mode,
-            typeFolders: Map<MessageType, CdrClientConfig.Connector.TypeFolders> = emptyMap()
+            typeFolders: Map<DocumentType, CdrClientConfig.Connector.DocTypeFolders> = emptyMap()
         ): CdrClientConfig.Connector {
             return CdrClientConfig.Connector().apply {
                 this.connectorId = connectorId
@@ -475,17 +475,17 @@ class CdrClientConfigTest {
                 this.sourceFolder = sourceFolder
                 this.contentType = contentType
                 this.mode = mode
-                this.typeFolders = typeFolders
+                this.docTypeFolders = typeFolders
             }
         }
 
-        private fun createTypeFolders(
-            targetFolder: Path?,
+        private fun createDocTypeFolders(
+            targetFolder: Path,
             sourceFolder: Path?,
-            messageType: MessageType = MessageType.INVOICE
-        ): Map<MessageType, CdrClientConfig.Connector.TypeFolders> {
-            return mapOf(messageType to CdrClientConfig.Connector.TypeFolders().apply {
-                if (targetFolder != null) this.targetFolder = targetFolder
+            documentType: DocumentType = DocumentType.INVOICE
+        ): Map<DocumentType, CdrClientConfig.Connector.DocTypeFolders> {
+            return mapOf(documentType to CdrClientConfig.Connector.DocTypeFolders().apply {
+                this.targetFolder = targetFolder
                 if (sourceFolder != null) this.sourceFolder = sourceFolder
             })
         }

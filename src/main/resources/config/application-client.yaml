@@ -1,8 +1,8 @@
 client:
   local-folder: ${cdrClient.localFolder:${java.io.tmpdir}/cdr_download}
   idp-credentials:
-    tenant-id: ${CDR_B2C_TENANT_ID:test-tenant-id} # `test-tenant-id` is the required value if the MockOauth2Server is used; see its `config.json`
-    client-id: ${CDR_CLIENT_ID:test-client-id}
+    tenant-id: ${CDR_B2C_TENANT_ID:test-tenant-client-id} # `test-tenant-client-id` is the required value if the MockOauth2Server is used; see its `config.json`
+    client-id: ${CDR_CLIENT_ID:easy-system-test-user-id}
     # Do not define the `client-secret` property here; defining the property here effectively prevents the password-auto-renewal from working
     # as the internal yaml file cannot be updated and the property also cannot be overridden in an external file as that would lead to two secret
     # locations, which currently also fails the update

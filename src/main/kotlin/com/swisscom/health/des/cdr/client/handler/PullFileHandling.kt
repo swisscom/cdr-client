@@ -1,16 +1,13 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
-import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Connector.Companion.effectiveTargetFolder
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.DownloadDocumentResult
-import com.swisscom.health.des.cdr.client.xml.ForumDatenaustauschNamespaces
-import com.swisscom.health.des.cdr.client.xml.MessageType
-import com.swisscom.health.des.cdr.client.xml.XmlParser
+import com.swisscom.health.des.cdr.client.xml.DocumentType
+import com.swisscom.health.des.cdr.client.xml.XmlUtil
 import com.swisscom.health.des.cdr.client.xml.toDom
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import org.springframework.stereotype.Component
-import org.xml.sax.SAXException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -30,7 +27,7 @@ internal const val PULL_RESULT_ID_HEADER = "cdr-document-uuid"
 class PullFileHandling(
     private val tracer: Tracer,
     private val cdrApiClient: CdrApiClient,
-    private val xmlParser: XmlParser
+    private val xmlParser: XmlUtil
 ) {
     /**
      * Downloads files for a specific customer.
@@ -101,26 +98,20 @@ class PullFileHandling(
      * @param connector the connector for whom the file was requested
      * @param file the file to move
      */
+    @Suppress("TooGenericExceptionCaught")
     private fun moveFileToClientFolder(connector: CdrClientConfig.Connector, file: Path) {
         logger.debug { "Move file to target directory start" }
-        val targetFolder = if (connector.typeFolders.isEmpty()) {
+        val targetFolder = if (connector.docTypeFolders.isEmpty()) {
             connector.targetFolder
         } else {
-            val forumDatenaustauschNamespaces: ForumDatenaustauschNamespaces = try {
+            val documentType: DocumentType = try {
                 xmlParser.findSchemaDefinition(file.inputStream().use { it.toDom() })
-            } catch (e: SAXException) {
+            } catch (e: Exception) {
                 logger.error { "Error parsing schema definition for file '$file': ${e.message}" }
                 throw e
             }
-            val fromValue = MessageType.fromValue(forumDatenaustauschNamespaces.prefix)
-            if (fromValue == MessageType.UNDEFINED) {
-                logger.error { "Unable to determine message type for file '$file' - will move it to the base target folder '${connector.targetFolder}'" }
-                // TODO: should we fail in this case? Probably not, as we don't want to block everything
-                connector.targetFolder
-            } else {
-                connector.typeFolders[fromValue]?.let { typeFolder -> connector.effectiveTargetFolder(typeFolder) }
-                    ?: connector.targetFolder.also { logger.info { "No specific target folder defined for files of type '${forumDatenaustauschNamespaces}'" } }
-            }
+            connector.docTypeFolders[documentType]?.let { docTypeFolder -> connector.effectiveTargetFolder(docTypeFolder) }
+                ?: connector.targetFolder.also { logger.info { "No specific target folder defined for files of type '${documentType}'" } }
         }
         val targetTmpFile = targetFolder.resolve(file.name)
 
@@ -140,10 +131,10 @@ class PullFileHandling(
             )
         }.fold(
             onSuccess = {
-                true.also { logger.debug { "Moved file '$file' to '${targetTmpFile.resolveSibling("${targetTmpFile.nameWithoutExtension}.xml")}'" } }
+                logger.debug { "Moved file '$file' to '${targetTmpFile.resolveSibling("${targetTmpFile.nameWithoutExtension}.xml")}'" }
             },
             onFailure = { t: Throwable ->
-                false.also { logger.error { "Unable to move file '$file' to '${connector.targetFolder}': ${t.message}" } }
+                logger.error { "Unable to move file '$file' to '${connector.targetFolder}': ${t.message}" }
             }
         )
     }

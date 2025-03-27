@@ -5,9 +5,7 @@ import com.swisscom.health.des.cdr.client.SpanContextElement
 import com.swisscom.health.des.cdr.client.TraceSupport.continueSpan
 import com.swisscom.health.des.cdr.client.TraceSupport.startSpan
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
-import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Connector.Companion.effectiveSourceFolder
 import com.swisscom.health.des.cdr.client.config.FileBusyTester
-import com.swisscom.health.des.cdr.client.config.getAllSourceTypeFolders
 import com.swisscom.health.des.cdr.client.config.getConnectorForSourceFile
 import com.swisscom.health.des.cdr.client.handler.RetryUploadFileHandling
 import io.github.irgaly.kfswatch.KfsDirectoryWatcher
@@ -99,7 +97,7 @@ class EventTriggerUploadScheduler(
         logger.info { "Starting file watcher process..." }
         config.customer.forEach { connector ->
             logger.info { "Watching source directory: '${connector.sourceFolder}'" }
-            connector.typeFolders.filter { map -> map.value.sourceFolder != null }
+            connector.docTypeFolders.filter { map -> map.value.sourceFolder != null }
                 .forEach { (_, typeFolders) -> logger.info { "Watching additional source directory: '${connector.effectiveSourceFolder(typeFolders)}'" } }
         }
 
@@ -125,7 +123,7 @@ class EventTriggerUploadScheduler(
     )
 
     private suspend fun watchForNewFilesToUpload(watcher: KfsDirectoryWatcher): Flow<Pair<Path, Span>> {
-        val sourceTypeFolders: List<Path> = config.customer.map { it.getAllSourceTypeFolders() }.flatten()
+        val sourceTypeFolders: List<Path> = config.customer.map { it.getAllSourceDocTypeFolders() }.flatten()
         val folders = config.customer.map { it.sourceFolder } + sourceTypeFolders
 
         addWatchedPaths(watcher, folders)
@@ -230,7 +228,7 @@ class PollingUploadScheduler(
         config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let { humanReadableDelay ->
             config.customer.forEach { connector ->
                 logger.info { "Polling source directory every '$humanReadableDelay': '${connector.sourceFolder}'" }
-                connector.typeFolders.filter { map -> map.value.sourceFolder != null }
+                connector.docTypeFolders.filter { map -> map.value.sourceFolder != null }
                     .forEach { (_, typeFolders) ->
                         logger.info {
                             "Polling additional source directory every '$humanReadableDelay': '${connector.effectiveSourceFolder(typeFolders)}'"
@@ -268,13 +266,12 @@ class PollingUploadScheduler(
                     .map {
                         startSpan(tracer, "poll directory ${it.sourceFolder}") {
                             logger.debug { "Polling source directory for files: ${it.sourceFolder}" }
-                            it.getAllSourceTypeFolders().forEach { folder -> logger.debug { "Polling additional source directory for files: $folder" } }
-                            it.sourceFolder to it
+                            it.getAllSourceDocTypeFolders().forEach { folder -> logger.debug { "Polling additional source directory for files: $folder" } }
+                            it
                         }
                     }
-                    .flatMap { (sourceFolderPair, span) ->
-                        val (sourceFolder, connector) = sourceFolderPair
-                        val allSourceFolders: List<Path> = listOf(sourceFolder) + connector.getAllSourceTypeFolders()
+                    .flatMap { (connector, span) ->
+                        val allSourceFolders: List<Path> = listOf(connector.sourceFolder) + connector.getAllSourceDocTypeFolders()
                         allSourceFolders.flatMap { folder ->
                             folder.listDirectoryEntries()
                                 .asSequence()

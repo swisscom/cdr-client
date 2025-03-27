@@ -103,7 +103,7 @@ Following environment variables can be set (to override their `dev` profile defa
 | CDR_CLIENT_LOCAL_FOLDER  | $HOME/Documents/cdr/inflight |
 | CDR_CLIENT_TARGET_FOLDER | $HOME/Documents/cdr/target   |
 | CDR_CLIENT_SOURCE_FOLDER | $HOME/Documents/cdr/source   |
-| CDR_B2C_TENANT_ID        | test-tenant-id               |
+| CDR_B2C_TENANT_ID        | test-tenant-client-id        |
 | CDR_CLIENT_ID            | fake-id                      |
 | CDR_CLIENT_SECRET        | Placeholder_dummy            |
 

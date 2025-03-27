@@ -7,9 +7,9 @@ import javax.xml.XMLConstants
 import javax.xml.parsers.DocumentBuilderFactory
 
 @Service
-class XmlParser {
+class XmlUtil {
 
-    fun findSchemaDefinition(doc: Document): ForumDatenaustauschNamespaces {
+    fun findSchemaDefinition(doc: Document): DocumentType {
         fun isEven(value: Int) = value % 2 == 0
         val namespaceDeclarationElements = doc.documentElement.attributes
             .getNamedItemNS("http://www.w3.org/2001/XMLSchema-instance", "schemaLocation")
@@ -26,11 +26,11 @@ class XmlParser {
             ?.toSet()
             ?: emptySet()
 
-        val find = ForumDatenaustauschNamespaces.entries.find { pc ->
+        val find = DocumentType.entries.find { pc ->
             namespaceDeclarationElements.any{ namespace -> namespace.startsWith(pc.uri) }
         }
 
-        return find ?: ForumDatenaustauschNamespaces.UNDEFINED
+        return find ?: DocumentType.UNDEFINED
     }
 
 }

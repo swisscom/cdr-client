@@ -8,13 +8,13 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.xml.sax.SAXParseException
 
-internal class XmlParserTest {
+internal class XmlUtilTest {
 
-    private lateinit var xmlParser: XmlParser
+    private lateinit var xmlUtil: XmlUtil
 
     @BeforeEach
     fun setUp() {
-        xmlParser = XmlParser()
+        xmlUtil = XmlUtil()
     }
 
     @ParameterizedTest
@@ -29,8 +29,8 @@ internal class XmlParserTest {
     fun `test find schema definition`(invoiceFile: String, uri: String) {
         this::class.java.getResourceAsStream(invoiceFile)?.use {
             it.toDom().let { dom ->
-                val schema = xmlParser.findSchemaDefinition(dom)
-                assertEquals(ForumDatenaustauschNamespaces.fromUri(uri), schema)
+                val schema = xmlUtil.findSchemaDefinition(dom)
+                assertEquals(DocumentType.fromUri(uri), schema)
             }
         }
     }
@@ -39,8 +39,8 @@ internal class XmlParserTest {
     fun `test fail finding schema definition`() {
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><hello/>".byteInputStream().use {
             it.toDom().let { dom ->
-                val findSchemaDefinition = xmlParser.findSchemaDefinition(dom)
-                assertEquals(ForumDatenaustauschNamespaces.UNDEFINED, findSchemaDefinition)
+                val findSchemaDefinition = xmlUtil.findSchemaDefinition(dom)
+                assertEquals(DocumentType.UNDEFINED, findSchemaDefinition)
             }
         }
     }

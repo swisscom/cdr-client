@@ -2,8 +2,8 @@ client:
   function-key:
   idp-credentials:
     # if you change this value, you must also change it in the mock-oauth2-server/config.json file and caddy/Caddyfile
-    tenant-id: test-tenant-id
-    client-id: test-client-id
+    tenant-id: test-tenant-client-id
+    client-id: easy-system-test-user-id
     client-secret: test-client-secret
     scopes:
       - https://dev.identity.health.swisscom.ch/CdrApi/.default

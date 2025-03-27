@@ -1,9 +1,7 @@
 package com.swisscom.health.des.cdr.client.config
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Connector
-import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Connector.Companion.effectiveSourceFolder
-import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Connector.Companion.effectiveTargetFolder
-import com.swisscom.health.des.cdr.client.xml.MessageType
+import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PostConstruct
 import org.springframework.boot.context.properties.ConfigurationProperties
@@ -89,20 +87,6 @@ class CdrClientConfig {
 
     class Connector {
 
-        companion object {
-            /**
-             * Returns the effective source folder for a given [TypeFolders] instance. If the [TypeFolders.sourceFolder] is not set, returns `null`.
-             * @see TypeFolders
-             */
-            fun Connector.effectiveSourceFolder(typeFolder: TypeFolders): Path? = typeFolder.sourceFolder?.let { this.sourceFolder.resolve(it) }
-
-            /**
-             * Returns the effective target folder for a given [TypeFolders] instance. If the [TypeFolders.targetFolder] is not set, returns `null`.
-             * @see TypeFolders
-             */
-            fun Connector.effectiveTargetFolder(typeFolder: TypeFolders): Path? = typeFolder.targetFolder?.let { this.targetFolder.resolve(it) }
-        }
-
         /** Unique identifier for the connector; log into CDR web app to look up your connector ID(s). */
         lateinit var connectorId: String
 
@@ -130,7 +114,7 @@ class CdrClientConfig {
         /**
          * Folder to archive uploaded files to. The folder will be created for you if it does not exist yet if [sourceArchiveEnabled]
          * is set to `true`. If you specify a relative path it will be resolved relative to the source folder. If you specify an absolute path,
-         * the path will be used as is for all archive folders, such as for all [typeFolders].
+         * the path will be used as is for all archive folders, such as for all [docTypeFolders].
          *
          * Beware: On Linux both `.` and `./` resolve to the current working directory, while `./archive` (and just `archive`) resolve
          * to `<source_dir>/archive`.
@@ -145,7 +129,7 @@ class CdrClientConfig {
 
         /**
          * Folder to move documents to for which the upload has failed. If you specify a relative path it will be resolved relative
-         * to the source folder. If you specify an absolute path, the path will be used as is for all error folders, such as for all [typeFolders].
+         * to the source folder. If you specify an absolute path, the path will be used as is for all error folders, such as for all [docTypeFolders].
          *
          * Beware: On Linux both `.` and `./` resolve to the current working directory, while `./error` (and just `error`) resolve
          * to `<source_dir>/error`.
@@ -160,17 +144,11 @@ class CdrClientConfig {
         /** Mode of the connector; either `test` or `production`; attempting to upload documents with a mismatching mode attribute value will fail. */
         lateinit var mode: Mode
 
-        private var _typeFolders: Map<MessageType, TypeFolders>? = null
-
         /**
          * Forum Datenaustausch message types related folders. In case that the files come from different source folders or received files need to be stored
          * to different target folders, depending on the message type
          */
-        var typeFolders: Map<MessageType, TypeFolders>
-            get() = _typeFolders ?: emptyMap()
-            set(value) {
-                _typeFolders = value
-            }
+        var docTypeFolders: Map<DocumentType, DocTypeFolders> = emptyMap()
 
         /**
          * If [sourceArchiveEnabled] is set to `true` returns the archive folder resolved against the source folder with a subdirectory
@@ -190,7 +168,7 @@ class CdrClientConfig {
                 }.resolve(sourceArchiveFolder.resolve(getDateNow()))
             } else {
                 EMPTY_PATH
-            }.also { createDirectoryIfNeeded(it) }
+            }.also { createDirectoryIfMissing(it) }
 
         /**
          * Convenience property to get the connector archive folder that is used in all cases where no message type related folders are defined.
@@ -198,13 +176,31 @@ class CdrClientConfig {
          */
         val effectiveConnectorSourceArchiveFolder: Path
             get() = if (sourceArchiveEnabled) sourceFolder.resolve(sourceArchiveFolder.resolve(getDateNow()))
-                .also { createDirectoryIfNeeded(it) } else EMPTY_PATH
+                .also { createDirectoryIfMissing(it) } else EMPTY_PATH
 
-        private fun createDirectoryIfNeeded(path: Path): Path = try {
+        /**
+         * Returns all source folders for all document types of this connector. If a [DocTypeFolders.sourceFolder] is not set, the entry is omitted.
+         */
+        fun getAllSourceDocTypeFolders(): List<Path> = this.docTypeFolders.values.mapNotNull { this.effectiveSourceFolder(it) }
+
+        /**
+         * Returns the effective source folder for a given [DocTypeFolders] instance. If the [DocTypeFolders.sourceFolder] is not set, returns `null`.
+         * @see DocTypeFolders
+         */
+        fun effectiveSourceFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.sourceFolder?.let { this.sourceFolder.resolve(it) }
+
+        /**
+         * Returns the effective target folder for a given [DocTypeFolders] instance. If the [DocTypeFolders.targetFolder] is not set, returns `null`.
+         * @see DocTypeFolders
+         */
+        fun effectiveTargetFolder(docTypeFolders: DocTypeFolders): Path = docTypeFolders.targetFolder.let { this.targetFolder.resolve(it) }
+
+        @Suppress("TooGenericExceptionCaught")
+        private fun createDirectoryIfMissing(path: Path): Path = try {
             path.createDirectories()
-        } catch (ex: IOException) {
-            logger.error { ex }
-            error("Failed to create directory '$path' for connector '$connectorId' - Is the path reachable and are there sufficient access rights?")
+        } catch (t: Throwable) {
+            logger.error { "Failed to create directory '$path' for connector '$connectorId': $t" }
+            throw t
         }
 
         private fun getDateNow(): String = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
@@ -222,41 +218,51 @@ class CdrClientConfig {
             } else {
                 path.parent
             }.resolve(sourceErrorFolder.resolve(getDateNow()))
-                .also { createDirectoryIfNeeded(it) }
+                .also { createDirectoryIfMissing(it) }
 
         /**
          * Convenience property to get the connector error folder that is used in all cases where no message type related folders are defined.
          * @see getEffectiveSourceErrorFolder
          */
         val effectiveConnectorSourceErrorFolder: Path
-            get() = sourceFolder.resolve(sourceErrorFolder.resolve(getDateNow())).also { createDirectoryIfNeeded(it) }
+            get() = sourceFolder.resolve(sourceErrorFolder.resolve(getDateNow())).also { createDirectoryIfMissing(it) }
 
         override fun toString(): String {
-            return "Connector(connectorId='$connectorId', targetFolder=$targetFolder, sourceFolder=$sourceFolder, contentType=$contentType, " +
-                    "uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
-                    "effectiveSourceArchiveFolder=${effectiveConnectorSourceArchiveFolder}, " +
-                    if (sourceArchiveEnabled && typeFolders.isNotEmpty() && typeFolders.entries.any { it.value.sourceFolder != null })
-                        "additionalEffectiveSourceArchiveFolders=[${
-                            typeFolders.entries.filter { it.value.sourceFolder != null }
-                                .joinToString { "${it.key}=${getEffectiveSourceArchiveFolder(it.value.sourceFolder!!)}" }
+            return "Connector(connectorId='$connectorId', targetFolder=$targetFolder, sourceFolder=$sourceFolder, " +
+                    if (docTypeFolders.isNotEmpty())
+                        "additionalDocTypeFolders=[${
+                            docTypeFolders.entries.joinToString("; ") { "${it.key}=source=${it.value.sourceFolder},target=${it.value.targetFolder}" }
                         }], "
-                    else "" +
-                            "sourceErrorFolder=$sourceErrorFolder, effectiveSourceErrorFolder=${effectiveConnectorSourceErrorFolder} " +
-                            if (typeFolders.isNotEmpty() && typeFolders.entries.any { it.value.sourceFolder != null })
-                                "additionalEffectiveSourceErrorFolders=[${
-                                    typeFolders.entries.filter { it.value.sourceFolder != null }
-                                        .joinToString { "${it.key}=${getEffectiveSourceErrorFolder(it.value.sourceFolder!!)}" }
-                                }], "
-                            else "" +
-                                    "mode=$mode)"
+                    else {
+                        ""
+                    } +
+                    "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
+                    "effectiveSourceArchiveFolder=${effectiveConnectorSourceArchiveFolder}, " +
+                    if (sourceArchiveEnabled && docTypeFolders.isNotEmpty())
+                        "additionalEffectiveSourceArchiveFolders=[${
+                            docTypeFolders.entries.joinToString("; ") { "${it.key}=${getEffectiveSourceArchiveFolder(it.value.sourceFolder!!)}" }
+                        }], "
+                    else {
+                        ""
+                    } +
+                    "sourceErrorFolder=$sourceErrorFolder, effectiveSourceErrorFolder=${effectiveConnectorSourceErrorFolder} " +
+                    if (docTypeFolders.isNotEmpty())
+                        "additionalEffectiveSourceErrorFolders=[${
+                            docTypeFolders.entries.filter { it.value.sourceFolder != null }
+                                .joinToString(", ") { "${it.key}=${getEffectiveSourceErrorFolder(it.value.sourceFolder!!)}" }
+                        }], "
+                    else {
+                        ""
+                    } +
+                    "mode=$mode)"
         }
 
         /**
-         * Specified folders for a specific message type (e.g. Invoice). Can be absolute or relative (to the [Connector.sourceFolder]) paths.
+         * Specified folders for a specific document type (e.g. Invoice). Can be absolute or relative (to the [Connector.sourceFolder]) paths.
          */
-        class TypeFolders {
+        class DocTypeFolders {
             var sourceFolder: Path? = null
-            var targetFolder: Path? = null
+            var targetFolder: Path = EMPTY_PATH
         }
 
     }
@@ -396,9 +402,9 @@ class CdrClientConfig {
 
     private fun localFolderIsUnique() {
         val baseSourceFolders = customer.map { it.sourceFolder }
-        val allSourceTypeFolders = getAllSourceTypeFolders()
+        val allSourceTypeFolders = getAllSourceDocTypeFolders()
         val baseTargetFolders = customer.map { it.targetFolder }
-        val allTargetTypeFolders = getAllTargetTypeFolders()
+        val allTargetTypeFolders = getAllTargetDocTypeFolders()
 
         if ((baseSourceFolders + allSourceTypeFolders + baseTargetFolders + allTargetTypeFolders).contains(localFolder)) {
             error("The local folder '$localFolder' is configured as source or target folder for a connector")
@@ -408,9 +414,9 @@ class CdrClientConfig {
 
     private fun sourceTargetFolderOverlap() {
         val baseSourceFolders = customer.map { it.sourceFolder }
-        val allSourceTypeFolders = getAllSourceTypeFolders()
+        val allSourceTypeFolders = getAllSourceDocTypeFolders()
         val baseTargetFolders = customer.map { it.targetFolder }
-        val allTargetTypeFolders = getAllTargetTypeFolders()
+        val allTargetTypeFolders = getAllTargetDocTypeFolders()
 
         val allSourceFolders: List<Path> = baseSourceFolders + allSourceTypeFolders
         val allTargetFolders: Set<Path> = (baseTargetFolders + allTargetTypeFolders).toSet()
@@ -422,15 +428,15 @@ class CdrClientConfig {
         }
     }
 
-    private fun getAllSourceTypeFolders(): List<Path> =
-        customer.flatMap { connector -> connector.typeFolders.values.mapNotNull { connector.effectiveSourceFolder(it) } }
+    private fun getAllSourceDocTypeFolders(): List<Path> =
+        customer.flatMap { connector -> connector.docTypeFolders.values.mapNotNull { connector.effectiveSourceFolder(it) } }
 
-    private fun getAllTargetTypeFolders(): List<Path> =
-        customer.flatMap { connector -> connector.typeFolders.values.mapNotNull { connector.effectiveTargetFolder(it) } }
+    private fun getAllTargetDocTypeFolders(): List<Path> =
+        customer.flatMap { connector -> connector.docTypeFolders.values.map { connector.effectiveTargetFolder(it) } }
 
     private fun duplicateSourceFolders(): Unit =
         customer.flatMap { connector ->
-            listOf(connector.sourceFolder) + connector.typeFolders.values.mapNotNull { connector.effectiveSourceFolder(it) }
+            listOf(connector.sourceFolder) + connector.docTypeFolders.values.mapNotNull { connector.effectiveSourceFolder(it) }
         }.groupingBy { it }.eachCount().filter { it.value > 1 }.let { duplicateSources ->
             if (duplicateSources.keys.isNotEmpty()) {
                 error("Duplicate source folders detected: ${duplicateSources.keys}")
@@ -459,10 +465,10 @@ class CdrClientConfig {
                 archiveFolder,
                 errorFolder,
                 "connector '${it.connectorId}' target" to it.targetFolder,
-            ) + it.typeFolders.values.flatMap { typeFolder ->
+            ) + it.docTypeFolders.values.flatMap { typeFolder ->
                 listOfNotNull(
                     it.effectiveSourceFolder(typeFolder)?.let { folder -> "connector '${it.connectorId}' type source" to folder },
-                    it.effectiveTargetFolder(typeFolder)?.let { folder -> "connector '${it.connectorId}' type target" to folder }
+                    it.effectiveTargetFolder(typeFolder).let { folder -> "connector '${it.connectorId}' type target" to folder }
                 )
             }
         } + listOf("Global inflight folder (could be changed with the property 'client.local-folder=')" to localFolder)
@@ -512,6 +518,5 @@ class CdrClientConfig {
 
 }
 
-fun Connector.getAllSourceTypeFolders(): List<Path> = this.typeFolders.values.mapNotNull { this.effectiveSourceFolder(it) }
 fun List<Connector>.getConnectorForSourceFile(file: Path): Connector =
-    this.first { it.sourceFolder == file.parent || it.getAllSourceTypeFolders().contains(file.parent) }
+    this.first { it.sourceFolder == file.parent || it.getAllSourceDocTypeFolders().contains(file.parent) }

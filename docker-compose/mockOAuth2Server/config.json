@@ -10,7 +10,7 @@
   },
   "tokenCallbacks": [
     {
-      "issuerId": "test-tenant-id/oauth2/v2.0",
+      "issuerId": "test-tenant-client-id/oauth2/v2.0",
       "tokenExpiry":360,
       "requestMappings": [
         {

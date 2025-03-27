@@ -9,7 +9,7 @@ import com.ninjasquad.springmockk.MockkBean
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
-import com.swisscom.health.des.cdr.client.xml.MessageType
+import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -236,7 +236,7 @@ internal class PollingPushFileHandlingTest {
                 mode = CdrClientConfig.Mode.TEST
                 sourceArchiveEnabled = true
                 sourceArchiveFolder = relativeArchiveFolder
-                typeFolders = mapOf(MessageType.INVOICE to CdrClientConfig.Connector.TypeFolders().apply { sourceFolder = invoiceSourceFolder })
+                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = invoiceSourceFolder })
             }
         )
 
@@ -289,7 +289,7 @@ internal class PollingPushFileHandlingTest {
                 mode = CdrClientConfig.Mode.TEST
                 sourceArchiveEnabled = true
                 sourceArchiveFolder = absoluteArchiveFolder
-                typeFolders = mapOf(MessageType.INVOICE to CdrClientConfig.Connector.TypeFolders().apply { sourceFolder = invoiceSourceFolder })
+                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = invoiceSourceFolder })
             }
         )
 
@@ -464,7 +464,7 @@ internal class PollingPushFileHandlingTest {
                 contentType = forumDatenaustauschMediaType
                 mode = CdrClientConfig.Mode.TEST
                 sourceErrorFolder = absoluteErrorFolder
-                typeFolders = mapOf(MessageType.INVOICE to CdrClientConfig.Connector.TypeFolders().apply { sourceFolder = invoiceSourceFolder })
+                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = invoiceSourceFolder })
             }
         )
 
@@ -524,7 +524,7 @@ internal class PollingPushFileHandlingTest {
                 contentType = forumDatenaustauschMediaType
                 mode = CdrClientConfig.Mode.TEST
                 sourceErrorFolder = relativeErrorFolder
-                typeFolders = mapOf(MessageType.INVOICE to CdrClientConfig.Connector.TypeFolders().apply { sourceFolder = invoiceSourceFolder })
+                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = invoiceSourceFolder })
             }
         )
 
