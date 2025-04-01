@@ -2,12 +2,16 @@ package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.DownloadDocumentResult
+import com.swisscom.health.des.cdr.client.xml.DocumentType
+import com.swisscom.health.des.cdr.client.xml.XmlUtil
+import com.swisscom.health.des.cdr.client.xml.toDom
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import org.springframework.stereotype.Component
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import kotlin.io.path.inputStream
 import kotlin.io.path.name
 import kotlin.io.path.nameWithoutExtension
 
@@ -23,6 +27,7 @@ internal const val PULL_RESULT_ID_HEADER = "cdr-document-uuid"
 class PullFileHandling(
     private val tracer: Tracer,
     private val cdrApiClient: CdrApiClient,
+    private val xmlParser: XmlUtil
 ) {
     /**
      * Downloads files for a specific customer.
@@ -47,7 +52,7 @@ class PullFileHandling(
                 } while (true)
             }.fold(
                 onSuccess = { logger.info { "Sync connector done - '$counter' file(s) pulled" } },
-                onFailure = { t: Throwable -> logger.info { "Synced '$counter' file(s) before exception happened" } }
+                onFailure = { logger.info { "Synced '$counter' file(s) before exception happened" } }
             )
         }
     }
@@ -93,15 +98,26 @@ class PullFileHandling(
      * @param connector the connector for whom the file was requested
      * @param file the file to move
      */
-    private fun moveFileToClientFolder(connector: CdrClientConfig.Connector, file: Path): Boolean {
+    @Suppress("TooGenericExceptionCaught")
+    private fun moveFileToClientFolder(connector: CdrClientConfig.Connector, file: Path) {
         logger.debug { "Move file to target directory start" }
-        val sourceFile = file
-        val targetFolder = connector.targetFolder
-        val targetTmpFile = targetFolder.resolve(sourceFile.name)
+        val targetFolder = if (connector.docTypeFolders.isEmpty()) {
+            connector.targetFolder
+        } else {
+            val documentType: DocumentType = try {
+                xmlParser.findSchemaDefinition(file.inputStream().use { it.toDom() })
+            } catch (e: Exception) {
+                logger.error { "Error parsing schema definition for file '$file': ${e.message}" }
+                throw e
+            }
+            connector.docTypeFolders[documentType]?.let { docTypeFolder -> connector.effectiveTargetFolder(docTypeFolder) }
+                ?: connector.targetFolder.also { logger.info { "No specific target folder defined for files of type '${documentType}'" } }
+        }
+        val targetTmpFile = targetFolder.resolve(file.name)
 
-        val success: Boolean = runCatching {
+        runCatching {
             Files.move(
-                sourceFile,
+                file,
                 targetTmpFile,
                 StandardCopyOption.REPLACE_EXISTING
             )
@@ -114,15 +130,13 @@ class PullFileHandling(
                 StandardCopyOption.REPLACE_EXISTING,
             )
         }.fold(
-            onSuccess = { path: Path ->
-                true.also { logger.debug { "Moved file '$file' to '${targetTmpFile.resolveSibling("${targetTmpFile.nameWithoutExtension}.xml")}'" } }
+            onSuccess = {
+                logger.debug { "Moved file '$file' to '${targetTmpFile.resolveSibling("${targetTmpFile.nameWithoutExtension}.xml")}'" }
             },
             onFailure = { t: Throwable ->
-                false.also { logger.error { "Unable to move file '$file' to '${connector.targetFolder}': ${t.message}" } }
+                logger.error { "Unable to move file '$file' to '${connector.targetFolder}': ${t.message}" }
             }
         )
-
-        return success
     }
 
 }

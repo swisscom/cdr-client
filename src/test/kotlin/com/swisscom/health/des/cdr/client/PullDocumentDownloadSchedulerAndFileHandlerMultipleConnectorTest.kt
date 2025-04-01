@@ -11,6 +11,7 @@ import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CONNECT
 import com.swisscom.health.des.cdr.client.handler.PULL_RESULT_ID_HEADER
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import com.swisscom.health.des.cdr.client.scheduling.DocumentDownloadScheduler
+import com.swisscom.health.des.cdr.client.xml.XmlUtil
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.TraceContext
 import io.micrometer.tracing.Tracer
@@ -77,6 +78,9 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
     @MockK
     private lateinit var securedApp: IConfidentialClientApplication
+
+    @MockK
+    private lateinit var xmlParser: XmlUtil
 
     @TempDir
     private lateinit var tmpDir: Path
@@ -148,7 +152,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         mockTracer()
 
         cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), clientCredentialParams, retryIoErrorsThrice, securedApp, ObjectMapper())
-        pullFileHandling = PullFileHandling(tracer, cdrApiClient)
+        pullFileHandling = PullFileHandling(tracer, cdrApiClient, xmlParser)
         documentDownloadScheduler = DocumentDownloadScheduler(
             config,
             pullFileHandling,

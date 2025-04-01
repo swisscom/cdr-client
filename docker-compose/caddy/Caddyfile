@@ -19,5 +19,5 @@ login.microsoftonline.com {
     }
     tls /root/certs/cert.pem /root/certs/key.pem
     reverse_proxy /common/discovery/* wiremock:8080
-    reverse_proxy /test-tenant-id/* mock-oauth2-server:8080
+    reverse_proxy /test-tenant-client-id/* mock-oauth2-server:8080
 }

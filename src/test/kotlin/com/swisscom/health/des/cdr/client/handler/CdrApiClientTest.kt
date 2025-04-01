@@ -282,7 +282,7 @@ class CdrApiClientTest {
 
     private companion object {
         private const val DEFAULT_TRACE_ID = "fake_trace_id"
-        private const val TEST_CLIENT_ID = "test-client-id"
+        private const val TEST_CLIENT_ID = "easy-system-test-user-id"
         private const val RENEWED_SECRET = "Placeholder_eWN8Q~MkHkK4vI.97tH2S65AQcP4qBsg2KzBcbSy"
         private const val RENEW_SECRET_RESPONSE = """
             {

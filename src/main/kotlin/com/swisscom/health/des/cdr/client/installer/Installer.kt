@@ -23,12 +23,12 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
         println("###############################################")
         println("")
         println("Configuration was not found. Please provide the following information (obtainable from the CDR customer website): ")
-        print("Tenant-ID: ")
-        val tenantId = scanner.nextLine()
         print("Client-ID: ")
         val clientId = scanner.nextLine()
         print("Client-Secret: ")
         val clientSecret = scanner.nextLine()
+        print("Tenant-ID: ")
+        val tenantId = scanner.nextLine()
         print("Connector-ID: ")
         val connectorId = scanner.nextLine()
         print("Automatically update credentials (recommended: Y)? (Y/n): ")
@@ -104,6 +104,7 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
             .let {
                 if (tenantId.startsWith(TST_TENANT_ID_START)) {
                     it.plus("client.cdr-api.host=stg.cdr.health.swisscom.ch")
+                        .plus("client.idp-credentials.scopes=https://tst.identity.health.swisscom.ch/CdrApi/.default")
                 } else {
                     it
                 }
@@ -122,7 +123,7 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
             tenantId = tenantId,
             clientId = clientId,
             clientSecret = clientSecret,
-                    updateCredentials= updateCredentials,
+            updateCredentials = updateCredentials,
         )
             .plus(
                 createConnector(

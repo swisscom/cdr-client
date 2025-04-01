@@ -6,6 +6,7 @@ import com.swisscom.health.des.cdr.client.TraceSupport.continueSpan
 import com.swisscom.health.des.cdr.client.TraceSupport.startSpan
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.FileBusyTester
+import com.swisscom.health.des.cdr.client.config.getConnectorForSourceFile
 import com.swisscom.health.des.cdr.client.handler.RetryUploadFileHandling
 import io.github.irgaly.kfswatch.KfsDirectoryWatcher
 import io.github.irgaly.kfswatch.KfsDirectoryWatcherEvent
@@ -94,8 +95,10 @@ class EventTriggerUploadScheduler(
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFileWatcher(): Unit = runCatching {
         logger.info { "Starting file watcher process..." }
-        config.customer.forEach {
-            logger.info { "Watching source directory: '${it.sourceFolder}'" }
+        config.customer.forEach { connector ->
+            logger.info { "Watching source directory: '${connector.sourceFolder}'" }
+            connector.docTypeFolders.filter { map -> map.value.sourceFolder != null }
+                .forEach { (_, typeFolders) -> logger.info { "Watching additional source directory: '${connector.effectiveSourceFolder(typeFolders)}'" } }
         }
 
         coroutineScope {
@@ -120,7 +123,10 @@ class EventTriggerUploadScheduler(
     )
 
     private suspend fun watchForNewFilesToUpload(watcher: KfsDirectoryWatcher): Flow<Pair<Path, Span>> {
-        addWatchedPaths(watcher, config.customer.map { it.sourceFolder })
+        val sourceTypeFolders: List<Path> = config.customer.map { it.getAllSourceDocTypeFolders() }.flatten()
+        val folders = config.customer.map { it.sourceFolder } + sourceTypeFolders
+
+        addWatchedPaths(watcher, folders)
 
         return watcher.onEventFlow
             .onCompletion { error: Throwable? ->
@@ -220,8 +226,14 @@ class PollingUploadScheduler(
     suspend fun launchFilePoller(): Unit = runCatching {
         logger.info { "Starting directory polling process..." }
         config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let { humanReadableDelay ->
-            config.customer.forEach {
-                logger.info { "Polling source directory every '$humanReadableDelay': '${it.sourceFolder}'" }
+            config.customer.forEach { connector ->
+                logger.info { "Polling source directory every '$humanReadableDelay': '${connector.sourceFolder}'" }
+                connector.docTypeFolders.filter { map -> map.value.sourceFolder != null }
+                    .forEach { (_, typeFolders) ->
+                        logger.info {
+                            "Polling additional source directory every '$humanReadableDelay': '${connector.effectiveSourceFolder(typeFolders)}'"
+                        }
+                    }
             }
         }
         coroutineScope {
@@ -254,15 +266,18 @@ class PollingUploadScheduler(
                     .map {
                         startSpan(tracer, "poll directory ${it.sourceFolder}") {
                             logger.debug { "Polling source directory for files: ${it.sourceFolder}" }
-                            it.sourceFolder
+                            it.getAllSourceDocTypeFolders().forEach { folder -> logger.debug { "Polling additional source directory for files: $folder" } }
+                            it
                         }
                     }
-                    .flatMap { (sourceFolder, span) ->
-                        sourceFolder
-                            .listDirectoryEntries()
-                            .asSequence()
-                            .sortedBy { Files.readAttributes(it, BasicFileAttributes::class.java).lastModifiedTime() }
-                            .map { path -> path to tracer.nextSpan(span)!! }
+                    .flatMap { (connector, span) ->
+                        val allSourceFolders: List<Path> = listOf(connector.sourceFolder) + connector.getAllSourceDocTypeFolders()
+                        allSourceFolders.flatMap { folder ->
+                            folder.listDirectoryEntries()
+                                .asSequence()
+                                .sortedBy { Files.readAttributes(it, BasicFileAttributes::class.java).lastModifiedTime() }
+                                .map { path -> path to tracer.nextSpan(span)!! }
+                        }
                     }.forEach { (path, span) ->
                         emit(path.absolute() to span)
                     }
@@ -319,7 +334,7 @@ abstract class BaseUploadScheduler(
             .filter { (file: Path, span: Span) ->
                 continueSpan(tracer, span) {
                     logger.debug {
-                        "new file '${file.name}']' in '${file.parent}' ; file ${
+                        "new file '${file.name}' in '${file.parent}' ; file ${
                             if (file.extension == EXTENSION_XML) "ends"
                             else "does not end"
                         } with '.$EXTENSION_XML' and will be ${
@@ -379,7 +394,7 @@ abstract class BaseUploadScheduler(
     }
 
     private suspend fun dispatchForUpload(file: Path): Boolean =
-        config.customer.first { it.sourceFolder == file.parent }.let { connector ->
+        config.customer.getConnectorForSourceFile(file).let { connector ->
             if (!file.isBusy()) {
                 retryUploadFileHandling.uploadRetrying(file, connector)
                 true

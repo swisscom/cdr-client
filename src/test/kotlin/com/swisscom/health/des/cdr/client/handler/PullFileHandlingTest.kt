@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.xml.DocumentType
+import com.swisscom.health.des.cdr.client.xml.XmlUtil
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.TraceContext
 import io.micrometer.tracing.Tracer
@@ -99,7 +101,7 @@ internal class PullFileHandlingTest {
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } returns "Mocked Result"
 
         cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), clientCredentialParams, retryIoErrorsThrice, securedApp, ObjectMapper())
-        pullFileHandling = PullFileHandling(tracer, cdrApiClient)
+        pullFileHandling = PullFileHandling(tracer, cdrApiClient, XmlUtil())
     }
 
     @AfterEach
@@ -121,6 +123,113 @@ internal class PullFileHandlingTest {
         assertEquals(2, listFiles.size)
 
         tmpDir.resolve(targetDirectory).listDirectoryEntries().let {
+            assertEquals(1, it.size)
+            assertTrue(it[0].extension == "xml", "File extension is not .xml")
+        }
+        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+            assertTrue(it.isEmpty())
+        }
+    }
+
+    @Test
+    fun `test sync of single file to type folder`() {
+        enqueueFileResponseWithReportResponse("generalInvoice450_qr_dt.xml")
+        enqueueEmptyResponse()
+
+        val invoiceFolder = tmpDir.resolve("invoice").also { it.createDirectories() }
+
+        val connector = CdrClientConfig.Connector().apply {
+            connectorId = "1-2-3-4"
+            targetFolder = tmpDir.resolve(targetDirectory)
+            sourceFolder = tmpDir.resolve(sourceDirectory)
+            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
+            mode = CdrClientConfig.Mode.PRODUCTION
+            docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply {
+                targetFolder = invoiceFolder
+            })
+        }
+
+        runBlocking {
+            pullFileHandling.pullSyncConnector(connector)
+        }
+
+        assertEquals(3, cdrServiceMock.requestCount, "the wrong amount of requests where done")
+        val listFiles = tmpDir.listDirectoryEntries()
+        assertEquals(3, listFiles.size)
+
+        invoiceFolder.listDirectoryEntries().let {
+            assertEquals(1, it.size)
+            assertTrue(it[0].extension == "xml", "File extension is not .xml")
+        }
+        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+            assertTrue(it.isEmpty())
+        }
+    }
+
+    @Test
+    fun `test sync of single file to default folder but another type is defined`() {
+        enqueueFileResponseWithReportResponse("notification_example_with_attachment.xml")
+        enqueueEmptyResponse()
+
+        val invoiceFolder = tmpDir.resolve("invoice").also { it.createDirectories() }
+        val targetDir = tmpDir.resolve(targetDirectory)
+
+        val connector = CdrClientConfig.Connector().apply {
+            connectorId = "1-2-3-4"
+            targetFolder = targetDir
+            sourceFolder = tmpDir.resolve(sourceDirectory)
+            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
+            mode = CdrClientConfig.Mode.PRODUCTION
+            docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply {
+                targetFolder = invoiceFolder
+            })
+        }
+
+        runBlocking {
+            pullFileHandling.pullSyncConnector(connector)
+        }
+
+        assertEquals(3, cdrServiceMock.requestCount, "the wrong amount of requests where done")
+        val listFiles = tmpDir.listDirectoryEntries()
+        assertEquals(3, listFiles.size)
+
+        targetDir.listDirectoryEntries().let {
+            assertEquals(1, it.size)
+            assertTrue(it[0].extension == "xml", "File extension is not .xml")
+        }
+        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+            assertTrue(it.isEmpty())
+        }
+    }
+
+    @Test
+    fun `test sync of single file to default folder for unknown type and another type is defined`() {
+        enqueueFileResponseWithReportResponse()
+        enqueueEmptyResponse()
+
+        val invoiceFolder = tmpDir.resolve("invoice").also { it.createDirectories() }
+        val targetDir = tmpDir.resolve(targetDirectory)
+
+        val connector = CdrClientConfig.Connector().apply {
+            connectorId = "1-2-3-4"
+            targetFolder = targetDir
+            sourceFolder = tmpDir.resolve(sourceDirectory)
+            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
+            mode = CdrClientConfig.Mode.PRODUCTION
+            docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply {
+                targetFolder = invoiceFolder
+            })
+        }
+
+        runBlocking {
+            pullFileHandling.pullSyncConnector(connector)
+        }
+
+        assertEquals(3, cdrServiceMock.requestCount, "the wrong amount of requests where done")
+        val listFiles = tmpDir.listDirectoryEntries()
+        assertEquals(3, listFiles.size)
+
+        targetDir.listDirectoryEntries().let {
             assertEquals(1, it.size)
             assertTrue(it[0].extension == "xml", "File extension is not .xml")
         }
@@ -228,17 +337,17 @@ internal class PullFileHandlingTest {
             mode = CdrClientConfig.Mode.PRODUCTION
         }
 
-    private fun enqueueFileResponseWithReportResponse() {
-        enqueueFileResponse()
+    private fun enqueueFileResponseWithReportResponse(fileName: String = "dummy.txt") {
+        enqueueFileResponse(fileName)
         enqueueReportResponse()
     }
 
-    private fun enqueueFileResponse() {
+    private fun enqueueFileResponse(fileName: String = "dummy.txt") {
         val pullRequestId = UUID.randomUUID().toString()
         val mockResponse = MockResponse()
             .setResponseCode(HttpStatus.OK.value())
             .setHeader(PULL_RESULT_ID_HEADER, pullRequestId)
-            .setBody(String(ClassPathResource("messages/dummy.txt").inputStream.readAllBytes(), StandardCharsets.UTF_8))
+            .setBody(String(ClassPathResource("messages/$fileName").inputStream.readAllBytes(), StandardCharsets.UTF_8))
         cdrServiceMock.enqueue(mockResponse)
     }
 
