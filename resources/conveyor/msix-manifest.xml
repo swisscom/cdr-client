@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package IgnorableNamespaces="rescap6 virtualization desktop6 uap7 uap8 uap10"
+         xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+         xmlns:com2="http://schemas.microsoft.com/appx/manifest/com/windows10/2"
+         xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+         xmlns:desktop2="http://schemas.microsoft.com/appx/manifest/desktop/windows10/2"
+         xmlns:desktop3="http://schemas.microsoft.com/appx/manifest/desktop/windows10/3"
+         xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+         xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+         xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+         xmlns:desktop7="http://schemas.microsoft.com/appx/manifest/desktop/windows10/7"
+         xmlns:desktop8="http://schemas.microsoft.com/appx/manifest/desktop/windows10/8"
+         xmlns:desktop9="http://schemas.microsoft.com/appx/manifest/desktop/windows10/9"
+         xmlns:f2="http://schemas.microsoft.com/appx/manifest/foundation/windows10/2"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         xmlns:rescap2="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities/2"
+         xmlns:rescap3="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities/3"
+         xmlns:rescap4="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities/4"
+         xmlns:rescap6="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities/6"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+         xmlns:uap2="http://schemas.microsoft.com/appx/manifest/uap/windows10/2"
+         xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+         xmlns:uap4="http://schemas.microsoft.com/appx/manifest/uap/windows10/4"
+         xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+         xmlns:uap6="http://schemas.microsoft.com/appx/manifest/uap/windows10/6"
+         xmlns:uap7="http://schemas.microsoft.com/appx/manifest/uap/windows10/7"
+         xmlns:uap8="http://schemas.microsoft.com/appx/manifest/uap/windows10/8"
+         xmlns:virtualization="http://schemas.microsoft.com/appx/manifest/virtualization/windows10">
+    <Identity Name="CdrClientUi"
+              Version="1.0.4.0"
+              Publisher="CN=CDR Client"
+              ProcessorArchitecture="x64"/>
+    <Properties>
+        <DisplayName>CDR Client</DisplayName>
+        <PublisherDisplayName>Swisscom (Schweiz) AG</PublisherDisplayName>
+        <Description>Client application to connect to Swisscom's Confidential Document Routing (CDR) service for participants in the Swiss healthcare system.</Description>
+        <Logo>ConveyorMsixResources/StoreLogo.png</Logo>
+    </Properties>
+    <Resources>
+        <Resource Language="en"/>
+    </Resources>
+    <Applications>
+        <Application Id="CdrClientUi"
+                     EntryPoint="Windows.FullTrustApplication"
+                     Executable="bin\cdr-client-ui.exe">
+            <uap:VisualElements AppListEntry="default"
+                                DisplayName="CDR Client"
+                                Description="Client application to connect to Swisscom&apos;s Confidential Document Routing (CDR) service for participants in the Swiss healthcare system."
+                                BackgroundColor="transparent"
+                                Square150x150Logo="ConveyorMsixResources/Square150x150Logo.png"
+                                Square44x44Logo="ConveyorMsixResources/Square44x44Logo.png"/>
+            <uap7:Properties>
+                <uap8:ActiveCodePage>UTF-8</uap8:ActiveCodePage>
+            </uap7:Properties>
+            <Extensions>
+                <uap3:Extension Category="windows.appExecutionAlias"
+                                Executable="bin\cdr-client-ui.exe"
+                                EntryPoint="Windows.FullTrustApplication">
+                    <uap3:AppExecutionAlias>
+                        <uap8:ExecutionAlias Alias="cdr-client-ui.exe"/>
+                    </uap3:AppExecutionAlias>
+                </uap3:Extension>
+<!--                <desktop6:Extension Category="windows.service"-->
+<!--                                    EntryPoint="Windows.FullTrustApplication"-->
+<!--                                    Executable="bin\winsw-x64.exe"-->
+<!--                                    uap10:RuntimeBehavior="win32App">-->
+<!--                    <desktop6:Service Name="CDRClientService"-->
+<!--                                      StartAccount="localSystem"-->
+<!--                                      StartupType="manuall"/>-->
+<!--                </desktop6:Extension>-->
+            </Extensions>
+        </Application>
+        <Application Id="CdrClientService"
+                     EntryPoint="Windows.FullTrustApplication"
+                     Executable="bin\cdr-client-service.exe">
+            <uap:VisualElements AppListEntry="none"
+                                DisplayName="CDR Client (cdr-client-service.exe)"
+                                Description="Client application to connect to Swisscom's Confidential Document Routing (CDR) service for participants in the Swiss healthcare system."
+                                BackgroundColor="transparent"
+                                Square150x150Logo="ConveyorMsixResources/Square150x150Logo.png"
+                                Square44x44Logo="ConveyorMsixResources/Square44x44Logo.png"/>
+            <uap7:Properties>
+                <uap8:ActiveCodePage>UTF-8</uap8:ActiveCodePage>
+            </uap7:Properties>
+<!--            <Extensions>-->
+<!--                <uap3:Extension Category="windows.appExecutionAlias"-->
+<!--                                Executable="bin\cdr-client-service.exe"-->
+<!--                                EntryPoint="Windows.FullTrustApplication">-->
+<!--                    <uap3:AppExecutionAlias>-->
+<!--                        <uap8:ExecutionAlias Alias="cdr-client-service.exe"/>-->
+<!--                    </uap3:AppExecutionAlias>-->
+<!--                </uap3:Extension>-->
+<!--            </Extensions>-->
+        </Application>
+        <Application Id="WinswX64"
+                     EntryPoint="Windows.FullTrustApplication"
+                     Executable="bin\winsw-x64.exe">
+            <uap:VisualElements AppListEntry="none"
+                                DisplayName="CDR Client (winsw-x64.exe)"
+                                Description="Client application to connect to Swisscom's Confidential Document Routing (CDR) service for participants in the Swiss healthcare system."
+                                BackgroundColor="transparent"
+                                Square150x150Logo="ConveyorMsixResources/Square150x150Logo.png"
+                                Square44x44Logo="ConveyorMsixResources/Square44x44Logo.png"/>
+<!--            <uap7:Properties>-->
+<!--                <uap8:ActiveCodePage>UTF-8</uap8:ActiveCodePage>-->
+<!--            </uap7:Properties>-->
+            <Extensions>
+<!--                <uap3:Extension Category="windows.appExecutionAlias"-->
+<!--                                Executable="bin\winsw-x64.exe"-->
+<!--                                EntryPoint="Windows.FullTrustApplication">-->
+<!--                    <uap3:AppExecutionAlias>-->
+<!--                        <uap8:ExecutionAlias Alias="winsw-x64.exe"/>-->
+<!--                    </uap3:AppExecutionAlias>-->
+<!--                </uap3:Extension>-->
+                <desktop6:Extension Category="windows.service"
+                                    uap10:RuntimeBehavior="win32App">
+                    <desktop6:Service Name="CDRClientService"
+                                      StartAccount="localSystem"
+                                      StartupType="manual"/>
+                </desktop6:Extension>
+            </Extensions>
+        </Application>
+    </Applications>
+    <Capabilities>
+        <rescap:Capability Name="allowElevation"/>
+        <rescap:Capability Name="localSystemServices"/>
+        <rescap:Capability Name="packagedServices"/>
+        <rescap:Capability Name="runFullTrust"/>
+    </Capabilities>
+    <Dependencies>
+        <TargetDeviceFamily Name="Windows.Desktop"
+                            MinVersion="10.0.17763.0"
+                            MaxVersionTested="10.0.26100.2454"/>
+    </Dependencies>
+    <Extensions />
+</Package>
