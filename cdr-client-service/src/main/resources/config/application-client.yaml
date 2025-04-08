@@ -1,0 +1,55 @@
+client:
+  local-folder: ${cdrClient.localFolder:${java.io.tmpdir}/cdr_download}
+  idp-credentials:
+    tenant-id: ${CDR_B2C_TENANT_ID:test-tenant-client-id} # `test-tenant-client-id` is the required value if the MockOauth2Server is used; see its `config.json`
+    client-id: ${CDR_CLIENT_ID:easy-system-test-user-id}
+    # Do not define the `client-secret` property here; defining the property here effectively prevents the password-auto-renewal from working
+    # as the internal yaml file cannot be updated and the property also cannot be overridden in an external file as that would lead to two secret
+    # locations, which currently also fails the update
+    scopes:
+      - https://${CDR_CLIENT_SCOPE_PREFIX:}identity.health.swisscom.ch/CdrApi/.default
+    renew-credential-at-startup: ${CDR_CLIENT_RENEW_CREDENTIAL_AT_STARTUP:true}
+  idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/
+  schedule-delay: PT10M
+  files-in-progress-cache-size: 10MB
+  connection-timeout-ms: 5000
+  #we want the read timeout to be longer than a connection timeout between backend and db
+  read-timeout-ms: 35000
+  # max number of connectors to be processed in parallel, one download per connector at any given time
+  pull-thread-pool-size: 5
+  # max number of parallel document uploads (independent of connector)
+  push-thread-pool-size: 5
+  retry-delay:
+    - 1s
+    - 2s
+    - 8s
+    - 32s
+    - 10m
+  file-busy-test-interval: 250ms
+  file-busy-test-timeout: 30s
+  file-busy-test-strategy: file_size_changed # valid values are `never_busy`, `file_size_changed`, `always_busy`
+  retry-template:
+    retries: 5
+    initial-delay: 250ms
+    multiplier: 5.0
+    max-delay: 10m
+  cdr-api:
+    scheme: https
+    port: 443
+    host: cdr.health.swisscom.ch
+    base-path: api/documents
+  credential-api:
+    scheme: ${client.cdr-api.scheme}
+    port: ${client.cdr-api.port}
+    host: ${client.cdr-api.host}
+    base-path: api/client-credentials
+  customer:
+  #  MUST BE SET IN ENVIRONMENT
+  #   - connector-id: 1
+  #     content-type: application/forumdatenaustausch+xml;charset=UTF-8
+  #     target-folder: /tmp/download
+  #     source-folder: /tmp/upload
+  #     source-archive-enabled: true
+  #     source-archive-folder: /tmp/archive/success  (absolute path)   or     success (relative path to source-folder: /tmp/upload/success)
+  #     source-error-folder: /tmp/archive/error  (absolute path)       or     error (relative path to source-folder: /tmp/upload/error)
+  #     mode: test|production
