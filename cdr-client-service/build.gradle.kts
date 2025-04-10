@@ -8,9 +8,9 @@ group = "com.swisscom.health.des.cdr.client.service"
 val outputDir: Provider<Directory> = layout.buildDirectory.dir(".")
 
 plugins {
-    alias(libs.plugins.dockerCompose)
-    alias(libs.plugins.springBoot)
-    alias(libs.plugins.springDependencyManagement)
+    alias(libs.plugins.docker.compose)
+    alias(libs.plugins.spring.boot)
+    alias(libs.plugins.spring.dependency.management)
     alias(libs.plugins.detekt)
     jacoco
     application

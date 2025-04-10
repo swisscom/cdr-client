@@ -61,11 +61,11 @@ awaitility = { group = "org.awaitility", name = "awaitility", version.ref = "awa
 
 [plugins]
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
-dockerCompose = { id = "com.avast.gradle.docker-compose", version.ref = "docker-compose" }
-springBoot = { id = "org.springframework.boot", version.ref = "spring-boot" }
-springDependencyManagement = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
-composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin-lang" }
-kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin-lang" }
-composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
+docker-compose = { id = "com.avast.gradle.docker-compose", version.ref = "docker-compose" }
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
+jetbrains-compose = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin-lang" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin-lang" }
 conveyor = { id = "dev.hydraulic.conveyor", version.ref = "conveyor-plugin" }
 

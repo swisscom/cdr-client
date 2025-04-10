@@ -1,14 +1,71 @@
 package com.swisscom.health.des.cdr.client.ui
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB_icon
+import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.painterResource
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
 
 
+@OptIn(ExperimentalTime::class)
 fun main() = application {
-    Window(
-        onCloseRequest = ::exitApplication,
-        title = "CDR Client Manager",
-    ) {
-        App()
+    var isVisible by remember { mutableStateOf(true) }
+    var isRunning by remember { mutableStateOf(true) }
+
+    var mainWindowTitle: String by remember { mutableStateOf("CDR Client - The time is ${Clock.System.now()}") }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1.seconds)
+            mainWindowTitle = "CDR Client - The time is ${Clock.System.now()}"
+        }
     }
+
+    Window(
+        onCloseRequest = { isVisible = false },
+        visible = isVisible,
+        title = mainWindowTitle,
+        icon = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon), // not rendered on Ubuntu-Linux
+    ) {
+        CdrConfigView()
+    }
+
+    // Swing tray looks ugly (on Linux, others unknown at the time of writing), but it works;
+    // notifications sent vie tray state pop up, but are horribly ugly
+    Tray(
+        icon = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon), // clipped, background not transparent
+        tooltip = "Swisscom Health CDR Client",
+        onAction = { isVisible = true },
+        menu = {
+            Item(text = "Client status: ${if (isRunning) "Running" else "Stopped"}", enabled = false, onClick = {}) // TODO: swap icon instead of text contents
+            Item(text = "Exit", onClick = ::exitApplication)
+        },
+    )
+
+    // looks pretty, but crashes; the dorkbox/system tray library (com.dorkbox:SystemTray:4.4) fixes the ugly
+    // looks of the tray icon and the menu; unfortunately it crashes my desktop session on Ubuntu 24.04.
+//    val systemTray: SystemTray? = SystemTray.get()
+//    if (systemTray == null) {
+//        throw RuntimeException("Unable to load SystemTray!")
+//    }
+//
+//
+//    systemTray.setImage("/home/taastrad/work/git/des/cdr-client/cdr-client-ui/src/commonMain/composeResources/drawable/Swisscom_Lifeform_Colour_RGB_icon.png")
+//    systemTray.setStatus("Not Running")
+//
+//    systemTray.menu.add(MenuItem("Quit", object : ActionListener {
+//        override fun actionPerformed(e: ActionEvent?) {
+//            systemTray.shutdown()
+//            //System.exit(0);  not necessary if all non-daemon threads have stopped.
+//        }
+//    })).setShortcut('q') // case does not matter
 }

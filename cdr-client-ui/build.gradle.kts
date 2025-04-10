@@ -2,9 +2,9 @@ group = "com.swisscom.health.des.cdr.client.ui"
 
 
 plugins {
-    alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.composeMultiplatform)
-    alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.jetbrains.compose)
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.conveyor)
 }
 
@@ -22,12 +22,16 @@ kotlin {
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
-            implementation(compose.material)
+            implementation(compose.material3)
             implementation(compose.ui)
             implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
+            // Preview tooling added by template, but actually not needed/wrong for desktop previews:
+            // https://youtrack.jetbrains.com/issue/CMP-4869
+//            implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
+            // https://github.com/alorma/Compose-Settings
+            implementation("com.github.alorma.compose-settings:ui-tiles:2.10.0")
             runtimeOnly(projects.cdrClientService) {
                 isTransitive = true
                 because("So Conveyor includes the service (plain) jar and its dependencies into the desktop application build")
