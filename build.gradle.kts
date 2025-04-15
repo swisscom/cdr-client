@@ -5,12 +5,12 @@ allprojects {
 plugins {
     // this is necessary to avoid the plugins to be loaded multiple times
     // in each subproject's classloader
-    alias(libs.plugins.composeMultiplatform) apply false
-    alias(libs.plugins.composeCompiler) apply false
-    alias(libs.plugins.kotlinMultiplatform) apply false
-    alias(libs.plugins.dockerCompose) apply false
-    alias(libs.plugins.springBoot) apply false
-    alias(libs.plugins.springDependencyManagement) apply false
+    alias(libs.plugins.jetbrains.compose) apply false
+    alias(libs.plugins.compose.compiler) apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.docker.compose) apply false
+    alias(libs.plugins.spring.boot) apply false
+    alias(libs.plugins.spring.dependency.management) apply false
     alias(libs.plugins.detekt) apply false
     kotlin("jvm").version(libs.versions.kotlin.lang) apply false
     kotlin("plugin.spring").version(libs.versions.kotlin.lang) apply false
