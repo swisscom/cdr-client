@@ -1,6 +1,5 @@
 package com.swisscom.health.des.cdr.client.ui
 
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -10,10 +9,13 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB_icon
-import kotlinx.coroutines.delay
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.app_name
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_status
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_exit
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_running
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_stopped
 import org.jetbrains.compose.resources.painterResource
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.seconds
+import org.jetbrains.compose.resources.stringResource
 import kotlin.time.ExperimentalTime
 
 
@@ -22,18 +24,10 @@ fun main() = application {
     var isVisible by remember { mutableStateOf(true) }
     var isRunning by remember { mutableStateOf(true) }
 
-    var mainWindowTitle: String by remember { mutableStateOf("CDR Client - The time is ${Clock.System.now()}") }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1.seconds)
-            mainWindowTitle = "CDR Client - The time is ${Clock.System.now()}"
-        }
-    }
-
     Window(
         onCloseRequest = { isVisible = false },
         visible = isVisible,
-        title = mainWindowTitle,
+        title = stringResource(Res.string.app_name),
         icon = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon), // not rendered on Ubuntu-Linux
     ) {
         CdrConfigView()
@@ -43,11 +37,13 @@ fun main() = application {
     // notifications sent vie tray state pop up, but are horribly ugly
     Tray(
         icon = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon), // clipped, background not transparent
-        tooltip = "Swisscom Health CDR Client",
+        tooltip = stringResource(Res.string.app_name),
         onAction = { isVisible = true },
         menu = {
-            Item(text = "Client status: ${if (isRunning) "Running" else "Stopped"}", enabled = false, onClick = {}) // TODO: swap icon instead of text contents
-            Item(text = "Exit", onClick = ::exitApplication)
+            Item(text = "${stringResource(Res.string.label_client_status)}: " +
+                    if (isRunning) stringResource(Res.string.status_running) else stringResource(Res.string.status_stopped),
+                enabled = false, onClick = {}) // TODO: swap icon instead of text contents
+            Item(text = stringResource(Res.string.label_exit), onClick = ::exitApplication)
         },
     )
 

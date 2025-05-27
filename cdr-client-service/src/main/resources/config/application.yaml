@@ -1,6 +1,6 @@
 spring:
   main:
-    web-application-type: none
+    web-application-type: REACTIVE
   application:
     name: CDR Client
   output:
@@ -24,27 +24,20 @@ spring:
   jmx:
     enabled: false
 
-# You need to set the `web-application-type` to `servlet` or `reactive` to enable the web server (for actuators like `health`)
-#server:
-#  address: 0.0.0.0
-#  port: 8080
-#  shutdown: "graceful"
-#  servlet:
-#    encoding:
-#      charset: UTF-8
-#      enabled: true
-#      force: true
-#  tomcat:
-#    connection-timeout: 1s
-#    keep-alive-timeout: 30s
+server:
+  address: localhost
+  port: 8191
+  shutdown: graceful
+  netty:
+    connection-timeout: 1s
+    idle-timeout: 30s
+    validate-headers: true
 
 management:
-# You need to set the `web-application-type` to `servlet` or `reactive` to enable the actuators
-#  endpoints:
-#    web:
-#      exposure:
-#        include: "actuator,health"
-#    enabled-by-default: true
+  endpoints:
+    web:
+      exposure:
+        include: "info,health"
   tracing:
     sampling:
       # sampling has to be disabled; if enabled we create a memory leak as there is no way to guarantee a sampled span gets closed and releases its resources

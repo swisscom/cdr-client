@@ -15,7 +15,7 @@ spring-mockk="4.0.2"
 msal4j="1.19.1"
 okHttp="4.12.0"
 spring-cloud="2024.0.1"
-spring-boot="3.4.4"
+spring-boot="3.4.5"
 spring-dependency-management="1.1.7"
 docker-compose="0.17.12"
 conveyor-plugin = "1.12"
@@ -28,7 +28,7 @@ kache = { group = "com.mayakapps.kache", name = "kache", version.ref = "kache" }
 msal4j = { group = "com.microsoft.azure", name = "msal4j", version.ref = "msal4j" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okHttp" }
 kfswatch = { group = "io.github.irgaly.kfswatch", name = "kfswatch", version.ref = "kfs-watch" }
-kotlin-logging = { group = "io.github.oshai", name = "kotlin-logging", version.ref = "kotlin-logging" }
+kotlin-logging = { group = "io.github.oshai", name = "kotlin-logging-jvm", version.ref = "kotlin-logging" }
 micrometer-tracing = { group = "io.micrometer", name = "micrometer-tracing" }
 micrometer-tracing-bridge-otel = { group = "io.micrometer", name = "micrometer-tracing-bridge-otel" }
 logstash-encoder = { group = "net.logstash.logback", name = "logstash-logback-encoder", version.ref = "logstash-encoder" }
@@ -41,7 +41,7 @@ androidx-lifecycle-viewmodel = { group = "org.jetbrains.androidx.lifecycle", nam
 androidx-lifecycle-runtime-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
 spring-boot-dependencies = { group = "org.springframework.boot", name = "spring-boot-dependencies", version.ref = "spring-boot" }
 spring-boot-starter-actuator = { group = "org.springframework.boot", name = "spring-boot-starter-actuator" }
-spring-boot-starter-web = { group = "org.springframework.boot", name = "spring-boot-starter-web" }
+spring-boot-starter-webflux = { group = "org.springframework.boot", name = "spring-boot-starter-webflux" }
 spring-retry = { group = "org.springframework.retry", name = "spring-retry" }
 spring-cloud-dependencies = { group = "org.springframework.cloud", name = "spring-cloud-dependencies", version.ref = "spring-cloud" }
 spring-cloud-context = { group = "org.springframework.cloud", name = "spring-cloud-context" }
