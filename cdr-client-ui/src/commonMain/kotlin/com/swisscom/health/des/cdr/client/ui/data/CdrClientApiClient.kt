@@ -32,7 +32,7 @@ class CdrClientApiClient {
                         ShutdownResult.Success()
                     } else {
                         logger.error {
-                            "END failed- Send command to shut down the client service; code: " +
+                            "END failed - Send command to shut down the client service; code: " +
                                     "[${response.code}]; body: [${response.body.use { it.toString() }}]"
                         }
                         ShutdownResult.Failure(Throwable("HTTP error: code: [${response.code}]; body; [${response.body.use { it.toString() }}]"))
