@@ -1,0 +1,19 @@
+<resources>
+    <!-- Labels -->
+    <string name="app_name">Swisscom Health CDR Client Manager</string>
+    <string name="label_exit">Exit</string>
+    <string name="label_cancel">Cancel</string>
+    <string name="label_apply">Apply</string>
+    <string name="label_client_status">Client status</string>
+    <string name="label_enable_client_service">Enable Client Service</string>
+    <string name="label_enable_client_service_subtitle">Enable to start synchronizing your documents</string>
+
+    <!-- Enumerations -->
+    <string name="status_running">Running</string>
+    <string name="status_stopped">Stopped</string>
+
+    <!-- Tooltips -->
+
+    <!-- Error messages -->
+    <string name="error_client_communication">Failed to communicate with the client service.</string>
+</resources>

@@ -88,7 +88,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.reactor) // to enable @Scheduled on Kotlin suspending functions
     implementation(libs.spring.boot.starter.actuator)
-    implementation(libs.spring.boot.starter.web)
+    implementation(libs.spring.boot.starter.webflux)
     implementation(libs.spring.retry)
     implementation(libs.spring.cloud.context)
     implementation(libs.jackson.dataformat.yaml)
@@ -122,11 +122,13 @@ kapt {
 }
 
 springBoot {
-    buildInfo()
+    buildInfo {
+        excludes.set(setOf("artifact", "group", "time"))
+    }
 }
 
 kotlin {
-    jvmToolchain (libs.versions.jdk.get().toInt())
+    jvmToolchain(libs.versions.jdk.get().toInt())
     compilerOptions {
         freeCompilerArgs = listOf("-Xjsr305=strict")
     }
@@ -321,9 +323,9 @@ tasks.register<Exec>("jpackageAppPrepareDebian") {
         "--java-options", "-Dfile.encoding=UTF-8",
         "--java-options", "-Dspring.profiles.active=customer",
     )
-    doLast{
+    doLast {
         copy {
-            from("."){
+            from(".") {
                 include("LICENSE")
             }
             into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")
@@ -361,7 +363,7 @@ tasks.register<Exec>("jpackageAppPrepareWindows") {
         "--java-options", "-Dfile.encoding=UTF-8",
         "--java-options", "-Dspring.profiles.active=customer",
     )
-    doLast{
+    doLast {
         copy {
             from("resources/windows") {
                 include("cdrClient.exe")
@@ -369,7 +371,7 @@ tasks.register<Exec>("jpackageAppPrepareWindows") {
                 include("icon.ico")
                 include("stop.bat")
             }
-            from("."){
+            from(".") {
                 include("LICENSE")
             }
             into("${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}/lib/app")

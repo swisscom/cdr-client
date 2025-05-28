@@ -91,7 +91,7 @@ class EventTriggerUploadScheduler(
     }
 
     // NOTE: The scheduled tasks are racing the SpringBoot/integration tests; we need to give the tests enough time to update the client configuration
-    // for the test scenario before the scheduled tasks start; the shorter we make the initial delay the higher the likelihood that the tests fail.
+    // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFileWatcher(): Unit = runCatching {
         logger.info { "Starting file watcher process..." }
@@ -221,7 +221,7 @@ class PollingUploadScheduler(
     }
 
     // NOTE: The scheduled tasks are racing the SpringBoot/integration tests; we need to give the tests enough time to update the client configuration
-    // for the test scenario before the scheduled tasks start; the shorter we make the initial delay the higher the likelihood that the tests fail.
+    // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFilePoller(): Unit = runCatching {
         logger.info { "Starting directory polling process..." }
@@ -287,7 +287,7 @@ class PollingUploadScheduler(
         }
             .onCompletion { error: Throwable? ->
                 tracer.withSpan(null)
-                // `shareIn(..)` makes this a hot flow which never terminates unless an error occurs, or it is explicitly cancelled
+                // `shareIn(..)` makes this a hot flow which never terminates unless an error occurs, or it is explicitly canceled
                 when (error) {
                     !is CancellationException -> logger.error {
                         "File system polling flow terminated${if (error != null) " with error: '${error::class}'; message: '${error.message}'" else "."}"

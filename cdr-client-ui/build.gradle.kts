@@ -6,6 +6,18 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.conveyor)
+    alias(libs.plugins.detekt)
+}
+
+project.afterEvaluate {
+    // https://github.com/detekt/detekt/issues/6198#issuecomment-2265183695
+    configurations.matching { it.name == "detekt" }.all {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlin") {
+                useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
+            }
+        }
+    }
 }
 
 kotlin {
@@ -30,8 +42,11 @@ kotlin {
 //            implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
+            implementation(libs.kotlin.logging)
             // https://github.com/alorma/Compose-Settings
-            implementation("com.github.alorma.compose-settings:ui-tiles:2.10.0")
+            implementation(libs.uitiles)
+            // https://github.com/rybalkinsd/kohttp/tree/master
+            implementation(libs.okhttp)
             runtimeOnly(projects.cdrClientService) {
                 isTransitive = true
                 because("So Conveyor includes the service (plain) jar and its dependencies into the desktop application build")
