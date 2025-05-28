@@ -44,7 +44,7 @@ kotlin {
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.kotlin.logging)
             // https://github.com/alorma/Compose-Settings
-            implementation("com.github.alorma.compose-settings:ui-tiles:2.10.0")
+            implementation(libs.uitiles)
             // https://github.com/rybalkinsd/kohttp/tree/master
             implementation(libs.okhttp)
             runtimeOnly(projects.cdrClientService) {

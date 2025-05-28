@@ -33,16 +33,16 @@ class CdrClientApiClient {
                     } else {
                         logger.error {
                             "END failed - Send command to shut down the client service; code: " +
-                                    "[${response.code}]; body: [${response.body.use { it.toString() }}]"
+                                    "'${response.code}'; body: '${response.body.use { it.toString() }}'"
                         }
-                        ShutdownResult.Failure(Throwable("HTTP error: code: [${response.code}]; body; [${response.body.use { it.toString() }}]"))
+                        ShutdownResult.Failure()
                     }
                 }
         }.fold(
             onSuccess = { it },
             onFailure = { error ->
-                logger.error { "END failed - Send command to shut down the client service; error: [$error]" }
-                ShutdownResult.Failure(error)
+                logger.error { "END failed - Send command to shut down the client service; error: '$error'" }
+                ShutdownResult.Failure()
             }
         )
     }
@@ -57,7 +57,7 @@ class CdrClientApiClient {
 
 sealed class ShutdownResult {
     class Success : ShutdownResult()
-    class Failure(val exception: Throwable) : ShutdownResult()
+    class Failure : ShutdownResult()
 }
 
 

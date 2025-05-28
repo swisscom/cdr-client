@@ -68,6 +68,10 @@ class WebOperations(
                 logger.info { "Shutdown requested for reason: [$shutdownTrigger]" }
                 // Wait a bit to allow the http response to be sent before shutting down
                 delay(SHUTDOWN_DELAY)
+                // previously producing the exit code was a single line:
+                // `exitProcess(SpringApplication.exit(context, { shutdownTrigger.exitCode }))`
+                // however, there must be some sort of race condition present; half the time the exit code was 0 instead of the code specified in the
+                // `shutdownTrigger`
                 val exitCode = SpringApplication.exit(context).let { contextExitCode ->
                     val exitCode =
                         if (contextExitCode != 0) {

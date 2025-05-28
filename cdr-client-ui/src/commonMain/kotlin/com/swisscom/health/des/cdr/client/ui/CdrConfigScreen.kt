@@ -57,7 +57,7 @@ fun CdrConfigView(
     ) {
         val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-        logger.info { "UI state: [$uiState]" }
+        logger.info { "UI state: '$uiState'" }
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -75,7 +75,7 @@ fun CdrConfigView(
                 runCatching {
                     // we ignore the SnackbarResult; is that a good idea?
                     snackbarHostState.showSnackbar(message = errorMessage)
-                }.onFailure { logger.error { "Snackbar fail: [${it.toString()}]" } }
+                }.onFailure { logger.error { "Snackbar fail: '${it.toString()}'" } }
 
                 viewModel.errorMessageShown()
             }
