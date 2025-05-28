@@ -65,7 +65,7 @@ class WebOperations(
     private fun scheduleShutdown(shutdownTrigger: ShutdownTrigger) {
         if (SHUTDOWN_GUARD.tryLock()) {
             GlobalScope.launch {
-                logger.info { "Shutdown requested for reason: [$shutdownTrigger]" }
+                logger.info { "Shutdown requested for reason: '$shutdownTrigger'" }
                 // Wait a bit to allow the http response to be sent before shutting down
                 delay(SHUTDOWN_DELAY)
                 // previously producing the exit code was a single line:
@@ -75,7 +75,7 @@ class WebOperations(
                 val exitCode = SpringApplication.exit(context).let { contextExitCode ->
                     val exitCode =
                         if (contextExitCode != 0) {
-                            logger.error { "Spring application context did not exit cleanly, exit code: [$contextExitCode]" }
+                            logger.error { "Spring application context did not exit cleanly, exit code: '$contextExitCode'" }
                             contextExitCode
                         } else {
                             logger.debug { "Spring application context exited cleanly." }
@@ -86,7 +86,7 @@ class WebOperations(
                 exitProcess(exitCode)
             }
         } else {
-            logger.info { "Shutdown already scheduled, ignoring request for reason: [$shutdownTrigger]" }
+            logger.info { "Shutdown already scheduled, ignoring request for reason: '$shutdownTrigger'" }
         }
     }
 
