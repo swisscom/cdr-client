@@ -23,6 +23,8 @@ spring:
         await-termination: true
   jmx:
     enabled: false
+  jackson:
+    time-zone: UTC
 
 server:
   address: localhost
@@ -34,10 +36,22 @@ server:
     validate-headers: true
 
 management:
+  server:
+    address: localhost
+    port: 8193
   endpoints:
     web:
       exposure:
         include: "info,health"
+  health:
+    defaults:
+      enabled: false
+    diskspace:
+      enabled: true
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
   tracing:
     sampling:
       # sampling has to be disabled; if enabled we create a memory leak as there is no way to guarantee a sampled span gets closed and releases its resources

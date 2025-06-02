@@ -43,10 +43,13 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodel)
             implementation(libs.androidx.lifecycle.runtime.compose)
             implementation(libs.kotlin.logging)
+            implementation(libs.kotlinx.serialization.core)
+            implementation(libs.kotlinx.serialization.json)
             // https://github.com/alorma/Compose-Settings
             implementation(libs.uitiles)
             // https://github.com/rybalkinsd/kohttp/tree/master
             implementation(libs.okhttp)
+            implementation(projects.cdrClientCommon)
             runtimeOnly(projects.cdrClientService) {
                 isTransitive = true
                 because("So Conveyor includes the service (plain) jar and its dependencies into the desktop application build")

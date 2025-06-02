@@ -5,9 +5,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.Divider
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -47,7 +49,7 @@ private val logger = KotlinLogging.logger {}
 
 @Composable
 @Preview
-fun CdrConfigView(
+internal fun CdrConfigView(
     modifier: Modifier = Modifier,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
     viewModel: CdrConfigViewModel = remember { CdrConfigViewModel(cdrClientApiClient = CdrClientApiClient()) }
@@ -57,14 +59,23 @@ fun CdrConfigView(
     ) {
         val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+        viewModel.getClientServiceStatus()
+
         logger.info { "UI state: '$uiState'" }
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceAround,
-            modifier = Modifier.padding(16.dp),
+            modifier = modifier.padding(16.dp),
         ) {
             SwisscomLogo(modifier.size(86.dp).padding(16.dp))
+            Divider(modifier = modifier)
+            Row(modifier = modifier.padding(16.dp)) {
+                Text(text = "CDR Client status:")
+                Spacer(Modifier.weight(1f))
+                Text(text = uiState.clientServiceRunning.toString())
+            }
+            Divider(modifier = modifier)
             ClientServiceOption(modifier)
             ButtonRow(viewModel = viewModel, modifier = modifier.fillMaxWidth(.75f).padding(16.dp))
         }

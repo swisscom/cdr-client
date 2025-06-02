@@ -1,6 +1,8 @@
 package com.swisscom.health.des.cdr.client.http
 
-import com.fasterxml.jackson.annotation.JsonFormat
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
@@ -8,6 +10,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.time.delay
 import org.springframework.boot.SpringApplication
+import org.springframework.boot.actuate.health.HealthEndpoint
+import org.springframework.boot.actuate.health.SystemHealth
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
@@ -25,9 +29,32 @@ private val logger = KotlinLogging.logger {}
  * This is not a public API. So RPC style http endpoints will suffice for now.
  */
 @RestController
-class WebOperations(
-    private val context: ConfigurableApplicationContext
+internal class WebOperations(
+    private val context: ConfigurableApplicationContext,
+    private val healthEndpoint: HealthEndpoint,
+    private val objectMapper: ObjectMapper,
 ) {
+
+    @GetMapping("api/status")
+    suspend fun status(): ResponseEntity<DTOs.StatusResponse> {
+        val healthStatus: SystemHealth = healthEndpoint.health() as SystemHealth
+        logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
+
+        val status = when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
+            healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
+            healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code -> DTOs.StatusResponse.StatusCode.DISABLED
+            else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+            // TODO: add checks for error scenarios: configuration errors, CDR API not reachable, IdP not reachable, etc.
+            //   all other error scenarios would probably prevent the client service from starting altogether;
+            //   remember result of last attempt to reach remote endpoints instead of pinging them?
+        }
+
+        return ResponseEntity.ok(
+            DTOs.StatusResponse(
+                statusCode = status,
+            )
+        )
+    }
 
     /**
      * This endpoint essentially does the same thing as the `shutdown` actuator, only it derives an exit code
@@ -47,9 +74,9 @@ class WebOperations(
             } else {
                 ResponseEntity
                     .ok(
-                        ShutdownResponse(
+                        DTOs.ShutdownResponse(
                             shutdownScheduledFor = Instant.now().plus(SHUTDOWN_DELAY),
-                            trigger = shutdownTrigger,
+                            trigger = shutdownTrigger.name,
                             exitCode = shutdownTrigger.exitCode
                         )
                     )
@@ -72,25 +99,19 @@ class WebOperations(
                 // `exitProcess(SpringApplication.exit(context, { shutdownTrigger.exitCode }))`
                 // however, there must be some sort of race condition present; half the time the exit code was 0 instead of the code specified in the
                 // `shutdownTrigger`
-                val exitCode = SpringApplication.exit(context).let { contextExitCode ->
-                    val exitCode =
-                        if (contextExitCode != 0) {
-                            logger.error { "Spring application context did not exit cleanly, exit code: '$contextExitCode'" }
-                            contextExitCode
-                        } else {
-                            logger.debug { "Spring application context exited cleanly." }
-                            shutdownTrigger.exitCode
-                        }
-                    exitCode
+                SpringApplication.exit(context).let { contextExitCode ->
+                    if (contextExitCode != 0) {
+                        logger.warn { "Spring application context did not exit cleanly, exit code: '$contextExitCode'" }
+                    }
                 }
-                exitProcess(exitCode)
+                exitProcess(shutdownTrigger.exitCode)
             }
         } else {
             logger.info { "Shutdown already scheduled, ignoring request for reason: '$shutdownTrigger'" }
         }
     }
 
-    enum class ShutdownTrigger(val reason: String, val exitCode: Int) {
+    internal enum class ShutdownTrigger(val reason: String, val exitCode: Int) {
         CONFIG_CHANGE("configurationChange", CONFIG_CHANGE_EXIT_CODE),
         UNKNOWN("unknown", UNKNOWN_EXIT_CODE);
 
@@ -101,16 +122,7 @@ class WebOperations(
         }
     }
 
-    data class ShutdownResponse(
-        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "UTC")
-        val shutdownScheduledOn: Instant = Instant.now(),
-        @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSXXX", timezone = "UTC")
-        val shutdownScheduledFor: Instant,
-        val trigger: ShutdownTrigger,
-        val exitCode: Int,
-    )
-
-    companion object {
+    private companion object {
         @JvmStatic
         private val SHUTDOWN_DELAY = Duration.ofMillis(500)
 
