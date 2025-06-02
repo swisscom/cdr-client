@@ -12,8 +12,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.S
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.app_name
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_status
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_exit
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_running
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_stopped
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_unknown
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import kotlin.time.ExperimentalTime
@@ -21,12 +20,11 @@ import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class)
 fun main() = application {
-    var isVisible by remember { mutableStateOf(true) }
-    var isRunning by remember { mutableStateOf(true) }
+    var isWindowVisible: Boolean by remember { mutableStateOf(true) }
 
     Window(
-        onCloseRequest = { isVisible = false },
-        visible = isVisible,
+        onCloseRequest = { isWindowVisible = false },
+        visible = isWindowVisible,
         title = stringResource(Res.string.app_name),
         icon = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon), // not rendered on Ubuntu-Linux
     ) {
@@ -38,17 +36,22 @@ fun main() = application {
     Tray(
         icon = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon), // clipped, background not transparent
         tooltip = stringResource(Res.string.app_name),
-        onAction = { isVisible = true },
+        onAction = {
+            isWindowVisible = true
+        },
         menu = {
-            Item(text = "${stringResource(Res.string.label_client_status)}: " +
-                    if (isRunning) stringResource(Res.string.status_running) else stringResource(Res.string.status_stopped),
-                enabled = false, onClick = {}) // TODO: swap icon instead of text contents
+            Item(
+                // TODO: status must be updated from model!
+                text = "${stringResource(Res.string.label_client_status)}: ${stringResource(Res.string.status_unknown)}",
+                enabled = false,
+                onClick = {}
+            )
             Item(text = stringResource(Res.string.label_exit), onClick = ::exitApplication)
         },
     )
 
     // looks pretty, but crashes; the dorkbox/system tray library (com.dorkbox:SystemTray:4.4) fixes the ugly
-    // looks of the tray icon and the menu; unfortunately it crashes my desktop session on Ubuntu 24.04.
+    // looks of the tray icon and the menu; unfortunately, it crashes my desktop session on Ubuntu 24.04.
 //    val systemTray: SystemTray? = SystemTray.get()
 //    if (systemTray == null) {
 //        throw RuntimeException("Unable to load SystemTray!")
@@ -64,4 +67,5 @@ fun main() = application {
 //            //System.exit(0);  not necessary if all non-daemon threads have stopped.
 //        }
 //    })).setShortcut('q') // case does not matter
+
 }

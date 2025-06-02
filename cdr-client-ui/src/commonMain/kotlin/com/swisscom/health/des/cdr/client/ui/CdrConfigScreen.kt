@@ -34,12 +34,19 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alorma.compose.settings.ui.SettingsMenuLink
+import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_apply
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cancel
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_service_status
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service_subtitle
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_disabled
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_error
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_offline
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_synchronizing
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_unknown
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.compose.resources.painterResource
@@ -59,7 +66,7 @@ internal fun CdrConfigView(
     ) {
         val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-        viewModel.getClientServiceStatus()
+        viewModel.updateClientServiceStatus()
 
         logger.info { "UI state: '$uiState'" }
 
@@ -71,9 +78,16 @@ internal fun CdrConfigView(
             SwisscomLogo(modifier.size(86.dp).padding(16.dp))
             Divider(modifier = modifier)
             Row(modifier = modifier.padding(16.dp)) {
-                Text(text = "CDR Client status:")
+                val statusTextResource = when (uiState.clientServiceStatus) {
+                    DTOs.StatusResponse.StatusCode.SYNCHRONIZING -> stringResource(Res.string.status_synchronizing)
+                    DTOs.StatusResponse.StatusCode.DISABLED -> stringResource(Res.string.status_disabled)
+                    DTOs.StatusResponse.StatusCode.ERROR -> stringResource(Res.string.status_error)
+                    DTOs.StatusResponse.StatusCode.OFFLINE -> stringResource(Res.string.status_offline)
+                    DTOs.StatusResponse.StatusCode.UNKNOWN -> stringResource(Res.string.status_unknown)
+                }
+                Text(text = stringResource(Res.string.label_client_service_status))
                 Spacer(Modifier.weight(1f))
-                Text(text = uiState.clientServiceRunning.toString())
+                Text(text = statusTextResource)
             }
             Divider(modifier = modifier)
             ClientServiceOption(modifier)

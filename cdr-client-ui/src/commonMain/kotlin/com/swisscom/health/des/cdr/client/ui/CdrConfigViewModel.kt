@@ -18,7 +18,7 @@ import org.jetbrains.compose.resources.StringResource
 import kotlin.time.Duration.Companion.seconds
 
 data class CdrConfigUiState(
-    val clientServiceRunning: DTOs.StatusResponse.StatusCode = DTOs.StatusResponse.StatusCode.SYNCHRONIZING,
+    val clientServiceStatus: DTOs.StatusResponse.StatusCode = DTOs.StatusResponse.StatusCode.SYNCHRONIZING,
     val errorKey: StringResource? = null, // should be an ArrayDeque<String>, but I have not figured out how to turn that into an observable state yet
 )
 
@@ -30,11 +30,11 @@ internal class CdrConfigViewModel(
 
     val uiState: StateFlow<CdrConfigUiState> = _uiState.asStateFlow()
 
-    fun shutdownClientService() = viewModelScope.launch {
+    fun shutdownClientService(): Job = viewModelScope.launch {
         cdrClientApiClient.shutdownClientServiceProcess().let { result ->
             when (result) {
                 is ShutdownResult.Success -> {
-                    _uiState.value = _uiState.value.copy(clientServiceRunning = DTOs.StatusResponse.StatusCode.UNKNOWN)
+                    _uiState.value = _uiState.value.copy(clientServiceStatus = DTOs.StatusResponse.StatusCode.UNKNOWN)
                 }
 
                 is ShutdownResult.Failure -> {
@@ -44,10 +44,10 @@ internal class CdrConfigViewModel(
         }
     }
 
-    fun getClientServiceStatus() : Job = viewModelScope.launch {
+    fun updateClientServiceStatus(): Job = viewModelScope.launch {
         while (true) {
             cdrClientApiClient.getClientServiceStatus().let { status ->
-                _uiState.value = _uiState.value.copy(clientServiceRunning = status)
+                _uiState.value = _uiState.value.copy(clientServiceStatus = status)
             }
             delay(STATUS_CHECK_DELAY)
         }

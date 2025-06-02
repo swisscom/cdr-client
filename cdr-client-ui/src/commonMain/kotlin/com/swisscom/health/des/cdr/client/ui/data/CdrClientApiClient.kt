@@ -73,9 +73,9 @@ internal class CdrClientApiClient {
                         }
 
                     if (response.isSuccessful) {
-                        val responseJson = JSON.decodeFromString<DTOs.StatusResponse>(responseString)
+                        val statusResponse = JSON.decodeFromString<DTOs.StatusResponse>(responseString)
                         logger.debug { "END success - Get client service status" }
-                        responseJson.statusCode
+                        statusResponse.statusCode
                     } else {
                         logger.debug {
                             "END failed - Get client service status; code: '${response.code}'; body: '$responseString'"

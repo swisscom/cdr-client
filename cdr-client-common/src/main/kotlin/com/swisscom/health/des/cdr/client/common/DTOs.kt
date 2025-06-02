@@ -31,7 +31,6 @@ class DTOs {
             UNKNOWN,
             SYNCHRONIZING,
             DISABLED,
-            STOPPED,
             ERROR,
             OFFLINE,
         }
