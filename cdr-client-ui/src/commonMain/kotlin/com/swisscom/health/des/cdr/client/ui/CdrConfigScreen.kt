@@ -47,7 +47,6 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.s
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_offline
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_synchronizing
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_unknown
-import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -56,19 +55,15 @@ private val logger = KotlinLogging.logger {}
 
 @Composable
 @Preview
-internal fun CdrConfigView(
+internal fun CdrConfigScreen(
     modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
-    viewModel: CdrConfigViewModel = remember { CdrConfigViewModel(cdrClientApiClient = CdrClientApiClient()) }
+    viewModel: CdrConfigViewModel,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) {
         val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-        viewModel.updateClientServiceStatus()
-
-        logger.info { "UI state: '$uiState'" }
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -78,16 +73,9 @@ internal fun CdrConfigView(
             SwisscomLogo(modifier.size(86.dp).padding(16.dp))
             Divider(modifier = modifier)
             Row(modifier = modifier.padding(16.dp)) {
-                val statusTextResource = when (uiState.clientServiceStatus) {
-                    DTOs.StatusResponse.StatusCode.SYNCHRONIZING -> stringResource(Res.string.status_synchronizing)
-                    DTOs.StatusResponse.StatusCode.DISABLED -> stringResource(Res.string.status_disabled)
-                    DTOs.StatusResponse.StatusCode.ERROR -> stringResource(Res.string.status_error)
-                    DTOs.StatusResponse.StatusCode.OFFLINE -> stringResource(Res.string.status_offline)
-                    DTOs.StatusResponse.StatusCode.UNKNOWN -> stringResource(Res.string.status_unknown)
-                }
                 Text(text = stringResource(Res.string.label_client_service_status))
                 Spacer(Modifier.weight(1f))
-                Text(text = statusTextResource)
+                Text(text = statusStringResource(uiState.clientServiceStatus))
             }
             Divider(modifier = modifier)
             ClientServiceOption(modifier)
@@ -110,6 +98,16 @@ internal fun CdrConfigView(
 }
 
 @Composable
+private fun statusStringResource(status: DTOs.StatusResponse.StatusCode): String =
+    when (status) {
+        DTOs.StatusResponse.StatusCode.SYNCHRONIZING -> stringResource(Res.string.status_synchronizing)
+        DTOs.StatusResponse.StatusCode.DISABLED -> stringResource(Res.string.status_disabled)
+        DTOs.StatusResponse.StatusCode.ERROR -> stringResource(Res.string.status_error)
+        DTOs.StatusResponse.StatusCode.OFFLINE -> stringResource(Res.string.status_offline)
+        DTOs.StatusResponse.StatusCode.UNKNOWN -> stringResource(Res.string.status_unknown)
+    }
+
+@Composable
 private fun SwisscomLogo(modifier: Modifier) =
     Image(
         painter = painterResource(resource = Res.drawable.Swisscom_Lifeform_Colour_RGB),
@@ -125,9 +123,6 @@ private fun ClientServiceOption(modifier: Modifier) =
         modifier = modifier,
         enabled = true,
         action = {
-            // you need to manually import the getter and setter functions for the `by` keyword to work in combination with `remember`
-            //import androidx.compose.runtime.getValue
-            //import androidx.compose.runtime.setValue
             var checked by remember { mutableStateOf(true) }
             Switch(
                 checked = checked,
@@ -145,7 +140,7 @@ private fun ButtonRow(viewModel: CdrConfigViewModel, modifier: Modifier) =
         modifier = modifier,
     ) {
         CancelButton(onClick = {})
-        ApplyButton(onClick = viewModel::shutdownClientService)
+        ApplyButton(onClick = viewModel::asyncClientServiceShutdown)
     }
 
 @OptIn(ExperimentalMaterial3Api::class)

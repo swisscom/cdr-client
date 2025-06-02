@@ -107,7 +107,7 @@ internal class WebOperations(
                 exitProcess(shutdownTrigger.exitCode)
             }
         } else {
-            logger.info { "Shutdown already scheduled, ignoring request for reason: '$shutdownTrigger'" }
+            logger.info { "Shutdown already scheduled, ignoring request with given reason: '$shutdownTrigger'" }
         }
     }
 
