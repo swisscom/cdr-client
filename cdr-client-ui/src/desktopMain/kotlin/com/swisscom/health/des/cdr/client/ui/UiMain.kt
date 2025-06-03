@@ -45,7 +45,7 @@ fun main() = application {
     }
 
     // Swing tray looks ugly (on Linux, others unknown at the time of writing), but it works;
-    // notifications sent vie tray state pop up but are horribly ugly
+    // notifications sent via tray state pop up but are horribly ugly
     // Do not use `com.dorkbox:SystemTray`, it crashes the desktop session on Ubuntu 24.04.
     // TODO: give https://github.com/kdroidFilter/ComposeNativeTray a try
     // FIXME: client service status must be updated from model! But cannot figure out how to update the model on demand on opening the tray menu?
