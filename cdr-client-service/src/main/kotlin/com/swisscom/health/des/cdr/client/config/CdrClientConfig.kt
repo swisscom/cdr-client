@@ -26,7 +26,7 @@ import kotlin.io.path.listDirectoryEntries
 private val logger = KotlinLogging.logger {}
 
 /**
- * CDR client specific configuration
+ * CDR client-specific configuration
  *
  * Note on the `lateinit var` properties: Unfortunately we cannot use an immutable configuration,
  * using data class constructor injection with `val` properties, due to the way spring-cloud-context
@@ -36,7 +36,10 @@ private val logger = KotlinLogging.logger {}
  */
 @ConfigurationProperties("client")
 class CdrClientConfig {
-    /** Customer specific list of [Connectors][Connector]. */
+    /** Whether file synchronization is enabled. If set to `false`, the client will not download or upload files. */
+    var fileSynchronizationEnabled: Boolean = true
+
+    /** Customer-specific list of [Connectors][Connector]. */
     lateinit var customer: List<Connector>
 
     /** Endpoint coordinates (protocol scheme, host, port, basePath) of the CDR API. */
@@ -90,7 +93,7 @@ class CdrClientConfig {
         /** Unique identifier for the connector; log into CDR web app to look up your connector ID(s). */
         lateinit var connectorId: String
 
-        /** Target folder where the CDR client will download files to. */
+        /** Destination folder where the CDR client will download files to. */
         lateinit var targetFolder: Path
 
         /** Source folder where the CDR client will upload files from. */
@@ -100,7 +103,7 @@ class CdrClientConfig {
         lateinit var contentType: MediaType
 
         /**
-         * Whether to enable the archiving of successfully uploaded files. If not enabled files that have been uploaded get deleted.
+         * Whether to enable the archiving of successfully uploaded files. If not enabled, files that have been uploaded get deleted.
          * If you enable archiving, beware that the client does not perform any housekeeping of the archive. Housekeeping is the
          * responsibility of the system's administrator.
          *
@@ -113,7 +116,7 @@ class CdrClientConfig {
 
         /**
          * Folder to archive uploaded files to. The folder will be created for you if it does not exist yet if [sourceArchiveEnabled]
-         * is set to `true`. If you specify a relative path it will be resolved relative to the source folder. If you specify an absolute path,
+         * is set to `true`. If you specify a relative path, it will be resolved relative to the source folder. If you specify an absolute path,
          * the path will be used as is for all archive folders, such as for all [docTypeFolders].
          *
          * Beware: On Linux both `.` and `./` resolve to the current working directory, while `./archive` (and just `archive`) resolve
@@ -128,7 +131,7 @@ class CdrClientConfig {
         var sourceArchiveFolder: Path = EMPTY_PATH
 
         /**
-         * Folder to move documents to for which the upload has failed. If you specify a relative path it will be resolved relative
+         * Folder to move documents to for which the upload has failed. If you specify a relative path, it will be resolved relative
          * to the source folder. If you specify an absolute path, the path will be used as is for all error folders, such as for all [docTypeFolders].
          *
          * Beware: On Linux both `.` and `./` resolve to the current working directory, while `./error` (and just `error`) resolve
@@ -146,7 +149,7 @@ class CdrClientConfig {
 
         /**
          * Forum Datenaustausch message types related folders. In case that the files come from different source folders or received files need to be stored
-         * to different target folders, depending on the message type
+         * in different target folders, depending on the message type
          */
         var docTypeFolders: Map<DocumentType, DocTypeFolders> = emptyMap()
 
@@ -258,7 +261,7 @@ class CdrClientConfig {
         }
 
         /**
-         * Specified folders for a specific document type (e.g. Invoice). Can be absolute or relative (to the [Connector.sourceFolder]) paths.
+         * Specified folders for a specific document type (e.g., Invoice). Can be absolute or relative (to the [Connector.sourceFolder]) paths.
          */
         class DocTypeFolders {
             var sourceFolder: Path? = null
@@ -298,7 +301,7 @@ class CdrClientConfig {
         /** Client ID used to authenticate against the OAuth identity provider. Log into CDR web app to look up or create your client ID. */
         lateinit var clientId: String
 
-        /** Client secret used to authenticate against the OAuth identity provider. Log into CDR web app to look up or re-issue a client secret. */
+        /** Client secret used to authenticate against the OAuth identity provider. Log into the CDR web app to look up or re-issue a client secret. */
         lateinit var clientSecret: String
 
         /**
@@ -351,7 +354,7 @@ class CdrClientConfig {
 
         /**
          * always flags the file as 'not busy'; use if all downstream applications
-         * create files in a single atomic operation (`move` on same file system).
+         * create files in a single atomic operation (`move` on the same file system).
          */
         NEVER_BUSY,
 
@@ -379,7 +382,7 @@ class CdrClientConfig {
         }
 
         sourceTargetFolderOverlap()
-        // we don't check target folder for duplicate as this can be configured deliberately by customers
+        // we don't check the target folder for duplicate as customers can configure this deliberately
         duplicateSourceFolders()
         checkNoConnectorIdHasTheSameModeDefinedTwice()
         allFoldersAreReadWriteable()
@@ -388,13 +391,13 @@ class CdrClientConfig {
             error("fileBusyTestTimeout must be greater than fileBusyTestInterval")
         }
 
-        // throws exception if any lateinit var (used in toString()) has not been initialized -- we have no optional configuration items
+        // throws an exception if any lateinit var (used in toString()) has not been initialized -- we have no optional configuration items
         val asString = toString()
 
         logger.info { "Client configuration: $asString" }
 
         // the error folders have been created automatically when we checked the configuration --> delete them again, if they are empty,
-        // to not pollute the filesystem with directories, that hopefully stay empty, on every (re)start of the client
+        // to not pollute the filesystem with directories that hopefully stay empty, on every (re)start of the client
         customer.forEach {
             if (it.effectiveConnectorSourceErrorFolder.listDirectoryEntries().isEmpty()) it.effectiveConnectorSourceErrorFolder.deleteExisting()
         }

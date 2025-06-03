@@ -92,6 +92,7 @@ dependencies {
     implementation(libs.spring.retry)
     implementation(libs.spring.cloud.context)
     implementation(libs.jackson.dataformat.yaml)
+    implementation(projects.cdrClientCommon)
 
     // Note: At the time of writing the configuration processor seems to be broken; might be related to the upgrade to Kotlin 2.x
     // Enable annotation processing via menu File | Settings | Build, Execution, Deployment

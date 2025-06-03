@@ -5,9 +5,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.Divider
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -32,13 +34,19 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alorma.compose.settings.ui.SettingsMenuLink
+import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_apply
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cancel
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_service_status
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service_subtitle
-import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_disabled
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_error
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_offline
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_synchronizing
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_unknown
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -47,24 +55,29 @@ private val logger = KotlinLogging.logger {}
 
 @Composable
 @Preview
-fun CdrConfigView(
+internal fun CdrConfigScreen(
     modifier: Modifier = Modifier,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
-    viewModel: CdrConfigViewModel = remember { CdrConfigViewModel(cdrClientApiClient = CdrClientApiClient()) }
+    viewModel: CdrConfigViewModel,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) {
         val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-        logger.info { "UI state: '$uiState'" }
-
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceAround,
-            modifier = Modifier.padding(16.dp),
+            modifier = modifier.padding(16.dp),
         ) {
             SwisscomLogo(modifier.size(86.dp).padding(16.dp))
+            Divider(modifier = modifier)
+            Row(modifier = modifier.padding(16.dp)) {
+                Text(text = stringResource(Res.string.label_client_service_status))
+                Spacer(Modifier.weight(1f))
+                Text(text = statusStringResource(uiState.clientServiceStatus))
+            }
+            Divider(modifier = modifier)
             ClientServiceOption(modifier)
             ButtonRow(viewModel = viewModel, modifier = modifier.fillMaxWidth(.75f).padding(16.dp))
         }
@@ -85,6 +98,16 @@ fun CdrConfigView(
 }
 
 @Composable
+private fun statusStringResource(status: DTOs.StatusResponse.StatusCode): String =
+    when (status) {
+        DTOs.StatusResponse.StatusCode.SYNCHRONIZING -> stringResource(Res.string.status_synchronizing)
+        DTOs.StatusResponse.StatusCode.DISABLED -> stringResource(Res.string.status_disabled)
+        DTOs.StatusResponse.StatusCode.ERROR -> stringResource(Res.string.status_error)
+        DTOs.StatusResponse.StatusCode.OFFLINE -> stringResource(Res.string.status_offline)
+        DTOs.StatusResponse.StatusCode.UNKNOWN -> stringResource(Res.string.status_unknown)
+    }
+
+@Composable
 private fun SwisscomLogo(modifier: Modifier) =
     Image(
         painter = painterResource(resource = Res.drawable.Swisscom_Lifeform_Colour_RGB),
@@ -100,9 +123,6 @@ private fun ClientServiceOption(modifier: Modifier) =
         modifier = modifier,
         enabled = true,
         action = {
-            // you need to manually import the getter and setter functions for the `by` keyword to work in combination with `remember`
-            //import androidx.compose.runtime.getValue
-            //import androidx.compose.runtime.setValue
             var checked by remember { mutableStateOf(true) }
             Switch(
                 checked = checked,
@@ -120,7 +140,7 @@ private fun ButtonRow(viewModel: CdrConfigViewModel, modifier: Modifier) =
         modifier = modifier,
     ) {
         CancelButton(onClick = {})
-        ApplyButton(onClick = viewModel::shutdownClientService)
+        ApplyButton(onClick = viewModel::asyncClientServiceShutdown)
     }
 
 @OptIn(ExperimentalMaterial3Api::class)
