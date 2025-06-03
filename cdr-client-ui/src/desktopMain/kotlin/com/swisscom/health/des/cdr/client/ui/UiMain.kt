@@ -53,7 +53,7 @@ fun main() = application {
 
     // I am not using JetBrains' default Tray() implementation:
     // The AWT-based tray looks ugly (on Linux, others unknown at the time of writing), but it works;
-    // notifications sent vie tray state pop up but are horribly ugly
+    // notifications sent via tray state pop up but are horribly ugly
     // Do not use `com.dorkbox:SystemTray`, it crashes the desktop session on Ubuntu 24.04.!
     // We use https://github.com/kdroidFilter/ComposeNativeTray, appears to work nicely (on Linux, others unknown at the time of writing)
     // FIXME: client service status must be updated from model! But cannot figure out how to update the model on demand on opening the tray menu?
