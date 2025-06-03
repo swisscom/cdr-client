@@ -1,12 +1,13 @@
 <resources>
     <!-- Labels -->
-    <string name="app_name">Swisscom Health CDR Client Manager</string>
+    <string name="app_name">CDR Client Manager</string>
+    <string name="label_open_application_window">Open application window</string>
     <string name="label_exit">Exit</string>
     <string name="label_cancel">Cancel</string>
     <string name="label_apply">Apply</string>
     <string name="label_client_status">Client status</string>
     <string name="label_enable_client_service">Enable Client Service</string>
-    <string name="label_enable_client_service_subtitle">Enable to start synchronizing your documents</string>
+    <string name="label_enable_client_service_subtitle">Enable this to start synchronizing your documents</string>
     <string name="label_client_service_status">CDR client service status:</string>
 
     <!-- Enumerations -->

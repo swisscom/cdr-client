@@ -61,6 +61,7 @@ kotlin {
             implementation(libs.jna)
             // Conveyor auto update control
             implementation(libs.conveyor.control)
+            implementation(libs.compose.native.tray)
         }
     }
 }
