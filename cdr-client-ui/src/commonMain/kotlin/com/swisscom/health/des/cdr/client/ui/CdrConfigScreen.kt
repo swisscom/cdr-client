@@ -143,7 +143,6 @@ private fun ButtonRow(viewModel: CdrConfigViewModel, modifier: Modifier) =
         ApplyButton(onClick = viewModel::asyncClientServiceShutdown)
     }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CancelButton(onClick: () -> Unit) =
     Button(
@@ -152,7 +151,6 @@ private fun CancelButton(onClick: () -> Unit) =
         onClick = onClick,
     )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ApplyButton(onClick: () -> Unit) =
     Button(

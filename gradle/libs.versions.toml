@@ -1,9 +1,10 @@
 [versions]
 jdk="17"
 kotlin-lang = "2.1.21"
-compose-multiplatform = "1.7.3"
+compose-multiplatform = "1.8.1"
+compose-native-tray = "0.6.4"
 kotlin-logging = "7.0.6"
-kotlinx-coroutines = "1.10.1"
+kotlinx-coroutines = "1.10.2"
 kotlinx-serialization="1.8.1"
 detekt = "1.23.8"
 awaitility="4.3.0"
@@ -53,6 +54,7 @@ jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "
 conveyor-control = { group = "dev.hydraulic.conveyor", name = "conveyor-control", version.ref = "conveyor-control-api" }
 jna = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jna" }
 uitiles = { group = "com.github.alorma.compose-settings", name = "ui-tiles", version.ref = "ui-tiles" }
+compose-native-tray = { group = "io.github.kdroidfilter", name = "composenativetray", version.ref = "compose-native-tray" }
 #### TEST DEPENDENCIES ####
 jacocoCore = { group = "org.jacoco", name = "org.jacoco.core", version.ref = "jacoco" }
 spring-boot-starter-test = { group = "org.springframework.boot", name = "spring-boot-starter-test" }
