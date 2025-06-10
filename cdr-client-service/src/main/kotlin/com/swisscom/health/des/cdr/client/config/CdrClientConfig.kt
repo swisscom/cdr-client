@@ -11,8 +11,10 @@ import java.io.IOException
 import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteExisting
 import kotlin.io.path.exists
@@ -25,82 +27,94 @@ import kotlin.io.path.listDirectoryEntries
 
 private val logger = KotlinLogging.logger {}
 
+internal interface PropertyNameAware {
+    val propertyName: String
+}
+
 /**
  * CDR client-specific configuration
- *
- * Note on the `lateinit var` properties: Unfortunately we cannot use an immutable configuration,
- * using data class constructor injection with `val` properties, due to the way spring-cloud-context
- * works, which we use to reload the configuration and configuration-dependent beans/components
- * at runtime after a configuration change. Currently, the only configuration change that triggers
- * a refresh of the context is the automatic renewal of the client secret.
  */
 @ConfigurationProperties("client")
-class CdrClientConfig {
+internal data class CdrClientConfig(
     /** Whether file synchronization is enabled. If set to `false`, the client will not download or upload files. */
-    var fileSynchronizationEnabled: Boolean = true
+    val fileSynchronizationEnabled: FileSynchronization,
 
     /** Customer-specific list of [Connectors][Connector]. */
-    lateinit var customer: List<Connector>
+    val customer: List<Connector>,
 
     /** Endpoint coordinates (protocol scheme, host, port, basePath) of the CDR API. */
-    lateinit var cdrApi: Endpoint
+    val cdrApi: Endpoint,
 
     /** Maximum data size of the cache for files in progress. The cache holds filenames, not the files themselves. */
-    lateinit var filesInProgressCacheSize: DataSize
+    val filesInProgressCacheSize: DataSize,
 
     /** Client credentials and tenant info used to authenticate against the OAUth identity provider (credential flow). */
-    lateinit var idpCredentials: IdpCredentials
+    val idpCredentials: IdpCredentials,
 
     /** OAuth IdP URL. */
-    lateinit var idpEndpoint: URL
+    val idpEndpoint: URL,
 
     /** Directory to temporarily store downloaded documents that are pending download acknowledgement. */
-    lateinit var localFolder: Path
+    val localFolder: Path,
 
     /** Maximum number of concurrent document downloads. */
-    var pullThreadPoolSize: Int = DEFAULT_SCHEDULER_POOL_SIZE
+    val pullThreadPoolSize: Int,
 
     /** Maximum number of concurrent document uploads. */
-    var pushThreadPoolSize: Int = DEFAULT_SCHEDULER_POOL_SIZE
+    val pushThreadPoolSize: Int,
 
     /** The delay between upload/download retries; the number of entries also defines how often a retry is attempted. */
-    lateinit var retryDelay: List<Duration>
+    val retryDelay: List<Duration>,
 
     /** The delay between scheduled document uploads and downloads. */
-    lateinit var scheduleDelay: Duration
+    val scheduleDelay: Duration,
 
     /** Endpoint coordinates (protocol scheme, host, port, basePath) of the credential API. */
-    lateinit var credentialApi: Endpoint
+    val credentialApi: Endpoint,
 
     /** Retry template configuration; retries http calls if IOExceptions or server errors are raised. */
-    lateinit var retryTemplate: RetryTemplateConfig
+    val retryTemplate: RetryTemplateConfig,
 
     /** Wait time between two tests whether a file scheduled for upload is still busy (written into). */
-    lateinit var fileBusyTestInterval: Duration
+    val fileBusyTestInterval: Duration,
 
     /** Maximum time to wait for a file to become available for upload before skipping it. */
-    lateinit var fileBusyTestTimeout: Duration
+    val fileBusyTestTimeout: Duration,
 
     /** Strategy to test whether a file is still busy (written into) before attempting to upload it. */
-    lateinit var fileBusyTestStrategy: FileBusyTestStrategy
+    val fileBusyTestStrategy: FileBusyTestStrategy,
+) : PropertyNameAware {
+
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    private companion object {
+        const val PROPERTY_NAME = "client"
+
+        @JvmStatic
+        val FREE_DISK_SPACE_WARNING_THRESHOLD: DataSize = DataSize.ofMegabytes(100L)
+
+        @JvmStatic
+        val EMPTY_PATH: Path = Path.of("")
+
+    }
 
     /**
      * Clients identified by their customer id
      */
-
-    class Connector {
+    data class Connector(
 
         /** Unique identifier for the connector; log into CDR web app to look up your connector ID(s). */
-        lateinit var connectorId: String
+        val connectorId: String,
 
         /** Destination folder where the CDR client will download files to. */
-        lateinit var targetFolder: Path
+        val targetFolder: Path,
 
         /** Source folder where the CDR client will upload files from. */
-        lateinit var sourceFolder: Path
+        val sourceFolder: Path,
 
         /** Media type to set for file uploads; currently only `application/forumdatenaustausch+xml;charset=UTF-8` is supported. */
-        lateinit var contentType: MediaType
+        val contentType: MediaType,
 
         /**
          * Whether to enable the archiving of successfully uploaded files. If not enabled, files that have been uploaded get deleted.
@@ -112,7 +126,7 @@ class CdrClientConfig {
          * @see sourceArchiveFolder
          * @see getEffectiveSourceArchiveFolder
          */
-        var sourceArchiveEnabled: Boolean = false
+        val sourceArchiveEnabled: Boolean = false,
 
         /**
          * Folder to archive uploaded files to. The folder will be created for you if it does not exist yet if [sourceArchiveEnabled]
@@ -128,7 +142,7 @@ class CdrClientConfig {
          * @see getEffectiveSourceArchiveFolder
          * @see sourceFolder
          */
-        var sourceArchiveFolder: Path = EMPTY_PATH
+        val sourceArchiveFolder: Path = EMPTY_PATH,
 
         /**
          * Folder to move documents to for which the upload has failed. If you specify a relative path, it will be resolved relative
@@ -142,16 +156,24 @@ class CdrClientConfig {
          * @see getEffectiveSourceErrorFolder
          * @see sourceFolder
          */
-        var sourceErrorFolder: Path = EMPTY_PATH
+        val sourceErrorFolder: Path = EMPTY_PATH,
 
         /** Mode of the connector; either `test` or `production`; attempting to upload documents with a mismatching mode attribute value will fail. */
-        lateinit var mode: Mode
+        val mode: Mode,
 
         /**
          * Forum Datenaustausch message types related folders. In case that the files come from different source folders or received files need to be stored
          * in different target folders, depending on the message type
          */
-        var docTypeFolders: Map<DocumentType, DocTypeFolders> = emptyMap()
+        val docTypeFolders: Map<DocumentType, DocTypeFolders> = emptyMap(),
+    ) : PropertyNameAware {
+
+        override val propertyName: String
+            get() = PROPERTY_NAME
+
+        companion object {
+            const val PROPERTY_NAME = "connector"
+        }
 
         /**
          * If [sourceArchiveEnabled] is set to `true` returns the archive folder resolved against the source folder with a subdirectory
@@ -263,85 +285,43 @@ class CdrClientConfig {
         /**
          * Specified folders for a specific document type (e.g., Invoice). Can be absolute or relative (to the [Connector.sourceFolder]) paths.
          */
-        class DocTypeFolders {
-            var sourceFolder: Path? = null
-            var targetFolder: Path = EMPTY_PATH
-        }
+        data class DocTypeFolders(
+            val sourceFolder: Path? = null,
+            val targetFolder: Path = EMPTY_PATH,
+        )
 
     }
 
     /**
      * CDR API definition
      */
-    class Endpoint {
+    data class Endpoint(
         /** Protocol scheme of the endpoint; either `http` or `https`. */
-        lateinit var scheme: String
+        val scheme: String,
 
         /** Hostname/FQDN of the endpoint. */
-        lateinit var host: String
+        val host: String,
 
         /** Port to connect to. */
-        var port: Int = DEFAULT_ENDPOINT_PORT
+        val port: Int,
 
         /** Base path of the endpoint, e.g. `/documents` */
-        lateinit var basePath: String
+        val basePath: String,
+    )
 
-        override fun toString(): String {
-            return "Endpoint(scheme='$scheme', host='$host', port=$port, basePath='$basePath')"
-        }
-    }
-
-    /**
-     * Client OAuth credentials
-     */
-    class IdpCredentials {
-        /** Tenant ID of the OAuth identity provider. */
-        lateinit var tenantId: String
-
-        /** Client ID used to authenticate against the OAuth identity provider. Log into CDR web app to look up or create your client ID. */
-        lateinit var clientId: String
-
-        /** Client secret used to authenticate against the OAuth identity provider. Log into the CDR web app to look up or re-issue a client secret. */
-        lateinit var clientSecret: String
-
-        /**
-         * Access scopes to request from the OAuth identity provider. Currently only ```https://[stg.]identity.health.swisscom.ch/CdrApi/.default```
-         * is supported.
-         * */
-        lateinit var scopes: List<String>
-
-        /**
-         * Whether to attempt to automatically renew the client secret at startup and then every 365 days should the client instance be running for that long.
-         *
-         * BEWARE: For automatic renewal to succeed, the client secret must be stored in a configuration property named `client.idp-credentials.client-secret`,
-         * either in a properties or YAML file, and the client process owner must have read/write permissions on that file. Other configuration sources like
-         * system properties, environment variables, etc., are not supported.
-         * */
-        var renewCredentialAtStartup: Boolean = false
-
-        override fun toString(): String {
-            return "IdpCredentials(tenantId='$tenantId', clientId='$clientId', clientSecret='********', scopes=$scopes, autoRenew='$renewCredentialAtStartup')"
-        }
-    }
-
-    class RetryTemplateConfig {
+    data class RetryTemplateConfig(
         /** The number of retries to attempt (on top of the initial request). */
-        var retries: Int = 1
+        val retries: Int,
 
         /** The initial delay before the first retry attempt. */
-        lateinit var initialDelay: Duration
+        val initialDelay: Duration,
 
         /** The maximum delay between retries. */
-        lateinit var maxDelay: Duration
+        val maxDelay: Duration,
 
         /** The multiplier to apply to the previous delay to get the next delay. */
-        var multiplier: Double = 1.0
-
-        override fun toString(): String {
-            return "RetryTemplateConfig(retries=$retries, initialDelay=$initialDelay, maxDelay=$maxDelay, multiplier=$multiplier)"
-        }
-
-    }
+        val multiplier: Double,
+    )
 
     enum class Mode(val value: String) {
         TEST("test"),
@@ -501,25 +481,136 @@ class CdrClientConfig {
         }
     }
 
-    override fun toString(): String {
-        return "CdrClientConfig(idpCredentials='$idpCredentials', idpEndpoint='$idpEndpoint', localFolder='$localFolder', " +
-                "customer=$customer, cdrApi=$cdrApi, credentialApi=$credentialApi, scheduleDelay='$scheduleDelay', " +
-                "retryDelay='${retryDelay.joinToString { it.toString() }}', retryTemplate='$retryTemplate', fileBusyTestInterval='$fileBusyTestInterval', " +
-                "fileBusyTestTimeout='$fileBusyTestTimeout', fileBusyTestStrategy='$fileBusyTestStrategy')"
-    }
-
-    private companion object {
-        private const val DEFAULT_SCHEDULER_POOL_SIZE = 1
-        private const val DEFAULT_ENDPOINT_PORT = 443
-
-        @JvmStatic
-        private val FREE_DISK_SPACE_WARNING_THRESHOLD = DataSize.ofMegabytes(100L)
-
-        @JvmStatic
-        val EMPTY_PATH: Path = Path.of("")
-    }
-
 }
 
-fun List<Connector>.getConnectorForSourceFile(file: Path): Connector =
+/**
+ * Client OAuth credentials
+ *
+ * Has to be a top-level class to be able to wrap some of its properties in value classes. See this
+ * [SO question](https://stackoverflow.com/questions/79658165/springboot-configurationproperties-class-with-kotlin-value-class-member-raises)
+ * for more details.
+ */
+internal data class IdpCredentials(
+    /** Tenant ID of the OAuth identity provider. */
+    val tenantId: String,
+
+    /** Client ID used to authenticate against the OAuth identity provider. Log into CDR web app to look up or create your client ID. */
+    val clientId: String,
+
+    /** Client secret used to authenticate against the OAuth identity provider. Log into the CDR web app to look up or re-issue a client secret. */
+    val clientSecret: ClientSecret,
+
+    /**
+     * Access scopes to request from the OAuth identity provider. Currently only ```https://[stg.]identity.health.swisscom.ch/CdrApi/.default```
+     * is supported.
+     * */
+    val scopes: List<String>,
+
+    /**
+     * Whether to attempt to automatically renew the client secret every [maxCredentialAge] days.
+     *
+     * BEWARE: For automatic renewal to succeed, the client secret must be stored in a configuration property named `client.idp-credentials.client-secret`,
+     * either in a properties or YAML file, and the client process owner must have read/write permissions on that file. Other configuration sources like
+     * system properties, environment variables, etc., are not supported.
+     * */
+    val renewCredential: RenewCredential,
+
+    /**
+     * Maximum age of the client secret before it is automatically renewed. `Now` is compared against [lastCredentialRenewalTime] to determine whether the
+     * age limit has been reached.
+     */
+    val maxCredentialAge: Duration = DEFAULT_MAX_CREDENTIAL_AGE,
+
+    /**
+     * Time when the client last renewed its secret. Defaults to `1970-01-01T00:00:00Z`.
+     */
+    val lastCredentialRenewalTime: LastUpdatedAt = DEFAULT_LAST_CREDENTIAL_RENEWAL_TIME,
+) : PropertyNameAware {
+
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    /**
+     * The number of milliseconds until the next credential renewal is due. Negative values will trigger an immediate renewal.
+     */
+    val millisUntilNextCredentialRenewal: Long
+        get() = maxCredentialAge.toMillis() - ChronoUnit.MILLIS.between(lastCredentialRenewalTime.value, Instant.now())
+
+    override fun toString(): String {
+        return "IdpCredentials(tenantId='$tenantId', clientId='$clientId', clientSecret='********', scopes=$scopes, renewCredential=$renewCredential, " +
+                "maxCredentialAge=$maxCredentialAge, lastCredentialRenewalTime=$lastCredentialRenewalTime)"
+    }
+
+    companion object {
+        const val PROPERTY_NAME = "idp-credentials"
+
+        @JvmStatic
+        val DEFAULT_MAX_CREDENTIAL_AGE: Duration = Duration.ofDays(365L)
+
+        @JvmStatic
+        val DEFAULT_LAST_CREDENTIAL_RENEWAL_TIME: LastUpdatedAt = LastUpdatedAt(Instant.ofEpochSecond(0L))
+    }
+}
+
+@JvmInline
+internal value class FileSynchronization private constructor(val value: Boolean) : PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    override fun toString(): String = value.toString()
+
+    companion object {
+        @JvmStatic
+        val ENABLED = FileSynchronization(true)
+
+        @JvmStatic
+        val DISABLED = FileSynchronization(false)
+
+        private const val PROPERTY_NAME = "file-synchronization-enabled"
+    }
+}
+
+@JvmInline
+internal value class RenewCredential (val value: Boolean) : PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    override fun toString(): String = value.toString()
+
+    companion object {
+        @JvmStatic
+        val ENABLED = RenewCredential(true)
+
+        @JvmStatic
+        val DISABLED = RenewCredential(false)
+
+        private const val PROPERTY_NAME = "renew-credential"
+    }
+}
+
+@JvmInline
+internal value class ClientSecret(val value: String) : PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    override fun toString(): String = value
+
+    companion object {
+        const val PROPERTY_NAME = "client-secret"
+    }
+}
+
+@JvmInline
+internal value class LastUpdatedAt(val value: Instant) : PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    override fun toString(): String = value.toString()
+
+    companion object {
+        const val PROPERTY_NAME = "last-credential-renewal-time"
+    }
+}
+
+internal fun List<Connector>.getConnectorForSourceFile(file: Path): Connector =
     this.first { it.sourceFolder == file.parent || it.getAllSourceDocTypeFolders().contains(file.parent) }

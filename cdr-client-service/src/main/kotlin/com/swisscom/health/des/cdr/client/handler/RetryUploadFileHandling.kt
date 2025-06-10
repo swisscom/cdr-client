@@ -31,7 +31,7 @@ private val logger = KotlinLogging.logger {}
  */
 @Component
 @Suppress("TooManyFunctions", "LongParameterList")
-class RetryUploadFileHandling(
+internal class RetryUploadFileHandling(
     private val cdrClientConfig: CdrClientConfig,
     private val tracer: Tracer,
     private val cdrApiClient: CdrApiClient,
@@ -44,7 +44,7 @@ class RetryUploadFileHandling(
     suspend fun uploadRetrying(file: Path, connector: CdrClientConfig.Connector) {
         logger.debug { "Uploading file '$file'" }
         var retryCount = 0
-        var retryNeeded = false
+        var retryNeeded: Boolean
 
         // a successful rename of the file to upload should guarantee that we can also delete it after a successful upload,
         // and thus prevent duplicate uploads of a file if we fail to delete or archive it after a successful upload

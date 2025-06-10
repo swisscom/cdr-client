@@ -38,7 +38,7 @@ import kotlin.io.path.writeText
     properties = [
         "spring.main.lazy-initialization=true",
         "spring.jmx.enabled=false",
-        "client.idp-credentials.renew-credential-at-startup=false",
+        "client.idp-credentials.renew-credential=false",
         "client.retry-template.retries=4",
         "client.retry-template.initial-delay=10ms",
         "client.retry-template.multiplier=1.1",
@@ -48,7 +48,7 @@ import kotlin.io.path.writeText
 @ActiveProfiles("test", "noPollingUploadScheduler", "noEventTriggerUploadScheduler", "noDownloadScheduler")
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 @Tag("integration-test")
-class CdrApiClientTest {
+internal class CdrApiClientTest {
 
     @SpykBean
     private lateinit var config: CdrClientConfig
@@ -66,19 +66,19 @@ class CdrApiClientTest {
         apiServerMock = MockWebServer()
         apiServerMock.start()
 
-        every { config.credentialApi } returns CdrClientConfig.Endpoint().apply {
-            scheme = "http"
-            host = apiServerMock.hostName
-            port = apiServerMock.port
-            basePath = "client-credentials"
-        }
+        every { config.credentialApi } returns CdrClientConfig.Endpoint(
+            scheme = "http",
+            host = apiServerMock.hostName,
+            port = apiServerMock.port,
+            basePath = "client-credentials",
+        )
 
-        every { config.cdrApi } returns CdrClientConfig.Endpoint().apply {
-            scheme = "http"
-            host = apiServerMock.hostName
-            port = apiServerMock.port
-            basePath = "documents"
-        }
+        every { config.cdrApi } returns CdrClientConfig.Endpoint(
+            scheme = "http",
+            host = apiServerMock.hostName,
+            port = apiServerMock.port,
+            basePath = "documents",
+        )
     }
 
     @AfterEach

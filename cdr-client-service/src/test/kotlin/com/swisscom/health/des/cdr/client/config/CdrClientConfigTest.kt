@@ -1,6 +1,5 @@
 package com.swisscom.health.des.cdr.client.config
 
-import com.swisscom.health.des.cdr.client.config.CdrClientConfig.IdpCredentials
 import com.swisscom.health.des.cdr.client.xml.DocumentType
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -19,7 +18,7 @@ import java.nio.file.Path
 import java.time.Duration
 import java.util.stream.Stream
 
-class CdrClientConfigTest {
+internal class CdrClientConfigTest {
 
     @TempDir
     private lateinit var localFolder0: Path
@@ -99,43 +98,45 @@ class CdrClientConfigTest {
     }
 
     private fun createCdrClientConfig(customers: List<CdrClientConfig.Connector>, defaultLocalFolder: Path = localFolder0): CdrClientConfig {
-        return CdrClientConfig().apply {
-            scheduleDelay = Duration.ofSeconds(1)
-            localFolder = defaultLocalFolder
-            cdrApi = CdrClientConfig.Endpoint().apply {
-                scheme = "http"
-                host = "localhost"
-                port = 8080
-                basePath = "api"
-            }
-            credentialApi = CdrClientConfig.Endpoint().apply {
-                scheme = "http"
-                host = "localhost"
-                port = 8080
-                basePath = "client-credentials"
-            }
-            customer = customers
-            pullThreadPoolSize = 1
-            pushThreadPoolSize = 1
-            retryDelay = listOf(Duration.ofSeconds(1))
-            filesInProgressCacheSize = DataSize.ofMegabytes(1)
-            idpCredentials = IdpCredentials().apply {
-                tenantId = "tenantId"
-                clientId = "clientId"
-                clientSecret = "secret"
-                scopes = listOf("CDR")
-            }
-            idpEndpoint = URL("http://localhost")
-            fileBusyTestStrategy = CdrClientConfig.FileBusyTestStrategy.FILE_SIZE_CHANGED
-            fileBusyTestInterval = Duration.ofMillis(250)
-            fileBusyTestTimeout = Duration.ofSeconds(1)
-            retryTemplate = CdrClientConfig.RetryTemplateConfig().apply {
-                retries = 3
-                initialDelay = Duration.ofSeconds(5)
-                maxDelay = Duration.ofSeconds(5)
-                multiplier = 2.0
-            }
-        }
+        return CdrClientConfig(
+            fileSynchronizationEnabled = FileSynchronization.ENABLED,
+            scheduleDelay = Duration.ofSeconds(1),
+            localFolder = defaultLocalFolder,
+            cdrApi = CdrClientConfig.Endpoint(
+                scheme = "http",
+                host = "localhost",
+                port = 8080,
+                basePath = "api",
+            ),
+            credentialApi = CdrClientConfig.Endpoint(
+                scheme = "http",
+                host = "localhost",
+                port = 8080,
+                basePath = "client-credentials",
+            ),
+            customer = customers,
+            pullThreadPoolSize = 1,
+            pushThreadPoolSize = 1,
+            retryDelay = listOf(Duration.ofSeconds(1)),
+            filesInProgressCacheSize = DataSize.ofMegabytes(1),
+            idpCredentials = IdpCredentials(
+                tenantId = "tenantId",
+                clientId = "clientId",
+                clientSecret = ClientSecret("secret"),
+                scopes = listOf("CDR"),
+                renewCredential = RenewCredential(true)
+            ),
+            idpEndpoint = URL("http://localhost"),
+            fileBusyTestStrategy = CdrClientConfig.FileBusyTestStrategy.FILE_SIZE_CHANGED,
+            fileBusyTestInterval = Duration.ofMillis(250),
+            fileBusyTestTimeout = Duration.ofSeconds(1),
+            retryTemplate = CdrClientConfig.RetryTemplateConfig(
+                retries = 3,
+                initialDelay = Duration.ofSeconds(5),
+                maxDelay = Duration.ofSeconds(5),
+                multiplier = 2.0,
+            ),
+        )
     }
 
     companion object {
@@ -184,23 +185,23 @@ class CdrClientConfigTest {
                 FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
                 CdrClientConfig.Mode.TEST,
                 mapOf(
-                    DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
-                    DocumentType.CREDIT to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
-                    DocumentType.FORM to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
-                    DocumentType.HOSPITAL_MCD to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
-                    DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
-                    DocumentType.NOTIFICATION to CdrClientConfig.Connector.DocTypeFolders().apply { targetFolder = targetFolder0 },
+                    DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
+                    DocumentType.CREDIT to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
+                    DocumentType.FORM to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
+                    DocumentType.HOSPITAL_MCD to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
+                    DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
+                    DocumentType.NOTIFICATION to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
                 )
             ),
             createConnector(
                 "connectorId", targetFolder1, sourceFolder1, FORUM_DATENAUSTAUSCH_MEDIA_TYPE, CdrClientConfig.Mode.PRODUCTION,
                 mapOf(
-                    DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub") },
-                    DocumentType.CREDIT to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub1") },
-                    DocumentType.FORM to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub2") },
-                    DocumentType.HOSPITAL_MCD to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub3") },
-                    DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub4") },
-                    DocumentType.NOTIFICATION to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = sourceFolder2.resolve("sub5") },
+                    DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub")),
+                    DocumentType.CREDIT to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub1")),
+                    DocumentType.FORM to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub2")),
+                    DocumentType.HOSPITAL_MCD to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub3")),
+                    DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub4")),
+                    DocumentType.NOTIFICATION to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub5")),
                 )
             ),
             createConnector("connectorId2", targetFolder2, sourceFolder2, FORUM_DATENAUSTAUSCH_MEDIA_TYPE, CdrClientConfig.Mode.TEST),
@@ -469,14 +470,14 @@ class CdrClientConfigTest {
             mode: CdrClientConfig.Mode,
             typeFolders: Map<DocumentType, CdrClientConfig.Connector.DocTypeFolders> = emptyMap()
         ): CdrClientConfig.Connector {
-            return CdrClientConfig.Connector().apply {
-                this.connectorId = connectorId
-                this.targetFolder = targetFolder
-                this.sourceFolder = sourceFolder
-                this.contentType = contentType
-                this.mode = mode
-                this.docTypeFolders = typeFolders
-            }
+            return CdrClientConfig.Connector(
+                connectorId = connectorId,
+                targetFolder = targetFolder,
+                sourceFolder = sourceFolder,
+                contentType = contentType,
+                mode = mode,
+                docTypeFolders = typeFolders,
+            )
         }
 
         private fun createDocTypeFolders(
@@ -484,10 +485,10 @@ class CdrClientConfigTest {
             sourceFolder: Path?,
             documentType: DocumentType = DocumentType.INVOICE
         ): Map<DocumentType, CdrClientConfig.Connector.DocTypeFolders> {
-            return mapOf(documentType to CdrClientConfig.Connector.DocTypeFolders().apply {
-                this.targetFolder = targetFolder
-                if (sourceFolder != null) this.sourceFolder = sourceFolder
-            })
+            return mapOf(documentType to CdrClientConfig.Connector.DocTypeFolders(
+                targetFolder = targetFolder,
+                sourceFolder = sourceFolder,
+            ))
         }
     }
 

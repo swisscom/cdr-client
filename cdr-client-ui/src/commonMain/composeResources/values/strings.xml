@@ -21,5 +21,6 @@
     <!-- Tooltips -->
 
     <!-- Error messages -->
-    <string name="error_client_communication">Failed to communicate with the client service.</string>
+    <string name="error_client_communication">Failed to communicate with the client service. Details:\n%1$s</string>
+    <string name="error_client_validation">CDR client reported an error. Details:\n%1$s</string>
 </resources>

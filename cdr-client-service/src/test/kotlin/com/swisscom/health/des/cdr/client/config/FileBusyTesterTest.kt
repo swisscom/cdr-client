@@ -18,7 +18,7 @@ import java.time.Duration
 import kotlin.io.path.createFile
 import kotlin.io.path.writeText
 
-class FileBusyTesterTest {
+internal class FileBusyTesterTest {
 
     @TempDir
     private lateinit var tempDir: Path

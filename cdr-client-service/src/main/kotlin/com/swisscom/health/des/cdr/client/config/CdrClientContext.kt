@@ -17,7 +17,6 @@ import okhttp3.Response
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
-import org.springframework.cloud.context.config.annotation.RefreshScope
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.retry.support.RetryTemplate
@@ -34,7 +33,7 @@ private val logger = KotlinLogging.logger {}
  */
 @Suppress("TooManyFunctions")
 @Configuration
-class CdrClientContext {
+internal class CdrClientContext {
 
     /**
      * Creates and returns an instance of the OkHttpClient.
@@ -123,12 +122,11 @@ class CdrClientContext {
     /**
      * Creates and returns an instance of the MSAL4J client object through which we can obtain an OAuth2 token.
      */
-    @RefreshScope
     @Bean
     fun confidentialClientApp(config: CdrClientConfig): IConfidentialClientApplication =
         ConfidentialClientApplication.builder(
             config.idpCredentials.clientId,
-            ClientCredentialFactory.createFromSecret(config.idpCredentials.clientSecret)
+            ClientCredentialFactory.createFromSecret(config.idpCredentials.clientSecret.value)
         ).authority(config.idpEndpoint.toString())
             .build()
 
@@ -186,19 +184,19 @@ class CdrClientContext {
 
 internal class HttpServerErrorException(message: String, val statusCode: Int, val responseBody: String) : RuntimeException(message)
 
-sealed class FileBusyTester {
-    abstract suspend fun isBusy(file: Path): Boolean
+sealed interface FileBusyTester {
+    suspend fun isBusy(file: Path): Boolean
 
-    object NeverBusy : FileBusyTester() {
+    object NeverBusy : FileBusyTester {
         override suspend fun isBusy(file: Path): Boolean = false
     }
 
     // Only useful for testing
-    object AlwaysBusy : FileBusyTester() {
+    object AlwaysBusy : FileBusyTester {
         override suspend fun isBusy(file: Path): Boolean = true
     }
 
-    class FileSizeChanged(private val testInterval: Duration) : FileBusyTester() {
+    class FileSizeChanged(private val testInterval: Duration) : FileBusyTester {
         override suspend fun isBusy(file: Path): Boolean = runCatching {
             val startSize = file.fileSize()
             delay(testInterval)

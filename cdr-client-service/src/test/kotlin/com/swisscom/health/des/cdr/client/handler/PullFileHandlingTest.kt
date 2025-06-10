@@ -84,12 +84,12 @@ internal class PullFileHandlingTest {
         cdrServiceMock.start()
         mockTracer()
 
-        endpoint = CdrClientConfig.Endpoint().apply {
-            host = cdrServiceMock.hostName
-            basePath = "documents"
-            scheme = "http"
-            port = cdrServiceMock.port
-        }
+        endpoint = CdrClientConfig.Endpoint(
+            host = cdrServiceMock.hostName,
+            basePath = "documents",
+            scheme = "http",
+            port = cdrServiceMock.port,
+        )
 
         tmpDir.resolve(targetDirectory).also { it.createDirectories() }
         val inflightDir = tmpDir.resolve(inflightFolder).also { it.createDirectories() }
@@ -138,16 +138,18 @@ internal class PullFileHandlingTest {
 
         val invoiceFolder = tmpDir.resolve("invoice").also { it.createDirectories() }
 
-        val connector = CdrClientConfig.Connector().apply {
-            connectorId = "1-2-3-4"
-            targetFolder = tmpDir.resolve(targetDirectory)
-            sourceFolder = tmpDir.resolve(sourceDirectory)
-            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
-            mode = CdrClientConfig.Mode.PRODUCTION
-            docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply {
-                targetFolder = invoiceFolder
-            })
-        }
+        val connector = CdrClientConfig.Connector(
+            connectorId = "1-2-3-4",
+            targetFolder = tmpDir.resolve(targetDirectory),
+            sourceFolder = tmpDir.resolve(sourceDirectory),
+            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
+            mode = CdrClientConfig.Mode.PRODUCTION,
+            docTypeFolders = mapOf(
+                DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
+                    targetFolder = invoiceFolder,
+                )
+            )
+        )
 
         runBlocking {
             pullFileHandling.pullSyncConnector(connector)
@@ -174,16 +176,18 @@ internal class PullFileHandlingTest {
         val invoiceFolder = tmpDir.resolve("invoice").also { it.createDirectories() }
         val targetDir = tmpDir.resolve(targetDirectory)
 
-        val connector = CdrClientConfig.Connector().apply {
-            connectorId = "1-2-3-4"
-            targetFolder = targetDir
-            sourceFolder = tmpDir.resolve(sourceDirectory)
-            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
-            mode = CdrClientConfig.Mode.PRODUCTION
-            docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply {
-                targetFolder = invoiceFolder
-            })
-        }
+        val connector = CdrClientConfig.Connector(
+            connectorId = "1-2-3-4",
+            targetFolder = targetDir,
+            sourceFolder = tmpDir.resolve(sourceDirectory),
+            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
+            mode = CdrClientConfig.Mode.PRODUCTION,
+            docTypeFolders = mapOf(
+                DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
+                    targetFolder = invoiceFolder,
+                )
+            )
+        )
 
         runBlocking {
             pullFileHandling.pullSyncConnector(connector)
@@ -210,16 +214,18 @@ internal class PullFileHandlingTest {
         val invoiceFolder = tmpDir.resolve("invoice").also { it.createDirectories() }
         val targetDir = tmpDir.resolve(targetDirectory)
 
-        val connector = CdrClientConfig.Connector().apply {
-            connectorId = "1-2-3-4"
-            targetFolder = targetDir
-            sourceFolder = tmpDir.resolve(sourceDirectory)
-            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
-            mode = CdrClientConfig.Mode.PRODUCTION
-            docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply {
-                targetFolder = invoiceFolder
-            })
-        }
+        val connector = CdrClientConfig.Connector(
+            connectorId = "1-2-3-4",
+            targetFolder = targetDir,
+            sourceFolder = tmpDir.resolve(sourceDirectory),
+            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
+            mode = CdrClientConfig.Mode.PRODUCTION,
+            docTypeFolders = mapOf(
+                DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
+                    targetFolder = invoiceFolder,
+                )
+            )
+        )
 
         runBlocking {
             pullFileHandling.pullSyncConnector(connector)
@@ -329,13 +335,13 @@ internal class PullFileHandlingTest {
         targetFolder0: Path = tmpDir.resolve(targetDirectory),
         sourceFolder0: Path = tmpDir.resolve(sourceDirectory),
     ): CdrClientConfig.Connector =
-        CdrClientConfig.Connector().apply {
-            connectorId = connectorId0
-            targetFolder = targetFolder0
-            sourceFolder = sourceFolder0
-            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
-            mode = CdrClientConfig.Mode.PRODUCTION
-        }
+        CdrClientConfig.Connector(
+            connectorId = connectorId0,
+            targetFolder = targetFolder0,
+            sourceFolder = sourceFolder0,
+            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
+            mode = CdrClientConfig.Mode.PRODUCTION,
+        )
 
     private fun enqueueFileResponseWithReportResponse(fileName: String = "dummy.txt") {
         enqueueFileResponse(fileName)

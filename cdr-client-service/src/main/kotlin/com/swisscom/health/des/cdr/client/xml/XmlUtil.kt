@@ -7,7 +7,7 @@ import javax.xml.XMLConstants
 import javax.xml.parsers.DocumentBuilderFactory
 
 @Service
-class XmlUtil {
+internal class XmlUtil {
 
     fun findSchemaDefinition(doc: Document): DocumentType {
         fun isEven(value: Int) = value % 2 == 0

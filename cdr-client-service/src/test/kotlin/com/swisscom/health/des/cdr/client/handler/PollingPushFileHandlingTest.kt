@@ -54,7 +54,7 @@ import kotlin.io.path.walk
     properties = [
         "spring.main.lazy-initialization=true",
         "spring.jmx.enabled=false",
-        "client.idp-credentials.renew-credential-at-startup=false",
+        "client.idp-credentials.renew-credential=false",
     ]
 )
 // only test polling, not filesystem event handling
@@ -94,20 +94,20 @@ internal class PollingPushFileHandlingTest {
         val targetFolder0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
 
         every { config.localFolder } returns inflightDir
-        every { config.cdrApi } returns CdrClientConfig.Endpoint().apply {
-            host = cdrServiceMock.hostName
-            basePath = "documents"
-            scheme = "http"
-            port = cdrServiceMock.port
-        }
+        every { config.cdrApi } returns CdrClientConfig.Endpoint(
+            host = cdrServiceMock.hostName,
+            basePath = "documents",
+            scheme = "http",
+            port = cdrServiceMock.port,
+        )
         every { config.customer } returns listOf(
-            CdrClientConfig.Connector().apply {
-                connectorId = "2345"
-                targetFolder = targetFolder0
-                sourceFolder = sourceFolder0
-                contentType = forumDatenaustauschMediaType
-                mode = CdrClientConfig.Mode.TEST
-            }
+            CdrClientConfig.Connector(
+                connectorId = "2345",
+                targetFolder = targetFolder0,
+                sourceFolder = sourceFolder0,
+                contentType = forumDatenaustauschMediaType,
+                mode = CdrClientConfig.Mode.TEST,
+            )
         )
 
         val resultMock: CompletableFuture<IAuthenticationResult> = mockk()
@@ -177,15 +177,15 @@ internal class PollingPushFileHandlingTest {
         val sourceFolder0 = tmpDir.resolve(sourceDirectory)
         val targetFolder0 = tmpDir.resolve(targetDirectory)
         every { config.customer } returns listOf(
-            CdrClientConfig.Connector().apply {
-                connectorId = "2345"
-                targetFolder = targetFolder0
-                sourceFolder = sourceFolder0
-                contentType = forumDatenaustauschMediaType
-                mode = CdrClientConfig.Mode.TEST
-                sourceArchiveEnabled = true
-                sourceArchiveFolder = relativeArchiveFolder
-            }
+            CdrClientConfig.Connector(
+                connectorId = "2345",
+                targetFolder = targetFolder0,
+                sourceFolder = sourceFolder0,
+                contentType = forumDatenaustauschMediaType,
+                mode = CdrClientConfig.Mode.TEST,
+                sourceArchiveEnabled = true,
+                sourceArchiveFolder = relativeArchiveFolder,
+            )
         )
 
         val mockResponse = MockResponse()
@@ -228,16 +228,16 @@ internal class PollingPushFileHandlingTest {
         val targetFolder0 = tmpDir.resolve(targetDirectory)
         val invoiceSourceFolder = sourceFolder0.resolve("invoice").also { it.createDirectories() }
         every { config.customer } returns listOf(
-            CdrClientConfig.Connector().apply {
-                connectorId = "2345"
-                targetFolder = targetFolder0
-                sourceFolder = sourceFolder0
-                contentType = forumDatenaustauschMediaType
-                mode = CdrClientConfig.Mode.TEST
-                sourceArchiveEnabled = true
-                sourceArchiveFolder = relativeArchiveFolder
-                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = invoiceSourceFolder })
-            }
+            CdrClientConfig.Connector(
+                connectorId = "2345",
+                targetFolder = targetFolder0,
+                sourceFolder = sourceFolder0,
+                contentType = forumDatenaustauschMediaType,
+                mode = CdrClientConfig.Mode.TEST,
+                sourceArchiveEnabled = true,
+                sourceArchiveFolder = relativeArchiveFolder,
+                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = invoiceSourceFolder)),
+            )
         )
 
         val mockResponse = MockResponse()
@@ -281,16 +281,16 @@ internal class PollingPushFileHandlingTest {
         val targetFolder0 = tmpDir.resolve(targetDirectory)
         val invoiceSourceFolder = sourceFolder0.resolve("invoice").also { it.createDirectories() }
         every { config.customer } returns listOf(
-            CdrClientConfig.Connector().apply {
-                connectorId = "2345"
-                targetFolder = targetFolder0
-                sourceFolder = sourceFolder0
-                contentType = forumDatenaustauschMediaType
-                mode = CdrClientConfig.Mode.TEST
-                sourceArchiveEnabled = true
-                sourceArchiveFolder = absoluteArchiveFolder
-                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = invoiceSourceFolder })
-            }
+            CdrClientConfig.Connector(
+                connectorId = "2345",
+                targetFolder = targetFolder0,
+                sourceFolder = sourceFolder0,
+                contentType = forumDatenaustauschMediaType,
+                mode = CdrClientConfig.Mode.TEST,
+                sourceArchiveEnabled = true,
+                sourceArchiveFolder = absoluteArchiveFolder,
+                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = invoiceSourceFolder)),
+            )
         )
 
         val mockResponse = MockResponse()
@@ -399,14 +399,14 @@ internal class PollingPushFileHandlingTest {
         val sourceFolder0 = tmpDir.resolve(sourceDirectory)
         val targetFolder0 = tmpDir.resolve(targetDirectory)
         every { config.customer } returns listOf(
-            CdrClientConfig.Connector().apply {
-                connectorId = "2345"
-                targetFolder = targetFolder0
-                sourceFolder = sourceFolder0
-                contentType = forumDatenaustauschMediaType
-                mode = CdrClientConfig.Mode.TEST
-                sourceErrorFolder = relativeErrorFolder
-            }
+            CdrClientConfig.Connector(
+                connectorId = "2345",
+                targetFolder = targetFolder0,
+                sourceFolder = sourceFolder0,
+                contentType = forumDatenaustauschMediaType,
+                mode = CdrClientConfig.Mode.TEST,
+                sourceErrorFolder = relativeErrorFolder,
+            )
         )
 
         val mockResponse = MockResponse()
@@ -457,15 +457,15 @@ internal class PollingPushFileHandlingTest {
         val invoiceSourceFolder = sourceFolder0.resolve("invoice").also { it.createDirectories() }
 
         every { config.customer } returns listOf(
-            CdrClientConfig.Connector().apply {
-                connectorId = "2345"
-                targetFolder = targetFolder0
-                sourceFolder = sourceFolder0
-                contentType = forumDatenaustauschMediaType
-                mode = CdrClientConfig.Mode.TEST
-                sourceErrorFolder = absoluteErrorFolder
-                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = invoiceSourceFolder })
-            }
+            CdrClientConfig.Connector(
+                connectorId = "2345",
+                targetFolder = targetFolder0,
+                sourceFolder = sourceFolder0,
+                contentType = forumDatenaustauschMediaType,
+                mode = CdrClientConfig.Mode.TEST,
+                sourceErrorFolder = absoluteErrorFolder,
+                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = invoiceSourceFolder)),
+            )
         )
 
         val mockResponse = MockResponse()
@@ -517,15 +517,15 @@ internal class PollingPushFileHandlingTest {
         val invoiceSourceFolder = sourceFolder0.resolve("invoice").also { it.createDirectories() }
 
         every { config.customer } returns listOf(
-            CdrClientConfig.Connector().apply {
-                connectorId = "2345"
-                targetFolder = targetFolder0
-                sourceFolder = sourceFolder0
-                contentType = forumDatenaustauschMediaType
-                mode = CdrClientConfig.Mode.TEST
-                sourceErrorFolder = relativeErrorFolder
-                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders().apply { sourceFolder = invoiceSourceFolder })
-            }
+            CdrClientConfig.Connector(
+                connectorId = "2345",
+                targetFolder = targetFolder0,
+                sourceFolder = sourceFolder0,
+                contentType = forumDatenaustauschMediaType,
+                mode = CdrClientConfig.Mode.TEST,
+                sourceErrorFolder = relativeErrorFolder,
+                docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = invoiceSourceFolder))
+            )
         )
 
         val mockResponse = MockResponse()

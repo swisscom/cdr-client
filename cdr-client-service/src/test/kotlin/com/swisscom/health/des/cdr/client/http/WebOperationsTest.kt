@@ -1,7 +1,9 @@
 package com.swisscom.health.des.cdr.client.http
 
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.http.WebOperations.ShutdownTrigger
+import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
+import com.swisscom.health.des.cdr.client.handler.ShutdownService
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
 import kotlinx.coroutines.test.runTest
@@ -12,7 +14,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.extension.ExtendWith
 import org.springframework.boot.actuate.health.HealthEndpoint
-import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
 
@@ -20,7 +21,10 @@ import org.springframework.http.ProblemDetail
 internal class WebOperationsTest {
 
     @MockK
-    lateinit var context: ConfigurableApplicationContext
+    lateinit var shutdownService: ShutdownService
+
+    @MockK
+    lateinit var configWriter: ConfigurationWriter
 
     @MockK
     lateinit var healthEndpoint: HealthEndpoint
@@ -28,11 +32,20 @@ internal class WebOperationsTest {
     @MockK
     lateinit var objectMapper: com.fasterxml.jackson.databind.ObjectMapper
 
+    @MockK
+    lateinit var config: CdrClientConfig
+
     lateinit var webOperations: WebOperations
 
     @BeforeEach
     fun setUp() {
-        webOperations = WebOperations(context = context, healthEndpoint = healthEndpoint, objectMapper = objectMapper)
+        webOperations = WebOperations(
+            shutdownService = shutdownService,
+            configWriter = configWriter,
+            healthEndpoint = healthEndpoint,
+            objectMapper = objectMapper,
+            config = config,
+        )
     }
 
     @Test
@@ -41,10 +54,10 @@ internal class WebOperationsTest {
                 "after a delay which may kill the VM running the test before it can finish, which in turn fails the build"
     )
     fun `test shutdown with valid reason`() = runTest {
-        val response = webOperations.shutdown(ShutdownTrigger.CONFIG_CHANGE.reason)
+        val response = webOperations.shutdown(ShutdownService.ShutdownTrigger.CONFIG_CHANGE.reason)
         val shutdownResponse = assertInstanceOf<DTOs.ShutdownResponse>(response.body)
-        assertEquals(ShutdownTrigger.CONFIG_CHANGE.name, shutdownResponse.trigger)
-        assertEquals(ShutdownTrigger.CONFIG_CHANGE.exitCode, shutdownResponse.exitCode)
+        assertEquals(ShutdownService.ShutdownTrigger.CONFIG_CHANGE.name, shutdownResponse.trigger)
+        assertEquals(ShutdownService.ShutdownTrigger.CONFIG_CHANGE.exitCode, shutdownResponse.exitCode)
     }
 
     @Test

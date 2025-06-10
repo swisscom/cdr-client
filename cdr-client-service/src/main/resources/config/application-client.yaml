@@ -1,4 +1,6 @@
+---
 client:
+  file-synchronization-enabled: true
   local-folder: ${cdrClient.localFolder:${java.io.tmpdir}/cdr_download}
   idp-credentials:
     tenant-id: ${CDR_B2C_TENANT_ID:test-tenant-client-id} # `test-tenant-client-id` is the required value if the MockOauth2Server is used; see its `config.json`
@@ -8,7 +10,9 @@ client:
     # locations, which currently also fails the update
     scopes:
       - https://${CDR_CLIENT_SCOPE_PREFIX:}identity.health.swisscom.ch/CdrApi/.default
-    renew-credential-at-startup: ${CDR_CLIENT_RENEW_CREDENTIAL_AT_STARTUP:true}
+    renew-credential: ${CDR_CLIENT_RENEW_CREDENTIAL_AT_STARTUP:true}
+    max-credential-age: 365d
+    last-credential-renewal-time: 1970-01-01T00:00:00Z
   idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/
   schedule-delay: PT10M
   files-in-progress-cache-size: 10MB

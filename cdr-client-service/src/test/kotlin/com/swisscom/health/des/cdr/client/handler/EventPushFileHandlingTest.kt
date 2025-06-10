@@ -52,7 +52,7 @@ import kotlin.io.path.walk
     properties = [
         "spring.main.lazy-initialization=true",
         "spring.jmx.enabled=false",
-        "client.idp-credentials.renew-credential-at-startup=false",
+        "client.idp-credentials.renew-credential=false",
     ]
 )
 // only test filesystem event handling, no polling
@@ -86,20 +86,20 @@ internal class EventPushFileHandlingTest {
         val sourceFolder0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
         val targetFolder0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
 
-        every { config.cdrApi } returns CdrClientConfig.Endpoint().apply {
-            host = cdrServiceMock.hostName
-            basePath = "documents"
-            scheme = "http"
-            port = cdrServiceMock.port
-        }
+        every { config.cdrApi } returns CdrClientConfig.Endpoint(
+            host = cdrServiceMock.hostName,
+            basePath = "documents",
+            scheme = "http",
+            port = cdrServiceMock.port,
+        )
         every { config.customer } returns listOf(
-            CdrClientConfig.Connector().apply {
-                connectorId = "2345"
-                targetFolder = targetFolder0
-                sourceFolder = sourceFolder0
-                contentType = forumDatenaustauschMediaType
-                mode = CdrClientConfig.Mode.TEST
-            }
+            CdrClientConfig.Connector(
+                connectorId = "2345",
+                targetFolder = targetFolder0,
+                sourceFolder = sourceFolder0,
+                contentType = forumDatenaustauschMediaType,
+                mode = CdrClientConfig.Mode.TEST,
+            )
         )
 
         val resultMock: CompletableFuture<IAuthenticationResult> = mockk()

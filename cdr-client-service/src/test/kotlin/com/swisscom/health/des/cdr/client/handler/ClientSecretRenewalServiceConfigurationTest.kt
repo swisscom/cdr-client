@@ -18,12 +18,12 @@ import java.nio.file.Path
     properties = [
         "spring.main.lazy-initialization=true",
         "spring.jmx.enabled=false",
-        "client.idp-credentials.renew-credential-at-startup=false",
+        "client.idp-credentials.renew-credential=false",
     ]
 )
 @ActiveProfiles("test", "noPollingUploadScheduler", "noEventTriggerUploadScheduler", "noDownloadScheduler")
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
-class ClientSecretRenewalServiceConfigurationTest {
+internal class ClientSecretRenewalServiceConfigurationTest {
 
     @Value("\${client.idp-credentials.client-secret}")
     private lateinit var clientSecret: String
@@ -39,7 +39,7 @@ class ClientSecretRenewalServiceConfigurationTest {
                     "property path in `com.swisscom.health.des.cdr.client.handler.ClientSecretRenewalService` and its unit test. Once all is done, amend " +
                     "the path in this test."
         )
-        assertTrue(config.idpCredentials.clientSecret == clientSecret)
+        assertTrue(config.idpCredentials.clientSecret.value == clientSecret)
         assertTrue(clientSecret == "test-client-secret")
     }
 

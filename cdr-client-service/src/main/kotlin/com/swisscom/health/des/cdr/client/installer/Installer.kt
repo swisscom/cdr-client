@@ -15,7 +15,7 @@ private val logger = KotlinLogging.logger {}
 
 fun Path.toSpringConfigString(): String = this.toString().replace("\\", "/")
 
-class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
+internal class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
 
     fun install() {
         println("###############################################")
@@ -96,7 +96,7 @@ class Installer(private val scanner: Scanner = Scanner(System.`in`)) {
             .plus("client.idp-credentials.$CONF_CLIENT_SECRET=$clientSecret\n")
             .let {
                 if (updateCredentials.lowercase() in listOf("n", "no", "non", "nein", "false")) {
-                    it.plus("client.idp-credentials.renew-credential-at-startup=false\n")
+                    it.plus("client.idp-credentials.renew-credential=false\n")
                 } else {
                     it
                 }

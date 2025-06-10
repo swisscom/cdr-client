@@ -8,7 +8,7 @@ import org.junit.jupiter.params.provider.ValueSource
 import java.nio.file.Paths
 import kotlin.io.path.absolutePathString
 
-class StartupHelperTest {
+internal class StartupHelperTest {
 
     @ParameterizedTest
     @ValueSource(strings = ["dev", "test", "customer,dev"])
