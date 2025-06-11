@@ -27,6 +27,7 @@ internal fun CdrClientConfig.toDto(): DTOs.CdrClientConfig {
         retryDelay = retryDelay,
         scheduleDelay = scheduleDelay,
         credentialApi = credentialApi.toDto(),
+        retryTemplate = retryTemplate.toDto(),
         fileBusyTestInterval = fileBusyTestInterval,
         fileBusyTestTimeout = fileBusyTestTimeout,
         fileBusyTestStrategy = fileBusyTestStrategy.toDto(),
@@ -75,6 +76,14 @@ internal fun IdpCredentials.toDto(): DTOs.CdrClientConfig.IdpCredentials =
         maxCredentialAge = maxCredentialAge,
         lastCredentialRenewalTime = lastCredentialRenewalTime.value,
     )
+
+internal fun RetryTemplateConfig.toDto(): DTOs.CdrClientConfig.RetryTemplateConfig =
+    DTOs.CdrClientConfig.RetryTemplateConfig(
+        retries = retries,
+        initialDelay = initialDelay,
+        maxDelay = maxDelay,
+        multiplier = multiplier
+    )
 /*
  * END - Spring Configuration -> Configuration DTOs
  */
@@ -86,13 +95,6 @@ internal fun DTOs.CdrClientConfig.toCdrClientConfig(): CdrClientConfig {
     fun List<DTOs.CdrClientConfig.Connector>.toCdrClientConfig(): List<CdrClientConfig.Connector> = map { it.toCdrClientConfig() }
     fun DTOs.CdrClientConfig.FileBusyTestStrategy.toCdrClientConfig(): CdrClientConfig.FileBusyTestStrategy =
         CdrClientConfig.FileBusyTestStrategy.valueOf(name)
-
-    val defaultRetryTemplateConfig = RetryTemplateConfig(
-        retries = 0,
-        initialDelay = java.time.Duration.ZERO,
-        maxDelay = java.time.Duration.ZERO,
-        multiplier = 0.0
-    )
 
     return CdrClientConfig(
         fileSynchronizationEnabled = if (fileSynchronizationEnabled) FileSynchronization.ENABLED else FileSynchronization.DISABLED,
@@ -107,10 +109,10 @@ internal fun DTOs.CdrClientConfig.toCdrClientConfig(): CdrClientConfig {
         retryDelay = retryDelay,
         scheduleDelay = scheduleDelay,
         credentialApi = credentialApi.toCdrClientConfig(),
+        retryTemplate = retryTemplate.toCdrClientConfig(),
         fileBusyTestInterval = fileBusyTestInterval,
         fileBusyTestTimeout = fileBusyTestTimeout,
         fileBusyTestStrategy = fileBusyTestStrategy.toCdrClientConfig(),
-        retryTemplate = defaultRetryTemplateConfig,
     )
 }
 
@@ -155,6 +157,14 @@ internal fun DTOs.CdrClientConfig.IdpCredentials.toCdrClientConfig(): IdpCredent
         renewCredential = RenewCredential(renewCredential),
         maxCredentialAge = maxCredentialAge,
         lastCredentialRenewalTime = LastUpdatedAt(lastCredentialRenewalTime),
+    )
+
+internal fun DTOs.CdrClientConfig.RetryTemplateConfig.toCdrClientConfig(): RetryTemplateConfig =
+    RetryTemplateConfig(
+        retries = retries,
+        initialDelay = java.time.Duration.ofMillis(initialDelay.toMillis()),
+        maxDelay = java.time.Duration.ofMillis(maxDelay.toMillis()),
+        multiplier = multiplier
     )
 
 /*

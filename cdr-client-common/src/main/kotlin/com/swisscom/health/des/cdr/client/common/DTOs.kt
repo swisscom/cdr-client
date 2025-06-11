@@ -99,6 +99,7 @@ class DTOs {
         val retryDelay: List<Duration>,
         val scheduleDelay: Duration,
         val credentialApi: Endpoint,
+        val retryTemplate: RetryTemplateConfig,
         val fileBusyTestInterval: Duration,
         val fileBusyTestTimeout: Duration,
         val fileBusyTestStrategy: FileBusyTestStrategy,
@@ -121,7 +122,8 @@ class DTOs {
                 credentialApi = Endpoint.EMPTY,
                 fileBusyTestInterval = Duration.ZERO,
                 fileBusyTestTimeout = Duration.ZERO,
-                fileBusyTestStrategy = FileBusyTestStrategy.NEVER_BUSY
+                fileBusyTestStrategy = FileBusyTestStrategy.NEVER_BUSY,
+                retryTemplate = RetryTemplateConfig.EMPTY,
             )
         }
 
@@ -196,6 +198,24 @@ class DTOs {
             HOSPITAL_MCD,
             INVOICE,
             NOTIFICATION;
+        }
+
+        @Serializable
+        data class RetryTemplateConfig(
+            val retries: Int,
+            val initialDelay: Duration,
+            val maxDelay: Duration,
+            val multiplier: Double,
+        ) {
+            companion object {
+                @JvmStatic
+                val EMPTY = RetryTemplateConfig(
+                    retries = 0,
+                    initialDelay = Duration.ZERO,
+                    maxDelay = Duration.ZERO,
+                    multiplier = 1.0
+                )
+            }
         }
 
         enum class Mode {

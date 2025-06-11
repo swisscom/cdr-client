@@ -235,6 +235,37 @@ class ConfigurationWriterTest {
         verify(exactly = 0) { propOrigin2.resource }
     }
 
+    @Test
+    fun `test property source not found, not writable, and found`() {
+        val configFile = tempConfigDir.resolve("unknown_config_format.yaml").apply {
+            createFile()
+        }
+        val propOriginWritable = mockk<TextResourceOrigin>()
+        val fileSystemResource = FileSystemResource(configFile)
+        every { propOriginWritable.resource } returns fileSystemResource
+        val propOriginNotWritable = mockk<TextResourceOrigin>()
+        val fileSystemResourceNotWritable = FileSystemResource(tempConfigDir)
+        every {  propOriginNotWritable.resource } returns fileSystemResourceNotWritable
+        val propSource = mockk<OriginTrackedMapPropertySource>()
+        every { propSource.getOrigin("client.file-synchronization-enabled") } returns propOriginWritable // writable
+        every { propSource.getOrigin("client.idp-credentials.renew-credential") } returns propOriginNotWritable // not writable
+        every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns null  // not writable
+        every { propSource.getOrigin("client.idp-credentials.client-secret") } returns null // not writable
+        val propertySources = MutablePropertySources().apply {
+            addLast(propSource)
+        }
+        every { applicationContext.environment.propertySources } returns propertySources
+
+        assertEquals(ConfigurationWriter.ConfigLookupResult.Writable,
+            configurationWriter.isWritableConfigurationItem("client.file-synchronization-enabled"))
+        assertEquals(ConfigurationWriter.ConfigLookupResult.NotWritable,
+            configurationWriter.isWritableConfigurationItem("client.idp-credentials.last-credential-renewal-time"))
+        assertEquals(ConfigurationWriter.ConfigLookupResult.NotWritable,
+            configurationWriter.isWritableConfigurationItem("client.idp-credentials.renew-credential"))
+        assertEquals(ConfigurationWriter.ConfigLookupResult.NotFound,
+            configurationWriter.isWritableConfigurationItem("client.unknown-property"))
+    }
+
     companion object {
         @JvmStatic
         private val EMPTY_PATH = Path.of("")

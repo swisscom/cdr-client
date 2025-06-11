@@ -33,7 +33,7 @@ internal class ConfigurationWriter(
 
     fun isWritableConfigurationItem(propertyPath: String): ConfigLookupResult =
         collectUpdatableConfigurationItems(currentConfig, currentConfig)
-            .firstOrNull { it.propertyPath == propertyPath && it is UpdatableConfigurationItem.WritableResourceConfigurationItem }
+            .firstOrNull { it.propertyPath == propertyPath }
             .let { updatableConfigItem: UpdatableConfigurationItem? ->
                 return when (updatableConfigItem) {
                     null -> ConfigLookupResult.NotFound

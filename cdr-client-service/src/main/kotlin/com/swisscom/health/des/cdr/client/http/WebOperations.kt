@@ -9,10 +9,14 @@ import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.actuate.health.HealthEndpoint
 import org.springframework.boot.actuate.health.SystemHealth
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -58,6 +62,9 @@ internal class WebOperations(
                         problemDetail.properties = result.errors
                         ResponseEntity
                             .of(problemDetail)
+                            .headers { headers ->
+                                headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+                            }
                             .build<ProblemDetail>()
                     }
                 }
@@ -69,6 +76,9 @@ internal class WebOperations(
             problemDetail.detail = "Failed to update service configuration: $error"
             ResponseEntity
                 .of(problemDetail)
+                .headers { headers ->
+                    headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+                }
                 .build<ProblemDetail>()
         }
     }
@@ -85,8 +95,8 @@ internal class WebOperations(
         logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
 
         val status = when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
-            healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
-            healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code -> DTOs.StatusResponse.StatusCode.DISABLED
+            FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
+            FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED
             else -> DTOs.StatusResponse.StatusCode.UNKNOWN
             // TODO: add checks for error scenarios: configuration errors, CDR API not reachable, IdP not reachable, etc.
             //   all other error scenarios would probably prevent the client service from starting altogether;
@@ -104,6 +114,9 @@ internal class WebOperations(
             problemDetail.detail = "Failed to retrieve service status: $error"
             ResponseEntity
                 .of(problemDetail)
+                .headers { headers ->
+                    headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+                }
                 .build<ProblemDetail>()
         }
     }
@@ -121,6 +134,9 @@ internal class WebOperations(
                 ProblemDetail.forStatus(HttpStatus.BAD_REQUEST).let { problemDetail ->
                     ResponseEntity
                         .of(problemDetail)
+                        .headers { headers ->
+                            headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+                        }
                         .build<ProblemDetail>()
                 }
             } else {
@@ -144,6 +160,9 @@ internal class WebOperations(
             problemDetail.detail = "Failed to schedule shutdown: $error"
             ResponseEntity
                 .of(problemDetail)
+                .headers { headers ->
+                    headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+                }
                 .build<ProblemDetail>()
         }
     }
