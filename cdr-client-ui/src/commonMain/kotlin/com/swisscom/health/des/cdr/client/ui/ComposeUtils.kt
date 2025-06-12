@@ -51,7 +51,7 @@ internal fun ButtonWithToolTip(
         ) {
             Button(
                 onClick = onClick,
-            ) { Text(text = "Apply") }
+            ) { Text(text = label) }
         }
     } else {
         Button(
