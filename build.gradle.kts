@@ -23,9 +23,11 @@ plugins {
     alias(libs.plugins.detekt)
 }
 
+val detektPluginId = libs.plugins.detekt.get().pluginId
+
 subprojects {
     apply {
-        plugin("io.gitlab.arturbosch.detekt")
+        plugin(detektPluginId)
     }
 
     detekt {

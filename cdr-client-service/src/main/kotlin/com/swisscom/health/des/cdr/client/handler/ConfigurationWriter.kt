@@ -165,13 +165,14 @@ internal class ConfigurationWriter(
                 getPropertyNameAwareChildren(currentConfigItem).zip(getPropertyNameAwareChildren(newConfigItem))
 
             if (propertyNameAwareChildren.isEmpty()) {
+                val propertyPathString = propertyPath.joinToString(separator = ".")
                 // if we have reached a leaf node in the tree of updatable configuration items (no more updatable child nodes),
                 // we try to resolve its property source and store the node for potential updates
-                getPropertySource(propertyPath.joinToString(separator = "."))?.let { propertySource ->
-                    logger.debug { "Writable resource found for configuration item '${propertyPath.joinToString(separator = ".")}': '$propertySource'" }
+                getPropertySource(propertyPathString)?.let { propertySource ->
+                    logger.debug { "Writable resource found for configuration item '$propertyPathString': '$propertySource'" }
                     updatableConfigItemCollector.add(
                         UpdatableConfigurationItem.WritableResourceConfigurationItem(
-                            propertyPath = propertyPath.joinToString(separator = "."),
+                            propertyPath = propertyPathString,
                             writableResource = propertySource,
                             currentValue = currentConfigItem,
                             newValue = newConfigItem,
@@ -179,10 +180,10 @@ internal class ConfigurationWriter(
                     )
 
                 } ?: run {
-                    logger.debug { "No writable resource found for configuration item '${propertyPath.joinToString(separator = ".")}'" }
+                    logger.debug { "No writable resource found for configuration item '$propertyPathString'" }
                     updatableConfigItemCollector.add(
                         UpdatableConfigurationItem.UnknownSourceConfigurationItem(
-                            propertyPath = propertyPath.joinToString(separator = "."),
+                            propertyPath = propertyPathString,
                             currentValue = currentConfigItem,
                             newValue = newConfigItem,
                         )

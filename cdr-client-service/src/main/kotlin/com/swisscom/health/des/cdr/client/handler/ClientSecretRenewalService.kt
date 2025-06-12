@@ -68,7 +68,11 @@ internal class ClientSecretRenewalService(
         return configurationWriter.updateClientServiceConfiguration(newCdrConfig).let { updateResult ->
             when (updateResult) {
                 is ConfigurationWriter.Result.Failure -> RenewClientSecretResult.Failure.also {
-                    logger.error { "Failed to update client service configuration with new client secret: ${updateResult.errors}" }
+                    logger.error {
+                        "Failed to update client service configuration with new client secret: '${updateResult.errors}'\n" +
+                                "Your previous secret has already been expired. You must create a new secret on the CDR Website and then set the " +
+                                "retrieved secret value via the 'CDR Client Admin' app."
+                    }
                 }
 
                 is ConfigurationWriter.Result.Success -> RenewClientSecretResult.Success

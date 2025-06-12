@@ -536,11 +536,6 @@ internal data class IdpCredentials(
     val millisUntilNextCredentialRenewal: Long
         get() = maxCredentialAge.toMillis() - ChronoUnit.MILLIS.between(lastCredentialRenewalTime.value, Instant.now())
 
-    override fun toString(): String {
-        return "IdpCredentials(tenantId='$tenantId', clientId='$clientId', clientSecret='********', scopes=$scopes, renewCredential=$renewCredential, " +
-                "maxCredentialAge=$maxCredentialAge, lastCredentialRenewalTime=$lastCredentialRenewalTime)"
-    }
-
     companion object {
         const val PROPERTY_NAME = "idp-credentials"
 
@@ -556,8 +551,6 @@ internal data class IdpCredentials(
 internal value class FileSynchronization private constructor(val value: Boolean) : PropertyNameAware {
     override val propertyName: String
         get() = PROPERTY_NAME
-
-    override fun toString(): String = value.toString()
 
     companion object {
         @JvmStatic
@@ -575,8 +568,6 @@ internal value class RenewCredential (val value: Boolean) : PropertyNameAware {
     override val propertyName: String
         get() = PROPERTY_NAME
 
-    override fun toString(): String = value.toString()
-
     companion object {
         @JvmStatic
         val ENABLED = RenewCredential(true)
@@ -593,7 +584,7 @@ internal value class ClientSecret(val value: String) : PropertyNameAware {
     override val propertyName: String
         get() = PROPERTY_NAME
 
-    override fun toString(): String = value
+    override fun toString(): String = "********"
 
     companion object {
         const val PROPERTY_NAME = "client-secret"
@@ -604,8 +595,6 @@ internal value class ClientSecret(val value: String) : PropertyNameAware {
 internal value class LastUpdatedAt(val value: Instant) : PropertyNameAware {
     override val propertyName: String
         get() = PROPERTY_NAME
-
-    override fun toString(): String = value.toString()
 
     companion object {
         const val PROPERTY_NAME = "last-credential-renewal-time"
