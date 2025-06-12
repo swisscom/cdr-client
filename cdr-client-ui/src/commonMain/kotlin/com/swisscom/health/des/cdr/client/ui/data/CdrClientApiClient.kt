@@ -153,7 +153,7 @@ internal class CdrClientApiClient {
                     }
                 }
         }.getOrElse { error ->
-            logger.info { "END failed - $action; error: '$error'" }
+            logger.info { "END failed - '$action'; error: '$error'" }
             Result.IOError(mapOf("exception" to error))
         }
     }
