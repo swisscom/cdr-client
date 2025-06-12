@@ -244,7 +244,7 @@ internal class ConfigurationWriter(
      *
      * As we cannot determine the effective origin and then check whether it is an updatable text resource, we search all
      * available property sources for the client secret property and fail if we find no origin. The local development setup
-     * may report more than one origin as it uses multiple profiles. If more then once origin is found we log a warning
+     * may report more than one origin as it uses multiple profiles. If more than once origin is found we log a warning
      * and return the first one from the list of origins.
      */
     private fun findPropertyOrigin(propertyPath: String): Origin? {
