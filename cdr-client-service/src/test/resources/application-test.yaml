@@ -1,10 +1,11 @@
 client:
-  function-key:
   idp-credentials:
+    renew-credential: true
     # if you change this value, you must also change it in the mock-oauth2-server/config.json file and caddy/Caddyfile
     tenant-id: test-tenant-client-id
     client-id: easy-system-test-user-id
     client-secret: test-client-secret
+    last-credential-renewal-time: 1970-01-01T00:00:00Z
     scopes:
       - https://dev.identity.health.swisscom.ch/CdrApi/.default
   local-folder: ${java.io.tmpdir}/cdr_download

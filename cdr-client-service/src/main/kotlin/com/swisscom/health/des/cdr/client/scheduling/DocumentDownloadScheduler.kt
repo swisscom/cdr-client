@@ -21,7 +21,7 @@ private val logger = KotlinLogging.logger {}
  */
 @Service
 @Profile("!noDownloadScheduler")
-class DocumentDownloadScheduler(
+internal class DocumentDownloadScheduler(
     private val cdrClientConfig: CdrClientConfig,
     private val pullFileHandling: PullFileHandling,
     @Qualifier("limitedParallelismCdrDownloadsDispatcher")

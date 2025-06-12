@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import kotlin.io.path.deleteIfExists
 
-class FileHandlingBaseTest {
+internal class FileHandlingBaseTest {
 
     @Test
     fun `test non writable folder`() {

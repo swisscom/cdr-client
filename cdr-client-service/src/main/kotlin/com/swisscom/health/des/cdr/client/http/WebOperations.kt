@@ -1,27 +1,30 @@
 package com.swisscom.health.des.cdr.client.http
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.swisscom.health.des.cdr.client.common.Constants.SHUTDOWN_DELAY
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.toCdrClientConfig
+import com.swisscom.health.des.cdr.client.config.toDto
+import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
+import com.swisscom.health.des.cdr.client.handler.ShutdownService
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.time.delay
-import org.springframework.boot.SpringApplication
 import org.springframework.boot.actuate.health.HealthEndpoint
 import org.springframework.boot.actuate.health.SystemHealth
-import org.springframework.context.ConfigurableApplicationContext
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
 import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PutMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
-import java.time.Duration
 import java.time.Instant
-import kotlin.system.exitProcess
 
 private val logger = KotlinLogging.logger {}
 
@@ -30,19 +33,70 @@ private val logger = KotlinLogging.logger {}
  */
 @RestController
 internal class WebOperations(
-    private val context: ConfigurableApplicationContext,
     private val healthEndpoint: HealthEndpoint,
     private val objectMapper: ObjectMapper,
+    private val shutdownService: ShutdownService,
+    private val configWriter: ConfigurationWriter,
+    private val config: CdrClientConfig,
 ) {
 
+    @GetMapping("api/service-configuration")
+    suspend fun getServiceConfiguration(): ResponseEntity<DTOs.CdrClientConfig> =
+        ResponseEntity
+            .ok(
+                config.toDto()
+            )
+
+    @PutMapping("api/service-configuration")
+    suspend fun updateServiceConfiguration(@RequestBody config: DTOs.CdrClientConfig): ResponseEntity<*> = runCatching {
+        configWriter.updateClientServiceConfiguration(config.toCdrClientConfig()).let { result ->
+            when (result) {
+                is ConfigurationWriter.Result.Success -> {
+                    ResponseEntity
+                        .ok(config)
+                }
+
+                is ConfigurationWriter.Result.Failure -> {
+                    ProblemDetail.forStatus(HttpStatus.BAD_REQUEST).let { problemDetail ->
+                        problemDetail.detail = "Invalid configuration"
+                        problemDetail.properties = result.errors
+                        ResponseEntity
+                            .of(problemDetail)
+                            .headers { headers ->
+                                headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+                            }
+                            .build<ProblemDetail>()
+                    }
+                }
+            }
+        }
+    }.getOrElse { error: Throwable ->
+        logger.error(error) { "Failed to update service configuration" }
+        ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR).let { problemDetail ->
+            problemDetail.detail = "Failed to update service configuration: $error"
+            ResponseEntity
+                .of(problemDetail)
+                .headers { headers ->
+                    headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+                }
+                .build<ProblemDetail>()
+        }
+    }
+
+
+    /**
+     * This endpoint returns the status of the client service. It uses the health endpoint and the [health indicators][HealthIndicators]
+     * registered in the application context. The health status of the different indicators is translated into an application-specific
+     * [status code][DTOs.StatusResponse.StatusCode].
+     */
     @GetMapping("api/status")
-    suspend fun status(): ResponseEntity<DTOs.StatusResponse> {
+    suspend fun status(): ResponseEntity<*> = runCatching {
         val healthStatus: SystemHealth = healthEndpoint.health() as SystemHealth
         logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
 
         val status = when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
-            healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
-            healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code -> DTOs.StatusResponse.StatusCode.DISABLED
+            FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
+            FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED
             else -> DTOs.StatusResponse.StatusCode.UNKNOWN
             // TODO: add checks for error scenarios: configuration errors, CDR API not reachable, IdP not reachable, etc.
             //   all other error scenarios would probably prevent the client service from starting altogether;
@@ -54,6 +108,17 @@ internal class WebOperations(
                 statusCode = status,
             )
         )
+    }.getOrElse { error: Throwable ->
+        logger.error(error) { "Failed to retrieve service status" }
+        ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR).let { problemDetail ->
+            problemDetail.detail = "Failed to retrieve service status: $error"
+            ResponseEntity
+                .of(problemDetail)
+                .headers { headers ->
+                    headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+                }
+                .build<ProblemDetail>()
+        }
     }
 
     /**
@@ -61,14 +126,17 @@ internal class WebOperations(
      * from the reason provided in the query parameter.
      */
     @GetMapping("/api/shutdown")
-    suspend fun shutdown(@RequestParam(name = "reason") reason: String?): ResponseEntity<*> {
-        val shutdownTrigger = if (reason.isNullOrBlank()) ShutdownTrigger.UNKNOWN else ShutdownTrigger.fromReason(reason)
+    suspend fun shutdown(@RequestParam(name = "reason") reason: String?): ResponseEntity<*> = runCatching {
+        val shutdownTrigger = if (reason.isNullOrBlank()) ShutdownService.ShutdownTrigger.UNKNOWN else ShutdownService.ShutdownTrigger.fromReason(reason)
 
         val response: ResponseEntity<*> =
-            if (shutdownTrigger == ShutdownTrigger.UNKNOWN) {
-                ProblemDetail.forStatus(HttpStatus.BAD_REQUEST.value()).let { problemDetail ->
+            if (shutdownTrigger == ShutdownService.ShutdownTrigger.UNKNOWN) {
+                ProblemDetail.forStatus(HttpStatus.BAD_REQUEST).let { problemDetail ->
                     ResponseEntity
                         .of(problemDetail)
+                        .headers { headers ->
+                            headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+                        }
                         .build<ProblemDetail>()
                 }
             } else {
@@ -81,55 +149,22 @@ internal class WebOperations(
                         )
                     )
                     .also {
-                        scheduleShutdown(shutdownTrigger)
+                        shutdownService.scheduleShutdown(shutdownTrigger)
                     }
             }
 
         return response
-    }
-
-    @OptIn(DelicateCoroutinesApi::class)
-    private fun scheduleShutdown(shutdownTrigger: ShutdownTrigger) {
-        if (SHUTDOWN_GUARD.tryLock()) {
-            GlobalScope.launch {
-                logger.info { "Shutdown requested for reason: '$shutdownTrigger'" }
-                // Wait a bit to allow the http response to be sent before shutting down
-                delay(SHUTDOWN_DELAY)
-                // previously producing the exit code was a single line:
-                // `exitProcess(SpringApplication.exit(context, { shutdownTrigger.exitCode }))`
-                // however, there must be some sort of race condition present; half the time the exit code was 0 instead of the code specified in the
-                // `shutdownTrigger`
-                SpringApplication.exit(context).let { contextExitCode ->
-                    if (contextExitCode != 0) {
-                        logger.warn { "Spring application context did not exit cleanly, exit code: '$contextExitCode'" }
-                    }
+    }.getOrElse { error: Throwable ->
+        logger.error(error) { "Failed to schedule shutdown" }
+        ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR).let { problemDetail ->
+            problemDetail.detail = "Failed to schedule shutdown: $error"
+            ResponseEntity
+                .of(problemDetail)
+                .headers { headers ->
+                    headers.add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
                 }
-                exitProcess(shutdownTrigger.exitCode)
-            }
-        } else {
-            logger.info { "Shutdown already scheduled, ignoring request with given reason: '$shutdownTrigger'" }
+                .build<ProblemDetail>()
         }
     }
 
-    internal enum class ShutdownTrigger(val reason: String, val exitCode: Int) {
-        CONFIG_CHANGE("configurationChange", CONFIG_CHANGE_EXIT_CODE),
-        UNKNOWN("unknown", UNKNOWN_EXIT_CODE);
-
-        companion object {
-            fun fromReason(reason: String): ShutdownTrigger {
-                return entries.firstOrNull { it.reason == reason } ?: UNKNOWN
-            }
-        }
-    }
-
-    private companion object {
-        @JvmStatic
-        private val SHUTDOWN_DELAY = Duration.ofMillis(500)
-
-        @JvmStatic
-        private val SHUTDOWN_GUARD = Mutex()
-
-        private const val CONFIG_CHANGE_EXIT_CODE = 29
-        private const val UNKNOWN_EXIT_CODE = 31
-    }
 }

@@ -69,7 +69,7 @@ internal class InstallerTest {
             configContent.contains("client.idp-credentials.client-secret=clientSecret"),
             "Config file should contain client-secret"
         )
-        assertFalse(configContent.contains("client.idp-credentials.renew-credential-at-startup"), "Config file should not contain renew-credential-at-startup")
+        assertFalse(configContent.contains("client.idp-credentials.renew-credential"), "Config file should not contain renew-credential")
         assertFalse(configContent.contains("client.cdr-api.host"), "Config file should not contain host")
         assertTrue(
             configContent.contains("client.customer[0].connector-id=connectorId"),
@@ -110,8 +110,8 @@ internal class InstallerTest {
             "Config file should contain client-secret"
         )
         assertTrue(
-            configContent.contains("client.idp-credentials.renew-credential-at-startup=false"),
-            "Config file should contain renew-credential-at-startup set to false"
+            configContent.contains("client.idp-credentials.renew-credential=false"),
+            "Config file should contain renew-credential set to false"
         )
         assertTrue(
             configContent.contains("client.idp-credentials.scopes=https://tst.identity.health.swisscom.ch/CdrApi/.default"),

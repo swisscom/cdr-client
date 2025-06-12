@@ -1,4 +1,3 @@
-import io.gitlab.arturbosch.detekt.Detekt
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.net.URI
 import java.time.Duration
@@ -11,7 +10,6 @@ plugins {
     alias(libs.plugins.docker.compose)
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.spring.dependency.management)
-    alias(libs.plugins.detekt)
     jacoco
     application
     kotlin("jvm").version(libs.versions.kotlin.lang)
@@ -61,17 +59,6 @@ gradle.taskGraph.whenReady(
     }
 )
 
-project.afterEvaluate {
-    // https://github.com/detekt/detekt/issues/6198#issuecomment-2265183695
-    configurations.matching { it.name == "detekt" }.all {
-        resolutionStrategy.eachDependency {
-            if (requested.group == "org.jetbrains.kotlin") {
-                useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
-            }
-        }
-    }
-}
-
 dependencies {
     implementation(platform(libs.spring.boot.dependencies))
     implementation(platform(libs.spring.cloud.dependencies))
@@ -90,8 +77,8 @@ dependencies {
     implementation(libs.spring.boot.starter.actuator)
     implementation(libs.spring.boot.starter.webflux)
     implementation(libs.spring.retry)
-    implementation(libs.spring.cloud.context)
     implementation(libs.jackson.dataformat.yaml)
+    implementation(libs.jackson.module.kotlin)
     implementation(projects.cdrClientCommon)
 
     // Note: At the time of writing the configuration processor seems to be broken; might be related to the upgrade to Kotlin 2.x
@@ -158,7 +145,7 @@ val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("ja
                 }
             }))
             limit {
-                minimum = "0.70".toBigDecimal()
+                minimum = "0.75".toBigDecimal()
             }
         }
     }
@@ -211,29 +198,6 @@ tasks.processResources {
     filesMatching("**/application.yaml") {
         expand(project.properties)
     }
-}
-
-tasks.withType<Detekt> {
-    reports {
-        xml {
-            required.set(true)
-            outputLocation.set(File("${outputDir.get().asFile.absolutePath}/reports/detekt.xml"))
-        }
-        html.required.set(false)
-        sarif.required.set(false)
-        txt.required.set(false)
-    }
-}
-
-/**
- * Detekt
- * See https://docs.sonarqube.org/latest/analysis/scan/sonarscanner-for-gradle/
- */
-detekt {
-    buildUponDefaultConfig = false // preconfigure defaults
-    allRules = true
-    parallel = true
-    config.setFrom(files("$rootDir/config/detekt.yml")) // Global Detekt rule set.
 }
 
 tasks.register("publishVersion") {

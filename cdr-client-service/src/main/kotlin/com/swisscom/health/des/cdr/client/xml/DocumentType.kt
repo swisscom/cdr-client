@@ -30,7 +30,7 @@ enum class DocumentType(val uri: String, val prefix: String) {
 
         @JsonCreator
         @JvmStatic
-        fun fromValue(value: String): DocumentType {
+        fun fromName(value: String): DocumentType {
             return entries.firstOrNull { it.name.equals(value, ignoreCase = true)} ?: UNDEFINED
         }
     }

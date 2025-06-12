@@ -18,7 +18,7 @@ internal const val CONFIG_FILE = "application-customer.properties"
 @SpringBootApplication(exclude = [ScheduledTasksObservabilityAutoConfiguration::class])
 @EnableConfigurationProperties(CdrClientConfig::class)
 @EnableScheduling
-class CdrClientApplication
+internal class CdrClientApplication
 
 @Suppress("SpreadOperator")
 fun main(args: Array<String>) {

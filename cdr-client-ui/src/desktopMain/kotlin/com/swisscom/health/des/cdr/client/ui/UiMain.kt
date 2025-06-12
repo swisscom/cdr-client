@@ -23,6 +23,8 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_open_application_window
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_unknown
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -34,10 +36,14 @@ fun main() = application {
     var isWindowVisible: Boolean by remember { mutableStateOf(true) }
     val cdrConfigViewModel: CdrConfigViewModel = remember { CdrConfigViewModel(cdrClientApiClient = CdrClientApiClient()) }
 
-    // I have found no way to push this down into the CdrConfigScreen composable
+    // I have found no way to push this down into the CdrConfigScreen composable;
+    // the client status query runs in a different coroutine scope, so it won't be canceled automatically when the main window is closed
+    var statusQueryJob: Job by remember { mutableStateOf(Job().apply { complete() }) }
     LaunchedEffect(isWindowVisible) {
+        statusQueryJob.cancelAndJoin()
         while (isWindowVisible) {
-            cdrConfigViewModel.updateClientServiceStatus()
+            statusQueryJob = cdrConfigViewModel.queryClientServiceStatus(CdrClientApiClient.RetryStrategy.EXPONENTIAL)
+            statusQueryJob.join()
             delay(STATUS_CHECK_DELAY)
         }
     }

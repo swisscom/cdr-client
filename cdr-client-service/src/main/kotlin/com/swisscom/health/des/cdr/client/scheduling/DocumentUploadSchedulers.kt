@@ -58,7 +58,7 @@ private val logger = KotlinLogging.logger {}
 @Service
 @Profile("!noEventTriggerUploadScheduler")
 @Suppress("LongParameterList")
-class EventTriggerUploadScheduler(
+internal class EventTriggerUploadScheduler(
     private val config: CdrClientConfig,
     private val tracer: Tracer,
     @Qualifier("limitedParallelismCdrUploadsDispatcher")
@@ -188,7 +188,7 @@ class EventTriggerUploadScheduler(
 @Service
 @Profile("!noPollingUploadScheduler")
 @Suppress("LongParameterList")
-class PollingUploadScheduler(
+internal class PollingUploadScheduler(
     private val config: CdrClientConfig,
     private val tracer: Tracer,
     @Qualifier("limitedParallelismCdrUploadsDispatcher")
@@ -305,7 +305,7 @@ class PollingUploadScheduler(
 
 }
 
-abstract class BaseUploadScheduler(
+internal abstract class BaseUploadScheduler(
     private val config: CdrClientConfig,
     private val retryUploadFileHandling: RetryUploadFileHandling,
     @Qualifier("limitedParallelismCdrUploadsDispatcher")

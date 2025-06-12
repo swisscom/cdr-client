@@ -1,21 +1,17 @@
 package com.swisscom.health.des.cdr.client
 
-import com.swisscom.health.des.cdr.client.scheduling.BaseUploadScheduler.Companion.DEFAULT_INITIAL_DELAY_MILLIS
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.scheduling.config.ScheduledTaskHolder
-import org.springframework.scheduling.config.TaskExecutionOutcome.Status.NONE
 import org.springframework.scheduling.config.TaskExecutionOutcome.Status.STARTED
+import org.springframework.scheduling.config.TaskExecutionOutcome.Status.SUCCESS
 import org.springframework.test.context.ActiveProfiles
 import java.nio.file.Path
 import java.security.SecureRandom
@@ -29,7 +25,7 @@ import javax.net.ssl.X509TrustManager
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
     properties = [
         "spring.jmx.enabled=false",
-        "client.idp-credentials.renew-credential-at-startup=true",
+        "client.idp-credentials.renew-credential=true",
     ]
 )
 @ActiveProfiles("test")
@@ -40,32 +36,23 @@ internal class CdrClientApplicationTest {
     private lateinit var cdrClientApplication: CdrClientApplication
 
     @Autowired
-    private lateinit var applicationContext: ConfigurableApplicationContext
-
-    @Autowired
     private lateinit var scheduledTaskHolder: ScheduledTaskHolder
-
-    @BeforeEach
-    fun setup() {
-        // The test is in a race condition with the code under test. We need to make sure that the event watcher task is
-        // not yet started to be sure that when it starts, it picks up the configuration we injected above in the @SpykBean.
-        val scheduleTasks =
-            scheduledTaskHolder.scheduledTasks.filter { it.task.toString().endsWith("launchFileWatcher") } +
-                    scheduledTaskHolder.scheduledTasks.filter { it.task.toString().endsWith("launchFilePoller") }
-        assertEquals(2, scheduleTasks.size)
-        assertTrue(scheduleTasks.all { it.task.lastExecutionOutcome.status == NONE }) {
-            "we cannot be sure whether we won or lost the race against the event watcher task; so let's bail out to err on the safe side"
-        }
-        await().until { scheduleTasks.all { it.task.lastExecutionOutcome.status == STARTED } }
-        // give the tasks some time to initialize
-        Thread.sleep(1_000L)
-    }
 
     @Test
     fun `test that application is starting`() {
         assertNotNull(cdrClientApplication)
-        Thread.sleep(DEFAULT_INITIAL_DELAY_MILLIS + 1_000L)
-        assertTrue(applicationContext.isRunning)
+        val scheduleTasks =
+            scheduledTaskHolder.scheduledTasks.filter { it.task.toString().endsWith("launchFileWatcher") } +
+                    scheduledTaskHolder.scheduledTasks.filter { it.task.toString().endsWith("launchFilePoller") }
+        assertEquals(2, scheduleTasks.size)
+        // those two scheduled tasks never finish and thus remain in the STARTED state
+        await().until { scheduleTasks.all { it.task.lastExecutionOutcome.status == STARTED } }
+
+        // the secret renewal task is scheduled to run immediately as `application-test.yaml` sets the last-updated timestamp to the start of the Unix epoch
+        val secretRenewalTask = scheduledTaskHolder.scheduledTasks.first { it.task.toString().endsWith("renewClientSecret") }
+        await().until {secretRenewalTask.task.lastExecutionOutcome.status == SUCCESS}
+        // successful secret renewal triggers a shutdown of the application context;
+        // but the call to the mockserver fails, and thus no restart gets triggered
     }
 
     private companion object {

@@ -107,28 +107,28 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         cdrServiceMock = MockWebServer()
         cdrServiceMock.start()
 
-        val endpoint = CdrClientConfig.Endpoint().apply {
-            host = cdrServiceMock.hostName
-            basePath = "documents"
-            scheme = "http"
-            port = cdrServiceMock.port
-        }
+        val endpoint = CdrClientConfig.Endpoint(
+            host = cdrServiceMock.hostName,
+            basePath = "documents",
+            scheme = "http",
+            port = cdrServiceMock.port,
+        )
         val connector1 =
-            CdrClientConfig.Connector().apply {
-                connectorId = connectorId1
-                targetFolder = tmpDir.resolve(directory1)
-                sourceFolder = tmpDir.resolve(directory1).resolve("source")
-                contentType = forumDatenaustauschMediaType
-                mode = CdrClientConfig.Mode.TEST
-            }
+            CdrClientConfig.Connector(
+                connectorId = connectorId1,
+                targetFolder = tmpDir.resolve(directory1),
+                sourceFolder = tmpDir.resolve(directory1).resolve("source"),
+                contentType = forumDatenaustauschMediaType,
+                mode = CdrClientConfig.Mode.TEST,
+            )
         val connector2 =
-            CdrClientConfig.Connector().apply {
-                connectorId = connectorId2
-                targetFolder = tmpDir.resolve(directory2)
-                sourceFolder = tmpDir.resolve(directory2).resolve("source")
-                contentType = forumDatenaustauschMediaType
-                mode = CdrClientConfig.Mode.PRODUCTION
-            }
+            CdrClientConfig.Connector(
+                connectorId = connectorId2,
+                targetFolder = tmpDir.resolve(directory2),
+                sourceFolder = tmpDir.resolve(directory2).resolve("source"),
+                contentType = forumDatenaustauschMediaType,
+                mode = CdrClientConfig.Mode.PRODUCTION,
+            )
         val localFolder = tmpDir.resolve(inflightFolder)
 
         connector1.sourceFolder.createDirectories()

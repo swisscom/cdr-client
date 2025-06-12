@@ -147,7 +147,9 @@ client:
     tenant-id: swisscom-health-tenant-id # provided by Swisscom Health
     client-id: my-client-id # Self-service on CDR website
     client-secret: my-secret # Self-service on CDR website
-    renew-credential-at-startup: false
+    renew-credential: false
+    max-credential-age: 365d
+    last-credential-renewal-time: 2025-06-05T14:01:42Z
   cdr-api:
     host: cdr.health.swisscom.ch
   retry-delay: 

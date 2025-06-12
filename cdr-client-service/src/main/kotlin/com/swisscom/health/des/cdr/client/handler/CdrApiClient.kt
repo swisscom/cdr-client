@@ -34,7 +34,7 @@ private val logger = KotlinLogging.logger {}
 
 @Suppress("TooManyFunctions")
 @Service
-class CdrApiClient(
+internal class CdrApiClient(
     private val cdrClientConfig: CdrClientConfig,
     private val httpClient: OkHttpClient,
     private val clientCredentialParams: ClientCredentialParameters,
@@ -71,7 +71,7 @@ class CdrApiClient(
                             this.build()
                         }
                     )
-                    // unfortunately okHttp requires a non-null body for patch/post requests
+                    // unfortunately, okHttp requires a non-null body for patch/post requests
                     // https://github.com/square/okhttp/issues/7005
                     .patch(byteArrayOf().toRequestBody())
                     .build()
@@ -444,23 +444,23 @@ class CdrApiClient(
         val EMPTY_PATH: Path = Path.of("")
     }
 
-    sealed class DownloadDocumentResult {
-        object NoDocumentPending : DownloadDocumentResult()
-        data class Success(val pullResultId: String, val file: Path = EMPTY_PATH) : DownloadDocumentResult()
-        data class DownloadError(val code: Int? = null, val message: String, val t: Throwable? = null) : DownloadDocumentResult()
+    sealed interface DownloadDocumentResult {
+        object NoDocumentPending : DownloadDocumentResult
+        data class Success(val pullResultId: String, val file: Path = EMPTY_PATH) : DownloadDocumentResult
+        data class DownloadError(val code: Int? = null, val message: String, val t: Throwable? = null) : DownloadDocumentResult
     }
 
-    sealed class UploadDocumentResult {
-        object Success : UploadDocumentResult()
-        data class UploadClientErrorResponse(val code: Int, val responseBody: String) : UploadDocumentResult()
-        data class UploadServerErrorResponse(val code: Int, val responseBody: String) : UploadDocumentResult()
-        data class UploadError(val message: String, val t: Throwable? = null) : UploadDocumentResult()
+    sealed interface UploadDocumentResult {
+        object Success : UploadDocumentResult
+        data class UploadClientErrorResponse(val code: Int, val responseBody: String) : UploadDocumentResult
+        data class UploadServerErrorResponse(val code: Int, val responseBody: String) : UploadDocumentResult
+        data class UploadError(val message: String, val t: Throwable? = null) : UploadDocumentResult
     }
 
-    sealed class RenewClientSecretResult {
-        data class Success(val clientId: String, val clientSecret: String) : RenewClientSecretResult()
-        data class RenewHttpErrorResponse(val code: Int, val responseBody: String) : RenewClientSecretResult()
-        data class RenewError(val message: String, val cause: Throwable) : RenewClientSecretResult()
+    sealed interface RenewClientSecretResult {
+        data class Success(val clientId: String, val clientSecret: String) : RenewClientSecretResult
+        data class RenewHttpErrorResponse(val code: Int, val responseBody: String) : RenewClientSecretResult
+        data class RenewError(val message: String, val cause: Throwable) : RenewClientSecretResult
 
     }
 

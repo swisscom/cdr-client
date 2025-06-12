@@ -24,7 +24,7 @@ internal const val PULL_RESULT_ID_HEADER = "cdr-document-uuid"
  */
 @Component
 @Suppress("TooManyFunctions")
-class PullFileHandling(
+internal class PullFileHandling(
     private val tracer: Tracer,
     private val cdrApiClient: CdrApiClient,
     private val xmlParser: XmlUtil

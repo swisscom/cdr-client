@@ -6,18 +6,6 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.conveyor)
-    alias(libs.plugins.detekt)
-}
-
-project.afterEvaluate {
-    // https://github.com/detekt/detekt/issues/6198#issuecomment-2265183695
-    configurations.matching { it.name == "detekt" }.all {
-        resolutionStrategy.eachDependency {
-            if (requested.group == "org.jetbrains.kotlin") {
-                useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
-            }
-        }
-    }
 }
 
 kotlin {
