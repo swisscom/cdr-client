@@ -39,3 +39,4 @@ Java.gitignore
 build/
 bin/
 .kotlin/
+output/
