@@ -109,8 +109,8 @@ Following environment variables can be set (to override their `dev` profile defa
 
 The application JRE has to be started with the following system properties:
 
-* `-Djdk.net.hosts.file=src/main/resources/msal4j_hosts`
-* `-Djavax.net.ssl.trustStore=src/main/resources/caddy_truststore.p12`
+* `-Djdk.net.hosts.file=src/test/resources/msal4j_hosts`
+* `-Djavax.net.ssl.trustStore=src/test/resources/caddy_truststore.p12`
 * `-Djavax.net.ssl.trustStorePassword=changeit`
 
 The first property sets a custom hosts file to resolve external servers that MSAL4J has hardcoded as valid IdPs and 

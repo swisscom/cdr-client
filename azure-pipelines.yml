@@ -1,0 +1,97 @@
+trigger:
+  - main
+
+variables:
+  - group: remote-connections
+  - group: conveyor
+  - name: conveyorCachePath
+    value: '$(Agent.ToolsDirectory)'
+  - name: conveyorVersion
+    value: '18.1'
+  - name: conveyorCommand
+    value: 'make site'
+
+pool:
+  name: c4-shared-manageddevopspool01
+  demands:
+    - WorkFolder -equals /mnt/custom-work-folder
+    - ImageOverride -equals ubuntu-22.04
+
+steps:
+  - task: AzureCLI@2
+    displayName: 'Download JDK 17'
+    inputs:
+      azureSubscription: 'azdo-des-sp-CDR'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        az storage blob download \
+        -f $(Agent.BuildDirectory)/microsoft-jdk-17.0.4.1-linux-x64.tar.gz \
+        --blob-url https://$(storageName)/build-agent-files/microsoft-jdk-17.0.4.1-linux-x64.tar.gz
+
+  - task: JavaToolInstaller@0
+    displayName: 'Install JDK 17'
+    inputs:
+      versionSpec: "17"
+      jdkArchitectureOption: x64
+      jdkSourceOption: LocalDirectory
+      jdkFile: "$(Agent.BuildDirectory)/microsoft-jdk-17.0.4.1-linux-x64.tar.gz"
+      jdkDestinationDirectory: "$(agent.toolsDirectory)/jdk17"
+      cleanDestinationDirectory: true
+  - script: |
+      which java
+    displayName: 'Show Java Release Number'
+
+  - script: |
+      INSTALL_DIR="${{ variables.conveyorCachePath }}/install/conveyor-${{ variables.conveyorVersion }}"
+      
+      if [ ! -d "$INSTALL_DIR" ]; then
+        echo "##vso[task.setvariable variable=ConveyorDownloaded;isOutput=true]true"
+        echo "Downloading and extracting Conveyor version ${{ variables.conveyorVersion }}..."
+        wget https://downloads.hydraulic.dev/conveyor/conveyor-${{ variables.conveyorVersion }}-linux-amd64.tar.gz
+        mkdir -p "${{ variables.conveyorCachePath }}/install"
+      
+        tar xzvf conveyor-${{ variables.conveyorVersion }}-linux-amd64.tar.gz -C "${{ variables.conveyorCachePath }}/install"
+        echo "Conveyor downloaded and extracted to $INSTALL_DIR"
+      else
+        echo "Conveyor version ${{ variables.conveyorVersion }} already exists at $INSTALL_DIR. Skipping download."
+      fi
+    displayName: 'Download and Extract Conveyor'
+
+  - task: Gradle@3
+    displayName: 'build application'
+    inputs:
+      gradleWrapperFile: 'gradlew'
+      tasks: 'clean build -x test'
+      publishJUnitResults: false
+      javaHomeOption: 'JDKVersion'
+
+  - task: AzureCLI@2
+    name: GetAccessToken
+    displayName: Get access token
+    inputs:
+      azureSubscription: 'azdo-des-sp-CDR'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        TOKEN="$(az account get-access-token --resource https://vault.azure.net --query accessToken --output tsv)"
+        echo "##vso[task.setvariable variable=kvToken;isOutput=true]$TOKEN"
+
+  - script: |
+      export PATH="$PATH:${{ variables.conveyorCachePath }}/install/conveyor-${{ variables.conveyorVersion }}/bin"
+      
+      export AZURE_API_ACCESS_TOKEN="$(GetAccessToken.kvToken)"
+      export CONTACT_EMAIL="$(contactEmail)"
+      export CONVEYOR_AGREE_TO_LICENSE="1"
+      export KEY_VAULT_NAME="$(keyVaultName)"
+      echo "Running Conveyor command: ${{ variables.conveyorCommand }}"
+      conveyor --cache-dir="${{ variables.conveyorCachePath }}/cache" -Kapp.signing-key="$(signingKey)" -Kapp.site.base-url="$(uploadStorageHostnamePath)/$(containerName)" ${{ variables.conveyorCommand }}
+    displayName: 'Run Conveyor Command'
+
+  - task: AzureCLI@2
+    displayName: upload files to storage account
+    inputs:
+      azureSubscription: 'azdo-des-sp-CDR'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: 'az storage blob upload-batch -s output --account-name $(uploadStorageName) -d $(containerName) --auth-mode login --overwrite'

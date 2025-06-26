@@ -1,6 +1,7 @@
 import org.springframework.boot.gradle.tasks.bundling.BootJar
 import java.net.URI
 import java.time.Duration
+import java.util.Date
 
 group = "com.swisscom.health.des.cdr.client.service"
 
@@ -32,9 +33,9 @@ tasks.bootRun {
     environment["JDK_JAVA_OPTIONS"] =
         listOfNotNull(
             environment["JDK_JAVA_OPTIONS"],
-            "-Djavax.net.ssl.trustStore=src/main/resources/caddy_truststore.p12",
+            "-Djavax.net.ssl.trustStore=src/test/resources/caddy_truststore.p12",
             "-Djavax.net.ssl.trustStorePassword=changeit",
-            "-Djdk.net.hosts.file=src/main/resources/msal4j_hosts"
+            "-Djdk.net.hosts.file=src/test/resources/msal4j_hosts"
         ).joinToString(" ")
 }
 
@@ -44,7 +45,6 @@ application {
 
 gradle.taskGraph.whenReady(
     closureOf<TaskExecutionGraph> {
-        println("Tasks to be executed: ${this.allTasks}")
         application {
             applicationDefaultJvmArgs =
                 if (gradle.taskGraph.hasTask(":bootRun")) {
@@ -189,6 +189,8 @@ tasks.named<BootJar>("bootJar") {
         // https://stackoverflow.com/questions/34519759/application-version-does-not-show-up-in-spring-boot-banner-txt
         attributes("Implementation-Title" to rootProject.name)
         attributes("Implementation-Version" to archiveVersion)
+        attributes("Build-Timestamp" to Date())
+        attributes("Implementation-Vendor" to "Swisscom (Schweiz) AG")
     }
 }
 
@@ -243,9 +245,9 @@ tasks.register<Test>("integrationTest") {
     environment["JDK_JAVA_OPTIONS"] =
         listOfNotNull(
             environment["JDK_JAVA_OPTIONS"],
-            "-Djavax.net.ssl.trustStore=src/main/resources/caddy_truststore.p12",
+            "-Djavax.net.ssl.trustStore=src/test/resources/caddy_truststore.p12",
             "-Djavax.net.ssl.trustStorePassword=changeit",
-            "-Djdk.net.hosts.file=src/main/resources/msal4j_hosts"
+            "-Djdk.net.hosts.file=src/test/resources/msal4j_hosts"
         ).joinToString(" ")
     shouldRunAfter(tasks.test)
     // Ensure latest images get pulled
@@ -261,11 +263,6 @@ dockerCompose {
 /***************************
  * END Integration Testing *
  ***************************/
-
-tasks.named<Jar>("jar") {
-    enabled = false
-}
-
 val packagePrepare = "jpackage-prepare"
 
 tasks.register<Delete>("clearPackagePrepare") {
