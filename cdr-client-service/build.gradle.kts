@@ -263,11 +263,6 @@ dockerCompose {
 /***************************
  * END Integration Testing *
  ***************************/
-/*
-tasks.named<Jar>("jar") {
-    enabled = false
-}
-*/
 val packagePrepare = "jpackage-prepare"
 
 tasks.register<Delete>("clearPackagePrepare") {
