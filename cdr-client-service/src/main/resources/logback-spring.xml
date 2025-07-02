@@ -6,6 +6,7 @@
         <include resource="org/springframework/boot/logging/logback/console-appender.xml" />
 
         <logger name="com.swisscom.health.des.cdr.client" level="DEBUG" />
+<!--        <logger name="org" level="INFO" />-->
 
         <root level="INFO">
             <appender-ref ref="CONSOLE" />

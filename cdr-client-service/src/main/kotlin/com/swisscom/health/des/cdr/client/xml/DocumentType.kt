@@ -1,6 +1,7 @@
 package com.swisscom.health.des.cdr.client.xml
 
 import com.fasterxml.jackson.annotation.JsonCreator
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 
 /**
  * Forum Datenaustausch namespaces with their "canonical" prefixes.
@@ -9,7 +10,7 @@ import com.fasterxml.jackson.annotation.JsonCreator
  * @param prefix The 'canonical' prefix of the namespace.
  */
 enum class DocumentType(val uri: String, val prefix: String) {
-    UNDEFINED("UNDEFINED", ""),
+    UNDEFINED("UNDEFINED", EMPTY_STRING),
     CONTAINER("http://www.forum-datenaustausch.ch/container", "container"),
     CREDIT("http://sumex1.net/gcr generalCreditRequest", "gcr"),
     FORM("http://www.forum-datenaustausch.ch/form", "form"),

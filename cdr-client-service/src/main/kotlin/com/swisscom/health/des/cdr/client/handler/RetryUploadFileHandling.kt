@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.getConnectorForSourceFile
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentResult
@@ -59,7 +60,7 @@ internal class RetryUploadFileHandling(
                     file = uploadFile,
                     connectorId = connector.connectorId,
                     mode = connector.mode,
-                    traceId = tracer.currentSpan()?.context()?.traceId() ?: ""
+                    traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
                 )
 
                 retryNeeded = when (response) {
@@ -115,11 +116,11 @@ internal class RetryUploadFileHandling(
 
     private fun deleteOrArchiveFile(file: Path): Unit = runCatching {
         cdrClientConfig.customer.getConnectorForSourceFile(file).let { connector ->
-            if (connector.sourceArchiveEnabled) {
+            connector.getEffectiveSourceArchiveFolder(file)?.let { archiveDir ->
                 file.moveTo(
-                    connector.getEffectiveSourceArchiveFolder(file).resolve("${file.nameWithoutExtension}_${UUID.randomUUID()}.xml")
+                    archiveDir.resolve("${file.nameWithoutExtension}_${UUID.randomUUID()}.xml")
                 )
-            } else {
+            } ?: run {
                 if (!file.deleteIfExists()) {
                     logger.warn { "Tried to delete the file '$file' but it was already gone" }
                 }

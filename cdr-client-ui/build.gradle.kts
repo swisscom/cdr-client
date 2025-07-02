@@ -35,7 +35,6 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             // https://github.com/alorma/Compose-Settings
             implementation(libs.uitiles)
-            // https://github.com/rybalkinsd/kohttp/tree/master
             implementation(libs.okhttp)
             implementation(projects.cdrClientCommon)
             runtimeOnly(projects.cdrClientService) {

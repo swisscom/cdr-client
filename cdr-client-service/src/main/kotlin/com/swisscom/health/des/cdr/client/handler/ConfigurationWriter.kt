@@ -1,6 +1,7 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -104,11 +105,17 @@ internal class ConfigurationWriter(
             while (remainingNodeNames.isNotEmpty()) {
                 tmpNode = tmpNode.get(remainingNodeNames.removeFirst()) as ObjectNode
             }
+
             tmpNode.apply {
                 when (changedConfigItem.newValue) {
-                    is Collection<*> -> TODO() // need to handle the collection of connectors!
+                    is Collection<*> -> {
+                        val arrayNode: ArrayNode = valueToTree(changedConfigItem.newValue)
+                        set<ArrayNode>(toBeUpdatedNodeName, arrayNode)
+                        logger.debug { "set '${changedConfigItem.propertyPath}' to '$arrayNode' as type '${arrayNode::class}'" }
+                    }
+
                     else -> {
-                        // we have to go to string first as the value might be one a value class, Duration, DataSize, etc., anything that
+                        // we have to go to string first as the value might be a value class, Duration, DataSize, etc., anything that
                         // SpringBoot's unmarshalling magic creates from what was originally a string
                         val stringValue = changedConfigItem.newValue.toString()
                         val storedValue = runCatching { stringValue.toBooleanStrict().also { put(toBeUpdatedNodeName, it) } }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.time.delay
+import org.jetbrains.compose.resources.StringResource
 import java.time.Duration
 import java.time.Instant
 import kotlin.time.Duration.Companion.seconds
@@ -46,12 +47,6 @@ internal class CdrConfigViewModel(
         queryClientServiceConfiguration()
     }
 
-    var fileSynchronizationEnabled: Boolean
-        get() = _uiState.value.clientServiceConfig.fileSynchronizationEnabled
-        set(value) {
-            setFileSync(value)
-        }
-
     fun applyClientServiceConfiguration(): Job =
         viewModelScope.launch {
             cdrClientApiClient.updateClientServiceConfiguration(_uiState.value.clientServiceConfig).handle { response: DTOs.CdrClientConfig ->
@@ -79,8 +74,8 @@ internal class CdrConfigViewModel(
             }
         }
 
-    private fun setFileSync(enabled: Boolean) {
-        logger.debug { "setFileSync: $enabled" }
+    fun setFileSync(enabled: Boolean) {
+        logger.debug { "setFileSync: '$enabled'" }
         _uiState.update {
             it.copy(
                 clientServiceConfig = it.clientServiceConfig.copy(
@@ -89,6 +84,264 @@ internal class CdrConfigViewModel(
             )
         }
     }
+
+    fun setFileBusyTestStrategy(strategy: String) {
+        logger.debug { "setFileBusyTestStrategy: '$strategy'" }
+        _uiState.update {
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    fileBusyTestStrategy = DTOs.CdrClientConfig.FileBusyTestStrategy.valueOf(strategy)
+                )
+            )
+        }
+    }
+
+    fun setCdrApiHost(host: String) {
+        logger.debug { "setCdrApiHost: '$host'" }
+        _uiState.update {
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    cdrApi = it.clientServiceConfig.cdrApi.copy(
+                        host = host
+                    )
+                )
+            )
+        }
+    }
+
+    fun setLocalPath(path: String) {
+        logger.debug { "setLocalPath: '$path'" }
+        _uiState.update {
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    localFolder = path
+                )
+            )
+        }
+    }
+
+    fun setIdpTenantId(id: String) {
+        logger.debug { "setTenantId: '$id'" }
+        _uiState.update {
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    idpCredentials = it.clientServiceConfig.idpCredentials.copy(
+                        tenantId = id
+                    )
+                )
+            )
+        }
+    }
+
+    fun setIdpClientId(id: String) {
+        logger.debug { "setClientId: '$id'" }
+        _uiState.update {
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    idpCredentials = it.clientServiceConfig.idpCredentials.copy(
+                        clientId = id
+                    )
+                )
+            )
+        }
+    }
+
+    fun setIdpClientPassword(password: String) {
+        logger.debug { "setClientPassword: '$password'" }
+        _uiState.update {
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    idpCredentials = it.clientServiceConfig.idpCredentials.copy(
+                        clientSecret = password
+                    )
+                )
+            )
+        }
+    }
+
+    fun setIdpRenewClientSecret(renew: Boolean) {
+        logger.debug { "setIdpRenewClientSecret: '$renew'" }
+        _uiState.update {
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    idpCredentials = it.clientServiceConfig.idpCredentials.copy(
+                        renewCredential = renew
+                    )
+                )
+            )
+        }
+    }
+
+    fun setConnectorId(connectorId: String) {
+        logger.debug { "setConnectorId: '$connectorId'" }
+        _uiState.update {
+            val connector =
+                if (it.clientServiceConfig.customer.isEmpty()) {
+                    DTOs.CdrClientConfig.Connector.EMPTY.copy(connectorId = connectorId)
+                } else {
+                    it.clientServiceConfig.customer[0].copy(connectorId = connectorId)
+                }
+
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    customer = listOf(connector)
+                )
+            )
+        }
+    }
+
+    fun setConnectorMode(mode:String) {
+        logger.debug { "setConnectorMode: '$mode'" }
+        _uiState.update {
+            val connector =
+                if (it.clientServiceConfig.customer.isEmpty()) {
+                    DTOs.CdrClientConfig.Connector.EMPTY.copy(mode = DTOs.CdrClientConfig.Mode.valueOf(mode))
+                } else {
+                    it.clientServiceConfig.customer[0].copy(mode = DTOs.CdrClientConfig.Mode.valueOf(mode))
+                }
+
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    customer = listOf(connector)
+                )
+            )
+        }
+    }
+
+    fun setConnectorArchiveDir(archiveDir: String) {
+        logger.debug { "setConnectorArchiveDir: '$archiveDir'" }
+        _uiState.update {
+            val connector =
+                if (it.clientServiceConfig.customer.isEmpty()) {
+                    DTOs.CdrClientConfig.Connector.EMPTY.copy(sourceArchiveFolder = archiveDir)
+                } else {
+                    it.clientServiceConfig.customer[0].copy(sourceArchiveFolder = archiveDir)
+                }
+
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    customer = listOf(connector)
+                )
+            )
+        }
+    }
+
+    fun setConnectorArchiveEnabled(enabled: Boolean) {
+        logger.debug { "setConnectorArchiveEnabled: '$enabled'" }
+        _uiState.update {
+            val connector =
+                if (it.clientServiceConfig.customer.isEmpty()) {
+                    DTOs.CdrClientConfig.Connector.EMPTY.copy(sourceArchiveEnabled = enabled)
+                } else {
+                    it.clientServiceConfig.customer[0].copy(sourceArchiveEnabled = enabled)
+                }
+
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    customer = listOf(connector)
+                )
+            )
+        }
+    }
+
+    fun setConnectorErrorDir(errorDir: String) {
+        logger.debug { "setConnectorErrorDir: '$errorDir'" }
+        _uiState.update {
+            val connector =
+                if (it.clientServiceConfig.customer.isEmpty()) {
+                    DTOs.CdrClientConfig.Connector.EMPTY.copy(sourceErrorFolder = errorDir)
+                } else {
+                    it.clientServiceConfig.customer[0].copy(sourceErrorFolder = errorDir)
+                }
+
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    customer = listOf(connector)
+                )
+            )
+        }
+    }
+
+    fun setConnectorBaseTargetDir(targetDir: String) {
+        logger.debug { "setConnectorBaseTargetDir: '$targetDir'" }
+        _uiState.update {
+            val connector =
+                if (it.clientServiceConfig.customer.isEmpty()) {
+                    DTOs.CdrClientConfig.Connector.EMPTY.copy(targetFolder = targetDir)
+                } else {
+                    it.clientServiceConfig.customer[0].copy(targetFolder = targetDir)
+                }
+
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    customer = listOf(connector)
+                )
+            )
+        }
+    }
+
+    fun setConnectorDocTypeTargetDir(docType: DTOs.CdrClientConfig.DocumentType, targetDir: String) {
+        logger.debug { "setConnectorDocTypeTargetDir: '$docType' -> '$targetDir'" }
+        _uiState.update {
+            val connector: DTOs.CdrClientConfig.Connector = it.clientServiceConfig.customer.firstOrNull() ?: DTOs.CdrClientConfig.Connector.EMPTY
+            val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
+                connector.docTypeFolders[docType]?.copy(targetFolder = targetDir) ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetDir)
+            val updatedConnector: DTOs.CdrClientConfig.Connector =
+                if (docTypeFolders == DTOs.CdrClientConfig.Connector.DocTypeFolders.EMPTY) {
+                    // if the target and source dir are both empty, we remove the docType from the map
+                    connector.copy(docTypeFolders = (connector.docTypeFolders as MutableMap).apply { remove(docType) })
+                } else {
+                    // otherwise, we add or update the docType directories map
+                    connector.copy(docTypeFolders = connector.docTypeFolders + (docType to docTypeFolders))
+                }
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    customer = listOf(updatedConnector)
+                )
+            )
+        }
+    }
+
+    fun setConnectorBaseSourceDir(sourceDir: String) {
+        logger.debug { "setConnectorBaseSourceDir: '$sourceDir'" }
+        _uiState.update {
+            val connector =
+                if (it.clientServiceConfig.customer.isEmpty()) {
+                    DTOs.CdrClientConfig.Connector.EMPTY.copy(sourceFolder = sourceDir)
+                } else {
+                    it.clientServiceConfig.customer[0].copy(sourceFolder = sourceDir)
+                }
+
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    customer = listOf(connector)
+                )
+            )
+        }
+    }
+
+    fun setConnectorDocTypeSourceDir(docType: DTOs.CdrClientConfig.DocumentType, sourceDir: String) {
+        logger.debug { "setConnectorDocTypeSourceDir: '$docType' -> '$sourceDir'" }
+        _uiState.update {
+            val connector: DTOs.CdrClientConfig.Connector = it.clientServiceConfig.customer.firstOrNull() ?: DTOs.CdrClientConfig.Connector.EMPTY
+            val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
+                connector.docTypeFolders[docType]?.copy(sourceFolder = sourceDir) ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceDir)
+            val updatedConnector: DTOs.CdrClientConfig.Connector =
+                if (docTypeFolders == DTOs.CdrClientConfig.Connector.DocTypeFolders.EMPTY) {
+                    // if the target and source dir are both empty, we remove the docType from the map
+                    connector.copy(docTypeFolders = (connector.docTypeFolders as MutableMap).apply { remove(docType) })
+                } else {
+                    // otherwise, we add or update the docType directories map
+                    connector.copy(docTypeFolders = connector.docTypeFolders + (docType to docTypeFolders))
+                }
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    customer = listOf(updatedConnector)
+                )
+            )
+        }
+    }
+
 
     /**
      * The intention is to restart the client service, but all we have to do is command it to shut down
@@ -106,7 +359,11 @@ internal class CdrConfigViewModel(
      */
     fun queryClientServiceStatus(retryStrategy: CdrClientApiClient.RetryStrategy): Job =
         viewModelScope.launch {
-            cdrClientApiClient.getClientServiceStatus(retryStrategy).let { status ->
+            cdrClientApiClient.getClientServiceStatus(retryStrategy).let { status: DTOs.StatusResponse.StatusCode ->
+                if (status.isOnlineState && _uiState.value.clientServiceStatus.isOfflineState) {
+                    // if we went from an offline state to an online state, we also need to refresh the client service configuration
+                    queryClientServiceConfiguration()
+                }
                 _uiState.update {
                     it.copy(
                         clientServiceStatus = status
@@ -150,33 +407,37 @@ internal class CdrConfigViewModel(
 
     private suspend fun <U> CdrClientApiClient.Result<U>.handle(
         onIOError: ErrorHandler = reportIoErrorHandler,
-        onValidationError: ErrorHandler = reportValidationErrorHandler,
+        onServiceError: ErrorHandler = reportServiceErrorHandler,
         onSuccess: SuccessHandler<U>,
     ) {
         when (this) {
             is CdrClientApiClient.Result.Success -> onSuccess(response)
             is CdrClientApiClient.Result.IOError -> onIOError(errors)
-            is CdrClientApiClient.Result.ValidationError -> onValidationError(errors)
+            is CdrClientApiClient.Result.ServiceError -> onServiceError(errors)
         }
     }
 
     private val reportIoErrorHandler: ErrorHandler = { errorMap ->
-        _uiState.update {
-            it.copy(
-                errorMessageKey = StringResourceWithArgs(
-                    resourceId = Res.string.error_client_communication,
-                    *(errorMap.values.toTypedArray())
-                )
-            )
-        }
+        reportError(
+            messageKey = Res.string.error_client_communication,
+            formatArgs = errorMap.values.toTypedArray()
+        )
     }
 
-    private val reportValidationErrorHandler: ErrorHandler = { errorMap ->
+    private val reportServiceErrorHandler: ErrorHandler = { errorMap ->
+        reportError(
+            messageKey = Res.string.error_client_validation,
+            formatArgs = arrayOf(errorMap.entries.joinToString("\n"))
+        )
+    }
+
+    internal fun reportError(messageKey: StringResource, vararg formatArgs: Any) {
+        logger.trace { "reportError: '$messageKey', args: '$formatArgs'" }
         _uiState.update {
             it.copy(
                 errorMessageKey = StringResourceWithArgs(
-                    resourceId = Res.string.error_client_validation,
-                    errorMap.entries.joinToString("\n"),
+                    resourceId = messageKey,
+                    formatArgs = formatArgs
                 )
             )
         }

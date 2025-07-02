@@ -3,7 +3,11 @@ package com.swisscom.health.des.cdr.client.handler
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
+import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Host
+import com.swisscom.health.des.cdr.client.config.TempDownloadDir
+import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.xml.DocumentType
 import com.swisscom.health.des.cdr.client.xml.XmlUtil
 import io.micrometer.tracing.Span
@@ -76,7 +80,7 @@ internal class PullFileHandlingTest {
     private val inflightFolder = "inflight"
     private val targetDirectory = "customer"
     private val sourceDirectory = "source"
-    private lateinit var endpoint: CdrClientConfig.Endpoint
+    private lateinit var endpoint: CdrApi
 
     @BeforeEach
     fun setup() {
@@ -84,8 +88,8 @@ internal class PullFileHandlingTest {
         cdrServiceMock.start()
         mockTracer()
 
-        endpoint = CdrClientConfig.Endpoint(
-            host = cdrServiceMock.hostName,
+        endpoint = CdrApi(
+            host = Host(cdrServiceMock.hostName),
             basePath = "documents",
             scheme = "http",
             port = cdrServiceMock.port,
@@ -95,8 +99,8 @@ internal class PullFileHandlingTest {
         val inflightDir = tmpDir.resolve(inflightFolder).also { it.createDirectories() }
 
         every { config.cdrApi } returns endpoint
-        every { config.localFolder } returns inflightDir
-        every { config.idpCredentials.tenantId } returns "something"
+        every { config.localFolder } returns TempDownloadDir(inflightDir)
+        every { config.idpCredentials.tenantId } returns TenantId("something")
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } returns "Mocked Result"
 

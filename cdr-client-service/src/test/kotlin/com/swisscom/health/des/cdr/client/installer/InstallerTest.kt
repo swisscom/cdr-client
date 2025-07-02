@@ -1,6 +1,7 @@
 package com.swisscom.health.des.cdr.client.installer
 
 import com.swisscom.health.des.cdr.client.CONFIG_FILE
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.getInstallDir
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -46,7 +47,7 @@ internal class InstallerTest {
         mockkStatic("com.swisscom.health.des.cdr.client.StartupHelperKt")
         println("createTempDirectory: $createTempDirectory, ${createTempDirectory.toUri().rawPath}")
         every { getInstallDir() } returns createTempDirectory
-        every { scanner.nextLine() } returns "clientId" andThen "clientSecret" andThen "tenantId" andThen "connectorId" andThen "" andThen "n"
+        every { scanner.nextLine() } returns "clientId" andThen "clientSecret" andThen "tenantId" andThen "connectorId" andThen EMPTY_STRING andThen "n"
 
         installer.install()
 

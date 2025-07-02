@@ -42,7 +42,7 @@ internal class DocumentDownloadScheduler(
      */
     private suspend fun callPullFileHandling() {
         withContext(cdrDownloadsDispatcher) {
-            if (pathIsDirectoryAndWritable(cdrClientConfig.localFolder, "pulled", logger)) {
+            if (pathIsDirectoryAndWritable(cdrClientConfig.localFolder.path, "pulled", logger)) {
                 cdrClientConfig.customer.forEach { connector ->
                     launch {
                         runCatching {

@@ -6,9 +6,46 @@
     <string name="label_cancel">Cancel</string>
     <string name="label_apply">Apply</string>
     <string name="label_client_status">Client status</string>
-    <string name="label_enable_client_service">Enable Client Service</string>
-    <string name="label_enable_client_service_subtitle">Enable this to start synchronizing your documents</string>
+    <string name="label_cdr_api_host">CDR host</string>
+    <string name="label_cdr_api_host_placeholder">Fully qualified domain name of the CDR host</string>
+    <string name="label_enable_client_service">Client Service</string>
+    <string name="label_enable_client_service_subtitle">Start synchronizing your documents</string>
+    <string name="label_enable_document_archive">Document Archive</string>
+    <string name="label_enable_document_archive_subtitle">Keep an archive of successfully uploaded documents</string>
     <string name="label_client_service_status">CDR client service status:</string>
+    <string name="label_client_idp_settings">CDR Login Details</string>
+    <string name="label_client_idp_settings_idp_env">Target environment</string>
+    <string name="label_client_idp_settings_idp_env_placeholder">customer integration / production</string>
+    <string name="label_client_idp_settings_client_id">Client ID</string>
+    <string name="label_client_idp_settings_client_id_placeholder">ID generated on CDR website</string>
+    <string name="label_client_idp_settings_client_secret">Client password</string>
+    <string name="label_client_idp_settings_client_secret_placeholder">Password generated on CDR website</string>
+    <string name="label_client_idp_settings_client_secret_renewal">Automatic Secret Renewal</string>
+    <string name="label_client_idp_settings_client_secret_renewal_subtitle">If enabled automatically renews the client secret every 365 days</string>
+    <string name="label_client_idp_settings_client_secret_renewal_timestamp">Last client secret renewal occurred at</string>
+    <string name="label_client_local_folder">Temporary download directory</string>
+    <string name="label_client_local_folder_placeholder">CDR client temporary download directory</string>
+    <string name="label_client_file_busy_strategy">File busy test strategy</string>
+    <string name="label_client_file_busy_strategy_placeholder">Strategy to test whether a file is still written to</string>
+    <string name="label_client_connector_settings">Connector Definition</string>
+    <string name="label_client_connector_id">Connector ID</string>
+    <string name="label_client_connector_id_placeholder">Connector ID as provided on the CDR web application</string>
+    <string name="label_client_connector_mode">Connector mode</string>
+    <string name="label_client_connector_mode_placeholder">Signals the CDR API the intended connector purpose</string>
+    <string name="label_client_connector_upload_dirs">Upload Directories</string>
+    <string name="label_client_connector_download_dirs">Download Directories</string>
+    <string name="label_client_connector_error_dir">Error directory</string>
+    <string name="label_client_connector_error_dir_placeholder">Files that failed to upload are moved here</string>
+    <string name="label_client_connector_archive_dir">Archive directory</string>
+    <string name="label_client_connector_archive_dir_placeholder">Files that were successfully processed are moved here</string>
+    <string name="label_client_connector_base_source_dir">Default upload directory</string>
+    <string name="label_client_connector_base_source_dir_placeholder">Default upload directory if no document type specific directory is defined</string>
+    <string name="label_client_connector_doctype_source_dir">%1$s upload directory</string>
+    <string name="label_client_connector_doctype_source_dir_placeholder">Default upload directory if no document type specific directory is defined</string>
+    <string name="label_client_connector_base_target_dir">Default download directory</string>
+    <string name="label_client_connector_base_target_dir_placeholder">Default download directory if no document type specific directory is defined</string>
+    <string name="label_client_connector_doctype_target_dir">%1$s download directory</string>
+    <string name="label_client_connector_doctype_target_dir_placeholder">Default download directory if no document type specific directory is defined</string>
 
     <!-- Enumerations -->
     <string name="status_synchronizing">synchronizing</string>
@@ -23,4 +60,17 @@
     <!-- Error messages -->
     <string name="error_client_communication">Failed to communicate with the client service. Details:\n%1$s</string>
     <string name="error_client_validation">CDR client reported an error. Details:\n%1$s</string>
+    <string name="error_value_is_mandatory">A value is required</string>
+    <string name="error_directory_not_found">This directory does not exist</string>
+    <string name="error_not_a_directory">Not a directory</string>
+    <string name="error_not_read_writable">Directory is not read/writable</string>
+    <string name="error_insufficient_permissions">User has insufficient permissions</string>
+    <string name="error_dir_used_multiple_times">Directory must not be re-used for multiple purposes</string>
+    <string name="error_overlaps_with_upload_dir">Overlaps with upload directory</string>
+    <string name="error_overlaps_with_download_dir">Overlaps with download directory</string>
+    <string name="error_overlaps_with_other_upload_dir">Overlaps with another upload directory</string>
+    <string name="error_duplicate_mode">Mode is already set for this connector</string>
+    <string name="error_test_timeout_too_long">Timeout cannot be longer than test interval</string>
+    <string name="error_no_connector">Connector configuration is missing</string>
+    <string name="error_multiple_connector_definitions_found">Multiple connector configurations found: %1$s\nONLY THE FIRST CONFIGURATION WILL BE PRESERVED!</string>
 </resources>

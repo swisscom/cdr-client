@@ -8,7 +8,10 @@ import com.microsoft.aad.msal4j.TokenSource
 import com.ninjasquad.springmockk.MockkBean
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
+import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Customer
+import com.swisscom.health.des.cdr.client.config.Host
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -86,19 +89,21 @@ internal class EventPushFileHandlingTest {
         val sourceFolder0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
         val targetFolder0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
 
-        every { config.cdrApi } returns CdrClientConfig.Endpoint(
-            host = cdrServiceMock.hostName,
+        every { config.cdrApi } returns CdrApi(
+            host = Host(cdrServiceMock.hostName),
             basePath = "documents",
             scheme = "http",
             port = cdrServiceMock.port,
         )
-        every { config.customer } returns listOf(
-            CdrClientConfig.Connector(
-                connectorId = "2345",
-                targetFolder = targetFolder0,
-                sourceFolder = sourceFolder0,
-                contentType = forumDatenaustauschMediaType,
-                mode = CdrClientConfig.Mode.TEST,
+        every { config.customer } returns Customer(
+            listOf(
+                CdrClientConfig.Connector(
+                    connectorId = "2345",
+                    targetFolder = targetFolder0,
+                    sourceFolder = sourceFolder0,
+                    contentType = forumDatenaustauschMediaType,
+                    mode = CdrClientConfig.Mode.TEST,
+                )
             )
         )
 

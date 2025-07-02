@@ -1,16 +1,25 @@
 package com.swisscom.health.des.cdr.client.http
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
+import com.swisscom.health.des.cdr.client.config.CredentialApi
+import com.swisscom.health.des.cdr.client.config.Customer
+import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
+import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
-import com.swisscom.health.des.cdr.client.config.LastUpdatedAt
 import com.swisscom.health.des.cdr.client.config.RenewCredential
+import com.swisscom.health.des.cdr.client.config.TempDownloadDir
+import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
+import com.swisscom.health.des.cdr.client.handler.ValidationService
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
@@ -51,6 +60,9 @@ internal class WebOperationsTest {
     @MockK
     private lateinit var healthEndpoint: HealthEndpoint
 
+    @MockK
+    private lateinit var validationService: ValidationService
+
     private var objectMapper: ObjectMapper = ObjectMapper()
 
     private lateinit var webOperations: WebOperations
@@ -63,6 +75,7 @@ internal class WebOperationsTest {
             healthEndpoint = healthEndpoint,
             objectMapper = objectMapper,
             config = DEFAULT_CDR_CONFIG,
+            validationService = validationService,
         )
     }
 
@@ -80,7 +93,7 @@ internal class WebOperationsTest {
 
     @Test
     fun `test shutdown with empty reason`() = runTest {
-        val response = webOperations.shutdown("")
+        val response = webOperations.shutdown(EMPTY_STRING)
         val shutdownResponse = assertInstanceOf<ProblemDetail>(response.body)
         assertEquals(HttpStatus.BAD_REQUEST.value(), shutdownResponse.status)
     }
@@ -102,7 +115,7 @@ internal class WebOperationsTest {
     }
 
     @Test
-    fun `test service configuration endpoint`() = runTest{
+    fun `test service configuration endpoint`() = runTest {
         val response = webOperations.getServiceConfiguration()
         assertEquals(DEFAULT_CDR_CONFIG.toDto(), response.body)
     }
@@ -129,7 +142,7 @@ internal class WebOperationsTest {
     }
 
     @Test
-    fun `test update service configuration - exception`() = runTest{
+    fun `test update service configuration - exception`() = runTest {
         every { configWriter.updateClientServiceConfiguration(any()) } throws IllegalStateException("BANG!")
 
         val response = webOperations.updateServiceConfiguration(DEFAULT_CDR_CONFIG.toDto())
@@ -147,12 +160,12 @@ internal class WebOperationsTest {
         "FOO, UNKNOWN"
     )
     fun `test status endpoint`(healthStatusString: String, responseStatusString: String) = runTest {
-        val healthStatus = when(healthStatusString) {
+        val healthStatus = when (healthStatusString) {
             "ENABLED" -> FILE_SYNCHRONIZATION_STATUS_ENABLED
             "DISABLED" -> FILE_SYNCHRONIZATION_STATUS_DISABLED
             else -> healthStatusString
         }
-        val responseStatus = when(responseStatusString) {
+        val responseStatus = when (responseStatusString) {
             "SYNCHRONIZING" -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
             "DISABLED" -> DTOs.StatusResponse.StatusCode.DISABLED
             else -> DTOs.StatusResponse.StatusCode.UNKNOWN
@@ -160,8 +173,8 @@ internal class WebOperationsTest {
 
         val systemHealth = mockk<SystemHealth>()
         every { healthEndpoint.health() } returns systemHealth
-        every { systemHealth.toString()} returns "fake health status"
-        every {systemHealth.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code} returns healthStatus
+        every { systemHealth.toString() } returns "fake health status"
+        every { systemHealth.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code } returns healthStatus
 
         val response = webOperations.status()
         assertEquals(HttpStatus.OK, response.statusCode)
@@ -184,49 +197,51 @@ internal class WebOperationsTest {
 
     companion object {
         @JvmStatic
-        val EMPTY_PATH: Path = Path.of("")
+        val CURRENT_WORKING_DIR: Path = Path.of(EMPTY_STRING)
 
         @JvmStatic
         val DEFAULT_CDR_CONFIG = CdrClientConfig(
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
-            customer = listOf(
-                CdrClientConfig.Connector(
-                    connectorId = "1",
-                    targetFolder = EMPTY_PATH,
-                    sourceFolder = EMPTY_PATH,
-                    contentType = MediaType.APPLICATION_OCTET_STREAM,
-                    sourceArchiveEnabled = false,
-                    sourceArchiveFolder = EMPTY_PATH,
-                    sourceErrorFolder = EMPTY_PATH,
-                    mode = CdrClientConfig.Mode.PRODUCTION,
-                    docTypeFolders = emptyMap()
+            customer = Customer(
+                listOf(
+                    CdrClientConfig.Connector(
+                        connectorId = "1",
+                        targetFolder = CURRENT_WORKING_DIR,
+                        sourceFolder = CURRENT_WORKING_DIR,
+                        contentType = MediaType.APPLICATION_OCTET_STREAM,
+                        sourceArchiveEnabled = false,
+                        sourceArchiveFolder = CURRENT_WORKING_DIR,
+                        sourceErrorFolder = CURRENT_WORKING_DIR,
+                        mode = CdrClientConfig.Mode.PRODUCTION,
+                        docTypeFolders = emptyMap()
+                    )
                 )
             ),
-            cdrApi = CdrClientConfig.Endpoint(
+            cdrApi = CdrApi(
                 scheme = "https",
-                host = "localhost",
+                host = Host("localhost"),
                 port = 8080,
                 basePath = "/"
             ),
             filesInProgressCacheSize = DataSize.ofMegabytes(1L),
             idpCredentials = IdpCredentials(
-                tenantId = "",
-                clientId = "",
-                clientSecret = ClientSecret(""),
+                tenantId = TenantId("fake-tenant-id"),
+                clientId = ClientId("fake-client-id"),
+                clientSecret = ClientSecret("fake-client-secret"),
                 scopes = emptyList(),
                 renewCredential = RenewCredential.ENABLED,
                 maxCredentialAge = Duration.ofDays(30),
-                lastCredentialRenewalTime = LastUpdatedAt(Instant.now()),
+                lastCredentialRenewalTime = Instant.now(),
             ),
             idpEndpoint = URL("http://localhost:8080"),
-            localFolder = EMPTY_PATH,
+            localFolder = TempDownloadDir(CURRENT_WORKING_DIR),
             pullThreadPoolSize = 1,
             pushThreadPoolSize = 1,
             retryDelay = emptyList(),
             scheduleDelay = Duration.ofSeconds(1L),
-            credentialApi = CdrClientConfig.Endpoint(
+            credentialApi = CredentialApi(
                 scheme = "https",
-                host = "localhost",
+                host = Host("localhost"),
                 port = 8080,
                 basePath = "/"
             ),
@@ -238,7 +253,7 @@ internal class WebOperationsTest {
             ),
             fileBusyTestInterval = Duration.ofSeconds(1L),
             fileBusyTestTimeout = Duration.ofSeconds(1L),
-            fileBusyTestStrategy = CdrClientConfig.FileBusyTestStrategy.NEVER_BUSY
+            fileBusyTestStrategy = FileBusyTestStrategyProperty(CdrClientConfig.FileBusyTestStrategy.NEVER_BUSY)
         )
     }
 }

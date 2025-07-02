@@ -1,6 +1,8 @@
 package com.swisscom.health.des.cdr.client.scheduling
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Customer
+import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.TraceContext
@@ -65,8 +67,8 @@ internal class DocumentDownloadSchedulerTest {
                 contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
                 mode = CdrClientConfig.Mode.TEST,
             )
-        every { config.customer } returns listOf(connector)
-        every { config.localFolder } returns inflightDir
+        every { config.customer } returns Customer(listOf(connector))
+        every { config.localFolder } returns TempDownloadDir(inflightDir)
         mockTracer()
     }
 
