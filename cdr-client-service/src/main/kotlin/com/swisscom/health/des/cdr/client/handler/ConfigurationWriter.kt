@@ -349,12 +349,20 @@ internal class ConfigurationWriter(
             }
 
     private val Resource.writeableResource: WritableResource?
-        get() = FileSystemResource(this.file).run {
-            when (isWritable) {
-                true -> this.also { logger.debug { "Resource is writable: '$this'" } }
-                false -> null.also { logger.warn { "Resource is not writable: '$this'" } }
+        get() = runCatching {
+            FileSystemResource(this.file).run {
+                when (isWritable) {
+                    true -> this.also { logger.debug { "Resource is writable: '$this'" } }
+                    false -> null.also { logger.warn { "Resource is not writable: '$this'" } }
+                }
             }
-        }
+        }.fold(
+            onSuccess = { it },
+            onFailure = { exception ->
+                logger.warn { "Resource is not writable: '$this'; reason: '$exception'" }
+                null
+            }
+        )
 
     private val Resource.fileTypeFromExtension: FileType?
         get() =
