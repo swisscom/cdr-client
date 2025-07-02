@@ -132,7 +132,6 @@ class ConfigurationWriterTest {
         assertInstanceOf<ConfigurationWriter.Result.Success>(result) { "Expected failure, but got $result" }
     }
 
-    @Disabled("Needs updated mocks")
     @Test
     fun `if the client secret origin resource is not a writable file then renewal should succeed - to be changed once rollback strategy is implemented`() {
         val propOrigin = mockk<TextResourceOrigin>()
@@ -144,7 +143,11 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
         every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.local-folder") } returns propOrigin
+        every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
         every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.credential-api.host") } returns propOrigin
+        every { propSource.getOrigin("client.cdr-api.host") } returns propOrigin
         val propertySources = MutablePropertySources().apply {
             addLast(propSource)
         }
@@ -182,7 +185,6 @@ class ConfigurationWriterTest {
         assertInstanceOf<ConfigurationWriter.Result.Success>(result) { "Expected Success, but got $result" }
     }
 
-    @Disabled("Needs updated mocks")
     @Test
     fun `successful renewal of client secret in a YAML file`() {
         val configFile = tempConfigDir.resolve("unknown_config_format.yaml").apply {
@@ -199,6 +201,11 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
         every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.local-folder") } returns propOrigin
+        every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
+        every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.credential-api.host") } returns propOrigin
+        every { propSource.getOrigin("client.cdr-api.host") } returns propOrigin
         val propertySources = MutablePropertySources().apply {
             addLast(propSource)
         }
@@ -217,7 +224,6 @@ class ConfigurationWriterTest {
         assertEquals(FileSynchronization.DISABLED.value, newFileSyncValue)
     }
 
-    @Disabled("Needs updated mocks")
     @Test
     fun `multiple known origins for property should update first in list`() {
         val configFile = tempConfigDir.resolve("unknown_config_format.yaml").apply {
@@ -243,6 +249,16 @@ class ConfigurationWriterTest {
         every { propSource2.getOrigin("client.idp-credentials.client-id") } returns null
         every { propSource1.getOrigin("client.customer") } returns propOrigin1
         every { propSource2.getOrigin("client.customer") } returns null
+        every { propSource1.getOrigin("client.local-folder") } returns propOrigin1
+        every { propSource2.getOrigin("client.local-folder") } returns null
+        every { propSource1.getOrigin("client.file-busy-test-strategy") } returns propOrigin1
+        every { propSource2.getOrigin("client.file-busy-test-strategy") } returns null
+        every { propSource1.getOrigin("client.customer") } returns propOrigin1
+        every { propSource2.getOrigin("client.customer") } returns null
+        every { propSource1.getOrigin("client.credential-api.host") } returns propOrigin1
+        every { propSource2.getOrigin("client.credential-api.host") } returns null
+        every { propSource1.getOrigin("client.cdr-api.host") } returns propOrigin1
+        every { propSource2.getOrigin("client.cdr-api.host") } returns null
         val propertySources = MutablePropertySources().apply {
             addLast(propSource1)
             addLast(propSource2)
@@ -265,7 +281,6 @@ class ConfigurationWriterTest {
         verify(exactly = 0) { propOrigin2.resource }
     }
 
-    @Disabled("Needs updated mocks")
     @Test
     fun `test property source not found, not writable, and found`() {
         val configFile = tempConfigDir.resolve("unknown_config_format.yaml").apply {
@@ -284,6 +299,11 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns null
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns null
         every { propSource.getOrigin("client.customer") } returns null
+        every { propSource.getOrigin("client.local-folder") } returns null
+        every { propSource.getOrigin("client.file-busy-test-strategy") } returns null
+        every { propSource.getOrigin("client.customer") } returns null
+        every { propSource.getOrigin("client.credential-api.host") } returns null
+        every { propSource.getOrigin("client.cdr-api.host") } returns null
         val propertySources = MutablePropertySources().apply {
             addLast(propSource)
         }
