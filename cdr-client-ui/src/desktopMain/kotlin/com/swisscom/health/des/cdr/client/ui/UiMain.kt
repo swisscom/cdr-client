@@ -3,6 +3,7 @@ package com.swisscom.health.des.cdr.client.ui
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,6 +15,7 @@ import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.kdroid.composetray.tray.api.Tray
+import com.swisscom.health.des.cdr.client.common.Constants.CONFIG_CHANGE_EXIT_CODE
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.ui.CdrConfigViewModel.Companion.STATUS_CHECK_DELAY
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
@@ -24,18 +26,24 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_open_application_window
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_unknown
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
+import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
+private val logger = KotlinLogging.logger {}
+
 @OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 fun main() = application {
+    val serviceProcessRef = remember { AtomicReference<Process?>() }
     var isWindowVisible: Boolean by remember { mutableStateOf(true) }
     val cdrConfigViewModel: CdrConfigViewModel = remember { CdrConfigViewModel(cdrClientApiClient = CdrClientApiClient()) }
+    var serviceMonitorJob: Job? = null
 
     // I have found no way to push this down into the CdrConfigScreen composable;
     // the client status query runs in a different coroutine scope, so it won't be canceled automatically when the main window is closed
@@ -61,6 +69,18 @@ fun main() = application {
                 cdrClientApiClient = CdrClientApiClient()
             )
         )
+        if (isMacOS()) {
+            logger.debug { "Running on macOS, starting cdr-client-service if not running" }
+            val startCdrClientServiceIfNotRunning = startCdrClientServiceIfNotRunning()
+            if (startCdrClientServiceIfNotRunning != null) {
+                serviceProcessRef.set(startCdrClientServiceIfNotRunning)
+                serviceMonitorJob = monitorServiceProcess(
+                    processRef = serviceProcessRef,
+                    shouldRestart = { exitCode -> exitCode == CONFIG_CHANGE_EXIT_CODE },
+                    startProcess = ::startCdrClientServiceIfNotRunning
+                )
+            }
+        }
     }
 
     // I am not using JetBrains' default Tray() implementation:
@@ -73,7 +93,17 @@ fun main() = application {
     CdrSystemTray(
         primaryAction = { isWindowVisible = true }
     )
-
+    DisposableEffect(Unit) {
+        onDispose {
+            serviceMonitorJob?.cancel()
+            logger.debug { "Service process reference: ${serviceProcessRef.get()}" }
+            serviceProcessRef.get()?.let {
+                logger.debug { "Gracefully shutting down cdr-client-service" }
+                it.destroy()
+                it.waitFor()
+            }
+        }
+    }
 }
 
 @Composable
