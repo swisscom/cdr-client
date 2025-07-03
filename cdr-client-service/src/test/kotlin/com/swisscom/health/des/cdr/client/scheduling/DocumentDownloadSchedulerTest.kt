@@ -18,7 +18,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
-import org.springframework.http.MediaType
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 
@@ -64,7 +63,7 @@ internal class DocumentDownloadSchedulerTest {
                 connectorId = "1234",
                 targetFolder = targetDir0,
                 sourceFolder = sourceDir0,
-                contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
+                contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
                 mode = CdrClientConfig.Mode.TEST,
             )
         every { config.customer } returns Customer(listOf(connector))

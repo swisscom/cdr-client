@@ -1,11 +1,12 @@
 package com.swisscom.health.des.cdr.client.config
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Connector
 import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
+import net.minidev.json.annotate.JsonIgnore
 import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
 import java.net.URL
 import java.nio.file.Path
@@ -21,6 +22,8 @@ import kotlin.io.path.isDirectory
 
 private val logger = KotlinLogging.logger {}
 
+// `@JsonIgnore` had no effect when used on implementing class members
+@JsonIgnoreProperties(value = ["propertyName"])
 internal interface PropertyNameAware {
     val propertyName: String
 }
@@ -78,7 +81,6 @@ internal data class CdrClientConfig(
     /** Strategy to test whether a file is still busy (written into) before attempting to upload it. */
     val fileBusyTestStrategy: FileBusyTestStrategyProperty,
 ) : PropertyNameAware {
-
     override val propertyName: String
         get() = PROPERTY_NAME
 
@@ -104,7 +106,7 @@ internal data class CdrClientConfig(
         val sourceFolder: Path,
 
         /** Media type to set for file uploads; currently only `application/forumdatenaustausch+xml;charset=UTF-8` is supported. */
-        val contentType: MediaType,
+        val contentType: String,
 
         /**
          * Whether to enable the archiving of successfully uploaded files. If not enabled, files that have been uploaded get deleted.
@@ -174,6 +176,7 @@ internal data class CdrClientConfig(
          * @see sourceArchiveFolder
          * @see sourceFolder
          */
+        @JsonIgnore
         fun getEffectiveSourceArchiveFolder(path: Path): Path? =
             if (sourceArchiveEnabled) {
                 if (path.isDirectory()) {
@@ -191,6 +194,7 @@ internal data class CdrClientConfig(
          * @see getEffectiveSourceArchiveFolder
          */
         val effectiveConnectorSourceArchiveFolder: Path?
+            @JsonIgnore
             get() =
                 if (sourceArchiveEnabled)
                     sourceFolder.resolve(sourceArchiveFolder.resolve(getDateNow()))
@@ -201,18 +205,21 @@ internal data class CdrClientConfig(
         /**
          * Returns all source folders for all document types of this connector. If a [DocTypeFolders.sourceFolder] is not set, the entry is omitted.
          */
+        @JsonIgnore
         fun getAllSourceDocTypeFolders(): List<Path> = this.docTypeFolders.values.mapNotNull { this.effectiveSourceFolder(it) }
 
         /**
          * Returns the effective source folder for a given [DocTypeFolders] instance. If the [DocTypeFolders.sourceFolder] is not set, returns `null`.
          * @see DocTypeFolders
          */
+        @JsonIgnore
         fun effectiveSourceFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.sourceFolder?.let { this.sourceFolder.resolve(it) }
 
         /**
          * Returns the effective target folder for a given [DocTypeFolders] instance. If the [DocTypeFolders.targetFolder] is not set, returns `null`.
          * @see DocTypeFolders
          */
+        @JsonIgnore
         fun effectiveTargetFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.targetFolder?.let { this.targetFolder.resolve(it) }
 
         @Suppress("TooGenericExceptionCaught")
@@ -232,6 +239,7 @@ internal data class CdrClientConfig(
          * @see sourceErrorFolder
          * @see sourceFolder
          */
+        @JsonIgnore
         fun getEffectiveSourceErrorFolder(path: Path): Path =
             (sourceErrorFolder ?: Path.of(EMPTY_STRING)).let { errorDir ->
                 if (path.isDirectory()) {
@@ -248,6 +256,7 @@ internal data class CdrClientConfig(
          * @see getEffectiveSourceErrorFolder
          */
         val effectiveConnectorSourceErrorFolder: Path
+            @JsonIgnore
             get() = (sourceErrorFolder ?: Path.of(EMPTY_STRING)).let { errorDir ->
                 sourceFolder.resolve(errorDir.resolve(getDateNow()))
                     .also { createDirectoryIfMissing(it) }
@@ -468,6 +477,7 @@ internal data class IdpCredentials(
      * The number of milliseconds until the next credential renewal is due. Negative values will trigger an immediate renewal.
      */
     val millisUntilNextCredentialRenewal: Long
+        @JsonIgnore
         get() = maxCredentialAge.toMillis() - ChronoUnit.MILLIS.between(lastCredentialRenewalTime, Instant.now())
 
     companion object {

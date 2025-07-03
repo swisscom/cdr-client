@@ -43,6 +43,7 @@ internal class ValidationService(
      */
     @PostConstruct
     fun validateConfigAndFailHardOnValidationError() {
+        logger.info { "CDR client configuration: '$config'" }
         val validationResult = validateAllConfigurationItems(config.toDto())
         if (validationResult is ValidationResult.Failure) {
             error("CdrClientConfig validation failed: '$validationResult'")

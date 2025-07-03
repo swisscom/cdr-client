@@ -43,13 +43,15 @@ class DTOs {
         @Serializable
         @SerialName("success")
         object Success : ValidationResult {
-            override val type = "success"
+            override val type: String = "success"
         }
 
         @Serializable
         @SerialName("failure")
-        data class Failure(val validationDetails: List<ValidationDetail>) : ValidationResult {
-            override val type = "failure"
+        data class Failure(
+            val validationDetails: List<ValidationDetail>
+        ) : ValidationResult {
+            override val type: String = "failure"
         }
 
         operator fun plus(other: ValidationResult): ValidationResult =

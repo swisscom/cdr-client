@@ -123,7 +123,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
                 connectorId = connectorId1,
                 targetFolder = tmpDir.resolve(directory1),
                 sourceFolder = tmpDir.resolve(directory1).resolve("source"),
-                contentType = forumDatenaustauschMediaType,
+                contentType = forumDatenaustauschMediaType.toString(),
                 mode = CdrClientConfig.Mode.TEST,
             )
         val connector2 =
@@ -131,7 +131,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
                 connectorId = connectorId2,
                 targetFolder = tmpDir.resolve(directory2),
                 sourceFolder = tmpDir.resolve(directory2).resolve("source"),
-                contentType = forumDatenaustauschMediaType,
+                contentType = forumDatenaustauschMediaType.toString(),
                 mode = CdrClientConfig.Mode.PRODUCTION,
             )
         val localFolder = tmpDir.resolve(inflightFolder)

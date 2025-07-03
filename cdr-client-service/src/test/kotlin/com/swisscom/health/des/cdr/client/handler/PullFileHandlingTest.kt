@@ -29,7 +29,6 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.core.io.ClassPathResource
 import org.springframework.http.HttpStatus
-import org.springframework.http.MediaType
 import org.springframework.retry.RetryCallback
 import org.springframework.retry.support.RetryTemplate
 import java.nio.charset.StandardCharsets
@@ -146,7 +145,7 @@ internal class PullFileHandlingTest {
             connectorId = "1-2-3-4",
             targetFolder = tmpDir.resolve(targetDirectory),
             sourceFolder = tmpDir.resolve(sourceDirectory),
-            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
+            contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
                 DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
@@ -184,7 +183,7 @@ internal class PullFileHandlingTest {
             connectorId = "1-2-3-4",
             targetFolder = targetDir,
             sourceFolder = tmpDir.resolve(sourceDirectory),
-            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
+            contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
                 DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
@@ -222,7 +221,7 @@ internal class PullFileHandlingTest {
             connectorId = "1-2-3-4",
             targetFolder = targetDir,
             sourceFolder = tmpDir.resolve(sourceDirectory),
-            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
+            contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
                 DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
@@ -343,7 +342,7 @@ internal class PullFileHandlingTest {
             connectorId = connectorId0,
             targetFolder = targetFolder0,
             sourceFolder = sourceFolder0,
-            contentType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8"),
+            contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
             mode = CdrClientConfig.Mode.PRODUCTION,
         )
 

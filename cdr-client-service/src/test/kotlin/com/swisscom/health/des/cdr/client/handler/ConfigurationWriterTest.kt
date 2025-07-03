@@ -23,7 +23,6 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.extension.ExtendWith
@@ -69,7 +68,7 @@ class ConfigurationWriterTest {
                         connectorId = "1",
                         targetFolder = CURRENT_WORKING_DIR,
                         sourceFolder = CURRENT_WORKING_DIR,
-                        contentType = MediaType.APPLICATION_OCTET_STREAM,
+                        contentType = MediaType.APPLICATION_OCTET_STREAM.toString(),
                         sourceArchiveEnabled = false,
                         sourceArchiveFolder = CURRENT_WORKING_DIR,
                         sourceErrorFolder = CURRENT_WORKING_DIR,

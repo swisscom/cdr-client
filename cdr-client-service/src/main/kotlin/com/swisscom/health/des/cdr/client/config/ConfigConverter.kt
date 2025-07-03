@@ -3,7 +3,6 @@ package com.swisscom.health.des.cdr.client.config
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.RetryTemplateConfig
 import com.swisscom.health.des.cdr.client.xml.DocumentType
-import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
 import java.nio.file.Path
 import kotlin.io.path.absolutePathString
@@ -52,7 +51,7 @@ internal fun CdrClientConfig.Connector.toDto(): DTOs.CdrClientConfig.Connector {
         connectorId = connectorId,
         targetFolder = targetFolder.absolutePathString(),
         sourceFolder = sourceFolder.absolutePathString(),
-        contentType = contentType.toString(),
+        contentType = contentType,
         sourceArchiveEnabled = sourceArchiveEnabled,
         sourceArchiveFolder = sourceArchiveFolder.absolutePathString(),
         sourceErrorFolder = sourceErrorFolder?.absolutePathString(),
@@ -132,7 +131,7 @@ internal fun DTOs.CdrClientConfig.Connector.toCdrClientConfig(): CdrClientConfig
         connectorId = connectorId,
         targetFolder = Path.of(targetFolder),
         sourceFolder = Path.of(sourceFolder),
-        contentType = MediaType.parseMediaType(contentType),
+        contentType = contentType,
         sourceArchiveEnabled = sourceArchiveEnabled,
         sourceArchiveFolder = Path.of(sourceArchiveFolder),
         sourceErrorFolder = if (sourceErrorFolder != null) Path.of(sourceErrorFolder!!) else null,

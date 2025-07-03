@@ -335,7 +335,7 @@ internal class ValidationServiceTest {
             connectorId = "connectorId",
             targetFolder = targetFolder0,
             sourceFolder = sourceFolder0,
-            contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE.toString(),
             mode = CdrClientConfig.Mode.TEST,
             docTypeFolders = mapOf(
                 DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
@@ -352,7 +352,7 @@ internal class ValidationServiceTest {
             sourceFolder = sourceFolder1,
             sourceErrorFolder = sourceErrorDir1,
             sourceArchiveFolder = sourceArchiveDir1,
-            contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE.toString(),
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
                 DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub")),
@@ -367,14 +367,14 @@ internal class ValidationServiceTest {
             connectorId = "connectorId2",
             targetFolder = targetFolder2,
             sourceFolder = sourceFolder2,
-            contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE.toString(),
             mode = CdrClientConfig.Mode.TEST
         ),
         CdrClientConfig.Connector(
             connectorId = "connectorId3",
             targetFolder = targetFolder3,
             sourceFolder = sourceFolder3,
-            contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE.toString(),
             mode = CdrClientConfig.Mode.PRODUCTION
         ),
         CdrClientConfig.Connector(
@@ -383,7 +383,7 @@ internal class ValidationServiceTest {
             sourceFolder = sourceFolder4,
             sourceErrorFolder = sourceErrorDir4,
             sourceArchiveFolder = sourceArchiveDir4,
-            contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE,
+            contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE.toString(),
             mode = CdrClientConfig.Mode.TEST
         )
     )

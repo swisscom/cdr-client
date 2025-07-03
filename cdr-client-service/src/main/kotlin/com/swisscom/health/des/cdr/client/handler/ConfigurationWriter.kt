@@ -3,6 +3,8 @@ package com.swisscom.health.des.cdr.client.handler
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.PropertyNameAware
@@ -104,7 +106,12 @@ internal class ConfigurationWriter(
 
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth")
     private fun updateYamlSource(changedConfigItem: UpdatableConfigurationItem.WritableResourceConfigurationItem): Unit =
-        YAMLMapper().run {
+        YAMLMapper(
+            YAMLFactory()
+                .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+                .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR)
+                .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+        ).run {
             val yamlNode: JsonNode = readTree(changedConfigItem.writableResource.inputStream)
             var tmpNode = yamlNode as ObjectNode
             val remainingNodeNames = ArrayDeque(changedConfigItem.propertyPath.split("."))
@@ -359,8 +366,7 @@ internal class ConfigurationWriter(
         }.fold(
             onSuccess = { it },
             onFailure = { exception ->
-                logger.warn { "Resource is not writable: '$this'; reason: '$exception'" }
-                null
+                null.also { logger.warn { "Resource is not writable: '$this'; reason: '$exception'" } }
             }
         )
 

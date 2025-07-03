@@ -101,7 +101,7 @@ internal class EventPushFileHandlingTest {
                     connectorId = "2345",
                     targetFolder = targetFolder0,
                     sourceFolder = sourceFolder0,
-                    contentType = forumDatenaustauschMediaType,
+                    contentType = forumDatenaustauschMediaType.toString(),
                     mode = CdrClientConfig.Mode.TEST,
                 )
             )

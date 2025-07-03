@@ -208,7 +208,7 @@ internal class WebOperationsTest {
                         connectorId = "1",
                         targetFolder = CURRENT_WORKING_DIR,
                         sourceFolder = CURRENT_WORKING_DIR,
-                        contentType = MediaType.APPLICATION_OCTET_STREAM,
+                        contentType = MediaType.APPLICATION_OCTET_STREAM.toString(),
                         sourceArchiveEnabled = false,
                         sourceArchiveFolder = CURRENT_WORKING_DIR,
                         sourceErrorFolder = CURRENT_WORKING_DIR,
