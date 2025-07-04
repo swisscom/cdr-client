@@ -1,12 +1,20 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
+import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
+import com.swisscom.health.des.cdr.client.config.CredentialApi
+import com.swisscom.health.des.cdr.client.config.Customer
+import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
+import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
-import com.swisscom.health.des.cdr.client.config.LastUpdatedAt
 import com.swisscom.health.des.cdr.client.config.RenewCredential
+import com.swisscom.health.des.cdr.client.config.TempDownloadDir
+import com.swisscom.health.des.cdr.client.config.TenantId
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
@@ -49,48 +57,51 @@ class ConfigurationWriterTest {
     private lateinit var configurationWriter: ConfigurationWriter
 
 
+    @Suppress("LongMethod")
     @BeforeEach
     fun setup() {
         config = CdrClientConfig(
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
-            customer = listOf(
-                CdrClientConfig.Connector(
-                    connectorId = "1",
-                    targetFolder = EMPTY_PATH,
-                    sourceFolder = EMPTY_PATH,
-                    contentType = MediaType.APPLICATION_OCTET_STREAM,
-                    sourceArchiveEnabled = false,
-                    sourceArchiveFolder = EMPTY_PATH,
-                    sourceErrorFolder = EMPTY_PATH,
-                    mode = CdrClientConfig.Mode.PRODUCTION,
-                    docTypeFolders = emptyMap()
+            customer = Customer(
+                listOf(
+                    CdrClientConfig.Connector(
+                        connectorId = "1",
+                        targetFolder = CURRENT_WORKING_DIR,
+                        sourceFolder = CURRENT_WORKING_DIR,
+                        contentType = MediaType.APPLICATION_OCTET_STREAM.toString(),
+                        sourceArchiveEnabled = false,
+                        sourceArchiveFolder = CURRENT_WORKING_DIR,
+                        sourceErrorFolder = CURRENT_WORKING_DIR,
+                        mode = CdrClientConfig.Mode.PRODUCTION,
+                        docTypeFolders = emptyMap()
+                    )
                 )
             ),
-            cdrApi = CdrClientConfig.Endpoint(
+            cdrApi = CdrApi(
                 scheme = "https",
-                host = "localhost",
+                host = Host("localhost"),
                 port = 8080,
                 basePath = "/"
             ),
             filesInProgressCacheSize = DataSize.ofMegabytes(1L),
             idpCredentials = IdpCredentials(
-                tenantId = "",
-                clientId = "",
-                clientSecret = ClientSecret(""),
+                tenantId = TenantId("fake-tenant-id"),
+                clientId = ClientId("fake-client-id"),
+                clientSecret = ClientSecret("fake-client-secret"),
                 scopes = emptyList(),
                 renewCredential = RenewCredential.ENABLED,
                 maxCredentialAge = Duration.ofDays(30),
-                lastCredentialRenewalTime = LastUpdatedAt(Instant.now()),
+                lastCredentialRenewalTime = Instant.now(),
             ),
             idpEndpoint = URL("http://localhost:8080"),
-            localFolder = EMPTY_PATH,
+            localFolder = TempDownloadDir(CURRENT_WORKING_DIR),
             pullThreadPoolSize = 1,
             pushThreadPoolSize = 1,
             retryDelay = emptyList(),
             scheduleDelay = Duration.ofSeconds(1L),
-            credentialApi = CdrClientConfig.Endpoint(
+            credentialApi = CredentialApi(
                 scheme = "https",
-                host = "localhost",
+                host = Host("localhost"),
                 port = 8080,
                 basePath = "/"
             ),
@@ -102,7 +113,7 @@ class ConfigurationWriterTest {
             ),
             fileBusyTestInterval = Duration.ofSeconds(1L),
             fileBusyTestTimeout = Duration.ofSeconds(1L),
-            fileBusyTestStrategy = CdrClientConfig.FileBusyTestStrategy.NEVER_BUSY
+            fileBusyTestStrategy = FileBusyTestStrategyProperty(CdrClientConfig.FileBusyTestStrategy.NEVER_BUSY)
         )
 
         configurationWriter = ConfigurationWriter(
@@ -127,8 +138,15 @@ class ConfigurationWriterTest {
         val propSource = mockk<OriginTrackedMapPropertySource>()
         every { propSource.getOrigin("client.file-synchronization-enabled") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.renew-credential") } returns propOrigin
-        every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
+        every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.local-folder") } returns propOrigin
+        every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
+        every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.credential-api.host") } returns propOrigin
+        every { propSource.getOrigin("client.cdr-api.host") } returns propOrigin
         val propertySources = MutablePropertySources().apply {
             addLast(propSource)
         }
@@ -148,8 +166,14 @@ class ConfigurationWriterTest {
         val propSource = mockk<OriginTrackedMapPropertySource>()
         every { propSource.getOrigin("client.file-synchronization-enabled") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.renew-credential") } returns propOrigin
-        every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
+        every { propSource.getOrigin("client.local-folder") } returns propOrigin
+        every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
+        every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.credential-api.host") } returns propOrigin
+        every { propSource.getOrigin("client.cdr-api.host") } returns propOrigin
         val propertySources = MutablePropertySources().apply {
             addLast(propSource)
         }
@@ -172,8 +196,15 @@ class ConfigurationWriterTest {
         val propSource = mockk<OriginTrackedMapPropertySource>()
         every { propSource.getOrigin("client.file-synchronization-enabled") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.renew-credential") } returns propOrigin
-        every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
+        every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.local-folder") } returns propOrigin
+        every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
+        every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.credential-api.host") } returns propOrigin
+        every { propSource.getOrigin("client.cdr-api.host") } returns propOrigin
         val propertySources = MutablePropertySources().apply {
             addLast(propSource)
         }
@@ -209,10 +240,24 @@ class ConfigurationWriterTest {
         every { propSource2.getOrigin("client.file-synchronization-enabled") } returns propOrigin2
         every { propSource1.getOrigin("client.idp-credentials.renew-credential") } returns propOrigin1
         every { propSource2.getOrigin("client.idp-credentials.renew-credential") } returns null
-        every { propSource1.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin1
-        every { propSource2.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns null
         every { propSource1.getOrigin("client.idp-credentials.client-secret") } returns propOrigin1
         every { propSource2.getOrigin("client.idp-credentials.client-secret") } returns null
+        every { propSource1.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin1
+        every { propSource2.getOrigin("client.idp-credentials.tenant-id") } returns null
+        every { propSource1.getOrigin("client.idp-credentials.client-id") } returns propOrigin1
+        every { propSource2.getOrigin("client.idp-credentials.client-id") } returns null
+        every { propSource1.getOrigin("client.customer") } returns propOrigin1
+        every { propSource2.getOrigin("client.customer") } returns null
+        every { propSource1.getOrigin("client.local-folder") } returns propOrigin1
+        every { propSource2.getOrigin("client.local-folder") } returns null
+        every { propSource1.getOrigin("client.file-busy-test-strategy") } returns propOrigin1
+        every { propSource2.getOrigin("client.file-busy-test-strategy") } returns null
+        every { propSource1.getOrigin("client.customer") } returns propOrigin1
+        every { propSource2.getOrigin("client.customer") } returns null
+        every { propSource1.getOrigin("client.credential-api.host") } returns propOrigin1
+        every { propSource2.getOrigin("client.credential-api.host") } returns null
+        every { propSource1.getOrigin("client.cdr-api.host") } returns propOrigin1
+        every { propSource2.getOrigin("client.cdr-api.host") } returns null
         val propertySources = MutablePropertySources().apply {
             addLast(propSource1)
             addLast(propSource2)
@@ -249,8 +294,15 @@ class ConfigurationWriterTest {
         val propSource = mockk<OriginTrackedMapPropertySource>()
         every { propSource.getOrigin("client.file-synchronization-enabled") } returns propOriginWritable // writable
         every { propSource.getOrigin("client.idp-credentials.renew-credential") } returns propOriginNotWritable // not writable
-        every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns null  // not writable
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns null // not writable
+        every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns null
+        every { propSource.getOrigin("client.idp-credentials.client-id") } returns null
+        every { propSource.getOrigin("client.customer") } returns null
+        every { propSource.getOrigin("client.local-folder") } returns null
+        every { propSource.getOrigin("client.file-busy-test-strategy") } returns null
+        every { propSource.getOrigin("client.customer") } returns null
+        every { propSource.getOrigin("client.credential-api.host") } returns null
+        every { propSource.getOrigin("client.cdr-api.host") } returns null
         val propertySources = MutablePropertySources().apply {
             addLast(propSource)
         }
@@ -259,7 +311,7 @@ class ConfigurationWriterTest {
         assertEquals(ConfigurationWriter.ConfigLookupResult.Writable,
             configurationWriter.isWritableConfigurationItem("client.file-synchronization-enabled"))
         assertEquals(ConfigurationWriter.ConfigLookupResult.NotWritable,
-            configurationWriter.isWritableConfigurationItem("client.idp-credentials.last-credential-renewal-time"))
+            configurationWriter.isWritableConfigurationItem("client.idp-credentials.client-secret"))
         assertEquals(ConfigurationWriter.ConfigLookupResult.NotWritable,
             configurationWriter.isWritableConfigurationItem("client.idp-credentials.renew-credential"))
         assertEquals(ConfigurationWriter.ConfigLookupResult.NotFound,
@@ -268,13 +320,13 @@ class ConfigurationWriterTest {
 
     companion object {
         @JvmStatic
-        private val EMPTY_PATH = Path.of("")
-
-        @JvmStatic
         private val FILE_SYNC_YAML = """
             client:
                file-synchronization-enabled: true
         """.trimIndent()
+
+        @JvmStatic
+        private val CURRENT_WORKING_DIR = Path.of(EMPTY_STRING)
     }
 
 }

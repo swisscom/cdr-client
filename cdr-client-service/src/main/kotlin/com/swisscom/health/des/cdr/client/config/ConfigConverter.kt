@@ -3,16 +3,18 @@ package com.swisscom.health.des.cdr.client.config
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.RetryTemplateConfig
 import com.swisscom.health.des.cdr.client.xml.DocumentType
-import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
+import java.nio.file.Path
+import kotlin.io.path.absolutePathString
+import kotlin.reflect.KClass
 
 /*
  * BEGIN - Spring Configuration -> Configuration DTOs
  */
 internal fun CdrClientConfig.toDto(): DTOs.CdrClientConfig {
     fun List<CdrClientConfig.Connector>.toDto(): List<DTOs.CdrClientConfig.Connector> = map { it.toDto() }
-    fun CdrClientConfig.FileBusyTestStrategy.toDto(): DTOs.CdrClientConfig.FileBusyTestStrategy =
-        DTOs.CdrClientConfig.FileBusyTestStrategy.entries.first { it.name == name }
+    fun FileBusyTestStrategyProperty.toDto(): DTOs.CdrClientConfig.FileBusyTestStrategy =
+        DTOs.CdrClientConfig.FileBusyTestStrategy.entries.first { it.name == strategy.name }
 
     return DTOs.CdrClientConfig(
         fileSynchronizationEnabled = fileSynchronizationEnabled.value,
@@ -21,7 +23,7 @@ internal fun CdrClientConfig.toDto(): DTOs.CdrClientConfig {
         filesInProgressCacheSize = filesInProgressCacheSize.toString(),
         idpCredentials = idpCredentials.toDto(),
         idpEndpoint = idpEndpoint,
-        localFolder = localFolder,
+        localFolder = localFolder.path.absolutePathString(),
         pullThreadPoolSize = pullThreadPoolSize,
         pushThreadPoolSize = pushThreadPoolSize,
         retryDelay = retryDelay,
@@ -39,42 +41,42 @@ internal fun CdrClientConfig.Connector.toDto(): DTOs.CdrClientConfig.Connector {
             Map<DTOs.CdrClientConfig.DocumentType, DTOs.CdrClientConfig.Connector.DocTypeFolders> {
         return map { (key, value) ->
             DTOs.CdrClientConfig.DocumentType.entries.first { it.name == key.name } to DTOs.CdrClientConfig.Connector.DocTypeFolders(
-                sourceFolder = value.sourceFolder,
-                targetFolder = value.targetFolder
+                sourceFolder = value.sourceFolder?.absolutePathString(),
+                targetFolder = value.targetFolder?.absolutePathString(),
             )
         }.toMap()
     }
 
     return DTOs.CdrClientConfig.Connector(
         connectorId = connectorId,
-        targetFolder = targetFolder,
-        sourceFolder = sourceFolder,
-        contentType = contentType.toString(),
+        targetFolder = targetFolder.absolutePathString(),
+        sourceFolder = sourceFolder.absolutePathString(),
+        contentType = contentType,
         sourceArchiveEnabled = sourceArchiveEnabled,
-        sourceArchiveFolder = sourceArchiveFolder,
-        sourceErrorFolder = sourceErrorFolder,
+        sourceArchiveFolder = sourceArchiveFolder.absolutePathString(),
+        sourceErrorFolder = sourceErrorFolder?.absolutePathString(),
         mode = DTOs.CdrClientConfig.Mode.entries.first { it.name == mode.name },
         docTypeFolders = docTypeFolders.toDto(),
     )
 }
 
-internal fun CdrClientConfig.Endpoint.toDto(): DTOs.CdrClientConfig.Endpoint =
+internal fun Endpoint.toDto(): DTOs.CdrClientConfig.Endpoint =
     DTOs.CdrClientConfig.Endpoint(
         scheme = scheme,
-        host = host,
+        host = host.fqdn,
         port = port,
         basePath = basePath
     )
 
 internal fun IdpCredentials.toDto(): DTOs.CdrClientConfig.IdpCredentials =
     DTOs.CdrClientConfig.IdpCredentials(
-        tenantId = tenantId,
-        clientId = clientId,
+        tenantId = tenantId.id,
+        clientId = clientId.id,
         clientSecret = clientSecret.value,
         scopes = scopes,
         renewCredential = renewCredential.value,
         maxCredentialAge = maxCredentialAge,
-        lastCredentialRenewalTime = lastCredentialRenewalTime.value,
+        lastCredentialRenewalTime = lastCredentialRenewalTime,
     )
 
 internal fun RetryTemplateConfig.toDto(): DTOs.CdrClientConfig.RetryTemplateConfig =
@@ -93,22 +95,21 @@ internal fun RetryTemplateConfig.toDto(): DTOs.CdrClientConfig.RetryTemplateConf
  */
 internal fun DTOs.CdrClientConfig.toCdrClientConfig(): CdrClientConfig {
     fun List<DTOs.CdrClientConfig.Connector>.toCdrClientConfig(): List<CdrClientConfig.Connector> = map { it.toCdrClientConfig() }
-    fun DTOs.CdrClientConfig.FileBusyTestStrategy.toCdrClientConfig(): CdrClientConfig.FileBusyTestStrategy =
-        CdrClientConfig.FileBusyTestStrategy.valueOf(name)
+    fun DTOs.CdrClientConfig.FileBusyTestStrategy.toCdrClientConfig(): FileBusyTestStrategyProperty = FileBusyTestStrategyProperty.valueOf(name)
 
     return CdrClientConfig(
         fileSynchronizationEnabled = if (fileSynchronizationEnabled) FileSynchronization.ENABLED else FileSynchronization.DISABLED,
-        customer = customer.toCdrClientConfig(),
-        cdrApi = cdrApi.toCdrClientConfig(),
+        customer = Customer(customer.toCdrClientConfig()),
+        cdrApi = cdrApi.toCdrClientConfig(CdrApi::class),
         filesInProgressCacheSize = DataSize.parse(filesInProgressCacheSize),
         idpCredentials = idpCredentials.toCdrClientConfig(),
         idpEndpoint = idpEndpoint,
-        localFolder = localFolder,
+        localFolder = TempDownloadDir(localFolder),
         pullThreadPoolSize = pullThreadPoolSize,
         pushThreadPoolSize = pushThreadPoolSize,
         retryDelay = retryDelay,
         scheduleDelay = scheduleDelay,
-        credentialApi = credentialApi.toCdrClientConfig(),
+        credentialApi = credentialApi.toCdrClientConfig(CredentialApi::class),
         retryTemplate = retryTemplate.toCdrClientConfig(),
         fileBusyTestInterval = fileBusyTestInterval,
         fileBusyTestTimeout = fileBusyTestTimeout,
@@ -118,45 +119,56 @@ internal fun DTOs.CdrClientConfig.toCdrClientConfig(): CdrClientConfig {
 
 internal fun DTOs.CdrClientConfig.Connector.toCdrClientConfig(): CdrClientConfig.Connector {
     fun Map<DTOs.CdrClientConfig.DocumentType, DTOs.CdrClientConfig.Connector.DocTypeFolders>.toCdrClientConfig():
-            Map<DocumentType, CdrClientConfig.Connector.DocTypeFolders> {
-        return map { (key, value) ->
+            Map<DocumentType, CdrClientConfig.Connector.DocTypeFolders> =
+        map { (key, value) ->
             DocumentType.valueOf(key.name) to CdrClientConfig.Connector.DocTypeFolders(
-                sourceFolder = value.sourceFolder,
-                targetFolder = value.targetFolder
+                sourceFolder = if (value.sourceFolder != null) Path.of(value.sourceFolder!!) else null,
+                targetFolder = if (value.targetFolder != null) Path.of(value.targetFolder!!) else null,
             )
         }.toMap()
-    }
 
     return CdrClientConfig.Connector(
         connectorId = connectorId,
-        targetFolder = targetFolder,
-        sourceFolder = sourceFolder,
-        contentType = MediaType.parseMediaType(contentType),
+        targetFolder = Path.of(targetFolder),
+        sourceFolder = Path.of(sourceFolder),
+        contentType = contentType,
         sourceArchiveEnabled = sourceArchiveEnabled,
-        sourceArchiveFolder = sourceArchiveFolder,
-        sourceErrorFolder = sourceErrorFolder,
+        sourceArchiveFolder = Path.of(sourceArchiveFolder),
+        sourceErrorFolder = if (sourceErrorFolder != null) Path.of(sourceErrorFolder!!) else null,
         mode = CdrClientConfig.Mode.valueOf(mode.name),
         docTypeFolders = docTypeFolders.toCdrClientConfig(),
     )
 }
 
-internal fun DTOs.CdrClientConfig.Endpoint.toCdrClientConfig(): CdrClientConfig.Endpoint =
-    CdrClientConfig.Endpoint(
-        scheme = scheme,
-        host = host,
-        port = port,
-        basePath = basePath
-    )
+internal inline fun <reified T : Endpoint> DTOs.CdrClientConfig.Endpoint.toCdrClientConfig(type: KClass<T>): T =
+    when (type) {
+        CdrApi::class -> CdrApi(
+            scheme = scheme,
+            host = Host(host),
+            port = port,
+            basePath = basePath
+        )
+
+        CredentialApi::class -> CredentialApi(
+            scheme = scheme,
+            host = Host(host),
+            port = port,
+            basePath = basePath
+        )
+
+        else -> error("Unrecognized endpoint: $type")
+    } as T
+
 
 internal fun DTOs.CdrClientConfig.IdpCredentials.toCdrClientConfig(): IdpCredentials =
     IdpCredentials(
-        tenantId = tenantId,
-        clientId = clientId,
+        tenantId = TenantId(tenantId),
+        clientId = ClientId(clientId),
         clientSecret = ClientSecret(clientSecret),
         scopes = scopes,
         renewCredential = RenewCredential(renewCredential),
         maxCredentialAge = maxCredentialAge,
-        lastCredentialRenewalTime = LastUpdatedAt(lastCredentialRenewalTime),
+        lastCredentialRenewalTime = lastCredentialRenewalTime,
     )
 
 internal fun DTOs.CdrClientConfig.RetryTemplateConfig.toCdrClientConfig(): RetryTemplateConfig =

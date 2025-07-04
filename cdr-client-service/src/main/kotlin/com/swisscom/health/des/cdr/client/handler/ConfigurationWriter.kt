@@ -1,7 +1,10 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.PropertyNameAware
@@ -14,7 +17,13 @@ import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.core.io.FileSystemResource
 import org.springframework.core.io.Resource
 import org.springframework.core.io.WritableResource
+import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
+import org.springframework.util.unit.DataSize
+import java.net.URL
+import java.nio.file.Path
+import java.time.Duration
+import java.time.Instant
 import kotlin.reflect.full.memberProperties
 
 private val logger = KotlinLogging.logger {}
@@ -95,8 +104,15 @@ internal class ConfigurationWriter(
         }
     }
 
+    @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
     private fun updateYamlSource(changedConfigItem: UpdatableConfigurationItem.WritableResourceConfigurationItem): Unit =
-        YAMLMapper().run {
+        YAMLMapper(
+            YAMLFactory()
+                .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+                .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR)
+                .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+        ).run {
+            // unmarshal the YAML file the to-be-updated value belongs to
             val yamlNode: JsonNode = readTree(changedConfigItem.writableResource.inputStream)
             var tmpNode = yamlNode as ObjectNode
             val remainingNodeNames = ArrayDeque(changedConfigItem.propertyPath.split("."))
@@ -104,24 +120,77 @@ internal class ConfigurationWriter(
             while (remainingNodeNames.isNotEmpty()) {
                 tmpNode = tmpNode.get(remainingNodeNames.removeFirst()) as ObjectNode
             }
+
+            // unbox kotlin value classes
+            val newValue: Any = if (changedConfigItem.newValue::class.isValue) changedConfigItem.newValue.unbox() else changedConfigItem.newValue
+
+            // update node with new value
             tmpNode.apply {
-                when (changedConfigItem.newValue) {
-                    is Collection<*> -> TODO() // need to handle the collection of connectors!
+                when (newValue) {
+                    is Collection<*> -> {
+                        val arrayNode: ArrayNode = valueToTree(newValue)
+                        set<ArrayNode>(toBeUpdatedNodeName, arrayNode)
+                        logger.debug { "set '${changedConfigItem.propertyPath}' to '$arrayNode' as type '${arrayNode::class}'" }
+                    }
+
+                    is String -> {
+                        put(toBeUpdatedNodeName, newValue)
+                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                    }
+
+                    is Boolean -> {
+                        put(toBeUpdatedNodeName, newValue)
+                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                    }
+
+                    is Int -> {
+                        put(toBeUpdatedNodeName, newValue)
+                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                    }
+
+                    is Long -> {
+                        put(toBeUpdatedNodeName, newValue)
+                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                    }
+
+                    is Float -> {
+                        put(toBeUpdatedNodeName, newValue)
+                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                    }
+
+                    is Double -> {
+                        put(toBeUpdatedNodeName, newValue)
+                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                    }
+
+                    is Enum<*> -> {
+                        // handle Enums, which are stored as strings in the YAML file
+                        put(toBeUpdatedNodeName, newValue.name)
+                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue.name}' as type '${newValue::class}'" }
+                    }
+
+                    is Duration, DataSize::class, Instant::class, URL::class, Path::class, MediaType::class -> {
+                        // handle Duration, DataSize, Instant, URL, etc., anything that SpringBoot's unmarshalling magic creates
+                        // from what was originally a string
+                        newValue.toString().let { stringValue ->
+                            put(toBeUpdatedNodeName, stringValue)
+                            logger.debug { "set '${changedConfigItem.propertyPath}' to '$stringValue' as type '${stringValue::class}'" }
+                        }
+                    }
+
                     else -> {
-                        // we have to go to string first as the value might be one a value class, Duration, DataSize, etc., anything that
-                        // SpringBoot's unmarshalling magic creates from what was originally a string
-                        val stringValue = changedConfigItem.newValue.toString()
-                        val storedValue = runCatching { stringValue.toBooleanStrict().also { put(toBeUpdatedNodeName, it) } }
-                            .recoverCatching { stringValue.toInt().also { put(toBeUpdatedNodeName, it) } }
-                            .recoverCatching { stringValue.toFloat().also { put(toBeUpdatedNodeName, it) } }
-                            .getOrElse { stringValue.also { put(toBeUpdatedNodeName, it) } }
-                        logger.debug { "set '${changedConfigItem.propertyPath}' to '$storedValue' as type '${storedValue::class}'" }
+                        error("Unsupported type for configuration item '${changedConfigItem.propertyPath}': '${newValue::class}'")
                     }
                 }
             }
 
+            // persist the updated YAML file
             writeValue(changedConfigItem.writableResource.outputStream.writer(), yamlNode)
         }
+
+    // the trick to search the unboxing method on Java class was stolen from com.fasterxml.jackson.module.kotlin.ValueClassUnboxSerializer.serialize
+    // the method is not listed as member of the KClass, probably because it is generated and not declared
+    private fun Any.unbox(): Any = if (this::class.isValue) this::class.java.getMethod("unbox-impl").invoke(this) else this
 
 //    private fun updatePropertySource(changedConfigItem: UpdatableConfigurationItem): Unit =
 //        Properties().run {
@@ -295,12 +364,19 @@ internal class ConfigurationWriter(
             }
 
     private val Resource.writeableResource: WritableResource?
-        get() = FileSystemResource(this.file).run {
-            when (isWritable) {
-                true -> this.also { logger.debug { "Resource is writable: '$this'" } }
-                false -> null.also { logger.warn { "Resource is not writable: '$this'" } }
+        get() = runCatching {
+            FileSystemResource(this.file).run {
+                when (isWritable) {
+                    true -> this.also { logger.debug { "Resource is writable: '$this'" } }
+                    false -> null.also { logger.warn { "Resource is not writable: '$this'" } }
+                }
             }
-        }
+        }.fold(
+            onSuccess = { it },
+            onFailure = { exception ->
+                null.also { logger.warn { "Resource is not writable: '$this'; reason: '$exception'" } }
+            }
+        )
 
     private val Resource.fileTypeFromExtension: FileType?
         get() =

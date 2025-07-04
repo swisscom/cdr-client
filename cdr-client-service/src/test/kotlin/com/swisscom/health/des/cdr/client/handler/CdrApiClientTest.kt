@@ -2,7 +2,11 @@ package com.swisscom.health.des.cdr.client.handler
 
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
+import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.CredentialApi
+import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.AZURE_TRACE_ID_HEADER
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CDR_PROCESSING_MODE_HEADER
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CONNECTOR_ID_HEADER
@@ -66,16 +70,16 @@ internal class CdrApiClientTest {
         apiServerMock = MockWebServer()
         apiServerMock.start()
 
-        every { config.credentialApi } returns CdrClientConfig.Endpoint(
+        every { config.credentialApi } returns CredentialApi(
             scheme = "http",
-            host = apiServerMock.hostName,
+            host = Host(apiServerMock.hostName),
             port = apiServerMock.port,
             basePath = "client-credentials",
         )
 
-        every { config.cdrApi } returns CdrClientConfig.Endpoint(
+        every { config.cdrApi } returns CdrApi(
             scheme = "http",
-            host = apiServerMock.hostName,
+            host = Host(apiServerMock.hostName),
             port = apiServerMock.port,
             basePath = "documents",
         )
@@ -210,7 +214,7 @@ internal class CdrApiClientTest {
             traceId = DEFAULT_TRACE_ID
         )
 
-        assertInstanceOf<CdrApiClient.DownloadDocumentResult.Success>(result) { "CdrApiClient.DownloadDocumentResult.Success expected but got $result" }
+        assertInstanceOf<CdrApiClient.DownloadDocumentResult.DownloadSuccess>(result) { "CdrApiClient.DownloadDocumentResult.Success expected but got $result" }
 
         assertEquals("test-pull-result-id", result.pullResultId)
         assertTrue(result.file.exists())
@@ -254,7 +258,7 @@ internal class CdrApiClientTest {
         val mockResponse = MockResponse()
             .setResponseCode(HttpStatus.OK.value())
             .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.ALL_VALUE)
-            .setBody("")
+            .setBody(EMPTY_STRING)
         apiServerMock.enqueue(mockResponse)
 
         val result: CdrApiClient.DownloadDocumentResult = cdrApiClient.acknowledgeDocumentDownload(

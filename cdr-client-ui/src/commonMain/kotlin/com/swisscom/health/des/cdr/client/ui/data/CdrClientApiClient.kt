@@ -1,6 +1,9 @@
 package com.swisscom.health.des.cdr.client.ui.data
 
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DomainObjects
+import com.swisscom.health.des.cdr.client.ui.data.HttpClient.addQueryParams
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -8,12 +11,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import java.net.URL
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -26,14 +29,39 @@ internal class CdrClientApiClient {
     sealed interface Result<U> {
         data class Success<T>(val response: T) : Result<T>
         data class IOError<Nothing>(val errors: Map<String, Any>) : Result<Nothing>
-        data class ValidationError<Nothing>(val errors: Map<String, Any>) : Result<Nothing>
+        data class ServiceError<Nothing>(val errors: Map<String, Any>) : Result<Nothing>
     }
+
+    suspend fun validateValueIsNotBlank(value: String?): Result<List<DTOs.ValidationMessageKey>> =
+        getAnything<List<DTOs.ValidationMessageKey>>(
+            CDR_CLIENT_VALIDATE_VALUE_NOT_BLANK.addQueryParams(
+                "value" to value
+            ),
+            "Validate value is not blank"
+        )
+
+    suspend fun validateDirectory(
+        config: DTOs.CdrClientConfig,
+        directory: String?,
+        validations: List<DomainObjects.ValidationType>
+    ): Result<DTOs.ValidationResult> =
+        putAnything<DTOs.CdrClientConfig, DTOs.ValidationResult>(
+            CDR_CLIENT_VALIDATE_DIRECTORY_URL.run {
+                addQueryParams(
+                    "dir" to directory
+                )
+            }.run {
+                addQueryParams(*(validations.map { validation -> "validation" to validation.name }.toTypedArray()))
+            },
+            config,
+            "Validate directory is read/writable"
+        )
 
     suspend fun getClientServiceConfiguration(): Result<DTOs.CdrClientConfig> =
         getAnything<DTOs.CdrClientConfig>(CDR_CLIENT_CONFIG_URL, "Get client service configuration")
 
     suspend fun updateClientServiceConfiguration(config: DTOs.CdrClientConfig): Result<DTOs.CdrClientConfig> =
-        putAnything<DTOs.CdrClientConfig>(CDR_CLIENT_CONFIG_URL, config, "Update client service configuration")
+        putAnything<DTOs.CdrClientConfig, DTOs.CdrClientConfig>(CDR_CLIENT_CONFIG_URL, config, "Update client service configuration")
 
     suspend fun shutdownClientServiceProcess(): Result<DTOs.ShutdownResponse> =
         getAnything<DTOs.ShutdownResponse>(SHUTDOWN_URL, "Send command to shut down the client service")
@@ -46,7 +74,7 @@ internal class CdrClientApiClient {
             logger.debug { "BEGIN - Get client service status; retry count '$retryCount'" }
             runCatching {
                 HttpClient
-                    .configure()
+                    .instance
                     .newCall(
                         HttpClient.get(STATUS_URL)
                     )
@@ -54,7 +82,7 @@ internal class CdrClientApiClient {
                     .use { response: Response ->
                         val responseString: String = response.body
                             .use { body ->
-                                body?.string() ?: ""
+                                body?.string() ?: EMPTY_STRING
                             }.also {
                                 logger.trace { "Response body: '$it'" }
                             }
@@ -77,11 +105,14 @@ internal class CdrClientApiClient {
         }
     }
 
-    private suspend inline fun <reified T> getAnything(url: URL, action: String): Result<T> = withContext(Dispatchers.IO) {
+    private suspend inline fun <reified T> getAnything(
+        url: HttpUrl,
+        action: String,
+    ): Result<T> = withContext(Dispatchers.IO) {
         logger.info { "BEGIN - $action" }
         runCatching {
             HttpClient
-                .configure()
+                .instance
                 .newCall(
                     HttpClient.get(url)
                 )
@@ -89,20 +120,21 @@ internal class CdrClientApiClient {
                 .use { response: Response ->
                     val responseString: String = response.body
                         .use { body ->
-                            body?.string() ?: ""
+                            body?.string() ?: EMPTY_STRING
                         }.also {
-                            logger.trace { "Response body: '$it'" }
+                            logger.trace { "raw response body: '$it'" }
                         }
 
                     if (response.isSuccessful) {
                         val result = JSON.decodeFromString<T>(responseString)
+                        logger.trace { "parsed response body: '$result'" }
                         logger.info { "END success - $action" }
                         Result.Success(result)
                     } else {
                         logger.info {
                             "END failed - $action; code: '${response.code}'; body: '$responseString'"
                         }
-                        Result.ValidationError(mapOf("statusCode" to response.code, "body" to responseString))
+                        Result.ServiceError(mapOf("statusCode" to response.code, "body" to responseString))
                     }
                 }
         }.getOrElse { error ->
@@ -111,11 +143,12 @@ internal class CdrClientApiClient {
         }
     }
 
-    private suspend inline fun <reified T> putAnything(url: URL, body: T, action: String): Result<T> = withContext(Dispatchers.IO) {
+    private suspend inline fun <reified V, reified T> putAnything(url: HttpUrl, body: V, action: String): Result<T> = withContext(Dispatchers.IO) {
         logger.info { "BEGIN - $action" }
+        logger.trace { "request body: '$body'" }
         runCatching {
             HttpClient
-                .configure()
+                .instance
                 .newCall(
                     HttpClient.put(url, JSON.encodeToString(body))
                 )
@@ -123,7 +156,7 @@ internal class CdrClientApiClient {
                 .use { response: Response ->
                     val responseString: String = response.body
                         .use { body ->
-                            body?.string() ?: ""
+                            body?.string() ?: EMPTY_STRING
                         }.also {
                             logger.trace { "Response body: '$it'" }
                         }
@@ -143,12 +176,12 @@ internal class CdrClientApiClient {
                         }.mapCatching { problemProperties ->
                             problemProperties.associate { it.key to it.value.jsonPrimitive.content }
                         }.mapCatching<Result<T>, Map<String, String>> { problemPropertiesMap ->
-                            Result.ValidationError(problemPropertiesMap)
+                            Result.ServiceError(problemPropertiesMap)
                         }.getOrElse { exception ->
                             logger.debug {
                                 "failed to parse response body as problem json with a properties map; response: '$responseString', exception: $exception"
                             }
-                            Result.ValidationError(mapOf("statusCode" to response.code, "body" to responseString))
+                            Result.ServiceError(mapOf("statusCode" to response.code, "body" to responseString))
                         }
                     }
                 }
@@ -203,13 +236,19 @@ internal class CdrClientApiClient {
         private const val CDR_CLIENT_BASE_URL = "http://localhost:8191/api"
 
         @JvmStatic
-        private val SHUTDOWN_URL = "$CDR_CLIENT_BASE_URL/shutdown?reason=configurationChange".toHttpUrl().toUrl()
+        private val SHUTDOWN_URL = "$CDR_CLIENT_BASE_URL/shutdown?reason=configurationChange".toHttpUrl()
 
         @JvmStatic
-        private val STATUS_URL = "$CDR_CLIENT_BASE_URL/status".toHttpUrl().toUrl()
+        private val STATUS_URL = "$CDR_CLIENT_BASE_URL/status".toHttpUrl()
 
         @JvmStatic
-        private val CDR_CLIENT_CONFIG_URL = "$CDR_CLIENT_BASE_URL/service-configuration".toHttpUrl().toUrl()
+        private val CDR_CLIENT_CONFIG_URL = "$CDR_CLIENT_BASE_URL/service-configuration".toHttpUrl()
+
+        @JvmStatic
+        private val CDR_CLIENT_VALIDATE_DIRECTORY_URL = "$CDR_CLIENT_BASE_URL/validate-directory".toHttpUrl()
+
+        @JvmStatic
+        private val CDR_CLIENT_VALIDATE_VALUE_NOT_BLANK = "$CDR_CLIENT_BASE_URL/validate-not-blank".toHttpUrl()
 
         @JvmStatic
         private val JSON = Json {}
@@ -217,28 +256,36 @@ internal class CdrClientApiClient {
 
 }
 
-
 private object HttpClient : OkHttpClient() {
 
-    fun configure(): OkHttpClient = newBuilder()
+    val instance = configure()
+
+    private fun configure(): OkHttpClient = newBuilder()
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
 
-    fun get(to: URL): Request {
+    fun get(to: HttpUrl): Request {
         return Request.Builder()
             .url(to)
             .get()
             .build()
     }
 
-    fun put(to: URL, body: String): Request {
+    fun put(to: HttpUrl, body: String): Request {
         return Request.Builder()
             .url(to)
             .put(body.toRequestBody())
             .header("Content-Type", "application/json")
             .build()
     }
+
+    fun HttpUrl.addQueryParams(vararg queryParams: Pair<String, String?>): HttpUrl =
+        this.newBuilder().apply {
+            queryParams.forEach { (key, value) ->
+                addQueryParameter(key, value)
+            }
+        }.build()
 
     const val CONNECT_TIMEOUT_SECONDS: Long = 1L
     const val READ_TIMEOUT_SECONDS: Long = 1L

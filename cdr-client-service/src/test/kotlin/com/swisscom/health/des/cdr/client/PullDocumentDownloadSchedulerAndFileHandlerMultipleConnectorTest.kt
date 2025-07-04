@@ -5,7 +5,12 @@ import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.microsoft.aad.msal4j.TokenSource
+import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Customer
+import com.swisscom.health.des.cdr.client.config.Host
+import com.swisscom.health.des.cdr.client.config.TempDownloadDir
+import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CONNECTOR_ID_HEADER
 import com.swisscom.health.des.cdr.client.handler.PULL_RESULT_ID_HEADER
@@ -107,8 +112,8 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         cdrServiceMock = MockWebServer()
         cdrServiceMock.start()
 
-        val endpoint = CdrClientConfig.Endpoint(
-            host = cdrServiceMock.hostName,
+        val endpoint = CdrApi(
+            host = Host(cdrServiceMock.hostName),
             basePath = "documents",
             scheme = "http",
             port = cdrServiceMock.port,
@@ -118,7 +123,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
                 connectorId = connectorId1,
                 targetFolder = tmpDir.resolve(directory1),
                 sourceFolder = tmpDir.resolve(directory1).resolve("source"),
-                contentType = forumDatenaustauschMediaType,
+                contentType = forumDatenaustauschMediaType.toString(),
                 mode = CdrClientConfig.Mode.TEST,
             )
         val connector2 =
@@ -126,7 +131,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
                 connectorId = connectorId2,
                 targetFolder = tmpDir.resolve(directory2),
                 sourceFolder = tmpDir.resolve(directory2).resolve("source"),
-                contentType = forumDatenaustauschMediaType,
+                contentType = forumDatenaustauschMediaType.toString(),
                 mode = CdrClientConfig.Mode.PRODUCTION,
             )
         val localFolder = tmpDir.resolve(inflightFolder)
@@ -135,10 +140,10 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         connector2.sourceFolder.createDirectories()
         localFolder.createDirectories()
 
-        every { config.customer } returns listOf(connector1, connector2)
+        every { config.customer } returns Customer(listOf(connector1, connector2))
         every { config.cdrApi } returns endpoint
-        every { config.localFolder } returns localFolder
-        every { config.idpCredentials.tenantId } returns "something"
+        every { config.localFolder } returns TempDownloadDir(localFolder)
+        every { config.idpCredentials.tenantId } returns TenantId("something")
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } answers { "Mocked Result" }
 

@@ -14,6 +14,7 @@ import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.kdroid.composetray.tray.api.Tray
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.ui.CdrConfigViewModel.Companion.STATUS_CHECK_DELAY
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB_icon
@@ -54,7 +55,12 @@ fun main() = application {
         title = stringResource(Res.string.app_name),
         icon = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon), // not rendered on Ubuntu-Linux
     ) {
-        CdrConfigScreen(viewModel = cdrConfigViewModel)
+        CdrConfigScreen(
+            viewModel = cdrConfigViewModel,
+            remoteViewValidations = CdrConfigViewRemoteValidations(
+                cdrClientApiClient = CdrClientApiClient()
+            )
+        )
     }
 
     // I am not using JetBrains' default Tray() implementation:
@@ -82,7 +88,7 @@ private fun ApplicationScope.CdrSystemTray(
         iconContent = {
             Icon(
                 painter = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon),
-                contentDescription = "",
+                contentDescription = EMPTY_STRING,
                 tint = Color.Unspecified,
                 modifier = Modifier.fillMaxSize()
                 // neither of these options works (on linux, at least); intention was to update the client service status when the tray icon is clicked

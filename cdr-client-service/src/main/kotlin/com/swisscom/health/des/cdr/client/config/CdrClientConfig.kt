@@ -1,32 +1,29 @@
 package com.swisscom.health.des.cdr.client.config
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Connector
 import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
-import jakarta.annotation.PostConstruct
+import net.minidev.json.annotate.JsonIgnore
 import org.springframework.boot.context.properties.ConfigurationProperties
-import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
-import java.io.IOException
 import java.net.URL
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlin.io.path.createDirectories
-import kotlin.io.path.deleteExisting
-import kotlin.io.path.exists
-import kotlin.io.path.fileStore
 import kotlin.io.path.isDirectory
-import kotlin.io.path.isReadable
-import kotlin.io.path.isWritable
-import kotlin.io.path.listDirectoryEntries
 
 
 private val logger = KotlinLogging.logger {}
 
+// `@JsonIgnore` had no effect when used on implementing class members
+@JsonIgnoreProperties(value = ["propertyName"])
 internal interface PropertyNameAware {
     val propertyName: String
 }
@@ -40,10 +37,10 @@ internal data class CdrClientConfig(
     val fileSynchronizationEnabled: FileSynchronization,
 
     /** Customer-specific list of [Connectors][Connector]. */
-    val customer: List<Connector>,
+    val customer: Customer,
 
     /** Endpoint coordinates (protocol scheme, host, port, basePath) of the CDR API. */
-    val cdrApi: Endpoint,
+    val cdrApi: CdrApi,
 
     /** Maximum data size of the cache for files in progress. The cache holds filenames, not the files themselves. */
     val filesInProgressCacheSize: DataSize,
@@ -55,7 +52,7 @@ internal data class CdrClientConfig(
     val idpEndpoint: URL,
 
     /** Directory to temporarily store downloaded documents that are pending download acknowledgement. */
-    val localFolder: Path,
+    val localFolder: TempDownloadDir,
 
     /** Maximum number of concurrent document downloads. */
     val pullThreadPoolSize: Int,
@@ -70,7 +67,7 @@ internal data class CdrClientConfig(
     val scheduleDelay: Duration,
 
     /** Endpoint coordinates (protocol scheme, host, port, basePath) of the credential API. */
-    val credentialApi: Endpoint,
+    val credentialApi: CredentialApi,
 
     /** Retry template configuration; retries http calls if IOExceptions or server errors are raised. */
     val retryTemplate: RetryTemplateConfig,
@@ -82,9 +79,8 @@ internal data class CdrClientConfig(
     val fileBusyTestTimeout: Duration,
 
     /** Strategy to test whether a file is still busy (written into) before attempting to upload it. */
-    val fileBusyTestStrategy: FileBusyTestStrategy,
+    val fileBusyTestStrategy: FileBusyTestStrategyProperty,
 ) : PropertyNameAware {
-
     override val propertyName: String
         get() = PROPERTY_NAME
 
@@ -92,11 +88,7 @@ internal data class CdrClientConfig(
         const val PROPERTY_NAME = "client"
 
         @JvmStatic
-        val FREE_DISK_SPACE_WARNING_THRESHOLD: DataSize = DataSize.ofMegabytes(100L)
-
-        @JvmStatic
-        val EMPTY_PATH: Path = Path.of("")
-
+        val TEMP_DIR_PATH: Path = Path.of(System.getProperty("java.io.tmpdir"))
     }
 
     /**
@@ -114,7 +106,7 @@ internal data class CdrClientConfig(
         val sourceFolder: Path,
 
         /** Media type to set for file uploads; currently only `application/forumdatenaustausch+xml;charset=UTF-8` is supported. */
-        val contentType: MediaType,
+        val contentType: String,
 
         /**
          * Whether to enable the archiving of successfully uploaded files. If not enabled, files that have been uploaded get deleted.
@@ -133,30 +125,30 @@ internal data class CdrClientConfig(
          * is set to `true`. If you specify a relative path, it will be resolved relative to the source folder. If you specify an absolute path,
          * the path will be used as is for all archive folders, such as for all [docTypeFolders].
          *
-         * Beware: On Linux both `.` and `./` resolve to the current working directory, while `./archive` (and just `archive`) resolve
+         * Beware: On Linux empty string, `.`, and `./` all resolve to the current working directory, while `./archive` (and just `archive`) resolve
          * to `<source_dir>/archive`.
          *
-         * Default is an empty path, which resolves to the source folder itself.
+         * Default is the system temp directory.
          *
          * @see sourceArchiveEnabled
          * @see getEffectiveSourceArchiveFolder
          * @see sourceFolder
          */
-        val sourceArchiveFolder: Path = EMPTY_PATH,
+        val sourceArchiveFolder: Path = TEMP_DIR_PATH,
 
         /**
          * Folder to move documents to for which the upload has failed. If you specify a relative path, it will be resolved relative
          * to the source folder. If you specify an absolute path, the path will be used as is for all error folders, such as for all [docTypeFolders].
          *
-         * Beware: On Linux both `.` and `./` resolve to the current working directory, while `./error` (and just `error`) resolve
-         * to `<source_dir>/error`.
+         * Beware: On Linux empty string, `.`, and `./` all resolve to the current working directory, while `./archive` (and just `archive`) resolve
+         * to `<source_dir>/archive`.
          *
-         * Default is an empty path, which resolves to the source folder itself.
+         * Default is the system temp directory.
          *
          * @see getEffectiveSourceErrorFolder
          * @see sourceFolder
          */
-        val sourceErrorFolder: Path = EMPTY_PATH,
+        val sourceErrorFolder: Path? = null,
 
         /** Mode of the connector; either `test` or `production`; attempting to upload documents with a mismatching mode attribute value will fail. */
         val mode: Mode,
@@ -184,41 +176,51 @@ internal data class CdrClientConfig(
          * @see sourceArchiveFolder
          * @see sourceFolder
          */
-        fun getEffectiveSourceArchiveFolder(path: Path): Path =
+        @JsonIgnore
+        fun getEffectiveSourceArchiveFolder(path: Path): Path? =
             if (sourceArchiveEnabled) {
                 if (path.isDirectory()) {
                     path
                 } else {
                     path.parent
                 }.resolve(sourceArchiveFolder.resolve(getDateNow()))
+                    .also { createDirectoryIfMissing(it) }
             } else {
-                EMPTY_PATH
-            }.also { createDirectoryIfMissing(it) }
+                null
+            }
 
         /**
          * Convenience property to get the connector archive folder that is used in all cases where no message type related folders are defined.
          * @see getEffectiveSourceArchiveFolder
          */
-        val effectiveConnectorSourceArchiveFolder: Path
-            get() = if (sourceArchiveEnabled) sourceFolder.resolve(sourceArchiveFolder.resolve(getDateNow()))
-                .also { createDirectoryIfMissing(it) } else EMPTY_PATH
+        val effectiveConnectorSourceArchiveFolder: Path?
+            @JsonIgnore
+            get() =
+                if (sourceArchiveEnabled)
+                    sourceFolder.resolve(sourceArchiveFolder.resolve(getDateNow()))
+                        .also { createDirectoryIfMissing(it) }
+                else
+                    null
 
         /**
          * Returns all source folders for all document types of this connector. If a [DocTypeFolders.sourceFolder] is not set, the entry is omitted.
          */
+        @JsonIgnore
         fun getAllSourceDocTypeFolders(): List<Path> = this.docTypeFolders.values.mapNotNull { this.effectiveSourceFolder(it) }
 
         /**
          * Returns the effective source folder for a given [DocTypeFolders] instance. If the [DocTypeFolders.sourceFolder] is not set, returns `null`.
          * @see DocTypeFolders
          */
+        @JsonIgnore
         fun effectiveSourceFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.sourceFolder?.let { this.sourceFolder.resolve(it) }
 
         /**
          * Returns the effective target folder for a given [DocTypeFolders] instance. If the [DocTypeFolders.targetFolder] is not set, returns `null`.
          * @see DocTypeFolders
          */
-        fun effectiveTargetFolder(docTypeFolders: DocTypeFolders): Path = docTypeFolders.targetFolder.let { this.targetFolder.resolve(it) }
+        @JsonIgnore
+        fun effectiveTargetFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.targetFolder?.let { this.targetFolder.resolve(it) }
 
         @Suppress("TooGenericExceptionCaught")
         private fun createDirectoryIfMissing(path: Path): Path = try {
@@ -237,20 +239,28 @@ internal data class CdrClientConfig(
          * @see sourceErrorFolder
          * @see sourceFolder
          */
+        @JsonIgnore
         fun getEffectiveSourceErrorFolder(path: Path): Path =
-            if (path.isDirectory()) {
-                path
-            } else {
-                path.parent
-            }.resolve(sourceErrorFolder.resolve(getDateNow()))
-                .also { createDirectoryIfMissing(it) }
+            (sourceErrorFolder ?: Path.of(EMPTY_STRING)).let { errorDir ->
+                if (path.isDirectory()) {
+                    path
+                } else {
+                    path.parent
+                }.resolve(errorDir.resolve(getDateNow()))
+                    .also { createDirectoryIfMissing(it) }
+            }
+
 
         /**
          * Convenience property to get the connector error folder that is used in all cases where no message type related folders are defined.
          * @see getEffectiveSourceErrorFolder
          */
         val effectiveConnectorSourceErrorFolder: Path
-            get() = sourceFolder.resolve(sourceErrorFolder.resolve(getDateNow())).also { createDirectoryIfMissing(it) }
+            @JsonIgnore
+            get() = (sourceErrorFolder ?: Path.of(EMPTY_STRING)).let { errorDir ->
+                sourceFolder.resolve(errorDir.resolve(getDateNow()))
+                    .also { createDirectoryIfMissing(it) }
+            }
 
         override fun toString(): String {
             return "Connector(connectorId='$connectorId', targetFolder=$targetFolder, sourceFolder=$sourceFolder, " +
@@ -259,7 +269,7 @@ internal data class CdrClientConfig(
                             docTypeFolders.entries.joinToString("; ") { "${it.key}=source=${it.value.sourceFolder},target=${it.value.targetFolder}" }
                         }], "
                     else {
-                        ""
+                        EMPTY_STRING
                     } +
                     "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
                     "effectiveSourceArchiveFolder=${effectiveConnectorSourceArchiveFolder}, " +
@@ -268,7 +278,7 @@ internal data class CdrClientConfig(
                             docTypeFolders.entries.joinToString("; ") { "${it.key}=${getEffectiveSourceArchiveFolder(it.value.sourceFolder!!)}" }
                         }], "
                     else {
-                        ""
+                        EMPTY_STRING
                     } +
                     "sourceErrorFolder=$sourceErrorFolder, effectiveSourceErrorFolder=${effectiveConnectorSourceErrorFolder} " +
                     if (docTypeFolders.isNotEmpty())
@@ -277,7 +287,7 @@ internal data class CdrClientConfig(
                                 .joinToString(", ") { "${it.key}=${getEffectiveSourceErrorFolder(it.value.sourceFolder!!)}" }
                         }], "
                     else {
-                        ""
+                        EMPTY_STRING
                     } +
                     "mode=$mode)"
         }
@@ -287,27 +297,10 @@ internal data class CdrClientConfig(
          */
         data class DocTypeFolders(
             val sourceFolder: Path? = null,
-            val targetFolder: Path = EMPTY_PATH,
+            val targetFolder: Path? = null,
         )
 
     }
-
-    /**
-     * CDR API definition
-     */
-    data class Endpoint(
-        /** Protocol scheme of the endpoint; either `http` or `https`. */
-        val scheme: String,
-
-        /** Hostname/FQDN of the endpoint. */
-        val host: String,
-
-        /** Port to connect to. */
-        val port: Int,
-
-        /** Base path of the endpoint, e.g. `/documents` */
-        val basePath: String,
-    )
 
     data class RetryTemplateConfig(
         /** The number of retries to attempt (on top of the initial request). */
@@ -342,145 +335,95 @@ internal data class CdrClientConfig(
         ALWAYS_BUSY,
     }
 
-    @PostConstruct
-    fun checkAndReport() {
-        if (customer.isEmpty()) {
-            error("There were no customer entries configured")
-        }
-        localFolderIsUnique()
-        if (localFolder.exists() && !localFolder.isDirectory()) {
-            error("Local folder is not a directory: '$localFolder'")
-        }
+}
 
-        if (!localFolder.exists()) {
-            try {
-                localFolder.createDirectories()
-            } catch (ex: IOException) {
-                logger.error { ex }
-                error("Failed to create directory '$localFolder' - Is the path reachable and are there sufficient access rights?")
-            }
-        }
+internal interface Endpoint {
+    /** Protocol scheme of the endpoint; either `http` or `https`. */
+    val scheme: String
 
-        sourceTargetFolderOverlap()
-        // we don't check the target folder for duplicate as customers can configure this deliberately
-        duplicateSourceFolders()
-        checkNoConnectorIdHasTheSameModeDefinedTwice()
-        allFoldersAreReadWriteable()
+    /** Hostname/FQDN of the endpoint. */
+    val host: Host
 
-        if (fileBusyTestTimeout <= fileBusyTestInterval) {
-            error("fileBusyTestTimeout must be greater than fileBusyTestInterval")
-        }
+    /** Port to connect to. */
+    val port: Int
 
-        // throws an exception if any lateinit var (used in toString()) has not been initialized -- we have no optional configuration items
-        val asString = toString()
+    /** Base path of the endpoint, e.g. `/documents` */
+    val basePath: String
+}
 
-        logger.info { "Client configuration: $asString" }
+// Spring fails to assign the endpoint instances with an "object is not of declared type" error if the classes are declared inside the Endpoint interface
+internal data class CdrApi (
+    override val scheme: String,
+    override val host: Host,
+    override val port: Int,
+    override val basePath: String,
+) : Endpoint, PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
 
-        // the error folders have been created automatically when we checked the configuration --> delete them again, if they are empty,
-        // to not pollute the filesystem with directories that hopefully stay empty, on every (re)start of the client
-        customer.forEach {
-            if (it.effectiveConnectorSourceErrorFolder.listDirectoryEntries().isEmpty()) it.effectiveConnectorSourceErrorFolder.deleteExisting()
-        }
+    companion object {
+        const val PROPERTY_NAME = "cdr-api"
     }
+}
 
-    private fun localFolderIsUnique() {
-        val baseSourceFolders = customer.map { it.sourceFolder }
-        val allSourceTypeFolders = getAllSourceDocTypeFolders()
-        val baseTargetFolders = customer.map { it.targetFolder }
-        val allTargetTypeFolders = getAllTargetDocTypeFolders()
+internal data class CredentialApi(
+    override val scheme: String,
+    override val host: Host,
+    override val port: Int,
+    override val basePath: String,
+) : Endpoint, PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
 
-        if ((baseSourceFolders + allSourceTypeFolders + baseTargetFolders + allTargetTypeFolders).contains(localFolder)) {
-            error("The local folder '$localFolder' is configured as source or target folder for a connector")
-        }
-
+    companion object {
+        const val PROPERTY_NAME = "credential-api"
     }
+}
 
-    private fun sourceTargetFolderOverlap() {
-        val baseSourceFolders = customer.map { it.sourceFolder }
-        val allSourceTypeFolders = getAllSourceDocTypeFolders()
-        val baseTargetFolders = customer.map { it.targetFolder }
-        val allTargetTypeFolders = getAllTargetDocTypeFolders()
+@Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
+internal data class Customer(
+    val customer: List<Connector>
+) : PropertyNameAware, MutableList<Connector> by customer.toMutableList() {
 
-        val allSourceFolders: List<Path> = baseSourceFolders + allSourceTypeFolders
-        val allTargetFolders: Set<Path> = (baseTargetFolders + allTargetTypeFolders).toSet()
+    // required by SringBoot
+    constructor() : this(emptyList())
 
-        allSourceFolders.intersect(allTargetFolders).let { sourceAsTargetAndViceVersa ->
-            if (sourceAsTargetAndViceVersa.isNotEmpty()) {
-                error("The following directories are configured as both source and target directories: $sourceAsTargetAndViceVersa")
-            }
-        }
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    companion object {
+        const val PROPERTY_NAME = "customer"
     }
+}
 
-    private fun getAllSourceDocTypeFolders(): List<Path> =
-        customer.flatMap { connector -> connector.docTypeFolders.values.mapNotNull { connector.effectiveSourceFolder(it) } }
+@JvmInline
+internal value class FileBusyTestStrategyProperty(val strategy: CdrClientConfig.FileBusyTestStrategy) : PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
 
-    private fun getAllTargetDocTypeFolders(): List<Path> =
-        customer.flatMap { connector -> connector.docTypeFolders.values.map { connector.effectiveTargetFolder(it) } }
+    companion object {
+        const val PROPERTY_NAME = "file-busy-test-strategy"
 
-    private fun duplicateSourceFolders(): Unit =
-        customer.flatMap { connector ->
-            listOf(connector.sourceFolder) + connector.docTypeFolders.values.mapNotNull { connector.effectiveSourceFolder(it) }
-        }.groupingBy { it }.eachCount().filter { it.value > 1 }.let { duplicateSources ->
-            if (duplicateSources.keys.isNotEmpty()) {
-                error("Duplicate source folders detected: ${duplicateSources.keys}")
-            }
-        }
-
-    private fun checkNoConnectorIdHasTheSameModeDefinedTwice(): Unit =
-        customer.groupBy { it.connectorId }.filter { cd -> cd.value.size > 1 }.values.forEach { connector ->
-            if (connector.groupingBy { cr -> cr.mode }.eachCount().any { it.value > 1 }) {
-                error("A connector has `production` or `test` mode defined defined twice: ${connector[0].connectorId}")
-            }
-        }
-
-    private fun allFoldersAreReadWriteable() {
-        val allFolders: List<Pair<String, Path>> = customer.flatMap {
-            // we only check the base connector archive folders, as all type error folders are created in a folder where the process already needs to have
-            // write access to read/delete files
-            val archiveFolder: Pair<String, Path>? =
-                if (it.sourceArchiveEnabled) "connector '${it.connectorId}' source archive" to it.effectiveConnectorSourceArchiveFolder else null
-            // we only check the base connector error folders, as all type error folders are created in a folder where the process already needs to have
-            // write access to read/delete files
-            val errorFolder: Pair<String, Path>? =
-                if (it.sourceErrorFolder != EMPTY_PATH) "connector '${it.connectorId}' source error" to it.effectiveConnectorSourceErrorFolder else null
-            listOfNotNull(
-                "connector '${it.connectorId}' source" to it.sourceFolder,
-                archiveFolder,
-                errorFolder,
-                "connector '${it.connectorId}' target" to it.targetFolder,
-            ) + it.docTypeFolders.values.flatMap { typeFolder ->
-                listOfNotNull(
-                    it.effectiveSourceFolder(typeFolder)?.let { folder -> "connector '${it.connectorId}' type source" to folder },
-                    it.effectiveTargetFolder(typeFolder).let { folder -> "connector '${it.connectorId}' type target" to folder }
-                )
-            }
-        } + listOf("Global inflight folder (could be changed with the property 'client.local-folder=')" to localFolder)
-
-        allFolders.forEach { (name, folder) ->
-            if (!folder.isDirectory()) {
-                logger.info { "Creating non existing directory '$folder'" }
-                try {
-                    folder.createDirectories()
-                } catch (ex: IOException) {
-                    logger.error { ex }
-                    error("Failed to create directory '$folder' - Is the path reachable and are there sufficient access rights?")
-                }
-                if (!folder.isDirectory()) {
-                    error("$name path '$folder' is not a directory or does not exist.")
-                }
-            }
-            if (!folder.isWritable()) {
-                error("$name path '$folder' isn't writable by running user.")
-            }
-            if (!folder.isReadable()) {
-                error("$name path '$folder' isn't readable by running user.")
-            }
-            if (DataSize.ofBytes(folder.fileStore().usableSpace) < FREE_DISK_SPACE_WARNING_THRESHOLD) {
-                logger.warn { "Filesystem of $name path '$folder' has less than ${FREE_DISK_SPACE_WARNING_THRESHOLD.toMegabytes()}mb of free space." }
-            }
-        }
+        @JvmStatic
+        fun valueOf(value: String): FileBusyTestStrategyProperty =
+            FileBusyTestStrategyProperty(CdrClientConfig.FileBusyTestStrategy.valueOf(value))
     }
+}
 
+@JvmInline
+internal value class FileSynchronization private constructor(val value: Boolean) : PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    companion object {
+        @JvmStatic
+        val ENABLED = FileSynchronization(true)
+
+        @JvmStatic
+        val DISABLED = FileSynchronization(false)
+
+        private const val PROPERTY_NAME = "file-synchronization-enabled"
+    }
 }
 
 /**
@@ -492,10 +435,10 @@ internal data class CdrClientConfig(
  */
 internal data class IdpCredentials(
     /** Tenant ID of the OAuth identity provider. */
-    val tenantId: String,
+    val tenantId: TenantId,
 
     /** Client ID used to authenticate against the OAuth identity provider. Log into CDR web app to look up or create your client ID. */
-    val clientId: String,
+    val clientId: ClientId,
 
     /** Client secret used to authenticate against the OAuth identity provider. Log into the CDR web app to look up or re-issue a client secret. */
     val clientSecret: ClientSecret,
@@ -524,7 +467,7 @@ internal data class IdpCredentials(
     /**
      * Time when the client last renewed its secret. Defaults to `1970-01-01T00:00:00Z`.
      */
-    val lastCredentialRenewalTime: LastUpdatedAt = DEFAULT_LAST_CREDENTIAL_RENEWAL_TIME,
+    val lastCredentialRenewalTime: Instant = DEFAULT_LAST_CREDENTIAL_RENEWAL_TIME,
 ) : PropertyNameAware {
 
     override val propertyName: String
@@ -534,7 +477,8 @@ internal data class IdpCredentials(
      * The number of milliseconds until the next credential renewal is due. Negative values will trigger an immediate renewal.
      */
     val millisUntilNextCredentialRenewal: Long
-        get() = maxCredentialAge.toMillis() - ChronoUnit.MILLIS.between(lastCredentialRenewalTime.value, Instant.now())
+        @JsonIgnore
+        get() = maxCredentialAge.toMillis() - ChronoUnit.MILLIS.between(lastCredentialRenewalTime, Instant.now())
 
     companion object {
         const val PROPERTY_NAME = "idp-credentials"
@@ -543,28 +487,28 @@ internal data class IdpCredentials(
         val DEFAULT_MAX_CREDENTIAL_AGE: Duration = Duration.ofDays(365L)
 
         @JvmStatic
-        val DEFAULT_LAST_CREDENTIAL_RENEWAL_TIME: LastUpdatedAt = LastUpdatedAt(Instant.ofEpochSecond(0L))
+        val DEFAULT_LAST_CREDENTIAL_RENEWAL_TIME: Instant = Instant.ofEpochSecond(0L)
     }
 }
 
 @JvmInline
-internal value class FileSynchronization private constructor(val value: Boolean) : PropertyNameAware {
+internal value class TempDownloadDir(val path: Path): PropertyNameAware {
+    constructor(path: String) : this(Paths.get(path))
+
     override val propertyName: String
         get() = PROPERTY_NAME
 
     companion object {
-        @JvmStatic
-        val ENABLED = FileSynchronization(true)
-
-        @JvmStatic
-        val DISABLED = FileSynchronization(false)
-
-        private const val PROPERTY_NAME = "file-synchronization-enabled"
+        const val PROPERTY_NAME = "local-folder"
     }
 }
 
+//
+// BEGIN - Value classes for IdpCredentials properties
+//
+
 @JvmInline
-internal value class RenewCredential (val value: Boolean) : PropertyNameAware {
+internal value class RenewCredential(val value: Boolean) : PropertyNameAware {
     override val propertyName: String
         get() = PROPERTY_NAME
 
@@ -580,6 +524,26 @@ internal value class RenewCredential (val value: Boolean) : PropertyNameAware {
 }
 
 @JvmInline
+internal value class TenantId(val id: String) : PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    companion object {
+        const val PROPERTY_NAME = "tenant-id"
+    }
+}
+
+@JvmInline
+internal value class ClientId(val id: String) : PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    companion object {
+        const val PROPERTY_NAME = "client-id"
+    }
+}
+
+@JvmInline
 internal value class ClientSecret(val value: String) : PropertyNameAware {
     override val propertyName: String
         get() = PROPERTY_NAME
@@ -591,15 +555,27 @@ internal value class ClientSecret(val value: String) : PropertyNameAware {
     }
 }
 
+//
+// END - Value classes for IdpCredentials properties
+//
+
+//
+// BEGIN - Value classes for Endpoint properties
+//
+
 @JvmInline
-internal value class LastUpdatedAt(val value: Instant) : PropertyNameAware {
+internal value class Host(val fqdn: String) : PropertyNameAware {
     override val propertyName: String
         get() = PROPERTY_NAME
 
     companion object {
-        const val PROPERTY_NAME = "last-credential-renewal-time"
+        const val PROPERTY_NAME = "host"
     }
 }
+
+//
+// END - Value classes for Endpoint properties
+//
 
 internal fun List<Connector>.getConnectorForSourceFile(file: Path): Connector =
     this.first { it.sourceFolder == file.parent || it.getAllSourceDocTypeFolders().contains(file.parent) }

@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.DownloadDocumentResult
 import com.swisscom.health.des.cdr.client.xml.DocumentType
@@ -44,7 +45,7 @@ internal class PullFileHandling(
                     when (val result = tryDownloadNextDocument(connector)) {
                         is DownloadDocumentResult.Success -> counter++  // carry on; there might be more files in the download queue
                         is DownloadDocumentResult.NoDocumentPending -> break // we are done for this time round
-                        is DownloadDocumentResult.DownloadError -> throw IllegalStateException(
+                        is DownloadDocumentResult.Error -> throw IllegalStateException(
                             "Error while downloading file for connector '${connector.connectorId}'",
                             result.t
                         )
@@ -69,16 +70,16 @@ internal class PullFileHandling(
         cdrApiClient.downloadDocument(
             connectorId = connector.connectorId,
             mode = connector.mode,
-            traceId = tracer.currentSpan()?.context()?.traceId() ?: ""
+            traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
         ).let { downloadResult: DownloadDocumentResult ->
-            if (downloadResult is DownloadDocumentResult.Success) {
+            if (downloadResult is DownloadDocumentResult.DownloadSuccess) {
                 cdrApiClient.acknowledgeDocumentDownload(
                     connectorId = connector.connectorId,
                     mode = connector.mode,
                     downloadId = downloadResult.pullResultId,
-                    traceId = tracer.currentSpan()?.context()?.traceId() ?: ""
+                    traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
                 ).let { ackResult: DownloadDocumentResult ->
-                    if (ackResult is DownloadDocumentResult.Success) {
+                    if (ackResult is DownloadDocumentResult.AcknowledgeSuccess) {
                         moveFileToClientFolder(connector, downloadResult.file)
                     }
                     ackResult
@@ -98,21 +99,25 @@ internal class PullFileHandling(
      * @param connector the connector for whom the file was requested
      * @param file the file to move
      */
-    @Suppress("TooGenericExceptionCaught")
     private fun moveFileToClientFolder(connector: CdrClientConfig.Connector, file: Path) {
         logger.debug { "Move file to target directory start" }
-        val targetFolder = if (connector.docTypeFolders.isEmpty()) {
-            connector.targetFolder
-        } else {
-            val documentType: DocumentType = try {
-                xmlParser.findSchemaDefinition(file.inputStream().use { it.toDom() })
-            } catch (e: Exception) {
-                logger.error { "Error parsing schema definition for file '$file': ${e.message}" }
-                throw e
+        val targetFolder =
+            if (connector.docTypeFolders.isEmpty()) {
+                connector.targetFolder
+            } else {
+                val documentType: DocumentType =
+                    runCatching {
+                        xmlParser.findSchemaDefinition(file.inputStream().use { it.toDom() })
+                    }.fold(
+                        onSuccess = { it },
+                        onFailure = { e ->
+                            logger.error { "Failed to determine document type of file '$file': ${e.message}" }
+                            DocumentType.UNDEFINED
+                        }
+                    )
+                connector.docTypeFolders[documentType]?.let { docTypeFolder -> connector.effectiveTargetFolder(docTypeFolder) }
+                    ?: connector.targetFolder.also { logger.debug { "No specific target folder defined for files of type '${documentType}'" } }
             }
-            connector.docTypeFolders[documentType]?.let { docTypeFolder -> connector.effectiveTargetFolder(docTypeFolder) }
-                ?: connector.targetFolder.also { logger.info { "No specific target folder defined for files of type '${documentType}'" } }
-        }
         val targetTmpFile = targetFolder.resolve(file.name)
 
         runCatching {

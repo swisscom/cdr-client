@@ -2,33 +2,42 @@ package com.swisscom.health.des.cdr.client.ui
 
 import androidx.compose.desktop.ui.tooling.preview.Preview
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Divider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.alorma.compose.settings.ui.SettingsMenuLink
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_apply
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cancel
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host_placeholder
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_file_busy_strategy
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_file_busy_strategy_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_service_status
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service_subtitle
@@ -48,27 +57,98 @@ private val logger = KotlinLogging.logger {}
 internal fun CdrConfigScreen(
     modifier: Modifier = Modifier,
     viewModel: CdrConfigViewModel,
+    remoteViewValidations: CdrConfigViewRemoteValidations,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
-    ) {
-        val uiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
+    ) { paddingValues: PaddingValues ->
+        val uiState: CdrConfigUiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
+        val scrollState: ScrollState = rememberScrollState()
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceAround,
-            modifier = modifier.padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+            modifier = modifier
+                .verticalScroll(scrollState)
+                .padding(16.dp),
         ) {
             SwisscomLogo(modifier.size(86.dp).padding(16.dp))
+
             Divider(modifier = modifier)
+
+            // client service staus
             Row(modifier = modifier.padding(16.dp)) {
                 Text(text = stringResource(Res.string.label_client_service_status))
                 Spacer(Modifier.weight(1f))
                 Text(text = statusStringResource(uiState.clientServiceStatus))
             }
+
             Divider(modifier = modifier)
-            ClientServiceOption(modifier, viewModel, uiState.clientServiceConfig.fileSynchronizationEnabled)
+
+            // client service enabled/disabled option
+            OnOffSwitch(
+                name = DomainObjects.ConfigurationItem.SYNC_SWITCH,
+                modifier = modifier.padding(all = 8.dp).padding(bottom = 16.dp),
+                title = stringResource(Res.string.label_enable_client_service),
+                subtitle = stringResource(Res.string.label_enable_client_service_subtitle),
+                checked = uiState.clientServiceConfig.fileSynchronizationEnabled,
+                onValueChange = { viewModel.setFileSync(it) },
+            )
+
+            Divider(modifier = modifier)
+
+            // CDR API Host
+            var cdrHostValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
+            LaunchedEffect(uiState.clientServiceConfig.cdrApi.host) {
+                cdrHostValidationResult =
+                    remoteViewValidations.validateNotBlank(uiState.clientServiceConfig.cdrApi.host, DomainObjects.ConfigurationItem.CDR_API_HOST)
+            }
+            ValidatedTextField(
+                name = DomainObjects.ConfigurationItem.CDR_API_HOST,
+                modifier = modifier.padding(8.dp).fillMaxWidth(),
+                validatable = { cdrHostValidationResult },
+                label = { Text(text = stringResource(Res.string.label_cdr_api_host)) },
+                value = uiState.clientServiceConfig.cdrApi.host,
+                placeHolder = { Text(text = stringResource(Res.string.label_cdr_api_host_placeholder)) },
+                onValueChange = { viewModel.setCdrApiHost(it) },
+            )
+
+            Divider(modifier = modifier)
+
+            // File busy test strategy
+            DropDownList(
+                name = DomainObjects.ConfigurationItem.FILE_BUSY_TEST_STRATEGY,
+                modifier = modifier.padding(8.dp).fillMaxWidth(),
+                initiallyExpanded = false,
+                options = { DTOs.CdrClientConfig.FileBusyTestStrategy.entries.filter { it != DTOs.CdrClientConfig.FileBusyTestStrategy.ALWAYS_BUSY } },
+                label = { Text(text = stringResource(Res.string.label_client_file_busy_strategy)) },
+                placeHolder = { Text(text = stringResource(Res.string.label_client_file_busy_strategy_placeholder)) },
+                value = uiState.clientServiceConfig.fileBusyTestStrategy.toString(),
+                onValueChange = { viewModel.setFileBusyTestStrategy(it) }
+            )
+
+            Divider(modifier = modifier)
+
+            ConnectorSettingsGroup(
+                modifier = modifier,
+                remoteViewValidations = remoteViewValidations,
+                viewModel = viewModel,
+                uiState = uiState,
+            )
+
+            Divider(modifier = modifier)
+
+            // IdP settings
+            IdpSettingsGroup(
+                modifier = modifier,
+                viewModel = viewModel,
+                uiState = uiState,
+                remoteViewValidations = remoteViewValidations,
+            )
+
+            Divider(modifier = modifier)
+
             ButtonRow(viewModel = viewModel, modifier = modifier.fillMaxWidth(.75f).padding(16.dp))
         }
 
@@ -109,24 +189,6 @@ private fun SwisscomLogo(modifier: Modifier) =
     }
 
 @Composable
-private fun ClientServiceOption(modifier: Modifier, viewModel: CdrConfigViewModel, checked: Boolean) =
-    SettingsMenuLink(
-        title = { Text(text = stringResource(Res.string.label_enable_client_service)) },
-        subtitle = { Text(text = stringResource(Res.string.label_enable_client_service_subtitle)) },
-        modifier = modifier,
-        enabled = true,
-        action = {
-            Switch(
-                checked = checked,
-                onCheckedChange = { viewModel.fileSynchronizationEnabled = it; logger.debug {  "file sync enabled: $it" } },
-            )
-        },
-        onClick = { },
-    ).also {
-        logger.trace { "ClientServiceOption has been (re-)composed." }
-    }
-
-@Composable
 private fun ButtonRow(viewModel: CdrConfigViewModel, modifier: Modifier) =
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -153,4 +215,4 @@ private fun ApplyButton(onClick: () -> Unit) =
         label = stringResource(Res.string.label_apply),
 //        toolTip = "Save new configuration and restart the client service to pick up the changes",
         onClick = onClick,
-    ).also {  logger.trace { "ApplyButton has been (re-)composed." } }
+    ).also { logger.trace { "ApplyButton has been (re-)composed." } }

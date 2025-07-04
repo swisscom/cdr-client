@@ -1,8 +1,10 @@
-@file:UseSerializers(InstantSerializer::class, DurationSerializer::class, UrlSerializer::class, NioPathSerializer::class)
+@file:UseSerializers(InstantSerializer::class, DurationSerializer::class, UrlSerializer::class)
 
 package com.swisscom.health.des.cdr.client.common
 
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.UseSerializers
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -10,9 +12,7 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
-import java.net.URI
 import java.net.URL
-import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 
@@ -34,23 +34,74 @@ object UrlSerializer : KSerializer<URL> {
     override fun deserialize(decoder: Decoder): URL = URL(decoder.decodeString())
 }
 
-// Need to be compatible with `com.fasterxml.jackson.databind.ext.NioPathSerializer.serialize` where a java.nio.file.Path is serialized as a URI string.
-object NioPathSerializer : KSerializer<Path> {
-    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.nio.file.Path", PrimitiveKind.STRING)
-    override fun serialize(encoder: Encoder, value: Path) = encoder.encodeString(value.toUri().toString())
-    override fun deserialize(decoder: Decoder): Path = decoder.decodeString()
-        .run {
-            runCatching {
-                // Try to parse as a URI first, as this is how Jackson serializes it.
-                Path.of(URI(this))
-            }
-                .recoverCatching {
-                    Path.of(this)
-                }.getOrThrow()
-        }
-}
-
 class DTOs {
+
+    @Serializable
+    sealed interface ValidationResult {
+        val type: String
+
+        @Serializable
+        @SerialName("success")
+        object Success : ValidationResult {
+            override val type: String = "success"
+        }
+
+        @Serializable
+        @SerialName("failure")
+        data class Failure(
+            val validationDetails: List<ValidationDetail>
+        ) : ValidationResult {
+            override val type: String = "failure"
+        }
+
+        operator fun plus(other: ValidationResult): ValidationResult =
+            when (this) {
+                is Success -> other
+                is Failure -> when (other) {
+                    is Success -> this
+                    is Failure -> Failure(this.validationDetails + other.validationDetails)
+                }
+            }
+    }
+
+    @Serializable
+    sealed interface ValidationDetail {
+        val type: String
+        val messageKey: ValidationMessageKey
+
+        @Serializable
+        @SerialName("configItemDetail")
+        data class ConfigItemDetail(
+            val configItem: DomainObjects.ConfigurationItem,
+            override val messageKey: ValidationMessageKey
+        ) : ValidationDetail {
+            override val type: String = "configItemDetail"
+        }
+
+        @Serializable
+        @SerialName("pathDetail")
+        data class PathDetail(
+            val path: String,
+            override val messageKey: ValidationMessageKey
+        ) : ValidationDetail {
+            override val type: String = "pathDetail"
+        }
+    }
+
+    enum class ValidationMessageKey {
+        NOT_A_DIRECTORY,
+        DIRECTORY_NOT_FOUND,
+        NOT_READ_WRITABLE,
+        LOCAL_DIR_OVERLAPS_WITH_SOURCE_DIRS,
+        LOCAL_DIR_OVERLAPS_WITH_TARGET_DIRS,
+        TARGET_DIR_OVERLAPS_SOURCE_DIRS,
+        DUPLICATE_SOURCE_DIRS,
+        DUPLICATE_MODE,
+        VALUE_IS_BLANK,
+        FILE_BUSY_TEST_TIMEOUT_TOO_LONG,
+        NO_CONNECTOR_CONFIGURED,
+    }
+
 
     @Serializable
     data class StatusResponse(
@@ -58,18 +109,17 @@ class DTOs {
         val errorCodes: List<String> = emptyList(),
     ) {
 
-        enum class StatusCode {
-            UNKNOWN,
-            SYNCHRONIZING,
-            DISABLED,
-            ERROR,
-            OFFLINE,
+        enum class StatusCode(val isOnlineState: Boolean) {
+            UNKNOWN(false),
+            SYNCHRONIZING(true),
+            DISABLED(true),
+            ERROR(true),
+            OFFLINE(false);
+
+            val isOfflineState: Boolean
+                get() = !isOnlineState
         }
 
-        enum class ErrorCode(val code: String) {
-            UNKNOWN("unknown"),
-            CONFIGURATION_ERROR("configuration_error"),
-        }
     }
 
     @Serializable
@@ -83,7 +133,11 @@ class DTOs {
     /**
      * CDR client configuration class hierarchy. It is an almost verbatim copy of `com.swisscom.health.des.cdr.client.config.CdrClientConfig`.
      *
-     * NOTE: Deserialization with Jackson fails if constructor parameters don't have default values.
+     * A note on `java.nio.Path`:<br/>
+     * All Path types have been replaced with the String type because `Path` removes trailing forward slashes in its string
+     * representation. As the string value is the value displayed in the UI, this leads to an effect that makes it look like forward slashes cannot be
+     * entered. While, in fact, they are entered, used to create a new Path instance, and then rendered as the string representation of that Path instance,
+     * which does not contain trailing forward slashes.
      */
     @Serializable
     data class CdrClientConfig(
@@ -93,7 +147,7 @@ class DTOs {
         val filesInProgressCacheSize: String,
         val idpCredentials: IdpCredentials,
         val idpEndpoint: URL,
-        val localFolder: Path,
+        val localFolder: String,
         val pullThreadPoolSize: Int,
         val pushThreadPoolSize: Int,
         val retryDelay: List<Duration>,
@@ -111,10 +165,10 @@ class DTOs {
                 fileSynchronizationEnabled = false,
                 customer = emptyList(),
                 cdrApi = Endpoint.EMPTY,
-                filesInProgressCacheSize = "",
+                filesInProgressCacheSize = EMPTY_STRING,
                 idpCredentials = IdpCredentials.EMPTY,
                 idpEndpoint = URL("http://localhost:8080"),
-                localFolder = EMPTY_PATH,
+                localFolder = EMPTY_STRING,
                 pullThreadPoolSize = 0,
                 pushThreadPoolSize = 0,
                 retryDelay = emptyList(),
@@ -130,21 +184,44 @@ class DTOs {
         @Serializable
         data class Connector(
             val connectorId: String,
-            val targetFolder: Path,
-            val sourceFolder: Path,
+            val targetFolder: String,
+            val sourceFolder: String,
             val contentType: String,
             val sourceArchiveEnabled: Boolean,
-            val sourceArchiveFolder: Path,
-            val sourceErrorFolder: Path,
+            val sourceArchiveFolder: String,
+            val sourceErrorFolder: String? = null,
             val mode: Mode,
             val docTypeFolders: Map<DocumentType, DocTypeFolders>,
         ) {
 
             @Serializable
             data class DocTypeFolders(
-                val sourceFolder: Path? = null,
-                val targetFolder: Path,
-            )
+                val sourceFolder: String? = null,
+                val targetFolder: String? = null,
+            ) {
+                companion object {
+                    @JvmStatic
+                    val EMPTY = DocTypeFolders(
+                        sourceFolder = null,
+                        targetFolder = null
+                    )
+                }
+            }
+
+            companion object {
+                @JvmStatic
+                val EMPTY = Connector(
+                    connectorId = EMPTY_STRING,
+                    targetFolder = EMPTY_STRING,
+                    sourceFolder = EMPTY_STRING,
+                    contentType = EMPTY_STRING,
+                    sourceArchiveEnabled = false,
+                    sourceArchiveFolder = EMPTY_STRING,
+                    sourceErrorFolder = null,
+                    mode = Mode.NONE,
+                    docTypeFolders = emptyMap()
+                )
+            }
 
         }
 
@@ -158,10 +235,10 @@ class DTOs {
             companion object {
                 @JvmStatic
                 val EMPTY = Endpoint(
-                    scheme = "",
-                    host = "",
+                    scheme = EMPTY_STRING,
+                    host = EMPTY_STRING,
                     port = 0,
-                    basePath = ""
+                    basePath = EMPTY_STRING
                 )
             }
         }
@@ -179,9 +256,9 @@ class DTOs {
             companion object {
                 @JvmStatic
                 val EMPTY = IdpCredentials(
-                    tenantId = "",
-                    clientId = "",
-                    clientSecret = "",
+                    tenantId = EMPTY_STRING,
+                    clientId = EMPTY_STRING,
+                    clientSecret = EMPTY_STRING,
                     scopes = emptyList(),
                     renewCredential = false,
                     maxCredentialAge = Duration.ZERO,
@@ -237,13 +314,6 @@ class DTOs {
             /** always flags the file as 'busy'; only useful for test scenarios. */
             ALWAYS_BUSY,
         }
-
-    }
-
-    companion object {
-
-        @JvmStatic
-        val EMPTY_PATH: Path = Path.of("")
 
     }
 

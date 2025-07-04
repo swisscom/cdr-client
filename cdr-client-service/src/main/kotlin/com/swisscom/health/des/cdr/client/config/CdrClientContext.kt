@@ -7,6 +7,7 @@ import com.microsoft.aad.msal4j.ClientCredentialFactory
 import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.ConfidentialClientApplication
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
+import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +58,7 @@ internal class CdrClientContext {
                     throw HttpServerErrorException(
                         message = "Received error status code '${response.code}'.",
                         statusCode = response.code,
-                        responseBody = response.body?.string() ?: ""
+                        responseBody = response.body?.string() ?: EMPTY_STRING
                     )
                 }
 
@@ -125,7 +126,7 @@ internal class CdrClientContext {
     @Bean
     fun confidentialClientApp(config: CdrClientConfig): IConfidentialClientApplication =
         ConfidentialClientApplication.builder(
-            config.idpCredentials.clientId,
+            config.idpCredentials.clientId.id,
             ClientCredentialFactory.createFromSecret(config.idpCredentials.clientSecret.value)
         ).authority(config.idpEndpoint.toString())
             .build()
