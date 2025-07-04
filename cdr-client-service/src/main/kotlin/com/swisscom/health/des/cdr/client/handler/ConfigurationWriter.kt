@@ -104,7 +104,7 @@ internal class ConfigurationWriter(
         }
     }
 
-    @Suppress("CyclomaticComplexMethod", "NestedBlockDepth")
+    @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
     private fun updateYamlSource(changedConfigItem: UpdatableConfigurationItem.WritableResourceConfigurationItem): Unit =
         YAMLMapper(
             YAMLFactory()
@@ -112,6 +112,7 @@ internal class ConfigurationWriter(
                 .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR)
                 .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
         ).run {
+            // unmarshal the YAML file the to-be-updated value belongs to
             val yamlNode: JsonNode = readTree(changedConfigItem.writableResource.inputStream)
             var tmpNode = yamlNode as ObjectNode
             val remainingNodeNames = ArrayDeque(changedConfigItem.propertyPath.split("."))
@@ -123,6 +124,7 @@ internal class ConfigurationWriter(
             // unbox kotlin value classes
             val newValue: Any = if (changedConfigItem.newValue::class.isValue) changedConfigItem.newValue.unbox() else changedConfigItem.newValue
 
+            // update node with new value
             tmpNode.apply {
                 when (newValue) {
                     is Collection<*> -> {
@@ -182,6 +184,7 @@ internal class ConfigurationWriter(
                 }
             }
 
+            // persist the updated YAML file
             writeValue(changedConfigItem.writableResource.outputStream.writer(), yamlNode)
         }
 
