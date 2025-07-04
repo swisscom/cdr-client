@@ -21,7 +21,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -96,17 +98,20 @@ internal fun CdrConfigScreen(
 
             Divider(modifier = modifier)
 
-            // TODO: replace with a dropdown to select the environment and set CDR host and tenant ID accordingly
             // CDR API Host
-            DropDownList(
+            var cdrHostValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
+            LaunchedEffect(uiState.clientServiceConfig.cdrApi.host) {
+                cdrHostValidationResult =
+                    remoteViewValidations.validateNotBlank(uiState.clientServiceConfig.cdrApi.host, DomainObjects.ConfigurationItem.CDR_API_HOST)
+            }
+            ValidatedTextField(
                 name = DomainObjects.ConfigurationItem.CDR_API_HOST,
                 modifier = modifier.padding(8.dp).fillMaxWidth(),
-                initiallyExpanded = false,
-                options = { listOf("cdr.health.swisscom.ch", "stg.cdr.health.swisscom.ch") },
+                validatable = { cdrHostValidationResult },
                 label = { Text(text = stringResource(Res.string.label_cdr_api_host)) },
-                placeHolder = { Text(text = stringResource(Res.string.label_cdr_api_host_placeholder)) },
                 value = uiState.clientServiceConfig.cdrApi.host,
-                onValueChange = { viewModel.setCdrApiHost(it) }
+                placeHolder = { Text(text = stringResource(Res.string.label_cdr_api_host_placeholder)) },
+                onValueChange = { viewModel.setCdrApiHost(it) },
             )
 
             Divider(modifier = modifier)

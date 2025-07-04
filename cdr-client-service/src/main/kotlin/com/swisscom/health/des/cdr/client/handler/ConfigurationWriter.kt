@@ -146,6 +146,11 @@ internal class ConfigurationWriter(
                         logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
                     }
 
+                    is Long -> {
+                        put(toBeUpdatedNodeName, newValue)
+                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                    }
+
                     is Float -> {
                         put(toBeUpdatedNodeName, newValue)
                         logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }

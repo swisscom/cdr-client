@@ -22,8 +22,8 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_client_secret_renewal
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_client_secret_renewal_subtitle
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_client_secret_renewal_timestamp
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_idp_env
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_idp_env_placeholder
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_tenant_id
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_tenant_id_placeholder
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.compose.resources.stringResource
 
@@ -52,17 +52,20 @@ internal fun IdpSettingsGroup(
             onValueChange = { viewModel.setIdpRenewClientSecret(it) },
         )
 
-        // TODO: replace with a dropdown to select the environment and set host and tenant ID accordingly
         // Tenant ID
-        DropDownList(
+        var tenantIdValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
+        LaunchedEffect(uiState.clientServiceConfig.idpCredentials.tenantId) {
+            tenantIdValidationResult =
+                remoteViewValidations.validateNotBlank(uiState.clientServiceConfig.idpCredentials.tenantId, DomainObjects.ConfigurationItem.IDP_TENANT_ID)
+        }
+        ValidatedTextField(
             name = DomainObjects.ConfigurationItem.IDP_TENANT_ID,
             modifier = modifier.fillMaxWidth(),
-            initiallyExpanded = false,
-            options = { listOf("70b434db-eccb-4280-95dc-1e59220aca55","dc5f3d15-71a0-47ad-a792-f708c9b4d123") }, // prod, stage
-            label = { Text(text = stringResource(Res.string.label_client_idp_settings_idp_env)) },
-            placeHolder = { Text(text = stringResource(Res.string.label_client_idp_settings_idp_env_placeholder)) },
+            validatable = { tenantIdValidationResult },
+            label = { Text(text = stringResource(Res.string.label_client_idp_settings_tenant_id)) },
+            placeHolder = { Text(text = stringResource(Res.string.label_client_idp_settings_tenant_id_placeholder)) },
             value = uiState.clientServiceConfig.idpCredentials.tenantId,
-            onValueChange = { viewModel.setIdpTenantId(it) }
+            onValueChange = { viewModel.setIdpTenantId(it) },
         )
 
         // Client ID
