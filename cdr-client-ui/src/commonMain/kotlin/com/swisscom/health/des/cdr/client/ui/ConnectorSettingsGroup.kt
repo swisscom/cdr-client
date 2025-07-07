@@ -40,6 +40,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_document_archive_subtitle
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.compose.resources.stringResource
+import java.io.File
 
 private val logger = KotlinLogging.logger { }
 
@@ -106,11 +107,12 @@ internal fun ConnectorSettingsGroup(
         // Temporary download directory
         var tmpDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
         LaunchedEffect(uiState.clientServiceConfig.localFolder) {
-            tmpDirValidationResult = remoteViewValidations.validateDirectory(
-                uiState.clientServiceConfig,
-                uiState.clientServiceConfig.localFolder,
-                DomainObjects.ConfigurationItem.LOCAL_DIRECTORY
-            )
+            tmpDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.localFolder) +
+                    remoteViewValidations.validateDirectory(
+                        uiState.clientServiceConfig,
+                        uiState.clientServiceConfig.localFolder,
+                        DomainObjects.ConfigurationItem.LOCAL_DIRECTORY
+                    )
         }
         ValidatedTextField(
             name = DomainObjects.ConfigurationItem.LOCAL_DIRECTORY,
@@ -125,11 +127,12 @@ internal fun ConnectorSettingsGroup(
         // Error directory
         var errorDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
         LaunchedEffect(uiState.clientServiceConfig.customer[0].sourceErrorFolder) {
-            errorDirValidationResult = remoteViewValidations.validateDirectory(
-                uiState.clientServiceConfig,
-                uiState.clientServiceConfig.customer[0].sourceErrorFolder,
-                DomainObjects.ConfigurationItem.ERROR_DIRECTORY
-            )
+            errorDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer[0].sourceErrorFolder) +
+                    remoteViewValidations.validateDirectory(
+                        uiState.clientServiceConfig,
+                        uiState.clientServiceConfig.customer[0].sourceErrorFolder,
+                        DomainObjects.ConfigurationItem.ERROR_DIRECTORY
+                    )
         }
         ValidatedTextField(
             name = DomainObjects.ConfigurationItem.ERROR_DIRECTORY,
@@ -155,11 +158,12 @@ internal fun ConnectorSettingsGroup(
         // Archive directory
         var archiveDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
         LaunchedEffect(uiState.clientServiceConfig.customer[0].sourceArchiveFolder) {
-            archiveDirValidationResult = remoteViewValidations.validateDirectory(
-                uiState.clientServiceConfig,
-                uiState.clientServiceConfig.customer[0].sourceArchiveFolder,
-                DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
-            )
+            archiveDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer[0].sourceArchiveFolder) +
+                    remoteViewValidations.validateDirectory(
+                        uiState.clientServiceConfig,
+                        uiState.clientServiceConfig.customer[0].sourceArchiveFolder,
+                        DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
+                    )
         }
         ValidatedTextField(
             name = DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY,
@@ -179,12 +183,12 @@ internal fun ConnectorSettingsGroup(
         // Base target directory
         var targetDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
         LaunchedEffect(uiState.clientServiceConfig.customer[0].targetFolder) {
-            targetDirValidationResult =
-                remoteViewValidations.validateDirectory(
-                    uiState.clientServiceConfig,
-                    uiState.clientServiceConfig.customer[0].targetFolder,
-                    DomainObjects.ConfigurationItem.TARGET_DIRECTORY
-                )
+            targetDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer[0].targetFolder) +
+                    remoteViewValidations.validateDirectory(
+                        uiState.clientServiceConfig,
+                        uiState.clientServiceConfig.customer[0].targetFolder,
+                        DomainObjects.ConfigurationItem.TARGET_DIRECTORY
+                    )
         }
         ValidatedTextField(
             name = DomainObjects.ConfigurationItem.TARGET_DIRECTORY,
@@ -206,11 +210,12 @@ internal fun ConnectorSettingsGroup(
                         DTOs.ValidationResult.Success
                     } else {
                         // Validate the document type specific target directory
-                        remoteViewValidations.validateDirectory(
-                            uiState.clientServiceConfig,
-                            docTypeFolder,
-                            DomainObjects.ConfigurationItem.TARGET_DIRECTORY
-                        )
+                        validateNeitherBlankNorRoot(docTypeFolder) +
+                                remoteViewValidations.validateDirectory(
+                                    uiState.clientServiceConfig,
+                                    docTypeFolder,
+                                    DomainObjects.ConfigurationItem.TARGET_DIRECTORY
+                                )
                     }
             }
             ValidatedTextField(
@@ -236,12 +241,12 @@ internal fun ConnectorSettingsGroup(
         // Base source directory
         var sourceDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
         LaunchedEffect(uiState.clientServiceConfig.customer[0].sourceFolder) {
-            sourceDirValidationResult =
-                remoteViewValidations.validateDirectory(
-                    uiState.clientServiceConfig,
-                    uiState.clientServiceConfig.customer[0].sourceFolder,
-                    DomainObjects.ConfigurationItem.SOURCE_DIRECTORY
-                )
+            sourceDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer[0].sourceFolder) +
+                    remoteViewValidations.validateDirectory(
+                        uiState.clientServiceConfig,
+                        uiState.clientServiceConfig.customer[0].sourceFolder,
+                        DomainObjects.ConfigurationItem.SOURCE_DIRECTORY
+                    )
         }
         ValidatedTextField(
             name = DomainObjects.ConfigurationItem.SOURCE_DIRECTORY,
@@ -263,11 +268,12 @@ internal fun ConnectorSettingsGroup(
                         DTOs.ValidationResult.Success
                     } else {
                         // Validate the document type specific source directory
-                        remoteViewValidations.validateDirectory(
-                            uiState.clientServiceConfig,
-                            docTypeFolder,
-                            DomainObjects.ConfigurationItem.SOURCE_DIRECTORY
-                        )
+                        validateNeitherBlankNorRoot(docTypeFolder) +
+                                remoteViewValidations.validateDirectory(
+                                    uiState.clientServiceConfig,
+                                    docTypeFolder,
+                                    DomainObjects.ConfigurationItem.SOURCE_DIRECTORY
+                                )
                     }
             }
             ValidatedTextField(
@@ -285,5 +291,25 @@ internal fun ConnectorSettingsGroup(
         // END - Source directories
         //
     }
+}
 
+/**
+ * The remote path checks require the use of `java.nio.Path`; and `Path` translates both "" and "/"
+ * into the current working directory (at least on Linux). Which is likely to exist and might be
+ * read/writable, and so passes validation. But the user sees a blank field (or "/") in the UI. So,
+ * as a workaround, we validate this particular case locally.
+ */
+private fun validateNeitherBlankNorRoot(path: String?): DTOs.ValidationResult {
+    return if (path?.removeSuffix(File.separator).isNullOrBlank()) {
+        DTOs.ValidationResult.Failure(
+            listOf(
+                DTOs.ValidationDetail.ConfigItemDetail(
+                    configItem = DomainObjects.ConfigurationItem.LOCAL_DIRECTORY,
+                    messageKey = DTOs.ValidationMessageKey.NOT_A_DIRECTORY
+                )
+            )
+        )
+    } else {
+        DTOs.ValidationResult.Success
+    }
 }

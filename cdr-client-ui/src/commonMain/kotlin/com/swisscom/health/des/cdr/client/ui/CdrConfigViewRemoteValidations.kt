@@ -6,6 +6,7 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DI
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DIR_SINGLE_USE
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.nio.file.Path
 
 private val logger = KotlinLogging.logger {}
 
@@ -44,8 +45,8 @@ internal class CdrConfigViewRemoteValidations(
                 is DTOs.ValidationResult.Failure -> {
                     // check if any path validation error is matching the path we are validating; if yes, return the failure
                     if (validationDetails
-                            .any { validationDetail: DTOs.ValidationDetail ->
-                                validationDetail is DTOs.ValidationDetail.PathDetail && validationDetail.path == path
+                                .any { validationDetail: DTOs.ValidationDetail ->
+                                validationDetail is DTOs.ValidationDetail.PathDetail && path != null && Path.of(validationDetail.path) == Path.of(path)
                             }
                     )
                         this

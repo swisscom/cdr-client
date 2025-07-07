@@ -39,7 +39,7 @@ internal class CdrApiClient(
     private val cdrClientConfig: CdrClientConfig,
     private val httpClient: OkHttpClient,
     private val clientCredentialParams: ClientCredentialParameters,
-    @Qualifier("retryIoAndServerErrors")
+    @param:Qualifier("retryIoAndServerErrors")
     private val retryIOExceptionsAndServerErrors: RetryTemplate,
     private val securedApp: IConfidentialClientApplication,
     private val objectMapper: ObjectMapper

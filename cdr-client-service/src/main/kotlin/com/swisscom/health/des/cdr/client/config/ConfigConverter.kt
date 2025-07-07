@@ -76,7 +76,7 @@ internal fun IdpCredentials.toDto(): DTOs.CdrClientConfig.IdpCredentials =
         scopes = scopes,
         renewCredential = renewCredential.value,
         maxCredentialAge = maxCredentialAge,
-        lastCredentialRenewalTime = lastCredentialRenewalTime,
+        lastCredentialRenewalTime = lastCredentialRenewalTime.instant,
     )
 
 internal fun RetryTemplateConfig.toDto(): DTOs.CdrClientConfig.RetryTemplateConfig =
@@ -168,7 +168,7 @@ internal fun DTOs.CdrClientConfig.IdpCredentials.toCdrClientConfig(): IdpCredent
         scopes = scopes,
         renewCredential = RenewCredential(renewCredential),
         maxCredentialAge = maxCredentialAge,
-        lastCredentialRenewalTime = lastCredentialRenewalTime,
+        lastCredentialRenewalTime = LastCredentialRenewalTime(lastCredentialRenewalTime),
     )
 
 internal fun DTOs.CdrClientConfig.RetryTemplateConfig.toCdrClientConfig(): RetryTemplateConfig =

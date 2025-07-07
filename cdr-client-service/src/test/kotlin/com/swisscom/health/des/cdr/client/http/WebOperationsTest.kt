@@ -13,6 +13,7 @@ import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
+import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
@@ -231,7 +232,7 @@ internal class WebOperationsTest {
                 scopes = emptyList(),
                 renewCredential = RenewCredential.ENABLED,
                 maxCredentialAge = Duration.ofDays(30),
-                lastCredentialRenewalTime = Instant.now(),
+                lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
             ),
             idpEndpoint = URL("http://localhost:8080"),
             localFolder = TempDownloadDir(CURRENT_WORKING_DIR),

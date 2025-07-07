@@ -12,6 +12,7 @@ import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
+import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime.Companion.BEGINNING_OF_TIME
 import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
@@ -316,7 +317,8 @@ internal class ValidationServiceTest {
                 clientId = ClientId("fake-client-id"),
                 clientSecret = ClientSecret("fake-client-secret"),
                 scopes = listOf("CDR"),
-                renewCredential = RenewCredential(true)
+                renewCredential = RenewCredential(true),
+                lastCredentialRenewalTime = BEGINNING_OF_TIME,
             ),
             idpEndpoint = URL("http://localhost"),
             fileBusyTestStrategy = FileBusyTestStrategyProperty(CdrClientConfig.FileBusyTestStrategy.FILE_SIZE_CHANGED),
