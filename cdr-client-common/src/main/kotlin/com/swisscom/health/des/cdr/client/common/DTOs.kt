@@ -2,6 +2,8 @@
 
 package com.swisscom.health.des.cdr.client.common
 
+import com.fasterxml.jackson.annotation.JsonSubTypes
+import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
@@ -36,23 +38,27 @@ object UrlSerializer : KSerializer<URL> {
 
 class DTOs {
 
+    @JsonTypeInfo(
+        use = JsonTypeInfo.Id.NAME,
+        include = JsonTypeInfo.As.PROPERTY,
+        property = "type"
+    )
+    @JsonSubTypes(
+        JsonSubTypes.Type(value = ValidationResult.Success::class, name = "success"),
+        JsonSubTypes.Type(value = ValidationResult.Failure::class, name = "failure"),
+    )
     @Serializable
     sealed interface ValidationResult {
-        val type: String
 
         @Serializable
         @SerialName("success")
-        object Success : ValidationResult {
-            override val type: String = "success"
-        }
+        object Success : ValidationResult
 
         @Serializable
         @SerialName("failure")
         data class Failure(
             val validationDetails: List<ValidationDetail>
-        ) : ValidationResult {
-            override val type: String = "failure"
-        }
+        ) : ValidationResult
 
         operator fun plus(other: ValidationResult): ValidationResult =
             when (this) {
@@ -64,9 +70,17 @@ class DTOs {
             }
     }
 
+    @JsonTypeInfo(
+        use = JsonTypeInfo.Id.NAME,
+        include = JsonTypeInfo.As.PROPERTY,
+        property = "type"
+    )
+    @JsonSubTypes(
+        JsonSubTypes.Type(value = ValidationDetail.ConfigItemDetail::class, name = "configItemDetail"),
+        JsonSubTypes.Type(value = ValidationDetail.PathDetail::class, name = "pathDetail"),
+    )
     @Serializable
     sealed interface ValidationDetail {
-        val type: String
         val messageKey: ValidationMessageKey
 
         @Serializable
@@ -74,18 +88,14 @@ class DTOs {
         data class ConfigItemDetail(
             val configItem: DomainObjects.ConfigurationItem,
             override val messageKey: ValidationMessageKey
-        ) : ValidationDetail {
-            override val type: String = "configItemDetail"
-        }
+        ) : ValidationDetail
 
         @Serializable
         @SerialName("pathDetail")
         data class PathDetail(
             val path: String,
             override val messageKey: ValidationMessageKey
-        ) : ValidationDetail {
-            override val type: String = "pathDetail"
-        }
+        ) : ValidationDetail
     }
 
     enum class ValidationMessageKey {
@@ -163,7 +173,7 @@ class DTOs {
             @JvmStatic
             val EMPTY = CdrClientConfig(
                 fileSynchronizationEnabled = false,
-                customer = emptyList(),
+                customer = listOf(Connector.EMPTY),
                 cdrApi = Endpoint.EMPTY,
                 filesInProgressCacheSize = EMPTY_STRING,
                 idpCredentials = IdpCredentials.EMPTY,

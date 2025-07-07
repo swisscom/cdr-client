@@ -37,6 +37,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -57,13 +58,14 @@ private val logger = KotlinLogging.logger {}
 
 @Service
 @Profile("!noEventTriggerUploadScheduler")
+@ConditionalOnProperty(prefix = "client", name = ["file-synchronization-enabled"])
 @Suppress("LongParameterList")
 internal class EventTriggerUploadScheduler(
     private val config: CdrClientConfig,
     private val tracer: Tracer,
-    @Qualifier("limitedParallelismCdrUploadsDispatcher")
+    @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
-    @Value("\${management.tracing.sampling.probability:0.0}")
+    @param:Value("\${management.tracing.sampling.probability:0.0}")
     private val samplerProbability: Double,
     retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
@@ -187,13 +189,14 @@ internal class EventTriggerUploadScheduler(
 
 @Service
 @Profile("!noPollingUploadScheduler")
+@ConditionalOnProperty(prefix = "client", name = ["file-synchronization-enabled"])
 @Suppress("LongParameterList")
 internal class PollingUploadScheduler(
     private val config: CdrClientConfig,
     private val tracer: Tracer,
-    @Qualifier("limitedParallelismCdrUploadsDispatcher")
+    @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
-    @Value("\${management.tracing.sampling.probability:1.0}")
+    @param:Value("\${management.tracing.sampling.probability:1.0}")
     private val samplerProbability: Double,
     retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
@@ -308,7 +311,7 @@ internal class PollingUploadScheduler(
 internal abstract class BaseUploadScheduler(
     private val config: CdrClientConfig,
     private val retryUploadFileHandling: RetryUploadFileHandling,
-    @Qualifier("limitedParallelismCdrUploadsDispatcher")
+    @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
     private val processingInProgressCache: ObjectKache<String, Path>,
     private val tracer: Tracer,

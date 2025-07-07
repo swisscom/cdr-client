@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -21,10 +22,11 @@ private val logger = KotlinLogging.logger {}
  */
 @Service
 @Profile("!noDownloadScheduler")
+@ConditionalOnProperty(prefix = "client", name = ["file-synchronization-enabled"])
 internal class DocumentDownloadScheduler(
     private val cdrClientConfig: CdrClientConfig,
     private val pullFileHandling: PullFileHandling,
-    @Qualifier("limitedParallelismCdrDownloadsDispatcher")
+    @param:Qualifier("limitedParallelismCdrDownloadsDispatcher")
     private val cdrDownloadsDispatcher: CoroutineDispatcher
 ) {
 

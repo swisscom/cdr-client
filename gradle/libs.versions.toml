@@ -51,6 +51,7 @@ spring-retry = { group = "org.springframework.retry", name = "spring-retry" }
 spring-cloud-dependencies = { group = "org.springframework.cloud", name = "spring-cloud-dependencies", version.ref = "spring-cloud" }
 jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml" }
 jackson-module-kotlin = { group = "com.fasterxml.jackson.module", name = "jackson-module-kotlin" }
+jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations" }
 conveyor-control = { group = "dev.hydraulic.conveyor", name = "conveyor-control", version.ref = "conveyor-control-api" }
 jna = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jna" }
 uitiles = { group = "com.github.alorma.compose-settings", name = "ui-tiles", version.ref = "ui-tiles" }

@@ -169,7 +169,7 @@ internal class ConfigurationWriter(
                         logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue.name}' as type '${newValue::class}'" }
                     }
 
-                    is Duration, DataSize::class, Instant::class, URL::class, Path::class, MediaType::class -> {
+                    is Duration, is DataSize, is Instant, is URL, is Path, is MediaType -> {
                         // handle Duration, DataSize, Instant, URL, etc., anything that SpringBoot's unmarshalling magic creates
                         // from what was originally a string
                         newValue.toString().let { stringValue ->

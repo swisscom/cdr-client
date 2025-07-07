@@ -3,6 +3,7 @@ package com.swisscom.health.des.cdr.client.handler
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientSecret
+import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -59,7 +60,7 @@ internal class ClientSecretRenewalService(
     private fun writeNewSecret(secret: String): RenewClientSecretResult {
         val newIdpCredentials = config.idpCredentials.copy(
             clientSecret = ClientSecret(secret),
-            lastCredentialRenewalTime = Instant.now(),
+            lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
         )
         val newCdrConfig = config.copy(
             idpCredentials = newIdpCredentials

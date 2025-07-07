@@ -12,6 +12,7 @@ import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
+import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
@@ -91,7 +92,7 @@ class ConfigurationWriterTest {
                 scopes = emptyList(),
                 renewCredential = RenewCredential.ENABLED,
                 maxCredentialAge = Duration.ofDays(30),
-                lastCredentialRenewalTime = Instant.now(),
+                lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
             ),
             idpEndpoint = URL("http://localhost:8080"),
             localFolder = TempDownloadDir(CURRENT_WORKING_DIR),
@@ -141,6 +142,7 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
         every { propSource.getOrigin("client.customer") } returns propOrigin
         every { propSource.getOrigin("client.local-folder") } returns propOrigin
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
@@ -169,6 +171,7 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
         every { propSource.getOrigin("client.local-folder") } returns propOrigin
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
         every { propSource.getOrigin("client.customer") } returns propOrigin
@@ -199,6 +202,7 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
         every { propSource.getOrigin("client.customer") } returns propOrigin
         every { propSource.getOrigin("client.local-folder") } returns propOrigin
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
@@ -246,6 +250,8 @@ class ConfigurationWriterTest {
         every { propSource2.getOrigin("client.idp-credentials.tenant-id") } returns null
         every { propSource1.getOrigin("client.idp-credentials.client-id") } returns propOrigin1
         every { propSource2.getOrigin("client.idp-credentials.client-id") } returns null
+        every { propSource1.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin1
+        every { propSource2.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns null
         every { propSource1.getOrigin("client.customer") } returns propOrigin1
         every { propSource2.getOrigin("client.customer") } returns null
         every { propSource1.getOrigin("client.local-folder") } returns propOrigin1
@@ -297,6 +303,7 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns null // not writable
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns null
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns null
+        every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns null
         every { propSource.getOrigin("client.customer") } returns null
         every { propSource.getOrigin("client.local-folder") } returns null
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns null

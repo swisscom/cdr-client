@@ -8,7 +8,9 @@ plugins {
 }
 
 dependencies {
+    implementation(platform(libs.spring.boot.dependencies))
     implementation(libs.kotlinx.serialization.core)
+    implementation(libs.jackson.annotations)
 }
 
 idea {

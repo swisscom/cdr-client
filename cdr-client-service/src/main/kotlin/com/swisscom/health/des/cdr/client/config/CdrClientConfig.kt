@@ -465,9 +465,9 @@ internal data class IdpCredentials(
     val maxCredentialAge: Duration = DEFAULT_MAX_CREDENTIAL_AGE,
 
     /**
-     * Time when the client last renewed its secret. Defaults to `1970-01-01T00:00:00Z`.
+     * Time when the client last renewed its secret.
      */
-    val lastCredentialRenewalTime: Instant = DEFAULT_LAST_CREDENTIAL_RENEWAL_TIME,
+    val lastCredentialRenewalTime: LastCredentialRenewalTime,
 ) : PropertyNameAware {
 
     override val propertyName: String
@@ -478,16 +478,13 @@ internal data class IdpCredentials(
      */
     val millisUntilNextCredentialRenewal: Long
         @JsonIgnore
-        get() = maxCredentialAge.toMillis() - ChronoUnit.MILLIS.between(lastCredentialRenewalTime, Instant.now())
+        get() = maxCredentialAge.toMillis() - ChronoUnit.MILLIS.between(lastCredentialRenewalTime.instant, Instant.now())
 
     companion object {
         const val PROPERTY_NAME = "idp-credentials"
 
         @JvmStatic
         val DEFAULT_MAX_CREDENTIAL_AGE: Duration = Duration.ofDays(365L)
-
-        @JvmStatic
-        val DEFAULT_LAST_CREDENTIAL_RENEWAL_TIME: Instant = Instant.ofEpochSecond(0L)
     }
 }
 
@@ -552,6 +549,18 @@ internal value class ClientSecret(val value: String) : PropertyNameAware {
 
     companion object {
         const val PROPERTY_NAME = "client-secret"
+    }
+}
+
+@JvmInline
+internal value class LastCredentialRenewalTime(val instant: Instant) : PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    companion object {
+        const val PROPERTY_NAME = "last-credential-renewal-time"
+        @JvmStatic
+        val BEGINNING_OF_TIME: LastCredentialRenewalTime = LastCredentialRenewalTime(Instant.ofEpochSecond(0L))
     }
 }
 
