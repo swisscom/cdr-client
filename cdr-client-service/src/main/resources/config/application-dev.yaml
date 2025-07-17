@@ -6,7 +6,7 @@ client:
       - https://dev.identity.health.swisscom.ch/CdrApi/.default
     client-secret: ${CDR_CLIENT_SECRET:Placeholder_test-secret}
     renew-credential: true
-    last-credential-renewal-time: 1970-01-01T00:00:00Z
+    last-credential-renewal-time: 2030-01-01T00:00:00Z
   cdr-api:
     scheme: http
     port: 9090

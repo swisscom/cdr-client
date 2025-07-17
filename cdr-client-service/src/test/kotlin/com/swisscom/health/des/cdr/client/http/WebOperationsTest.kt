@@ -34,15 +34,14 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertInstanceOf
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.springframework.boot.actuate.health.HealthEndpoint
 import org.springframework.boot.actuate.health.SystemHealth
-import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
-import org.springframework.http.ProblemDetail
 import org.springframework.util.unit.DataSize
 import java.net.URL
 import java.nio.file.Path
@@ -94,25 +93,25 @@ internal class WebOperationsTest {
 
     @Test
     fun `test shutdown with empty reason`() = runTest {
-        val response = webOperations.shutdown(EMPTY_STRING)
-        val shutdownResponse = assertInstanceOf<ProblemDetail>(response.body)
-        assertEquals(HttpStatus.BAD_REQUEST.value(), shutdownResponse.status)
+        val exception = assertThrows<WebOperations.BadRequest> { webOperations.shutdown(EMPTY_STRING) }
+        val probDetail = webOperations.handleError(exception)
+        assertEquals(HttpStatus.BAD_REQUEST.value(), probDetail.status)
     }
 
     @Test
     fun `test shutdown with unknown reason`() = runTest {
-        val response = webOperations.shutdown("go-figure")
-        val shutdownResponse = assertInstanceOf<ProblemDetail>(response.body)
-        assertEquals(HttpStatus.BAD_REQUEST.value(), shutdownResponse.status)
+        val exception = assertThrows<WebOperations.BadRequest> { webOperations.shutdown("go-figure") }
+        val probDetail = webOperations.handleError(exception)
+        assertEquals(HttpStatus.BAD_REQUEST.value(), probDetail.status)
     }
 
     @Test
     fun `test shutdown with exception`() = runTest {
         every { shutdownService.scheduleShutdown(any()) } throws IllegalStateException("BANG!")
 
-        val response = webOperations.shutdown(ShutdownService.ShutdownTrigger.CONFIG_CHANGE.reason)
-        val shutdownResponse = assertInstanceOf<ProblemDetail>(response.body)
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), shutdownResponse.status)
+        val exception = assertThrows<WebOperations.ServerError> { webOperations.shutdown(ShutdownService.ShutdownTrigger.CONFIG_CHANGE.reason) }
+        val probDetail = webOperations.handleError(exception)
+        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), probDetail.status)
     }
 
     @Test
@@ -134,24 +133,20 @@ internal class WebOperationsTest {
     fun `test update service configuration - configuration writer fail`() = runTest {
         every { configWriter.updateClientServiceConfiguration(any()) } returns ConfigurationWriter.Result.Failure(mapOf("error" to "Invalid configuration"))
 
-        val response = webOperations.updateServiceConfiguration(DEFAULT_CDR_CONFIG.toDto())
-        assertEquals(HttpStatus.BAD_REQUEST, response.statusCode)
-        assertEquals(listOf(MediaType.APPLICATION_PROBLEM_JSON_VALUE), response.headers[HttpHeaders.CONTENT_TYPE])
+        val exception = assertThrows<WebOperations.BadRequest> { webOperations.updateServiceConfiguration(DEFAULT_CDR_CONFIG.toDto()) }
+        val probDetail = webOperations.handleError(exception)
 
-        val body: ProblemDetail = assertInstanceOf<ProblemDetail>(response.body)
-        assertEquals(mapOf("error" to "Invalid configuration"), body.properties)
+        assertEquals(mapOf("error" to "Invalid configuration"), probDetail.properties)
     }
 
     @Test
     fun `test update service configuration - exception`() = runTest {
         every { configWriter.updateClientServiceConfiguration(any()) } throws IllegalStateException("BANG!")
 
-        val response = webOperations.updateServiceConfiguration(DEFAULT_CDR_CONFIG.toDto())
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.statusCode)
-        assertEquals(listOf(MediaType.APPLICATION_PROBLEM_JSON_VALUE), response.headers[HttpHeaders.CONTENT_TYPE])
+        val exception = assertThrows<WebOperations.ServerError> { webOperations.updateServiceConfiguration(DEFAULT_CDR_CONFIG.toDto()) }
+        val probDetail = webOperations.handleError(exception)
 
-        val body: ProblemDetail = assertInstanceOf<ProblemDetail>(response.body)
-        assertEquals("Failed to update service configuration: java.lang.IllegalStateException: BANG!", body.detail)
+        assertEquals("Failed to update service configuration: java.lang.IllegalStateException: BANG!", probDetail.detail)
     }
 
     @ParameterizedTest
@@ -187,14 +182,11 @@ internal class WebOperationsTest {
     fun `test status endpoint with exception`() = runTest {
         every { healthEndpoint.health() } throws IllegalStateException("BANG!")
 
-        val response = webOperations.status()
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.statusCode)
-        assertEquals(listOf(MediaType.APPLICATION_PROBLEM_JSON_VALUE), response.headers[HttpHeaders.CONTENT_TYPE])
+        val exception = assertThrows<WebOperations.ServerError> { webOperations.status() }
+        val probDetail = webOperations.handleError(exception)
 
-        val body: ProblemDetail = assertInstanceOf<ProblemDetail>(response.body)
-        assertEquals("Failed to retrieve service status: java.lang.IllegalStateException: BANG!", body.detail)
+        assertEquals("Failed to retrieve service status: java.lang.IllegalStateException: BANG!", probDetail.detail)
     }
-
 
     companion object {
         @JvmStatic
@@ -204,7 +196,7 @@ internal class WebOperationsTest {
         val DEFAULT_CDR_CONFIG = CdrClientConfig(
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
             customer = Customer(
-                listOf(
+                mutableListOf(
                     CdrClientConfig.Connector(
                         connectorId = "1",
                         targetFolder = CURRENT_WORKING_DIR,

@@ -64,7 +64,7 @@ class ConfigurationWriterTest {
         config = CdrClientConfig(
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
             customer = Customer(
-                listOf(
+                mutableListOf(
                     CdrClientConfig.Connector(
                         connectorId = "1",
                         targetFolder = CURRENT_WORKING_DIR,

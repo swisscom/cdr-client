@@ -9,7 +9,7 @@ import kotlin.io.path.deleteIfExists
 internal class FileHandlingBaseTest {
 
     @Test
-    fun `test non writable folder`() {
+    fun `test non writable directory`() {
         val createTempDirectory = Files.createTempDirectory("nonWritableTest")
         Assertions.assertTrue(pathIsDirectoryAndWritable(createTempDirectory, "test", KotlinLogging.logger {}))
         createTempDirectory.toFile().setWritable(false)
@@ -19,7 +19,7 @@ internal class FileHandlingBaseTest {
     }
 
     @Test
-    fun `test non directory`() {
+    fun `test no directory`() {
         val createTempFile = Files.createTempFile("nonDirectoryTest", "test")
         Assertions.assertFalse(pathIsDirectoryAndWritable(createTempFile, "test", KotlinLogging.logger {}))
         Assertions.assertTrue(createTempFile.deleteIfExists())

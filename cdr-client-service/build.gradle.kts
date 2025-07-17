@@ -53,7 +53,7 @@ gradle.taskGraph.whenReady(
                 } else {
                     // gets picked up by application plugin when building the distribution as the
                     // value of `DEFAULT_JVM_OPTS` in the generated start script
-                    listOf("-Dspring.profiles.active=client,customer")
+                    listOf("-Dspring.profiles.active=client")
                 }
         }
     }
@@ -283,7 +283,6 @@ tasks.register<Exec>("jpackageAppPrepareDebian") {
         "--icon", "resources/icon.png",
         "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
         "--java-options", "-Dfile.encoding=UTF-8",
-        "--java-options", "-Dspring.profiles.active=customer",
     )
     doLast {
         copy {
@@ -323,7 +322,6 @@ tasks.register<Exec>("jpackageAppPrepareWindows") {
         "--win-console",
         "--dest", "${outputDir.get().asFile.absolutePath}/$packagePrepare",
         "--java-options", "-Dfile.encoding=UTF-8",
-        "--java-options", "-Dspring.profiles.active=customer",
     )
     doLast {
         copy {

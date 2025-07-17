@@ -48,13 +48,13 @@ internal class DocumentDownloadSchedulerTest {
     @MockK
     private lateinit var pullFileHandling: PullFileHandling
 
-    private val inflightFolder = "inflight"
+    private val inflightDirectory = "inflight"
     private val targetDirectory = "customer"
     private val sourceDirectory = "source"
 
     @BeforeEach
     fun setup() {
-        val inflightDir = tmpDir.resolve(inflightFolder).also { it.createDirectories() }
+        val inflightDir = tmpDir.resolve(inflightDirectory).also { it.createDirectories() }
         val targetDir0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
         val sourceDir0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
 
@@ -66,7 +66,7 @@ internal class DocumentDownloadSchedulerTest {
                 contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
                 mode = CdrClientConfig.Mode.TEST,
             )
-        every { config.customer } returns Customer(listOf(connector))
+        every { config.customer } returns Customer(mutableListOf(connector))
         every { config.localFolder } returns TempDownloadDir(inflightDir)
         mockTracer()
     }
@@ -87,7 +87,7 @@ internal class DocumentDownloadSchedulerTest {
     }
 
     @Test
-    fun `test sync pull of single file to folder`() = runTest {
+    fun `test sync pull of single file to directory`() = runTest {
         coEvery { pullFileHandling.pullSyncConnector(any()) } returns Unit
 
         val documentDownloadScheduler = DocumentDownloadScheduler(
@@ -96,14 +96,14 @@ internal class DocumentDownloadSchedulerTest {
             cdrDownloadsDispatcher = Dispatchers.IO,
         )
 
-        documentDownloadScheduler.syncFilesToClientFolders()
+        documentDownloadScheduler.syncFilesToClientDirectories()
 
         coVerify(exactly = 1) { pullFileHandling.pullSyncConnector(any()) }
     }
 
     @Test
     // Test for coverage only, as there is only a log output in the error case
-    fun `test sync push of single file to folder throws exception`() = runTest {
+    fun `test sync push of single file to directory throws exception`() = runTest {
         coEvery { pullFileHandling.pullSyncConnector(any()) } throws IllegalArgumentException("Exception")
 
         val documentDownloadScheduler = DocumentDownloadScheduler(
@@ -112,7 +112,7 @@ internal class DocumentDownloadSchedulerTest {
             cdrDownloadsDispatcher = Dispatchers.IO,
         )
 
-        documentDownloadScheduler.syncFilesToClientFolders()
+        documentDownloadScheduler.syncFilesToClientDirectories()
 
         coVerify(exactly = 1) { pullFileHandling.pullSyncConnector(any()) }
     }

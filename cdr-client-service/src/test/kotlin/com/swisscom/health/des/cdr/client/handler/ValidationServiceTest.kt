@@ -167,7 +167,7 @@ internal class ValidationServiceTest {
     }
 
     @Test
-    fun `test validation error because source folders overlap`() {
+    fun `test validation error because source directories overlap`() {
         val overlappingSourceWithinSameConnector = listOf(
             blueSkyConnectors().first().copy(sourceFolder = sourceFolder1, mode = CdrClientConfig.Mode.PRODUCTION),
             blueSkyConnectors().first().copy(sourceFolder = sourceFolder1, mode = CdrClientConfig.Mode.TEST)
@@ -307,7 +307,7 @@ internal class ValidationServiceTest {
                 port = 8080,
                 basePath = "client-credentials",
             ),
-            customer = Customer(customers),
+            customer = Customer(customers.toMutableList()),
             pullThreadPoolSize = 1,
             pushThreadPoolSize = 1,
             retryDelay = listOf(Duration.ofSeconds(1)),

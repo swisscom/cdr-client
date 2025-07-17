@@ -16,7 +16,7 @@ plugins {
     kotlin("jvm").version(libs.versions.kotlin.lang) apply false
     kotlin("plugin.spring").version(libs.versions.kotlin.lang) apply false
     // https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.kotlin.configuration-properties
-    // KAPT is end of life, but KSP is not supported yet: https://github.com/spring-projects/spring-boot/issues/28046
+    // KAPT is end-of-life, but KSP is not supported yet: https://github.com/spring-projects/spring-boot/issues/28046
     kotlin("kapt").version(libs.versions.kotlin.lang) apply false
 
     // but we actually want to run detekt in all subprojects
@@ -60,5 +60,5 @@ subprojects {
 
 // NOTE: you should to run this target or manually update `gradle/gradle-daemon-jvm.properties` if we change the Java version!
 tasks.updateDaemonJvm {
-    jvmVersion = JavaLanguageVersion.of(libs.versions.jdk.get().toInt())
+    languageVersion = JavaLanguageVersion.of(libs.versions.jdk.get().toInt())
 }

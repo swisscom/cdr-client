@@ -44,6 +44,7 @@ internal class ValidationService(
     @PostConstruct
     fun validateConfigAndFailHardOnValidationError() {
         logger.info { "CDR client configuration: '$config'" }
+        logger.debug { "CDR client configuration as DTO: '${config.toDto()}'" }
         val validationResult = validateAllConfigurationItems(config.toDto())
         if (validationResult is ValidationResult.Failure) {
             error("CdrClientConfig validation failed: '$validationResult'")
@@ -117,7 +118,9 @@ internal class ValidationService(
             }
         }.fold(
             initial = ValidationResult.Success,
-            operation = { acc: ValidationResult, validationResult: ValidationResult -> acc + validationResult }
+            operation = {
+                acc: ValidationResult, validationResult: ValidationResult -> acc + validationResult
+            }
         )
 
     fun validateDirectoryIsReadWritable(path: Path?): ValidationResult =
@@ -148,9 +151,19 @@ internal class ValidationService(
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     fun validateDirectoryOverlap(config: DTOs.CdrClientConfig): ValidationResult {
-        fun getAllBaseSourceFolders(): List<Path> = config.customer.map { Path.of(it.sourceFolder) }
+        fun getAllBaseSourceFolders(): List<Path> = config.customer.map { connector ->
+            Path.of(connector.sourceFolder)
+                .also {
+                    logger.debug { "connector [${connector.connectorId}] base source folder: [${connector.sourceFolder}]" }
+                }
+        }
 
-        fun getAllBaseTargetFolders(): List<Path> = config.customer.map { Path.of(it.targetFolder) }
+        fun getAllBaseTargetFolders(): List<Path> = config.customer.map { connector ->
+            Path.of(connector.targetFolder)
+                .also {
+                    logger.debug { "connector [${connector.connectorId}] base target folder: [${connector.targetFolder}]" }
+                }
+        }
 
         fun effectiveSourceFolder(docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders, sourceFolder: Path): Path? =
             docTypeFolders.sourceFolder?.let { sourceFolder.resolve(it) }
@@ -159,7 +172,12 @@ internal class ValidationService(
             docTypeFolders.targetFolder?.let { targetFolder.resolve(it) }
 
         fun getAllSourceDocTypeFolders(): List<Path> = config.customer
-            .map { it.sourceFolder to it.docTypeFolders.values }
+            .map { connector ->
+                (connector.sourceFolder to connector.docTypeFolders.values)
+                    .also {
+                        logger.debug { "connector [${connector.connectorId}] doctype directories: [${connector.docTypeFolders}]" }
+                    }
+            }
             .flatMap { (sourceFolder, docTypeFolders) ->
                 docTypeFolders.mapNotNull {
                     effectiveSourceFolder(sourceFolder = Path.of(sourceFolder), docTypeFolders = it)
@@ -167,7 +185,7 @@ internal class ValidationService(
             }
 
         fun getAllTargetDocTypeFolders(): List<Path> = config.customer
-            .map { it.targetFolder to it.docTypeFolders.values }
+            .map { connector -> connector.targetFolder to connector.docTypeFolders.values }
             .flatMap { (targetFolder, docTypeFolders) ->
                 docTypeFolders.mapNotNull {
                     effectiveTargetFolder(targetFolder = Path.of(targetFolder), docTypeFolders = it)
@@ -175,7 +193,15 @@ internal class ValidationService(
             }
 
         fun getSourceArchiveAndErrorFolders(): List<Path> = config.customer
-            .flatMap { listOf(it.sourceArchiveFolder, it.sourceErrorFolder) }
+            .flatMap { connector ->
+                listOf(connector.sourceArchiveFolder, connector.sourceErrorFolder)
+                    .also {
+                        logger.debug {
+                            "connector [${connector.connectorId}] source archive folder: [${connector.sourceArchiveFolder}], " +
+                                    "source error folder: [${connector.sourceErrorFolder}]"
+                        }
+                    }
+            }
             .map { Path.of(it ?: EMPTY_STRING) }
 
         val localDirectory: List<Path> = listOf(Path.of(config.localFolder))

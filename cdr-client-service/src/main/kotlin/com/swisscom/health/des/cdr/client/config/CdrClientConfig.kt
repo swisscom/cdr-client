@@ -99,10 +99,10 @@ internal data class CdrClientConfig(
         /** Unique identifier for the connector; log into CDR web app to look up your connector ID(s). */
         val connectorId: String,
 
-        /** Destination folder where the CDR client will download files to. */
+        /** Destination directory where the CDR client will download files to. */
         val targetFolder: Path,
 
-        /** Source folder where the CDR client will upload files from. */
+        /** Source directory where the CDR client will upload files from. */
         val sourceFolder: Path,
 
         /** Media type to set for file uploads; currently only `application/forumdatenaustausch+xml;charset=UTF-8` is supported. */
@@ -121,9 +121,8 @@ internal data class CdrClientConfig(
         val sourceArchiveEnabled: Boolean = false,
 
         /**
-         * Folder to archive uploaded files to. The folder will be created for you if it does not exist yet if [sourceArchiveEnabled]
-         * is set to `true`. If you specify a relative path, it will be resolved relative to the source folder. If you specify an absolute path,
-         * the path will be used as is for all archive folders, such as for all [docTypeFolders].
+         * Directory to archive uploaded files to. If you specify a relative path, it will be resolved relative to the source directory.
+         * If you specify an absolute path, the path will be used as is for all archive directories (see [docTypeFolders]).
          *
          * Beware: On Linux empty string, `.`, and `./` all resolve to the current working directory, while `./archive` (and just `archive`) resolve
          * to `<source_dir>/archive`.
@@ -137,8 +136,8 @@ internal data class CdrClientConfig(
         val sourceArchiveFolder: Path = TEMP_DIR_PATH,
 
         /**
-         * Folder to move documents to for which the upload has failed. If you specify a relative path, it will be resolved relative
-         * to the source folder. If you specify an absolute path, the path will be used as is for all error folders, such as for all [docTypeFolders].
+         * directory to move documents to for which the upload has failed. If you specify a relative path, it will be resolved relative
+         * to the source directory. If you specify an absolute path, the path will be used as is for all error directories, such as for all [docTypeFolders].
          *
          * Beware: On Linux empty string, `.`, and `./` all resolve to the current working directory, while `./archive` (and just `archive`) resolve
          * to `<source_dir>/archive`.
@@ -154,8 +153,8 @@ internal data class CdrClientConfig(
         val mode: Mode,
 
         /**
-         * Forum Datenaustausch message types related folders. In case that the files come from different source folders or received files need to be stored
-         * in different target folders, depending on the message type
+         * Forum Datenaustausch message types related directories. In case that the files come from different source directories or received files need to be
+         * stored in different target directories, depending on the message type
          */
         val docTypeFolders: Map<DocumentType, DocTypeFolders> = emptyMap(),
     ) : PropertyNameAware {
@@ -168,7 +167,7 @@ internal data class CdrClientConfig(
         }
 
         /**
-         * If [sourceArchiveEnabled] is set to `true` returns the archive folder resolved against the source folder with a subdirectory
+         * If [sourceArchiveEnabled] is set to `true` returns the archive directory resolved against the source directory with a subdirectory
          * for the current date. The directories will be created if they do not exist. If [sourceArchiveEnabled] is `false` returns an
          * empty path.
          *
@@ -190,7 +189,7 @@ internal data class CdrClientConfig(
             }
 
         /**
-         * Convenience property to get the connector archive folder that is used in all cases where no message type related folders are defined.
+         * Convenience property to get the connector archive directory that is used in all cases where no message type related directories are defined.
          * @see getEffectiveSourceArchiveFolder
          */
         val effectiveConnectorSourceArchiveFolder: Path?
@@ -203,20 +202,20 @@ internal data class CdrClientConfig(
                     null
 
         /**
-         * Returns all source folders for all document types of this connector. If a [DocTypeFolders.sourceFolder] is not set, the entry is omitted.
+         * Returns all source directories for all document types of this connector. If a [DocTypeFolders.sourceFolder] is not set, the entry is omitted.
          */
         @JsonIgnore
         fun getAllSourceDocTypeFolders(): List<Path> = this.docTypeFolders.values.mapNotNull { this.effectiveSourceFolder(it) }
 
         /**
-         * Returns the effective source folder for a given [DocTypeFolders] instance. If the [DocTypeFolders.sourceFolder] is not set, returns `null`.
+         * Returns the effective source directory for a given [DocTypeFolders] instance. If the [DocTypeFolders.sourceFolder] is not set, returns `null`.
          * @see DocTypeFolders
          */
         @JsonIgnore
         fun effectiveSourceFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.sourceFolder?.let { this.sourceFolder.resolve(it) }
 
         /**
-         * Returns the effective target folder for a given [DocTypeFolders] instance. If the [DocTypeFolders.targetFolder] is not set, returns `null`.
+         * Returns the effective target directory for a given [DocTypeFolders] instance. If the [DocTypeFolders.targetFolder] is not set, returns `null`.
          * @see DocTypeFolders
          */
         @JsonIgnore
@@ -233,7 +232,7 @@ internal data class CdrClientConfig(
         private fun getDateNow(): String = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
 
         /**
-         * Returns the error folder resolved against the source folder with a subdirectory for the current date. The directories will be
+         * Returns the error directory resolved against the source directory with a subdirectory for the current date. The directories will be
          * created if they do not exist.
          *
          * @see sourceErrorFolder
@@ -252,7 +251,7 @@ internal data class CdrClientConfig(
 
 
         /**
-         * Convenience property to get the connector error folder that is used in all cases where no message type related folders are defined.
+         * Convenience property to get the connector error directory that is used in all cases where no message type related directories are defined.
          * @see getEffectiveSourceErrorFolder
          */
         val effectiveConnectorSourceErrorFolder: Path
@@ -293,7 +292,7 @@ internal data class CdrClientConfig(
         }
 
         /**
-         * Specified folders for a specific document type (e.g., Invoice). Can be absolute or relative (to the [Connector.sourceFolder]) paths.
+         * Specified directories for a specific document type (e.g., Invoice). Can be absolute or relative (to the [Connector.sourceFolder]) paths.
          */
         data class DocTypeFolders(
             val sourceFolder: Path? = null,
@@ -352,7 +351,7 @@ internal interface Endpoint {
 }
 
 // Spring fails to assign the endpoint instances with an "object is not of declared type" error if the classes are declared inside the Endpoint interface
-internal data class CdrApi (
+internal data class CdrApi(
     override val scheme: String,
     override val host: Host,
     override val port: Int,
@@ -382,11 +381,11 @@ internal data class CredentialApi(
 
 @Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
 internal data class Customer(
-    val customer: List<Connector>
-) : PropertyNameAware, MutableList<Connector> by customer.toMutableList() {
+    val customer: MutableList<Connector>
+) : PropertyNameAware, MutableList<Connector> by customer {
 
     // required by SringBoot
-    constructor() : this(emptyList())
+    constructor() : this(mutableListOf())
 
     override val propertyName: String
         get() = PROPERTY_NAME
@@ -489,7 +488,7 @@ internal data class IdpCredentials(
 }
 
 @JvmInline
-internal value class TempDownloadDir(val path: Path): PropertyNameAware {
+internal value class TempDownloadDir(val path: Path) : PropertyNameAware {
     constructor(path: String) : this(Paths.get(path))
 
     override val propertyName: String
@@ -559,6 +558,7 @@ internal value class LastCredentialRenewalTime(val instant: Instant) : PropertyN
 
     companion object {
         const val PROPERTY_NAME = "last-credential-renewal-time"
+
         @JvmStatic
         val BEGINNING_OF_TIME: LastCredentialRenewalTime = LastCredentialRenewalTime(Instant.ofEpochSecond(0L))
     }

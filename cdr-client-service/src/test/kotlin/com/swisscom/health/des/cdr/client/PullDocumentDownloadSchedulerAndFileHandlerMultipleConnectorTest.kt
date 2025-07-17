@@ -101,7 +101,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
     private val directory1 = "customer"
     private val directory2 = "otherOne"
-    private val inflightFolder = "inflight"
+    private val inflightDir = "inflight"
     private val connectorId1 = "1234"
     private val connectorId2 = "3456"
 
@@ -134,15 +134,15 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
                 contentType = forumDatenaustauschMediaType.toString(),
                 mode = CdrClientConfig.Mode.PRODUCTION,
             )
-        val localFolder = tmpDir.resolve(inflightFolder)
+        val localDir = tmpDir.resolve(inflightDir)
 
         connector1.sourceFolder.createDirectories()
         connector2.sourceFolder.createDirectories()
-        localFolder.createDirectories()
+        localDir.createDirectories()
 
-        every { config.customer } returns Customer(listOf(connector1, connector2))
+        every { config.customer } returns Customer(mutableListOf(connector1, connector2))
         every { config.cdrApi } returns endpoint
-        every { config.localFolder } returns TempDownloadDir(localFolder)
+        every { config.localFolder } returns TempDownloadDir(localDir)
         every { config.idpCredentials.tenantId } returns TenantId("something")
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } answers { "Mocked Result" }
@@ -237,7 +237,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
     }
 
     @Test
-    fun `test sync of multiple files to folder for two connectors`() = runTest {
+    fun `test sync of multiple files to directory for two connectors`() = runTest {
         val practOneMaxCount = 75
         val practTwoMaxCount = 50
         cdrServiceMock.dispatcher = object : Dispatcher() {
@@ -246,7 +246,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
             }
         }
 
-        documentDownloadScheduler.syncFilesToClientFolders()
+        documentDownloadScheduler.syncFilesToClientDirectories()
 
 
         assertEquals(practTwoMaxCount * 2 + practOneMaxCount * 2 + 2, cdrServiceMock.requestCount)
@@ -254,15 +254,15 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         val listFiles: List<Path> = tmpDir.listDirectoryEntries()
         assertNotNull(listFiles)
         assertEquals(3, listFiles.size)
-        assertTrue(listFiles.first { !it.endsWith(inflightFolder) }.listDirectoryEntries().size > 5)
+        assertTrue(listFiles.first { !it.endsWith(inflightDir) }.listDirectoryEntries().size > 5)
         assertEquals(counterOne, listFiles.first { it.endsWith(directory1) }.listDirectoryEntries().filter { it.extension == "xml" }.size)
         assertEquals(counterTwo, listFiles.first { it.endsWith(directory2) }.listDirectoryEntries().filter { it.extension == "xml" }.size)
-        assertTrue(listFiles.first { it.endsWith(inflightFolder) }.listDirectoryEntries().isEmpty())
+        assertTrue(listFiles.first { it.endsWith(inflightDir) }.listDirectoryEntries().isEmpty())
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `test sync of multiple files to folder for one connector`() = runTest {
+    fun `test sync of multiple files to directory for one connector`() = runTest {
         val practOneMaxCount = 10
         val practTwoMaxCount = 0
         cdrServiceMock.dispatcher = object : Dispatcher() {
@@ -271,14 +271,14 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
             }
         }
 
-        documentDownloadScheduler.syncFilesToClientFolders()
+        documentDownloadScheduler.syncFilesToClientDirectories()
         advanceUntilIdle()
 
         assertEquals(practTwoMaxCount * 2 + practOneMaxCount * 2 + 2, cdrServiceMock.requestCount)
         val listFiles = tmpDir.listDirectoryEntries()
         assertEquals(counterOne, listFiles.first { it.endsWith(directory1) }.listDirectoryEntries().filter { it.extension == "xml" }.size)
         assertEquals(counterTwo, listFiles.first { it.endsWith(directory2) }.listDirectoryEntries().filter { it.extension == "xml" }.size)
-        assertTrue(listFiles.first { it.endsWith(inflightFolder) }.listDirectoryEntries().isEmpty())
+        assertTrue(listFiles.first { it.endsWith(inflightDir) }.listDirectoryEntries().isEmpty())
     }
 
 }

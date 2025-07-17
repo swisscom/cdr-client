@@ -125,10 +125,10 @@ internal class EventTriggerUploadScheduler(
     )
 
     private suspend fun watchForNewFilesToUpload(watcher: KfsDirectoryWatcher): Flow<Pair<Path, Span>> {
-        val sourceTypeFolders: List<Path> = config.customer.map { it.getAllSourceDocTypeFolders() }.flatten()
-        val folders = config.customer.map { it.sourceFolder } + sourceTypeFolders
+        val sourceTypeDirectories: List<Path> = config.customer.map { it.getAllSourceDocTypeFolders() }.flatten()
+        val directories = config.customer.map { it.sourceFolder } + sourceTypeDirectories
 
-        addWatchedPaths(watcher, folders)
+        addWatchedPaths(watcher, directories)
 
         return watcher.onEventFlow
             .onCompletion { error: Throwable? ->
@@ -269,14 +269,14 @@ internal class PollingUploadScheduler(
                     .map {
                         startSpan(tracer, "poll directory ${it.sourceFolder}") {
                             logger.debug { "Polling source directory for files: ${it.sourceFolder}" }
-                            it.getAllSourceDocTypeFolders().forEach { folder -> logger.debug { "Polling additional source directory for files: $folder" } }
+                            it.getAllSourceDocTypeFolders().forEach { dir -> logger.debug { "Polling additional source directory for files: $dir" } }
                             it
                         }
                     }
                     .flatMap { (connector, span) ->
                         val allSourceFolders: List<Path> = listOf(connector.sourceFolder) + connector.getAllSourceDocTypeFolders()
-                        allSourceFolders.flatMap { folder ->
-                            folder.listDirectoryEntries()
+                        allSourceFolders.flatMap { dir ->
+                            dir.listDirectoryEntries()
                                 .asSequence()
                                 .sortedBy { Files.readAttributes(it, BasicFileAttributes::class.java).lastModifiedTime() }
                                 .map { path -> path to tracer.nextSpan(span)!! }

@@ -36,6 +36,8 @@ kotlin {
             // https://github.com/alorma/Compose-Settings
             implementation(libs.uitiles)
             implementation(libs.okhttp)
+            implementation(libs.jna)
+            implementation(libs.pgreze.kotlin.process)
             implementation(projects.cdrClientCommon)
             runtimeOnly(projects.cdrClientService) {
                 isTransitive = true
@@ -45,7 +47,6 @@ kotlin {
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutines.swing)
-            implementation(libs.jna)
             // Conveyor auto update control
             implementation(libs.conveyor.control)
             implementation(libs.compose.native.tray)

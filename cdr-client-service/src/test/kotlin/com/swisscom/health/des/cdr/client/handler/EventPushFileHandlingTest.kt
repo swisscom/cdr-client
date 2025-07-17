@@ -86,8 +86,8 @@ internal class EventPushFileHandlingTest {
         cdrServiceMock = MockWebServer()
         cdrServiceMock.start()
 
-        val sourceFolder0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
-        val targetFolder0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
+        val sourceDir0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
+        val targetDir0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
 
         every { config.cdrApi } returns CdrApi(
             host = Host(cdrServiceMock.hostName),
@@ -96,11 +96,11 @@ internal class EventPushFileHandlingTest {
             port = cdrServiceMock.port,
         )
         every { config.customer } returns Customer(
-            listOf(
+            mutableListOf(
                 CdrClientConfig.Connector(
                     connectorId = "2345",
-                    targetFolder = targetFolder0,
-                    sourceFolder = sourceFolder0,
+                    targetFolder = targetDir0,
+                    sourceFolder = sourceDir0,
                     contentType = forumDatenaustauschMediaType.toString(),
                     mode = CdrClientConfig.Mode.TEST,
                 )
@@ -138,7 +138,7 @@ internal class EventPushFileHandlingTest {
             fileCache.clear()
         }
 
-        // do not delete the source folder itself; the file watcher task does not survive if its watched directory gets deleted (and re-created)
+        // do not delete the source directory itself; the file watcher task does not survive if its watched directory gets deleted (and re-created)
         tmpDir.resolve(sourceDirectory).listDirectoryEntries().forEach {
             it.deleteRecursively()
         }

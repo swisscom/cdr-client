@@ -20,8 +20,8 @@ private val logger = KotlinLogging.logger {}
 internal const val PULL_RESULT_ID_HEADER = "cdr-document-uuid"
 
 /**
- * A class responsible for handling files for a customer by syncing the files to a local folder,
- * and moving the files to the customer folder after successfully downloading them locally.
+ * A class responsible for handling files for a customer by syncing the files to a local directory,
+ * and moving the files to the customer directory after successfully downloading them locally.
  */
 @Component
 @Suppress("TooManyFunctions")
@@ -80,7 +80,7 @@ internal class PullFileHandling(
                     traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
                 ).let { ackResult: DownloadDocumentResult ->
                     if (ackResult is DownloadDocumentResult.AcknowledgeSuccess) {
-                        moveFileToClientFolder(connector, downloadResult.file)
+                        moveFileToClientDirectory(connector, downloadResult.file)
                     }
                     ackResult
                 }
@@ -91,17 +91,18 @@ internal class PullFileHandling(
 
 
     /**
-     * Moves the file from the local folder to the connectors target folder.
-     * If the file already exists in the target folder, it will be overwritten.
-     * The file that is currently on the local file system, without file extension, will be moved to the target folder, also with no file extension.
-     * The file extension is changed from .tmp to .xml after a successful file copy.
+     * Moves the file from the local directory to the connectors target directory.
+     * If the file already exists in the target directory, it will be overwritten.
+     * The file that is currently on the local file system, without file extension,
+     * will be moved to the target directory, also with no file extension. The
+     * file extension is changed from .tmp to .xml after a successful file copy.
      *
      * @param connector the connector for whom the file was requested
      * @param file the file to move
      */
-    private fun moveFileToClientFolder(connector: CdrClientConfig.Connector, file: Path) {
+    private fun moveFileToClientDirectory(connector: CdrClientConfig.Connector, file: Path) {
         logger.debug { "Move file to target directory start" }
-        val targetFolder =
+        val targetDir =
             if (connector.docTypeFolders.isEmpty()) {
                 connector.targetFolder
             } else {
@@ -116,9 +117,9 @@ internal class PullFileHandling(
                         }
                     )
                 connector.docTypeFolders[documentType]?.let { docTypeFolder -> connector.effectiveTargetFolder(docTypeFolder) }
-                    ?: connector.targetFolder.also { logger.debug { "No specific target folder defined for files of type '${documentType}'" } }
+                    ?: connector.targetFolder.also { logger.debug { "No specific target directory defined for files of type '${documentType}'" } }
             }
-        val targetTmpFile = targetFolder.resolve(file.name)
+        val targetTmpFile = targetDir.resolve(file.name)
 
         runCatching {
             Files.move(
@@ -128,7 +129,7 @@ internal class PullFileHandling(
             )
             logger.debug { "Move file to target directory done" }
         }.mapCatching {
-            // be aware, that this is not an atomic operation on Windows operating system (but it is on Unix-based systems)
+            // be aware that this is not an atomic operation on Windows systems (but it is on Linux-based systems)
             Files.move(
                 targetTmpFile,
                 targetTmpFile.resolveSibling("${targetTmpFile.nameWithoutExtension}.xml"),

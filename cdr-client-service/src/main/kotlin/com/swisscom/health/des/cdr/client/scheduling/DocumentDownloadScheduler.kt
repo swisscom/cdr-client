@@ -16,9 +16,9 @@ import org.springframework.stereotype.Service
 private val logger = KotlinLogging.logger {}
 
 /**
- * A Spring service that defines a scheduled task to synchronize files to client folders.
+ * A Spring service that defines a scheduled task to synchronize files to client directories.
  * @property cdrClientConfig An instance of [CdrClientConfig], which is a configuration class for the CDR client.
- * @property pullFileHandling An instance of [PullFileHandling], which is a service that provides methods for syncing files to client folders.
+ * @property pullFileHandling An instance of [PullFileHandling], which is a service that provides methods for syncing files to client directories.
  */
 @Service
 @Profile("!noDownloadScheduler")
@@ -31,10 +31,10 @@ internal class DocumentDownloadScheduler(
 ) {
 
     /**
-     * A scheduled task that syncs files to client folders at regular intervals.
+     * A scheduled task that syncs files to client directories at regular intervals.
      */
-    @Scheduled(fixedDelayString = "\${client.schedule-delay}")
-    suspend fun syncFilesToClientFolders() {
+    @Scheduled(fixedDelayString = $$"${client.schedule-delay}")
+    suspend fun syncFilesToClientDirectories() {
         logger.info { "Triggered pull sync" }
         callPullFileHandling()
     }

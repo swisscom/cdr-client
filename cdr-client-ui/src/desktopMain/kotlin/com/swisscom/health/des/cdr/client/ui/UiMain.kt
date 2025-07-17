@@ -3,7 +3,6 @@ package com.swisscom.health.des.cdr.client.ui
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,9 +13,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import com.github.pgreze.process.ProcessResult
+import com.github.pgreze.process.Redirect
+import com.github.pgreze.process.process
 import com.kdroid.composetray.tray.api.Tray
 import com.swisscom.health.des.cdr.client.common.Constants.CONFIG_CHANGE_EXIT_CODE
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
+import com.swisscom.health.des.cdr.client.common.escalatingFind
 import com.swisscom.health.des.cdr.client.ui.CdrConfigViewModel.Companion.STATUS_CHECK_DELAY
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB_icon
@@ -26,24 +29,48 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_open_application_window
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_unknown
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
-import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
-import java.util.concurrent.atomic.AtomicReference
+import java.nio.file.Path
+import kotlin.io.path.absolute
+import kotlin.io.path.createDirectories
+import kotlin.io.path.createParentDirectories
+import kotlin.io.path.exists
+import kotlin.io.path.isReadable
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 
-private val logger = KotlinLogging.logger {}
+private const val UI_LOGBACK_FILE = "logback-ui.xml"
+private const val LOGBACK_CONFIGURATION_FILE_PROPERTY = "logback.configurationFile"
+
+/*
+  A note on the logback configuration (used by `io.github.oshai.kotlinlogging`):
+  The location of the external logback configuration file is set with a system property.
+  The location it points to is platform-dependent. And in the case of macOS, the initial
+  value is a relative path that gets resolved against the executing user's home
+  directory, and that resolved path gets stored in the same system property in
+  `initialLogbackConfig()`.
+  Because the logback configuration file might not exist yet and/or its final location
+  may not be known until `initLogbackConfig()` has completed, you cannot use
+  kotlin-logging in this kotlin file, as it would initialize Logback before the external
+  configuration file may be set.
+
+  So, DO NOT DEFINE A LOGGER LIKE THIS:
+  `private val logger = KotlinLogging.logger {}`
+ */
 
 @OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 fun main() = application {
-    val serviceProcessRef = remember { AtomicReference<Process?>() }
+    initLogbackConfig()
+
     var isWindowVisible: Boolean by remember { mutableStateOf(true) }
     val cdrConfigViewModel: CdrConfigViewModel = remember { CdrConfigViewModel(cdrClientApiClient = CdrClientApiClient()) }
-    var serviceMonitorJob: Job? = null
 
     // I have found no way to push this down into the CdrConfigScreen composable;
     // the client status query runs in a different coroutine scope, so it won't be canceled automatically when the main window is closed
@@ -61,7 +88,7 @@ fun main() = application {
         onCloseRequest = { isWindowVisible = false },
         visible = isWindowVisible,
         title = stringResource(Res.string.app_name),
-        icon = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon), // not rendered on Ubuntu-Linux
+        icon = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon), // not rendered on Ubuntu
     ) {
         CdrConfigScreen(
             viewModel = cdrConfigViewModel,
@@ -69,18 +96,6 @@ fun main() = application {
                 cdrClientApiClient = CdrClientApiClient()
             )
         )
-        if (isMacOS()) {
-            logger.debug { "Running on macOS, starting cdr-client-service if not running" }
-            val startCdrClientServiceIfNotRunning = startCdrClientServiceIfNotRunning()
-            if (startCdrClientServiceIfNotRunning != null) {
-                serviceProcessRef.set(startCdrClientServiceIfNotRunning)
-                serviceMonitorJob = monitorServiceProcess(
-                    processRef = serviceProcessRef,
-                    shouldRestart = { exitCode -> exitCode == CONFIG_CHANGE_EXIT_CODE },
-                    startProcess = ::startCdrClientServiceIfNotRunning
-                )
-            }
-        }
     }
 
     // I am not using JetBrains' default Tray() implementation:
@@ -93,15 +108,29 @@ fun main() = application {
     CdrSystemTray(
         primaryAction = { isWindowVisible = true }
     )
-    DisposableEffect(Unit) {
-        onDispose {
-            serviceMonitorJob?.cancel()
-            logger.debug { "Service process reference: ${serviceProcessRef.get()}" }
-            serviceProcessRef.get()?.let {
-                logger.debug { "Gracefully shutting down cdr-client-service" }
-                it.destroy()
-                it.waitFor()
-            }
+
+    // start cdr client service if the UI is configured to control the service
+    if (uiIsServiceController()) {
+        LaunchCdrClientService()
+    }
+}
+
+@Composable
+private fun LaunchCdrClientService() {
+    val cdrServiceExecutable: Path? = findClientServiceExecutable()
+    if (cdrServiceExecutable != null) {
+        LaunchedEffect(Unit) {
+            do {
+                println("(Re-)start ${clientServiceExecutableForPlatform()}")
+                val processResult: ProcessResult =
+                    process(
+                        cdrServiceExecutable.toString(),
+                        stdout = Redirect.PRINT,
+                        stderr = Redirect.PRINT,
+                    )
+                println("${clientServiceExecutableForPlatform()} exited with code ${processResult.resultCode}")
+            } while (processResult.resultCode == CONFIG_CHANGE_EXIT_CODE)
+            println("${clientServiceExecutableForPlatform()} stopped with non-restartable exit code.")
         }
     }
 }
@@ -140,3 +169,72 @@ private fun ApplicationScope.CdrSystemTray(
             onClick = ::exitApplication
         )
     }
+
+@Suppress("NestedBlockDepth", "LongMethod")
+private fun initLogbackConfig() =
+    System.getProperty(LOGBACK_CONFIGURATION_FILE_PROPERTY)
+        ?.let { logbackConfigLocation: String ->
+            val logbackConfigPath = Path.of(logbackConfigLocation)
+            if (!logbackConfigPath.isAbsolute) {
+                // should only be relevant for macOS where configuration, logs, etc., should go into `$HOME/Library/Application Support/...`
+                // on other platforms use absolute paths!
+                val userHome: Path = requireNotNull(System.getProperty("user.home")) {
+                    "User home directory is not set but is required to resolve the relative logback configuration path '$logbackConfigLocation'"
+                }.run(Path::of)
+                userHome.resolve(Path.of(logbackConfigLocation))
+            } else {
+                logbackConfigPath
+            }
+
+        }
+        ?.absolute()
+        ?.let { logbackConfigFile: Path ->
+            if (logbackConfigFile.exists()) {
+                check(logbackConfigFile.isRegularFile() && logbackConfigFile.isReadable()) {
+                    "The logback configuration file path '$logbackConfigFile' exists but does not point to a readable regular file."
+                }
+                println("logback config file '$logbackConfigFile' exists, skipping creation of default configuration file")
+            } else {
+                println("logback config file '$logbackConfigFile' does not exist, creating default logback configuration file")
+                val pwd: Path = ProcessHandle.current().info().command().get().let { cdrServiceCmd: String ->
+                    Path.of(cdrServiceCmd).parent.absolute()
+                }
+                val defaultLogbackConfigFile: List<Path> = escalatingFind(UI_LOGBACK_FILE, pwd)
+                check(defaultLogbackConfigFile.size == 1) {
+                    "Expected exactly one default logback configuration file with name '$UI_LOGBACK_FILE', but found " +
+                            "'${defaultLogbackConfigFile.size}' files: '$defaultLogbackConfigFile'; search started in '$pwd'"
+                }
+                println("found logback configuration template at: '${defaultLogbackConfigFile.first()}'")
+                val logDir: Path =
+                    requireNotNull(System.getProperty("cdr.client.log.directory")) {
+                        "log directory system property 'cdr.client.log.directory' is not set"
+                    }
+                        .run(Path::of)
+                        .run {
+                            if (isAbsolute) {
+                                this
+                            } else {
+                                // should only be relevant for macOS where configuration, logs, etc., should go into `$HOME/Library/Application Support/...`
+                                // on other platforms use absolute paths!
+                                requireNotNull(System.getProperty("user.home")) {
+                                    "User home directory is not set but is required to resolve the relative log directory '$this'"
+                                }.run(Path::of).resolve(this).absolute()
+                            }
+                        }
+                logDir.createDirectories()
+                defaultLogbackConfigFile
+                    .first()
+                    .readText()
+                    .replace("@@LOG_DIR@@", logDir.toString())
+                    .also { defaultConfigContents: String ->
+                        logbackConfigFile.createParentDirectories()
+                        logbackConfigFile.writeText(defaultConfigContents)
+                    }
+                println("default logback configuration file created at: '$logbackConfigFile'")
+            }
+            logbackConfigFile
+        }
+        ?.let { logbackConfigFile: Path ->
+            // update property with the absolute path to the logback configuration file
+            System.setProperty(LOGBACK_CONFIGURATION_FILE_PROPERTY, logbackConfigFile.toString())
+        }

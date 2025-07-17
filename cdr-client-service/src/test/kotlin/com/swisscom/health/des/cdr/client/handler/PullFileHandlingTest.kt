@@ -76,7 +76,7 @@ internal class PullFileHandlingTest {
 
     private lateinit var cdrApiClient: CdrApiClient
 
-    private val inflightFolder = "inflight"
+    private val inflightDirectory = "inflight"
     private val targetDirectory = "customer"
     private val sourceDirectory = "source"
     private lateinit var endpoint: CdrApi
@@ -95,7 +95,7 @@ internal class PullFileHandlingTest {
         )
 
         tmpDir.resolve(targetDirectory).also { it.createDirectories() }
-        val inflightDir = tmpDir.resolve(inflightFolder).also { it.createDirectories() }
+        val inflightDir = tmpDir.resolve(inflightDirectory).also { it.createDirectories() }
 
         every { config.cdrApi } returns endpoint
         every { config.localFolder } returns TempDownloadDir(inflightDir)
@@ -113,7 +113,7 @@ internal class PullFileHandlingTest {
     }
 
     @Test
-    fun `test sync of single file to folder`() {
+    fun `test sync of single file to directory`() {
         enqueueFileResponseWithReportResponse()
         enqueueEmptyResponse()
 
@@ -129,17 +129,17 @@ internal class PullFileHandlingTest {
             assertEquals(1, it.size)
             assertTrue(it[0].extension == "xml", "File extension is not .xml")
         }
-        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+        tmpDir.resolve(inflightDirectory).listDirectoryEntries().let {
             assertTrue(it.isEmpty())
         }
     }
 
     @Test
-    fun `test sync of single file to type folder`() {
+    fun `test sync of single file to type directory`() {
         enqueueFileResponseWithReportResponse("generalInvoice450_qr_dt.xml")
         enqueueEmptyResponse()
 
-        val invoiceFolder = tmpDir.resolve("invoice").also { it.createDirectories() }
+        val invoiceDir = tmpDir.resolve("invoice").also { it.createDirectories() }
 
         val connector = CdrClientConfig.Connector(
             connectorId = "1-2-3-4",
@@ -149,7 +149,7 @@ internal class PullFileHandlingTest {
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
                 DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
-                    targetFolder = invoiceFolder,
+                    targetFolder = invoiceDir,
                 )
             )
         )
@@ -162,21 +162,21 @@ internal class PullFileHandlingTest {
         val listFiles = tmpDir.listDirectoryEntries()
         assertEquals(3, listFiles.size)
 
-        invoiceFolder.listDirectoryEntries().let {
+        invoiceDir.listDirectoryEntries().let {
             assertEquals(1, it.size)
             assertTrue(it[0].extension == "xml", "File extension is not .xml")
         }
-        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+        tmpDir.resolve(inflightDirectory).listDirectoryEntries().let {
             assertTrue(it.isEmpty())
         }
     }
 
     @Test
-    fun `test sync of single file to default folder but another type is defined`() {
+    fun `test sync of single file to default directory but another type is defined`() {
         enqueueFileResponseWithReportResponse("notification_example_with_attachment.xml")
         enqueueEmptyResponse()
 
-        val invoiceFolder = tmpDir.resolve("invoice").also { it.createDirectories() }
+        val invoiceDir = tmpDir.resolve("invoice").also { it.createDirectories() }
         val targetDir = tmpDir.resolve(targetDirectory)
 
         val connector = CdrClientConfig.Connector(
@@ -187,7 +187,7 @@ internal class PullFileHandlingTest {
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
                 DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
-                    targetFolder = invoiceFolder,
+                    targetFolder = invoiceDir,
                 )
             )
         )
@@ -204,17 +204,17 @@ internal class PullFileHandlingTest {
             assertEquals(1, it.size)
             assertTrue(it[0].extension == "xml", "File extension is not .xml")
         }
-        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+        tmpDir.resolve(inflightDirectory).listDirectoryEntries().let {
             assertTrue(it.isEmpty())
         }
     }
 
     @Test
-    fun `test sync of single file to default folder for unknown type and another type is defined`() {
+    fun `test sync of single file to default directory for unknown type and another type is defined`() {
         enqueueFileResponseWithReportResponse()
         enqueueEmptyResponse()
 
-        val invoiceFolder = tmpDir.resolve("invoice").also { it.createDirectories() }
+        val invoiceDir = tmpDir.resolve("invoice").also { it.createDirectories() }
         val targetDir = tmpDir.resolve(targetDirectory)
 
         val connector = CdrClientConfig.Connector(
@@ -225,7 +225,7 @@ internal class PullFileHandlingTest {
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
                 DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
-                    targetFolder = invoiceFolder,
+                    targetFolder = invoiceDir,
                 )
             )
         )
@@ -242,7 +242,7 @@ internal class PullFileHandlingTest {
             assertEquals(1, it.size)
             assertTrue(it[0].extension == "xml", "File extension is not .xml")
         }
-        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+        tmpDir.resolve(inflightDirectory).listDirectoryEntries().let {
             assertTrue(it.isEmpty())
         }
     }
@@ -260,13 +260,13 @@ internal class PullFileHandlingTest {
         tmpDir.resolve(targetDirectory).listDirectoryEntries().let {
             assertTrue(it.isEmpty())
         }
-        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+        tmpDir.resolve(inflightDirectory).listDirectoryEntries().let {
             assertTrue(it.isEmpty())
         }
     }
 
     @Test
-    fun `test sync of single file to folder with failed report for success`() {
+    fun `test sync of single file to directory with failed report for success`() {
         enqueueFileResponse()
         enqueueExceptionResponse()
         enqueueEmptyResponse()
@@ -280,13 +280,13 @@ internal class PullFileHandlingTest {
         tmpDir.resolve(targetDirectory).listDirectoryEntries().let {
             assertTrue(it.isEmpty())
         }
-        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+        tmpDir.resolve(inflightDirectory).listDirectoryEntries().let {
             assertEquals(1, it.size)
         }
     }
 
     @Test
-    fun `test sync of multiple files to folder`() {
+    fun `test sync of multiple files to directory`() {
         enqueueFileResponseWithReportResponse()
         enqueueFileResponseWithReportResponse()
         enqueueFileResponseWithReportResponse()
@@ -304,13 +304,13 @@ internal class PullFileHandlingTest {
         tmpDir.resolve(targetDirectory).listDirectoryEntries().let {
             assertEquals(5, it.size)
         }
-        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+        tmpDir.resolve(inflightDirectory).listDirectoryEntries().let {
             assertTrue(it.isEmpty())
         }
     }
 
     @Test
-    fun `test sync of multiple files with an exception to folder`() {
+    fun `test sync of multiple files with an exception to directory`() {
         enqueueFileResponseWithReportResponse()
         enqueueFileResponseWithReportResponse()
         enqueueFileResponseWithReportResponse()
@@ -328,20 +328,20 @@ internal class PullFileHandlingTest {
         tmpDir.resolve(targetDirectory).listDirectoryEntries().let {
             assertEquals(3, it.size)
         }
-        tmpDir.resolve(inflightFolder).listDirectoryEntries().let {
+        tmpDir.resolve(inflightDirectory).listDirectoryEntries().let {
             assertTrue(it.isEmpty())
         }
     }
 
     private fun createConnector(
         connectorId0: String,
-        targetFolder0: Path = tmpDir.resolve(targetDirectory),
-        sourceFolder0: Path = tmpDir.resolve(sourceDirectory),
+        targetDir0: Path = tmpDir.resolve(targetDirectory),
+        sourceDir0: Path = tmpDir.resolve(sourceDirectory),
     ): CdrClientConfig.Connector =
         CdrClientConfig.Connector(
             connectorId = connectorId0,
-            targetFolder = targetFolder0,
-            sourceFolder = sourceFolder0,
+            targetFolder = targetDir0,
+            sourceFolder = sourceDir0,
             contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
             mode = CdrClientConfig.Mode.PRODUCTION,
         )
