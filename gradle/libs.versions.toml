@@ -2,7 +2,7 @@
 jdk="17"
 kotlin-lang = "2.2.0"
 compose-multiplatform = "1.8.2"
-compose-native-tray = "0.6.7"
+compose-native-tray = "0.6.9"
 kotlin-logging = "7.0.7"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization="1.9.0"
