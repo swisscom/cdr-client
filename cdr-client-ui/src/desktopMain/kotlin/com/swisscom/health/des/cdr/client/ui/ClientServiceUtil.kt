@@ -8,6 +8,8 @@ import java.nio.file.Path
 
 private val logger: KLogger = KotlinLogging.logger {}
 
+internal fun logInfo(e: Exception? = null, message: () -> String) = logger.info(e) { message() }
+
 internal fun findClientServiceExecutable(): Path? =
     ProcessHandle.current().info().command().get().let { cdrUiCmd: String ->
         logger.debug { "cdr-client-ui command: '$cdrUiCmd'" }

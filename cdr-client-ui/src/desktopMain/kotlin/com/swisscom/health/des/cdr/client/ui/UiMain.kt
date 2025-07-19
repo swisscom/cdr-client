@@ -111,29 +111,42 @@ fun main() = application {
 
     // start cdr client service if the UI is configured to control the service
     if (uiIsServiceController()) {
+        registerCdrClientServiceShutdownHook()
         LaunchCdrClientService()
     }
 }
 
+private fun registerCdrClientServiceShutdownHook() =
+    // Needed for macOS only: If "Quit" is selected from the dock icon's context menu, the main
+    // process is killed, but not its children. I have no idea why and how. If the UI process
+    // receives a SIGTERM, then the child process gets terminated as well as expected.
+    Runtime.getRuntime().addShutdownHook(
+        Thread {
+            ProcessHandle.current().children()
+                .forEach { childProcess: ProcessHandle ->
+                    logInfo { "Terminating child process '${childProcess.info().commandLine()}'" }
+                    childProcess.destroy()
+                }
+        }
+    )
+
 @Composable
-private fun LaunchCdrClientService() {
-    val cdrServiceExecutable: Path? = findClientServiceExecutable()
-    if (cdrServiceExecutable != null) {
+private fun LaunchCdrClientService() =
+    findClientServiceExecutable()?.let { cdrServiceExecutable: Path ->
         LaunchedEffect(Unit) {
             do {
-                println("(Re-)start ${clientServiceExecutableForPlatform()}")
+                logInfo { "(Re-)start ${clientServiceExecutableForPlatform()}" }
                 val processResult: ProcessResult =
                     process(
                         cdrServiceExecutable.toString(),
                         stdout = Redirect.PRINT,
                         stderr = Redirect.PRINT,
                     )
-                println("${clientServiceExecutableForPlatform()} exited with code ${processResult.resultCode}")
+                logInfo { "${clientServiceExecutableForPlatform()} exited with code ${processResult.resultCode}" }
             } while (processResult.resultCode == CONFIG_CHANGE_EXIT_CODE)
-            println("${clientServiceExecutableForPlatform()} stopped with non-restartable exit code.")
+            logInfo { "${clientServiceExecutableForPlatform()} stopped with non-restartable exit code." }
         }
     }
-}
 
 @Composable
 private fun ApplicationScope.CdrSystemTray(
@@ -150,14 +163,14 @@ private fun ApplicationScope.CdrSystemTray(
                 contentDescription = EMPTY_STRING,
                 tint = Color.Unspecified,
                 modifier = Modifier.fillMaxSize()
-                // neither of these options works (on linux, at least); intention was to update the client service status when the tray icon is clicked
+                    // neither of these options works (on linux, at least); intention was to update the client service status when the tray icon is clicked
 //                    .onClick(onClick = { logger.info { "updating client service status because tray icon was clicked" } })
 //                    .clickable(onClick = { logger.info { "updating client service status because tray icon was clicked" } })
             )
         },
         tooltip = toolTip,
         primaryAction = primaryAction,
-        primaryActionLinuxLabel = labelPrimaryAction
+        primaryActionLabel = labelPrimaryAction
     ) {
         Item(
             label = labelStatusItem,
