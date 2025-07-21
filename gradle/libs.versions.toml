@@ -2,7 +2,7 @@
 jdk="17"
 kotlin-lang = "2.2.0"
 compose-multiplatform = "1.8.2"
-compose-native-tray = "0.6.7"
+compose-native-tray = "0.6.9"
 kotlin-logging = "7.0.7"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization="1.9.0"
@@ -25,6 +25,7 @@ androidx-lifecycle = "2.9.1"
 conveyor-control-api = "1.1"
 jna = "5.17.0"
 ui-tiles = "2.10.0"
+pgreze-kotlin-process = "1.5.1"
 
 [libraries]
 kache = { group = "com.mayakapps.kache", name = "kache", version.ref = "kache" }
@@ -56,6 +57,7 @@ conveyor-control = { group = "dev.hydraulic.conveyor", name = "conveyor-control"
 jna = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jna" }
 uitiles = { group = "com.github.alorma.compose-settings", name = "ui-tiles", version.ref = "ui-tiles" }
 compose-native-tray = { group = "io.github.kdroidfilter", name = "composenativetray", version.ref = "compose-native-tray" }
+pgreze-kotlin-process = { group = "com.github.pgreze", name = "kotlin-process", version.ref = "pgreze-kotlin-process" }
 #### TEST DEPENDENCIES ####
 jacocoCore = { group = "org.jacoco", name = "org.jacoco.core", version.ref = "jacoco" }
 spring-boot-starter-test = { group = "org.springframework.boot", name = "spring-boot-starter-test" }

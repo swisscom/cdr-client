@@ -5,9 +5,9 @@ import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
+import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.HttpServerErrorException
-import com.swisscom.health.des.cdr.client.getRootestCause
 import io.github.oshai.kotlinlogging.KotlinLogging
 import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaType

@@ -16,7 +16,7 @@ class ConfigConverterTest {
     private val configAllRelativePaths: CdrClientConfig = CdrClientConfig(
         fileSynchronizationEnabled = FileSynchronization.ENABLED,
         customer = Customer(
-            listOf(
+            mutableListOf(
                 CdrClientConfig.Connector(
                     connectorId = "1",
                     targetFolder = RELATIVE_PATH,
@@ -75,7 +75,7 @@ class ConfigConverterTest {
     private val configAllAbsolutePaths: CdrClientConfig = CdrClientConfig(
         fileSynchronizationEnabled = FileSynchronization.ENABLED,
         customer = Customer(
-            listOf(
+            mutableListOf(
                 CdrClientConfig.Connector(
                     connectorId = "1",
                     targetFolder = ABSOLUTE_PATH,

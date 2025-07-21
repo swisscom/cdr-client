@@ -94,7 +94,7 @@ internal fun RetryTemplateConfig.toDto(): DTOs.CdrClientConfig.RetryTemplateConf
  * BEGIN - Configuration DTOs -> Spring Configuration
  */
 internal fun DTOs.CdrClientConfig.toCdrClientConfig(): CdrClientConfig {
-    fun List<DTOs.CdrClientConfig.Connector>.toCdrClientConfig(): List<CdrClientConfig.Connector> = map { it.toCdrClientConfig() }
+    fun List<DTOs.CdrClientConfig.Connector>.toCdrClientConfig(): MutableList<CdrClientConfig.Connector> = map { it.toCdrClientConfig() }.toMutableList()
     fun DTOs.CdrClientConfig.FileBusyTestStrategy.toCdrClientConfig(): FileBusyTestStrategyProperty = FileBusyTestStrategyProperty.valueOf(name)
 
     return CdrClientConfig(
