@@ -12,6 +12,14 @@ import java.time.Instant
 
 private val logger = KotlinLogging.logger {}
 
+/**
+ * The service renews the client secret via the CDR API. If the secret was successfully renewed,
+ * it is stored in the client's configuration using the [ConfigurationWriter].
+ *
+ *
+ * @see [ConfigurationWriter]
+ * @see [com.swisscom.health.des.cdr.client.scheduling.ClientSecretRenewalScheduler]
+ */
 @Service
 @ConditionalOnProperty(prefix = "client.idp-credentials", name = ["renew-credential"], havingValue = "true")
 internal class ClientSecretRenewalService(
@@ -68,7 +76,7 @@ internal class ClientSecretRenewalService(
 
         return configurationWriter.updateClientServiceConfiguration(newCdrConfig).let { updateResult ->
             when (updateResult) {
-                is ConfigurationWriter.Result.Failure -> RenewClientSecretResult.Failure.also {
+                is ConfigurationWriter.UpdateResult.Failure -> RenewClientSecretResult.Failure.also {
                     logger.error {
                         "Failed to update client service configuration with new client secret: '${updateResult.errors}'\n" +
                                 "Your previous secret has already been expired. You must create a new secret on the CDR Website and then set the " +
@@ -76,7 +84,7 @@ internal class ClientSecretRenewalService(
                     }
                 }
 
-                is ConfigurationWriter.Result.Success -> RenewClientSecretResult.Success
+                is ConfigurationWriter.UpdateResult.Success -> RenewClientSecretResult.Success
             }
         }
     }

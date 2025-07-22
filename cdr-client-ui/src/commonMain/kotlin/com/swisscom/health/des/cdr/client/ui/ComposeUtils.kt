@@ -66,7 +66,6 @@ import org.jetbrains.compose.resources.stringResource
 
 private val logger = KotlinLogging.logger { }
 
-
 fun interface Validatable {
     fun validate(): DTOs.ValidationResult
 }

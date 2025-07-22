@@ -12,6 +12,9 @@ internal class HealthIndicators(
     private val config: CdrClientConfig
 ) {
 
+    /**
+     * A custom health indicator that checks if file synchronization is enabled or disabled.
+     */
     @Bean
     fun fileSynchronizationHealthIndicator(): HealthIndicator =
         HealthIndicator {

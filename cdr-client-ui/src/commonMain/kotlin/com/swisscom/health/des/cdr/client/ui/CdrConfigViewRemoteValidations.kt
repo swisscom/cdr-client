@@ -13,10 +13,21 @@ private val logger = KotlinLogging.logger {}
 private typealias ValidationErrorHandler = suspend (Map<String, Any>, DomainObjects.ConfigurationItem) -> DTOs.ValidationResult
 private typealias ValidationSuccessHandler<T> = suspend (T, DomainObjects.ConfigurationItem) -> DTOs.ValidationResult
 
+/**
+ * Wrapper around the [CdrClientApiClient] that translates the API responses into [DTOs.ValidationResult]s.
+ */
 internal class CdrConfigViewRemoteValidations(
     private val cdrClientApiClient: CdrClientApiClient,
 ) {
 
+    /**
+     * Validates that the given value is not blank.
+     *
+     * @param value the value to validate
+     * @param fieldName the name of the field being validated
+     * @return a [DTOs.ValidationResult] indicating success or failure
+     * @see DomainObjects.ConfigurationItem
+     */
     internal suspend fun validateNotBlank(
         value: String,
         fieldName: DomainObjects.ConfigurationItem,
@@ -27,6 +38,17 @@ internal class CdrConfigViewRemoteValidations(
                 onSuccess = foldIntoValidationResult
             )
 
+    /**
+     * Validates that the given path is a directory that is readable and writable, and that it is a
+     * single-use directory.
+     *
+     * @param config the CDR client configuration
+     * @param path the path to validate
+     * @param fieldName the name of the field being validated
+     * @return a [DTOs.ValidationResult] indicating [DTOs.ValidationResult.Success] or
+     * [DTOs.ValidationResult.Failure]
+     * @see DomainObjects.ConfigurationItem
+     */
     internal suspend fun validateDirectory(
         config: DTOs.CdrClientConfig,
         path: String?,

@@ -12,6 +12,16 @@ import org.springframework.stereotype.Service
 
 private val logger = KotlinLogging.logger {}
 
+/**
+ * The scheduler renews the client secret via the [ClientSecretRenewalService] at a fixed interval.
+ * If the secret was successfully renewed, it triggers a shutdown of the application to refresh the Spring context.
+ *
+ * @param clientSecretRenewalService The service to renew the client secret.
+ * @param shutdownService The service to handle application shutdowns.
+ * @param tracer A Micrometer tracer for to create new `span`s.
+ * @see [ClientSecretRenewalService]
+ * @see [ShutdownService]
+ */
 @Service
 @ConditionalOnProperty(prefix = "client.idp-credentials", name = ["renew-credential"], havingValue = "true")
 internal class ClientSecretRenewalScheduler(

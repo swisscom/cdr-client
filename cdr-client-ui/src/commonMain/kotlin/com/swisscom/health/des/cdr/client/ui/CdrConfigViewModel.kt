@@ -26,6 +26,13 @@ private val logger = KotlinLogging.logger {}
 private typealias ErrorHandler = suspend (Map<String, Any>) -> Unit
 private typealias SuccessHandler<T> = suspend (T) -> Unit
 
+/**
+ * State of the various UI elements.
+ *
+ * @param clientServiceStatus The current status of the CDR Client service.
+ * @param clientServiceConfig The CDR Client service configuration.
+ * @param errorMessageKey An optional error message key to display in a Snackbar.
+ */
 internal data class CdrConfigUiState(
     val clientServiceStatus: DTOs.StatusResponse.StatusCode = DTOs.StatusResponse.StatusCode.UNKNOWN,
     val clientServiceConfig: DTOs.CdrClientConfig = DTOs.CdrClientConfig.EMPTY,
@@ -35,6 +42,8 @@ internal data class CdrConfigUiState(
 /**
  * ViewModel for the CDR client configuration screen. Unfortunately, the way this works is by creating
  * side effects on the [CdrConfigUiState]. Changes to the state trigger the recomposition of the UI.
+ *
+ * @param cdrClientApiClient The client to communicate with the CDR Client service.
  */
 internal class CdrConfigViewModel(
     private val cdrClientApiClient: CdrClientApiClient,
@@ -47,6 +56,10 @@ internal class CdrConfigViewModel(
         queryClientServiceConfiguration()
     }
 
+    /**
+     * Sends the current client configuration to the CDR Client service. If the service accepts the
+     * configuration, the service is told to restart so it applies the new configuration.
+     */
     fun applyClientServiceConfiguration(): Job =
         viewModelScope.launch {
             cdrClientApiClient.updateClientServiceConfiguration(_uiState.value.clientServiceConfig).handle { response: DTOs.CdrClientConfig ->
@@ -60,8 +73,10 @@ internal class CdrConfigViewModel(
         }
 
     /**
-     * Retrieves the client service configuration from the client service. This is the configuration as it is currently
-     * applied in the client service. This state might differ from the state of the configuration file.
+     * Retrieves the CDR Client service configuration from the client service. This is the
+     * configuration as it is currently applied in the client service. This state might differ
+     * from the state of the configuration file if the configuration has been updated, but the
+     * client service has not been restarted yet.
      */
     fun queryClientServiceConfiguration(): Job =
         viewModelScope.launch {
@@ -74,6 +89,11 @@ internal class CdrConfigViewModel(
             }
         }
 
+    /**
+     * Sets the file synchronization enabled state in the client service configuration.
+     *
+     * @param enabled Whether file synchronization is enabled or not.
+     */
     fun setFileSync(enabled: Boolean) {
         logger.debug { "setFileSync: '$enabled'" }
         _uiState.update {
@@ -85,6 +105,13 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the file busy test strategy in the client service configuration.
+     *
+     * @param strategy The file busy test strategy to use. Must be one of the values defined in
+     * [DTOs.CdrClientConfig.FileBusyTestStrategy].
+     * @see DTOs.CdrClientConfig.FileBusyTestStrategy
+     */
     fun setFileBusyTestStrategy(strategy: String) {
         logger.debug { "setFileBusyTestStrategy: '$strategy'" }
         _uiState.update {
@@ -96,6 +123,11 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the CDR API host in the client service configuration.
+     *
+     * @param host The (fully qualified) host name of the CDR API.
+     */
     fun setCdrApiHost(host: String) {
         logger.debug { "setCdrApiHost: '$host'" }
         _uiState.update {
@@ -109,6 +141,11 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the temporary download directory in the client service configuration.
+     *
+     * @param path The temporary directory to use for file downloads.
+     */
     fun setLocalPath(path: String) {
         logger.debug { "setLocalPath: '$path'" }
         _uiState.update {
@@ -120,6 +157,11 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the IDP tenant ID in the client service configuration.
+     *
+     * @param id The IDP tenant ID to use.
+     */
     fun setIdpTenantId(id: String) {
         logger.debug { "setTenantId: '$id'" }
         _uiState.update {
@@ -133,6 +175,11 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the IDP client ID in the client service configuration.
+     *
+     * @param id The IDP client ID to use.
+     */
     fun setIdpClientId(id: String) {
         logger.debug { "setClientId: '$id'" }
         _uiState.update {
@@ -146,6 +193,11 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the IDP client password in the client service configuration.
+     *
+     * @param password The IDP client password to use.
+     */
     fun setIdpClientPassword(password: String) {
         logger.debug { "setClientPassword: '$password'" }
         _uiState.update {
@@ -159,6 +211,11 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets whether the IDP client secret should be renewed automatically after 365 days.
+     *
+     * @param renew Whether to renew the client secret automatically.
+     */
     fun setIdpRenewClientSecret(renew: Boolean) {
         logger.debug { "setIdpRenewClientSecret: '$renew'" }
         _uiState.update {
@@ -172,6 +229,11 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the connector ID in the client service configuration.
+     *
+     * @param connectorId The ID of the connector to set.
+     */
     fun setConnectorId(connectorId: String) {
         logger.debug { "setConnectorId: '$connectorId'" }
         _uiState.update {
@@ -190,7 +252,14 @@ internal class CdrConfigViewModel(
         }
     }
 
-    fun setConnectorMode(mode:String) {
+    /**
+     * Sets the connector mode in the client service configuration.
+     *
+     * @param mode The mode of the connector to set. Must be one of the values defined in
+     * [DTOs.CdrClientConfig.Mode].
+     * @see DTOs.CdrClientConfig.Mode
+     */
+    fun setConnectorMode(mode: String) {
         logger.debug { "setConnectorMode: '$mode'" }
         _uiState.update {
             val connector =
@@ -208,6 +277,11 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the base archive directory for the connector in the client service configuration.
+     *
+     * @param archiveDir The base directory to use for archiving successfully uploaded files.
+     */
     fun setConnectorArchiveDir(archiveDir: String) {
         logger.debug { "setConnectorArchiveDir: '$archiveDir'" }
         _uiState.update {
@@ -226,6 +300,11 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets whether the connector archive is enabled in the client service configuration.
+     *
+     * @param enabled Whether the connector archive is enabled or not.
+     */
     fun setConnectorArchiveEnabled(enabled: Boolean) {
         logger.debug { "setConnectorArchiveEnabled: '$enabled'" }
         _uiState.update {
@@ -244,6 +323,11 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the base error directory for the connector in the client service configuration.
+     *
+     * @param errorDir The base directory to use for storing files that could not be processed.
+     */
     fun setConnectorErrorDir(errorDir: String) {
         logger.debug { "setConnectorErrorDir: '$errorDir'" }
         _uiState.update {
@@ -262,6 +346,12 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the base download directory for the connector in the client service configuration.
+     *
+     * @param targetDir The base directory to use for storing files that have been downloaded
+     * @see [setConnectorDocTypeTargetDir]
+     */
     fun setConnectorBaseTargetDir(targetDir: String) {
         logger.debug { "setConnectorBaseTargetDir: '$targetDir'" }
         _uiState.update {
@@ -280,6 +370,16 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the download directory for a specific document type in the connector in the client
+     * service configuration. The document type specific target directory can either be relative
+     * (to the base target directory) or absolute.
+     *
+     * @param docType The document type for which to set the target directory.
+     * @param targetDir The target directory to use for this document type.
+     * @see DTOs.CdrClientConfig.DocumentType
+     * @see [setConnectorBaseTargetDir]
+     */
     fun setConnectorDocTypeTargetDir(docType: DTOs.CdrClientConfig.DocumentType, targetDir: String) {
         logger.debug { "setConnectorDocTypeTargetDir: '$docType' -> '$targetDir'" }
         _uiState.update {
@@ -302,6 +402,12 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the base source directory for the connector in the client service configuration.
+     *
+     * @param sourceDir The base directory to use for processing files that are uploaded to the CDR API.
+     * @see [setConnectorDocTypeSourceDir]
+     */
     fun setConnectorBaseSourceDir(sourceDir: String) {
         logger.debug { "setConnectorBaseSourceDir: '$sourceDir'" }
         _uiState.update {
@@ -320,6 +426,16 @@ internal class CdrConfigViewModel(
         }
     }
 
+    /**
+     * Sets the source directory for a specific document type in the connector in the client
+     * service configuration. The document type specific source directory can either be relative
+     * (to the base source directory) or absolute.
+     *
+     * @param docType The document type for which to set the source directory.
+     * @param sourceDir The source directory to use for this document type.
+     * @see DTOs.CdrClientConfig.DocumentType
+     * @see [setConnectorBaseSourceDir]
+     */
     fun setConnectorDocTypeSourceDir(docType: DTOs.CdrClientConfig.DocumentType, sourceDir: String) {
         logger.debug { "setConnectorDocTypeSourceDir: '$docType' -> '$sourceDir'" }
         _uiState.update {
@@ -348,14 +464,14 @@ internal class CdrConfigViewModel(
      * with the correct reason, which translates into an exit code. It is the responsibility of the
      * service supervisor process (e.g., `systemd`) to then restart the service.
      *
-     * Effect: Updates the [uiStateFlow] and sets ths service status to [DTOs.StatusResponse.StatusCode.UNKNOWN].
-     * The status will be updated by the next call to [queryClientServiceStatus]. (Yes, we have a race
-     * condition here.)
+     * Side effect: Sets the service status to [DTOs.StatusResponse.StatusCode.UNKNOWN]. The status will
+     * be updated by the next call to
+     * [queryClientServiceStatus]. (Yes, we have a race condition here.)
      */
     fun asyncClientServiceRestart(): Job = asyncClientServiceShutdown()
 
     /**
-     * Queries the client service status and updates the [uiStateFlow] with the result.
+     * Queries the CDR Client service status.
      */
     fun queryClientServiceStatus(retryStrategy: CdrClientApiClient.RetryStrategy): Job =
         viewModelScope.launch {
@@ -372,6 +488,9 @@ internal class CdrConfigViewModel(
             }
         }
 
+    /**
+     * Clears the error message key from the UI state.
+     */
     fun clearErrorMessage() =
         _uiState.update {
             it.copy(
@@ -379,6 +498,18 @@ internal class CdrConfigViewModel(
             )
         }
 
+    /**
+     * Instructs the CDR Client service process to shut itself down. The received
+     * [DTOs.ShutdownResponse] contains the time when the shutdown is scheduled for. We delay until
+     * that time and then update the UI state and set the service status to
+     * [DTOs.StatusResponse.StatusCode.UNKNOWN].
+     *
+     * The shutdown is guarded by a [Mutex] to prevent multiple shutdowns from being triggered at
+     * the same time. If a shutdown is already in progress, then a completed job is returned immediately.
+     *
+     * @return A [Job] that completes when the shutdown is complete. If a shutdown is already in
+     * progress, a completed job is returned immediately.
+     */
     private fun asyncClientServiceShutdown(): Job =
         if (SHUTDOWN_GUARD.tryLock()) {
             viewModelScope.launch {
@@ -401,7 +532,7 @@ internal class CdrConfigViewModel(
                 invokeOnCompletion { _ -> SHUTDOWN_GUARD.unlock() }
             }
         } else {
-            logger.debug { "client shutdown is in progress, ignoring command" }
+            logger.debug { "client service shutdown is already in progress, ignoring command" }
             Job().apply { complete() }
         }
 

@@ -10,6 +10,13 @@ private val logger: KLogger = KotlinLogging.logger {}
 
 internal fun logInfo(e: Exception? = null, message: () -> String) = logger.info(e) { message() }
 
+/**
+ * Try and find the executable of the CDR Client service based on the current platform and the
+ * location of the CDR Client UI executable. If we run out of smarts we simply assume the
+ * executable is available on the user's `$PATH` and hope for the best.
+ *
+ * @return the path to the CDR Client service executable, or null if it could not be determined
+ */
 internal fun findClientServiceExecutable(): Path? =
     ProcessHandle.current().info().command().get().let { cdrUiCmd: String ->
         logger.debug { "cdr-client-ui command: '$cdrUiCmd'" }

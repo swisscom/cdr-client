@@ -41,13 +41,21 @@ private fun initConfig() {
     initSpringBootConfig()
 }
 
+/**
+ * Checks whether the system property `spring.config.additional-location` is set and if so, checks if
+ * the file exists. If it does not exist, the default customer configuration file is copied to that
+ * location. If the property value is a relative path, then it is resolved against the user's home
+ * directory. This should only be the case under macOS where configuration, logs, etc., should go into
+ * `$HOME/Library/...`. The system property is then updated with the absolute path to the customer
+ * configuration file.
+ */
 private fun initSpringBootConfig() =
     // create a default customer configuration file if we are told to do so and if it does not exist yet
     System.getProperty(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY)
         ?.let { additionalConfigLocation: String ->
             val additionalConfigPath = Path.of(additionalConfigLocation)
             if (!additionalConfigPath.isAbsolute) {
-                // should only be relevant for macOS where configuration, logs, etc., should go into `$HOME/Library/Application Support/...`
+                // should only be relevant for macOS where configuration, logs, etc., should go into `$HOME/Library/...`
                 // on other platforms use absolute paths!
                 val userHome: Path = requireNotNull(System.getProperty("user.home")) {
                     "User home directory is not set but is required to resolve the relative configuration path '$additionalConfigLocation'"
@@ -93,6 +101,14 @@ private fun initSpringBootConfig() =
             System.setProperty(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY, customerConfigFile.toString())
         }
 
+/**
+ * Checks whether the system property `logging.config` is set and if so, checks if the file exists.
+ * If it does not exist, a default logback configuration file is created at that location. If the
+ * property value is a relative path, then it is resolved against the user's home directory. This
+ * should only be the case under macOS where configuration, logs, etc., should go into
+ * `$HOME/Library/...`.The system property is then updated with the absolute path to the customer
+ * configuration file.
+ */
 @Suppress("NestedBlockDepth", "LongMethod")
 private fun initLogbackConfig() =
     System.getProperty(SPRING_BOOT_LOGBACK_CONFIG_LOCATION_PROPERTY)

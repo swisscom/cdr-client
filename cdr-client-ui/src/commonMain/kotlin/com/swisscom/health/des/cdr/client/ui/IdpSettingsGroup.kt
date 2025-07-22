@@ -29,6 +29,9 @@ import org.jetbrains.compose.resources.stringResource
 
 private val logger = KotlinLogging.logger { }
 
+/**
+ * A composable function that displays a group of settings related to Identity Provider (IdP) configuration.
+ */
 @Composable
 internal fun IdpSettingsGroup(
     modifier: Modifier,
