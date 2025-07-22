@@ -28,6 +28,22 @@ import kotlin.reflect.full.memberProperties
 
 private val logger = KotlinLogging.logger {}
 
+/**
+ * Persists changes to the CDR Client service configuration.
+ *
+ * The current client service configuration is injected at creation time. The new configuration is
+ * passed as a parameter to [updateClientServiceConfiguration]. If any of the updatable configuration
+ * items have changed, then the ConfigurationWriter will try to update the corresponding configuration
+ * file. If it finds more than one writable source for the property, it updates the first that it
+ * finds. Which may or may not be the correct one. It is thus strongly recommended to pool all
+ * updatable configuration items in a single customer configuration file.
+ *
+ * The `ConfigurationWriter` does NOT restart the CDR Client service to activate the newly written
+ * configuration. This responsibility is left to the caller.
+ *
+ * @see [ClientSecretRenewalService]
+ * @see [com.swisscom.health.des.cdr.client.http.WebOperations.updateServiceConfiguration]
+ */
 @Service
 internal class ConfigurationWriter(
     private val currentConfig: CdrClientConfig,
@@ -37,9 +53,21 @@ internal class ConfigurationWriter(
     sealed interface ConfigLookupResult {
         object NotFound : ConfigLookupResult
         object NotWritable : ConfigLookupResult
-        object Writable : ConfigLookupResult
+        data class Writable(val resource: Resource) : ConfigLookupResult
     }
 
+    /**
+     * Lets you check whether a configuration property at the given property path is
+     * 1. an updatable configuration item or not, and whether it is
+     * 2. sourced from a writable configuration file or not.
+     *
+     * @param propertyPath the property path of the configuration item to check, e.g.,
+     * `client.idp-credentials.client-secret`
+     * @return [ConfigLookupResult.NotFound] if the property at the given path is not updatable,
+     * [ConfigLookupResult.NotWritable] if the property is updatable
+     *   but was not sourced from a writable resource, or [ConfigLookupResult.Writable] if the
+     *   property is updatable and sourced from a writable resource.
+     */
     fun isWritableConfigurationItem(propertyPath: String): ConfigLookupResult =
         collectUpdatableConfigurationItems(currentConfig, currentConfig)
             .firstOrNull { it.propertyPath == propertyPath }
@@ -47,21 +75,39 @@ internal class ConfigurationWriter(
                 return when (updatableConfigItem) {
                     null -> ConfigLookupResult.NotFound
                     is UpdatableConfigurationItem.UnknownSourceConfigurationItem -> ConfigLookupResult.NotWritable
-                    is UpdatableConfigurationItem.WritableResourceConfigurationItem -> ConfigLookupResult.Writable
+                    is UpdatableConfigurationItem.WritableResourceConfigurationItem -> ConfigLookupResult.Writable(
+                        resource = updatableConfigItem.writableResource
+                    )
                 }
             }
 
-    sealed interface Result {
-        object Success : Result
-        data class Failure(val errors: Map<String, Any>) : Result
+    sealed interface UpdateResult {
+        object Success : UpdateResult
+        data class Failure(val errors: Map<String, Any>) : UpdateResult
     }
 
-    fun updateClientServiceConfiguration(newConfig: CdrClientConfig): Result = runCatching {
+    /**
+     * Persists the CDR Client service configuration with the new configuration provided.
+     *
+     * Before persisting the new configuration, it is validated. If any validation errors are found,
+     * the update will fail and return an [UpdateResult.Failure] with the validation errors.
+     *
+     * Even though the full client configuration is passed to this method, only the updatable
+     * configuration items and out of that set only those that have changed will be persisted. A
+     * property is updatable if it implements the [PropertyNameAware] interface and all of its
+     * ancestor properties in the property tree do so as well and if the property is a leaf node in
+     * the property name aware tree.
+     *
+     * @param newConfig the new CDR Client service configuration to persist.
+     * @return [UpdateResult.Success] if the update was successful, or [UpdateResult.Failure] with a
+     * map of (validation) errors if the update failed.
+     */
+    fun updateClientServiceConfiguration(newConfig: CdrClientConfig): UpdateResult = runCatching {
         logger.trace { "New CDR client config: '$newConfig'" }
 
         validate(newConfig).let { validationErrors: Map<String, Any> ->
             if (validationErrors.isNotEmpty()) {
-                Result.Failure(validationErrors)
+                UpdateResult.Failure(validationErrors)
             } else {
                 val updatableItems: List<UpdatableConfigurationItem> = collectUpdatableConfigurationItems(currentConfig, newConfig)
                 logger.trace { "Updatable configuration items found: '$updatableItems'" }
@@ -95,11 +141,11 @@ internal class ConfigurationWriter(
                         }
                     }
 
-                Result.Success
+                UpdateResult.Success
             }
         }
     }.getOrElse { exception ->
-        Result.Failure(mapOf("error" to exception)).also {
+        UpdateResult.Failure(mapOf("error" to exception)).also {
             logger.error(exception) { "Failed to update configuration items" }
         }
     }
@@ -192,6 +238,7 @@ internal class ConfigurationWriter(
     // the method is not listed as member of the KClass, probably because it is generated and not declared
     private fun Any.unbox(): Any = if (this::class.isValue) this::class.java.getMethod("unbox-impl").invoke(this) else this
 
+    // TODO
 //    private fun updatePropertySource(changedConfigItem: UpdatableConfigurationItem): Unit =
 //        Properties().run {
 //            load(propertiesResource.inputStream)

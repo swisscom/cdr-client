@@ -129,7 +129,7 @@ class ConfigurationWriterTest {
 
         val result = configurationWriter.updateClientServiceConfiguration(config.copy(fileSynchronizationEnabled = FileSynchronization.DISABLED))
 
-        assertInstanceOf<ConfigurationWriter.Result.Success>(result) { "Expected failure, but got $result" }
+        assertInstanceOf<ConfigurationWriter.UpdateResult.Success>(result) { "Expected failure, but got $result" }
     }
 
     @Test
@@ -156,7 +156,7 @@ class ConfigurationWriterTest {
 
         val result = configurationWriter.updateClientServiceConfiguration(config.copy(fileSynchronizationEnabled = FileSynchronization.DISABLED))
 
-        assertInstanceOf<ConfigurationWriter.Result.Success>(result) { "Expected Success, but got $result" }
+        assertInstanceOf<ConfigurationWriter.UpdateResult.Success>(result) { "Expected Success, but got $result" }
     }
 
     @Test
@@ -184,7 +184,7 @@ class ConfigurationWriterTest {
 
         val result = configurationWriter.updateClientServiceConfiguration(config.copy(fileSynchronizationEnabled = FileSynchronization.DISABLED))
 
-        assertInstanceOf<ConfigurationWriter.Result.Success>(result) { "Expected Success, but got $result" }
+        assertInstanceOf<ConfigurationWriter.UpdateResult.Success>(result) { "Expected Success, but got $result" }
     }
 
     @Test
@@ -216,7 +216,7 @@ class ConfigurationWriterTest {
 
         val result = configurationWriter.updateClientServiceConfiguration(config.copy(fileSynchronizationEnabled = FileSynchronization.DISABLED))
 
-        assertInstanceOf<ConfigurationWriter.Result.Success>(result) { "Expected Success, but got $result" }
+        assertInstanceOf<ConfigurationWriter.UpdateResult.Success>(result) { "Expected Success, but got $result" }
         val newFileSyncValue = YAMLMapper().run {
             readTree(configFile.inputStream()).run {
                 get("client")
@@ -272,7 +272,7 @@ class ConfigurationWriterTest {
 
         val result = configurationWriter.updateClientServiceConfiguration(config.copy(fileSynchronizationEnabled = FileSynchronization.DISABLED))
 
-        assertInstanceOf<ConfigurationWriter.Result.Success>(result) { "Expected Success, but got $result" }
+        assertInstanceOf<ConfigurationWriter.UpdateResult.Success>(result) { "Expected Success, but got $result" }
         val newFileSyncValue = YAMLMapper().run {
             readTree(configFile.inputStream()).run {
                 get("client")
@@ -315,7 +315,7 @@ class ConfigurationWriterTest {
         }
         every { applicationContext.environment.propertySources } returns propertySources
 
-        assertEquals(ConfigurationWriter.ConfigLookupResult.Writable,
+        assertEquals(ConfigurationWriter.ConfigLookupResult.Writable(resource = fileSystemResource),
             configurationWriter.isWritableConfigurationItem("client.file-synchronization-enabled"))
         assertEquals(ConfigurationWriter.ConfigLookupResult.NotWritable,
             configurationWriter.isWritableConfigurationItem("client.idp-credentials.client-secret"))

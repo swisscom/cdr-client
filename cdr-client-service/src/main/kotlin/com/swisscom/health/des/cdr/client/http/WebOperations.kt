@@ -33,7 +33,8 @@ import java.time.Instant
 private val logger = KotlinLogging.logger {}
 
 /**
- * This is not a public API. So RPC style http endpoints will suffice for now.
+ * This is not a public API. So RPC style http endpoints will suffice for now. The client of this
+ * HTTP API is the cdr-client-ui module.
  */
 @RestController
 internal class WebOperations(
@@ -80,6 +81,12 @@ internal class WebOperations(
      * is known to the caller, and the caller can thus assemble the full [DTOs.ValidationDetail] by combining its own data with the message keys.
      */
 
+    /**
+     * Validates if the value of the `value` query parameter is not blank.
+     *
+     * @return a list of [DTOs.ValidationMessageKey] if the value is null or blank, or an empty list
+     * if the value contains any text characters
+     */
     @GetMapping("api/validate-not-blank")
     internal suspend fun validateIsNotBlank(
         @RequestParam(name = "value") value: String?,
@@ -98,7 +105,16 @@ internal class WebOperations(
     }
 
     /**
+     * Validates if the given directory is readable and writable, and/or if it is a single-use directory,
+     * depending on the types of validation requested.
      *
+     * All requested validations are performed in the order they are specified in the `validations`
+     * query parameter and their results are combined.
+     *
+     * @param config the CDR Client configuration to use for validating single use of directories
+     * @param directory the directory to validate
+     * @param validations the list of validation types to perform on the directory
+     * @return a [DTOs.ValidationResult] indicating the result of the validation
      */
     @PutMapping("api/validate-directory")
     internal suspend fun validateDirectory(
@@ -133,7 +149,7 @@ internal class WebOperations(
     //
 
     /**
-     *
+     * This endpoint returns the current CDR Client service configuration as a [DTOs.CdrClientConfig] object.
      */
     @GetMapping("api/service-configuration")
     suspend fun getServiceConfiguration(): ResponseEntity<DTOs.CdrClientConfig> =
@@ -143,7 +159,12 @@ internal class WebOperations(
             )
 
     /**
+     * This endpoint updates the current CDR Client service configuration with the provided
+     * [DTOs.CdrClientConfig] object.
      *
+     * @param config the new configuration to apply
+     * @return the configuration as it was received in the request body if the update was successful,
+     * or a [BadRequest] if the configuration is invalid
      */
     @PutMapping("api/service-configuration")
     internal suspend fun updateServiceConfiguration(
@@ -152,12 +173,12 @@ internal class WebOperations(
         logger.trace { "received DTOs.CdrClientConfig: '$config'" }
         configWriter.updateClientServiceConfiguration(config.toCdrClientConfig()).let { result ->
             when (result) {
-                is ConfigurationWriter.Result.Success -> {
+                is ConfigurationWriter.UpdateResult.Success -> {
                     ResponseEntity
                         .ok(config)
                 }
 
-                is ConfigurationWriter.Result.Failure -> {
+                is ConfigurationWriter.UpdateResult.Failure -> {
                     throw BadRequest(
                         message = "Invalid configuration",
                         props = result.errors
@@ -173,9 +194,13 @@ internal class WebOperations(
     }
 
     /**
-     * This endpoint returns the status of the client service. It uses the health endpoint and the [health indicators][HealthIndicators]
-     * registered in the application context. The health status of the different indicators is translated into an application-specific
+     * This endpoint returns the status of the client service. It uses the health endpoint and
+     * the [health indicators][HealthIndicators] registered in the application context. The health
+     * status of the different indicators is translated into an application-specific
      * [status code][DTOs.StatusResponse.StatusCode].
+     *
+     * @return a [DTOs.StatusResponse] containing the status code of the client service
+     * @see [HealthIndicators]
      */
     @GetMapping("api/status")
     internal suspend fun status(): ResponseEntity<DTOs.StatusResponse> = runCatching {
@@ -201,8 +226,13 @@ internal class WebOperations(
     }
 
     /**
-     * This endpoint essentially does the same thing as the `shutdown` actuator, only it derives an exit code
-     * from the reason provided in the query parameter.
+     * This endpoint essentially does the same thing as the `shutdown` actuator, only it derives
+     * an exit code from the reason provided in the query parameter.
+     *
+     * @param reason the reason for the shutdown, which is used to determine the exit code
+     * @return a [DTOs.ShutdownResponse] containing the scheduled shutdown time, the trigger, and
+     * the exit code
+     * @throws [BadRequest] if the reason is invalid or blank
      */
     @GetMapping("/api/shutdown")
     internal suspend fun shutdown(

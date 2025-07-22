@@ -12,6 +12,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.extension.ExtendWith
+import org.mockito.Mockito.mock
 
 @ExtendWith(MockKExtension::class)
 @CheckUnnecessaryStub
@@ -43,7 +44,7 @@ internal class ClientSecretRenewalServiceTest {
 
     @Test
     fun `no known origin for secret property should yield error`() {
-        every {configurationWriter.isWritableConfigurationItem(any<String>())} returns ConfigurationWriter.ConfigLookupResult.NotFound
+        every { configurationWriter.isWritableConfigurationItem(any<String>()) } returns ConfigurationWriter.ConfigLookupResult.NotFound
 
         val result: ClientSecretRenewalService.RenewClientSecretResult = clientSecretRenewalService.renewClientSecret()
 
@@ -55,7 +56,7 @@ internal class ClientSecretRenewalServiceTest {
 
     @Test
     fun `failing call to credential API should leave config file unchanged`() {
-        every { configurationWriter.isWritableConfigurationItem(any<String>()) } returns ConfigurationWriter.ConfigLookupResult.Writable
+        every { configurationWriter.isWritableConfigurationItem(any<String>()) } returns ConfigurationWriter.ConfigLookupResult.Writable(resource = mock())
         every { tracer.currentSpan() } returns null
         every { cdrApiClient.renewClientCredential(any<String>()) } returns CdrApiClient.RenewClientSecretResult.RenewHttpErrorResponse(500, "API call failed")
 

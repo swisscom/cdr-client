@@ -9,7 +9,10 @@ import kotlin.contracts.InvocationKind
 import kotlin.contracts.contract
 import kotlin.coroutines.CoroutineContext
 
-
+/**
+ * Kotlin streams do not play nicely with Micrometer tracing, so we provide some helper functions
+ * to start and continue spans from stream processing steps.
+ */
 object TraceSupport {
 
     @OptIn(ExperimentalContracts::class)
