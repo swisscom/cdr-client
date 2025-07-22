@@ -8,6 +8,7 @@ import com.microsoft.aad.msal4j.TokenSource
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Customer
+import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
@@ -144,6 +145,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         every { config.cdrApi } returns endpoint
         every { config.localFolder } returns TempDownloadDir(localDir)
         every { config.idpCredentials.tenantId } returns TenantId("something")
+        every { config.isFileSynchronizationEnabled } returns FileSynchronization.ENABLED
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } answers { "Mocked Result" }
 

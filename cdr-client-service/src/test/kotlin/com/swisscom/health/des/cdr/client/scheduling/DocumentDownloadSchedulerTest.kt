@@ -2,6 +2,7 @@ package com.swisscom.health.des.cdr.client.scheduling
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Customer
+import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import io.micrometer.tracing.Span
@@ -68,6 +69,7 @@ internal class DocumentDownloadSchedulerTest {
             )
         every { config.customer } returns Customer(mutableListOf(connector))
         every { config.localFolder } returns TempDownloadDir(inflightDir)
+        every { config.isFileSynchronizationEnabled } returns FileSynchronization.ENABLED
         mockTracer()
     }
 

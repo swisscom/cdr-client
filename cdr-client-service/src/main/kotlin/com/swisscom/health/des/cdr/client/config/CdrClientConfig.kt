@@ -84,6 +84,11 @@ internal data class CdrClientConfig(
     override val propertyName: String
         get() = PROPERTY_NAME
 
+    val isFileSynchronizationEnabled: FileSynchronization
+        get() = System.getProperty("client.file-synchronization-enabled")?.let {
+            if (it.toBoolean()) FileSynchronization.ENABLED else FileSynchronization.DISABLED
+        } ?: fileSynchronizationEnabled
+
     private companion object {
         const val PROPERTY_NAME = "client"
 

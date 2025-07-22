@@ -1,4 +1,5 @@
 client:
+  file-synchronization-enabled: true
   idp-credentials:
     renew-credential: true
     # if you change this value, you must also change it in the mock-oauth2-server/config.json file and caddy/Caddyfile
@@ -9,10 +10,9 @@ client:
     scopes:
       - https://dev.identity.health.swisscom.ch/CdrApi/.default
   local-folder: ${java.io.tmpdir}/cdr_download
-  # if you change the issuer host name, you also need to change add in caddy/Caddyfile and you need to add the new host to the `test_hosts` file;
+  # if you change the idp-endpoint issuer host name, you also need to change add in caddy/Caddyfile and you need to add the new host to the `test_hosts` file;
   # no matter what you change it to, unless you use one of the trusted issuer hosts (com.microsoft.aad.msal4j.AadInstanceDiscoveryProvider.TRUSTED_HOSTS_SET),
   # msal4j's initial request will go to `login.microsoftonline.com` to retrieve some MS specific metadata; see wiremock/mappings/discovery.json
-  idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/
   schedule-delay: PT1S
   files-in-progress-cache-size: 1MB
   connection-timeout-ms: 500
@@ -26,11 +26,17 @@ client:
     - 100ms
     - 100ms
     - 100ms
+  file-busy-test-strategy: file_size_changed # valid values are `never_busy`, `file_size_changed`, `always_busy`
   cdr-api:
     scheme: http
     port: 80
     host: localhost
     base-path: documents
+  credential-api:
+    scheme: ${client.cdr-api.scheme}
+    port: ${client.cdr-api.port}
+    host: ${client.cdr-api.host}
+    base-path: api/client-credentials
   customer:
     - connector-id: 1
       content-type: application/forumdatenaustausch+xml;charset=UTF-8

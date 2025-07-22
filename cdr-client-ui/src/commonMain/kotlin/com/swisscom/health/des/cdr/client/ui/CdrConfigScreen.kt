@@ -34,6 +34,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.R
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_apply
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cancel
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_close
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_file_busy_strategy
@@ -154,10 +155,11 @@ internal fun CdrConfigScreen(
 
         uiState.errorMessageKey?.let { errorKey ->
             val errorMessage = errorKey.asString()
+            val closeActionLabel = stringResource(Res.string.label_close)
             LaunchedEffect(Unit) {
                 runCatching {
                     // we ignore the SnackbarResult; is that a good idea?
-                    snackbarHostState.showSnackbar(message = errorMessage)
+                    snackbarHostState.showSnackbar(message = errorMessage, actionLabel = closeActionLabel)
                 }.onFailure { logger.error { "Snackbar fail: '${it.toString()}'" } }
 
                 viewModel.clearErrorMessage()

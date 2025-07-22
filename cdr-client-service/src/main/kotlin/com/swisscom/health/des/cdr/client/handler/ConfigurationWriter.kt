@@ -38,9 +38,10 @@ internal class ConfigurationWriter(
         object NotFound : ConfigLookupResult
         object NotWritable : ConfigLookupResult
         object Writable : ConfigLookupResult
+        object MultipleOrigins : ConfigLookupResult
     }
 
-    fun isWritableConfigurationItem(propertyPath: String): ConfigLookupResult =
+    fun isWritableConfigurationItem(propertyPath: String): ConfigLookupResult = try {
         collectUpdatableConfigurationItems(currentConfig, currentConfig)
             .firstOrNull { it.propertyPath == propertyPath }
             .let { updatableConfigItem: UpdatableConfigurationItem? ->
@@ -50,6 +51,9 @@ internal class ConfigurationWriter(
                     is UpdatableConfigurationItem.WritableResourceConfigurationItem -> ConfigLookupResult.Writable
                 }
             }
+    } catch (_: IllegalStateException) {
+        ConfigLookupResult.MultipleOrigins
+    }
 
     sealed interface Result {
         object Success : Result
@@ -99,7 +103,7 @@ internal class ConfigurationWriter(
             }
         }
     }.getOrElse { exception ->
-        Result.Failure(mapOf("error" to exception)).also {
+        Result.Failure(mapOf("error" to (exception.message ?: exception ))).also {
             logger.error(exception) { "Failed to update configuration items" }
         }
     }
@@ -313,9 +317,7 @@ internal class ConfigurationWriter(
      * [SpringBoot Feature Request](https://github.com/spring-projects/spring-boot/issues/21613)
      *
      * As we cannot determine the effective origin and then check whether it is an updatable text resource, we search all
-     * available property sources for the client secret property and fail if we find no origin. The local development setup
-     * may report more than one origin as it uses multiple profiles. If more than once origin is found we log a warning
-     * and return the first one from the list of origins.
+     * available property sources for the given property and fail if we find no origin. If more than one origin is found we throw an error.
      */
     private fun findPropertyOrigin(propertyPath: String): Origin? {
         @Suppress("UNCHECKED_CAST")
@@ -333,7 +335,7 @@ internal class ConfigurationWriter(
                 logger.debug { "No origin found for property `$propertyPath`" }
 
             origins.size > 1 -> {
-                logger.warn { "Multiple origins found for property `$propertyPath`: '$origins'; picking first one, your mileage might vary!" }
+                error("Multiple origins found for property `$propertyPath`, expected only one origin, but found: $origins")
             }
         }
 
