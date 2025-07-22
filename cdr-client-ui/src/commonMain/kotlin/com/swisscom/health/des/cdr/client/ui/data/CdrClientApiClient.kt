@@ -60,7 +60,7 @@ internal class CdrClientApiClient {
         )
 
     /**
-     * Validates that the given directory.
+     * Validates the given directory.
      *
      * @param config The CDR client configuration as currently held by the CDR Client ui.
      * @param directory The directory to validate.
