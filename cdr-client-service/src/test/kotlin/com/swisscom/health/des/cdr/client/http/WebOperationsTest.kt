@@ -122,7 +122,7 @@ internal class WebOperationsTest {
 
     @Test
     fun `test update service configuration - configuration writer success`() = runTest {
-        every { configWriter.updateClientServiceConfiguration(any()) } returns ConfigurationWriter.Result.Success
+        every { configWriter.updateClientServiceConfiguration(any()) } returns ConfigurationWriter.UpdateResult.Success
 
         val response = webOperations.updateServiceConfiguration(DEFAULT_CDR_CONFIG.toDto())
         assertEquals(HttpStatus.OK, response.statusCode)
@@ -131,7 +131,9 @@ internal class WebOperationsTest {
 
     @Test
     fun `test update service configuration - configuration writer fail`() = runTest {
-        every { configWriter.updateClientServiceConfiguration(any()) } returns ConfigurationWriter.Result.Failure(mapOf("error" to "Invalid configuration"))
+        every { configWriter.updateClientServiceConfiguration(any()) } returns ConfigurationWriter.UpdateResult.Failure(
+            mapOf("error" to "Invalid configuration")
+        )
 
         val exception = assertThrows<WebOperations.BadRequest> { webOperations.updateServiceConfiguration(DEFAULT_CDR_CONFIG.toDto()) }
         val probDetail = webOperations.handleError(exception)

@@ -183,6 +183,14 @@ private fun ApplicationScope.CdrSystemTray(
         )
     }
 
+/**
+ * Checks whether the system property `logback.configurationFile` is set and if so, checks if the
+ * file exists. If it does not exist, a default logback configuration file is created at that
+ * location. If the property value is a relative path, then it is resolved against the user's home
+ * directory. This should only be the case under macOS where configuration, logs, etc., should go
+ * into `$HOME/Library/...`.The system property is then updated with the absolute path to the
+ * customer configuration file.
+ */
 @Suppress("NestedBlockDepth", "LongMethod")
 private fun initLogbackConfig() =
     System.getProperty(LOGBACK_CONFIGURATION_FILE_PROPERTY)

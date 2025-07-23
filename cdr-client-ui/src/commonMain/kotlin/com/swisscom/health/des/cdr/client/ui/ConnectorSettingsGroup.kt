@@ -44,6 +44,9 @@ import java.io.File
 
 private val logger = KotlinLogging.logger { }
 
+/**
+ * A composable function that displays the connector settings group in the CDR client configuration view.
+ */
 @Composable
 internal fun ConnectorSettingsGroup(
     modifier: Modifier,

@@ -3,6 +3,7 @@ package com.swisscom.health.des.cdr.client.ui.data
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DomainObjects
+import com.swisscom.health.des.cdr.client.ui.data.HttpClient.MEDIA_TYPE_APPLICATION_JSON
 import com.swisscom.health.des.cdr.client.ui.data.HttpClient.addQueryParams
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +14,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.MediaType
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -24,6 +27,15 @@ import kotlin.time.Duration.Companion.seconds
 
 private val logger = KotlinLogging.logger {}
 
+/**
+ * Client for the CDR Client service API.
+ *
+ * This client provides methods to interact with the CDR Client service, including validation of values,
+ * directory checks, configuration retrieval and updates, and service status checks. Details about failed
+ * validations are of type [DTOs.ValidationMessageKey] to facilitate localization of the validation error
+ * message in the UI. Either the message keys are the returned result or they are wrapped in a
+ * [DTOs.ValidationResult.Failure] instance.
+ */
 internal class CdrClientApiClient {
 
     sealed interface Result<U> {
@@ -32,6 +44,13 @@ internal class CdrClientApiClient {
         data class ServiceError<Nothing>(val errors: Map<String, Any>) : Result<Nothing>
     }
 
+    /**
+     * Validates that the given value is not blank.
+     *
+     * @param value The value to validate.
+     * @return A [Result] containing a list of validation message keys if the value is blank, or an empty
+     * list if it is valid.
+     */
     suspend fun validateValueIsNotBlank(value: String?): Result<List<DTOs.ValidationMessageKey>> =
         getAnything<List<DTOs.ValidationMessageKey>>(
             CDR_CLIENT_VALIDATE_VALUE_NOT_BLANK.addQueryParams(
@@ -40,6 +59,14 @@ internal class CdrClientApiClient {
             "Validate value is not blank"
         )
 
+    /**
+     * Validates the given directory.
+     *
+     * @param config The CDR client configuration as currently held by the CDR Client ui.
+     * @param directory The directory to validate.
+     * @param validations The list of [validations][DomainObjects.ValidationType] to perform on the directory.
+     * @return A [Result] containing a [DTOs.ValidationResult] with the results of the validations.
+     */
     suspend fun validateDirectory(
         config: DTOs.CdrClientConfig,
         directory: String?,
@@ -58,15 +85,40 @@ internal class CdrClientApiClient {
             "Validate directory is read/writable"
         )
 
+    /**
+     * Retrieves the current client service configuration.
+     *
+     * @return A [Result] containing the [DTOs.CdrClientConfig]
+     */
     suspend fun getClientServiceConfiguration(): Result<DTOs.CdrClientConfig> =
         getAnything<DTOs.CdrClientConfig>(CDR_CLIENT_CONFIG_URL, "Get client service configuration")
 
+    /**
+     * Updates the CDR Client service configuration.
+     *
+     * @param config The new configuration to set.
+     * @return A [Result] containing that same configuration if it was successfully persisted, or an
+     * error if the update failed.
+     */
     suspend fun updateClientServiceConfiguration(config: DTOs.CdrClientConfig): Result<DTOs.CdrClientConfig> =
         putAnything<DTOs.CdrClientConfig, DTOs.CdrClientConfig>(CDR_CLIENT_CONFIG_URL, config, "Update client service configuration")
 
+    /**
+     * Sends a command to the CDR client service to shut itself down. (The platform's service control
+     * process is responsible for restarting the service.)
+     *
+     * @return A [Result] containing a [DTOs.ShutdownResponse] if the command was successfully sent,
+     * or an error if the request failed.
+     */
     suspend fun shutdownClientServiceProcess(): Result<DTOs.ShutdownResponse> =
         getAnything<DTOs.ShutdownResponse>(SHUTDOWN_URL, "Send command to shut down the client service")
 
+    /**
+     * Retrieves the current [status][DTOs.StatusResponse.StatusCode] of the CDR Client service.
+     *
+     * @param retryStrategy The [RetryStrategy] to use for retrying the request in case of an IO error.
+     * @return The current [status][DTOs.StatusResponse.StatusCode] of the CDR Client service.
+     */
     // TODO: Make condition for retry configurable, so that it can be used for any response type;
     //  then add retry to getAnything() and use it here as well.
     suspend fun getClientServiceStatus(retryStrategy: RetryStrategy): DTOs.StatusResponse.StatusCode = withContext(Dispatchers.IO) {
@@ -75,7 +127,7 @@ internal class CdrClientApiClient {
             logger.debug { "BEGIN - Get client service status; retry count '$retryCount'" }
             runCatching {
                 HttpClient
-                    .instance
+                    .INSTANCE
                     .newCall(
                         HttpClient.get(STATUS_URL)
                     )
@@ -106,6 +158,14 @@ internal class CdrClientApiClient {
         }
     }
 
+    /**
+     * Generic method to perform a GET request to the CDR Client service API.
+     *
+     * @param url The URL to send the request to.
+     * @param action A description of the action being performed, used for logging.
+     * @return A [Result] containing the parsed response of type [T] if the request was successful,
+     * or an error if the request failed.
+     */
     private suspend inline fun <reified T> getAnything(
         url: HttpUrl,
         action: String,
@@ -113,7 +173,7 @@ internal class CdrClientApiClient {
         logger.info { "BEGIN - $action" }
         runCatching {
             HttpClient
-                .instance
+                .INSTANCE
                 .newCall(
                     HttpClient.get(url)
                 )
@@ -144,14 +204,24 @@ internal class CdrClientApiClient {
         }
     }
 
+    /**
+     * Generic method to perform a PUT request to the CDR Client service API with a request body.
+     *
+     * @param url The URL to send the request to.
+     * @param body The request body to send; must be [JSON][Json] serializable
+     * @param action A description of the action being performed, used for logging.
+     * @return A [Result] containing the parsed response of type [T] if the request was successful,
+     * or an error if the request failed.
+     * @see [kotlinx.serialization.Serializable]
+     */
     private suspend inline fun <reified V, reified T> putAnything(url: HttpUrl, body: V, action: String): Result<T> = withContext(Dispatchers.IO) {
         logger.info { "BEGIN - $action" }
         logger.trace { "request body: '$body'" }
         runCatching {
             HttpClient
-                .instance
+                .INSTANCE
                 .newCall(
-                    HttpClient.put(url, JSON.encodeToString(body))
+                    HttpClient.put(url, JSON.encodeToString(body), MEDIA_TYPE_APPLICATION_JSON)
                 )
                 .execute()
                 .use { response: Response ->
@@ -192,6 +262,13 @@ internal class CdrClientApiClient {
         }
     }
 
+    /**
+     * Retry strategies to wrap the remote call in a retry loop. Unless the [RetryStrategy.NONE]
+     * is used, the call will be retried in case the call yields the remote status
+     * [DTOs.StatusResponse.StatusCode.OFFLINE].
+     *
+     * @see [DTOs.StatusResponse.StatusCode]
+     */
     enum class RetryStrategy {
         NONE,
         LINEAR,
@@ -257,11 +334,22 @@ internal class CdrClientApiClient {
 
 }
 
-private object HttpClient : OkHttpClient() {
+/**
+ * Singleton wrapper around an [OkHttpClient] instance to provide convenience methods for creating
+ * requests and adding query parameters.
+ */
+private object HttpClient {
 
-    val instance = configure()
+    const val CONNECT_TIMEOUT_SECONDS: Long = 1L
+    const val READ_TIMEOUT_SECONDS: Long = 1L
 
-    private fun configure(): OkHttpClient = newBuilder()
+    @JvmStatic
+    val MEDIA_TYPE_APPLICATION_JSON = "application/json".toMediaType()
+
+    @JvmStatic
+    val INSTANCE: OkHttpClient = configure()
+
+    private fun configure(): OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
@@ -273,11 +361,10 @@ private object HttpClient : OkHttpClient() {
             .build()
     }
 
-    fun put(to: HttpUrl, body: String): Request {
+    fun put(to: HttpUrl, body: String, mediaType: MediaType): Request {
         return Request.Builder()
             .url(to)
-            .put(body.toRequestBody())
-            .header("Content-Type", "application/json")
+            .put(body.toRequestBody(mediaType))
             .build()
     }
 
@@ -287,8 +374,5 @@ private object HttpClient : OkHttpClient() {
                 addQueryParameter(key, value)
             }
         }.build()
-
-    const val CONNECT_TIMEOUT_SECONDS: Long = 1L
-    const val READ_TIMEOUT_SECONDS: Long = 1L
 
 }
