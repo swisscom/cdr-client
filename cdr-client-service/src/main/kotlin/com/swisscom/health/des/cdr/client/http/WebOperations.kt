@@ -208,7 +208,7 @@ internal class WebOperations(
         logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
 
 
-        val status = if (configValidationService.isConfigValid) {
+        val status = if (configValidationService.isConfigSourceUnambiguous) {
             when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
                 FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
                 FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED

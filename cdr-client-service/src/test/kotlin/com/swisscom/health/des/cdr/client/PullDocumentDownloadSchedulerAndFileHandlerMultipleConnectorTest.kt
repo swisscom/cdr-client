@@ -148,7 +148,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         every { config.cdrApi } returns endpoint
         every { config.localFolder } returns TempDownloadDir(localDir)
         every { config.idpCredentials.tenantId } returns TenantId("something")
-        every { configValidationService.isConfigValid } returns true
+        every { configValidationService.isConfigSourceUnambiguous } returns true
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } answers { "Mocked Result" }
 

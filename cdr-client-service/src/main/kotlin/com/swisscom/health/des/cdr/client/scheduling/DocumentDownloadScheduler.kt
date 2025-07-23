@@ -37,7 +37,7 @@ internal class DocumentDownloadScheduler(
      */
     @Scheduled(fixedDelayString = $$"${client.schedule-delay}")
     suspend fun syncFilesToClientDirectories() {
-        if (configValidationService.isConfigValid) {
+        if (configValidationService.isConfigSourceUnambiguous) {
             logger.info { "Triggered pull sync" }
             callPullFileHandling()
         }

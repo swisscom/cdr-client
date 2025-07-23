@@ -40,7 +40,7 @@ internal class ConfigValidationService(
     private val environment: Environment
 ) {
 
-    val isConfigValid: Boolean by lazy { isConfigFromOneSource() }
+    val isConfigSourceUnambiguous: Boolean by lazy { isConfigFromOneSource() }
 
     /**
      * TODO: This is temporary! Ultimately, we need to fail softly instead and disable the scheduling of
@@ -65,7 +65,6 @@ internal class ConfigValidationService(
         return if (!activeProfiles.contains("test")) {
             when (configurationWriter.isWritableConfigurationItem("dummy")) {
                 ConfigurationWriter.ConfigLookupResult.MultipleOrigins -> {
-                    System.setProperty("client.file-synchronization-enabled", "false")
                     false
                 }
 

@@ -173,7 +173,7 @@ internal class WebOperationsTest {
         every { healthEndpoint.health() } returns systemHealth
         every { systemHealth.toString() } returns "fake health status"
         every { systemHealth.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code } returns healthStatus
-        every { configValidationService.isConfigValid } returns true
+        every { configValidationService.isConfigSourceUnambiguous } returns true
 
         val response = webOperations.status()
         assertEquals(HttpStatus.OK, response.statusCode)

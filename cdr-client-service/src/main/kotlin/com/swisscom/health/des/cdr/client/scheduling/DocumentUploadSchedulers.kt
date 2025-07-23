@@ -98,7 +98,7 @@ internal class EventTriggerUploadScheduler(
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFileWatcher(): Unit = runCatching {
-        if (configValidationService.isConfigValid) {
+        if (configValidationService.isConfigSourceUnambiguous) {
             logger.info { "Starting file watcher process..." }
             config.customer.forEach { connector ->
                 logger.info { "Watching source directory: '${connector.sourceFolder}'" }
@@ -232,7 +232,7 @@ internal class PollingUploadScheduler(
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFilePoller(): Unit = runCatching {
-        if (configValidationService.isConfigValid) {
+        if (configValidationService.isConfigSourceUnambiguous) {
             logger.info { "Starting directory polling process..." }
             config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let { humanReadableDelay ->
                 config.customer.forEach { connector ->

@@ -73,6 +73,8 @@ internal class ConfigurationWriter(
      * [ConfigLookupResult.MultipleOrigins] if the property is updatable but has multiple origins, which means that it is ambiguous which writable resource
      * to use.
      */
+    // TODO: Refactoring, as this method checks the full configuration tree for unambiguous updatable configuration items (which was deliberately used in
+    //       ConfigValidationService.isConfigFromOneSource() with a dummy value).
     fun isWritableConfigurationItem(propertyPath: String): ConfigLookupResult = try {
         collectUpdatableConfigurationItems(currentConfig, currentConfig)
             .firstOrNull { it.propertyPath == propertyPath }
