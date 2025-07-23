@@ -20,7 +20,7 @@ import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
-import com.swisscom.health.des.cdr.client.handler.ValidationService
+import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
@@ -61,7 +61,7 @@ internal class WebOperationsTest {
     private lateinit var healthEndpoint: HealthEndpoint
 
     @MockK
-    private lateinit var validationService: ValidationService
+    private lateinit var configValidationService: ConfigValidationService
 
     private var objectMapper: ObjectMapper = ObjectMapper()
 
@@ -75,7 +75,7 @@ internal class WebOperationsTest {
             healthEndpoint = healthEndpoint,
             objectMapper = objectMapper,
             config = DEFAULT_CDR_CONFIG,
-            validationService = validationService,
+            configValidationService = configValidationService,
         )
     }
 
@@ -173,6 +173,7 @@ internal class WebOperationsTest {
         every { healthEndpoint.health() } returns systemHealth
         every { systemHealth.toString() } returns "fake health status"
         every { systemHealth.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code } returns healthStatus
+        every { configValidationService.isConfigValid } returns true
 
         val response = webOperations.status()
         assertEquals(HttpStatus.OK, response.statusCode)

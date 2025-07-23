@@ -1,7 +1,7 @@
 package com.swisscom.health.des.cdr.client.scheduling
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
-import com.swisscom.health.des.cdr.client.config.FileSynchronization
+import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import com.swisscom.health.des.cdr.client.handler.pathIsDirectoryAndWritable
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -10,7 +10,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
-import org.springframework.context.annotation.DependsOn
 import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -23,11 +22,11 @@ private val logger = KotlinLogging.logger {}
  * @property pullFileHandling An instance of [PullFileHandling], which is a service that provides methods for syncing files to client directories.
  */
 @Service
-@DependsOn("configSanityChecker")
 @Profile("!noDownloadScheduler")
 @ConditionalOnProperty(prefix = "client", name = ["file-synchronization-enabled"])
 internal class DocumentDownloadScheduler(
     private val cdrClientConfig: CdrClientConfig,
+    private val configValidationService: ConfigValidationService,
     private val pullFileHandling: PullFileHandling,
     @param:Qualifier("limitedParallelismCdrDownloadsDispatcher")
     private val cdrDownloadsDispatcher: CoroutineDispatcher
@@ -38,7 +37,7 @@ internal class DocumentDownloadScheduler(
      */
     @Scheduled(fixedDelayString = $$"${client.schedule-delay}")
     suspend fun syncFilesToClientDirectories() {
-        if (cdrClientConfig.isFileSynchronizationEnabled == FileSynchronization.ENABLED) {
+        if (configValidationService.isConfigValid) {
             logger.info { "Triggered pull sync" }
             callPullFileHandling()
         }

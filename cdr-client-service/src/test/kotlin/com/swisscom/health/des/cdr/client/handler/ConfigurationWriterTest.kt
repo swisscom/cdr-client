@@ -228,21 +228,12 @@ class ConfigurationWriterTest {
 
     @Test
     fun `multiple known origins for property should fail`() {
-        val configFile = tempConfigDir.resolve("unknown_config_format.yaml").apply {
-            createFile()
-            writeText(FILE_SYNC_YAML)
-        }
-
         val propOrigin1 = mockk<TextResourceOrigin>()
         val propOrigin2 = mockk<TextResourceOrigin>()
-        val fileSystemResource = FileSystemResource(configFile)
-        every { propOrigin1.resource } returns fileSystemResource
         val propSource1 = mockk<OriginTrackedMapPropertySource>()
         val propSource2 = mockk<OriginTrackedMapPropertySource>()
-        every { propSource1.getOrigin("client.file-synchronization-enabled") } returns propOrigin1
-        every { propSource2.getOrigin("client.file-synchronization-enabled") } returns propOrigin2
         every { propSource1.getOrigin("client.local-folder") } returns propOrigin1
-        every { propSource2.getOrigin("client.local-folder") } returns null
+        every { propSource2.getOrigin("client.local-folder") } returns propOrigin2
         val propertySources = MutablePropertySources().apply {
             addLast(propSource1)
             addLast(propSource2)

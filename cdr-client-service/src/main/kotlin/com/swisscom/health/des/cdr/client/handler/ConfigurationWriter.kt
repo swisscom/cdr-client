@@ -65,9 +65,13 @@ internal class ConfigurationWriter(
      * @param propertyPath the property path of the configuration item to check, e.g.,
      * `client.idp-credentials.client-secret`
      * @return [ConfigLookupResult.NotFound] if the property at the given path is not updatable,
-     * [ConfigLookupResult.NotWritable] if the property is updatable
-     *   but was not sourced from a writable resource, or [ConfigLookupResult.Writable] if the
-     *   property is updatable and sourced from a writable resource.
+     *
+     * [ConfigLookupResult.NotWritable] if the property is updatable but was not sourced from a writable resource,
+     *
+     * [ConfigLookupResult.Writable] if the property is updatable and sourced from a writable resource,
+     *
+     * [ConfigLookupResult.MultipleOrigins] if the property is updatable but has multiple origins, which means that it is ambiguous which writable resource
+     * to use.
      */
     fun isWritableConfigurationItem(propertyPath: String): ConfigLookupResult = try {
         collectUpdatableConfigurationItems(currentConfig, currentConfig)
@@ -81,7 +85,7 @@ internal class ConfigurationWriter(
                     )
                 }
             }
-    } catch (_: IllegalStateException) {
+    } catch (_: AmbiguousPropertySourcesException) {
         ConfigLookupResult.MultipleOrigins
     }
 
@@ -149,7 +153,7 @@ internal class ConfigurationWriter(
             }
         }
     }.getOrElse { exception ->
-        UpdateResult.Failure(mapOf("error" to (exception.message ?: exception ))).also {
+        UpdateResult.Failure(mapOf("error" to (exception.message ?: exception))).also {
             logger.error(exception) { "Failed to update configuration items" }
         }
     }
@@ -382,7 +386,7 @@ internal class ConfigurationWriter(
                 logger.debug { "No origin found for property `$propertyPath`" }
 
             origins.size > 1 -> {
-                error("Multiple origins found for property `$propertyPath`, expected only one origin, but found: $origins")
+                throw AmbiguousPropertySourcesException("Multiple origins found for property `$propertyPath`, expected only one origin, but found: $origins")
             }
         }
 
@@ -459,3 +463,5 @@ internal class ConfigurationWriter(
         ) : UpdatableConfigurationItem
     }
 }
+
+class AmbiguousPropertySourcesException(message: String) : RuntimeException(message)

@@ -6,8 +6,8 @@ import com.swisscom.health.des.cdr.client.TraceSupport.continueSpan
 import com.swisscom.health.des.cdr.client.TraceSupport.startSpan
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.FileBusyTester
-import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.getConnectorForSourceFile
+import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.RetryUploadFileHandling
 import io.github.irgaly.kfswatch.KfsDirectoryWatcher
 import io.github.irgaly.kfswatch.KfsDirectoryWatcherEvent
@@ -39,7 +39,6 @@ import kotlinx.coroutines.withTimeout
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
-import org.springframework.context.annotation.DependsOn
 import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -59,12 +58,12 @@ import kotlin.io.path.name
 private val logger = KotlinLogging.logger {}
 
 @Service
-@DependsOn("configSanityChecker")
 @Profile("!noEventTriggerUploadScheduler")
 @ConditionalOnProperty(prefix = "client", name = ["file-synchronization-enabled"])
 @Suppress("LongParameterList")
 internal class EventTriggerUploadScheduler(
     private val config: CdrClientConfig,
+    private val configValidationService: ConfigValidationService,
     private val tracer: Tracer,
     @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
@@ -99,7 +98,7 @@ internal class EventTriggerUploadScheduler(
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFileWatcher(): Unit = runCatching {
-        if (config.isFileSynchronizationEnabled == FileSynchronization.ENABLED) {
+        if (configValidationService.isConfigValid) {
             logger.info { "Starting file watcher process..." }
             config.customer.forEach { connector ->
                 logger.info { "Watching source directory: '${connector.sourceFolder}'" }
@@ -193,12 +192,12 @@ internal class EventTriggerUploadScheduler(
 }
 
 @Service
-@DependsOn("configSanityChecker")
 @Profile("!noPollingUploadScheduler")
 @ConditionalOnProperty(prefix = "client", name = ["file-synchronization-enabled"])
 @Suppress("LongParameterList")
 internal class PollingUploadScheduler(
     private val config: CdrClientConfig,
+    private val configValidationService: ConfigValidationService,
     private val tracer: Tracer,
     @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
@@ -233,7 +232,7 @@ internal class PollingUploadScheduler(
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFilePoller(): Unit = runCatching {
-        if (config.isFileSynchronizationEnabled == FileSynchronization.ENABLED) {
+        if (configValidationService.isConfigValid) {
             logger.info { "Starting directory polling process..." }
             config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let { humanReadableDelay ->
                 config.customer.forEach { connector ->

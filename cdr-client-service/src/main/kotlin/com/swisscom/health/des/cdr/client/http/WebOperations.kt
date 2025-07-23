@@ -9,9 +9,9 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DI
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toCdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
+import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
-import com.swisscom.health.des.cdr.client.handler.ValidationService
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
@@ -43,7 +43,7 @@ internal class WebOperations(
     private val shutdownService: ShutdownService,
     private val configWriter: ConfigurationWriter,
     private val config: CdrClientConfig,
-    private val validationService: ValidationService,
+    private val configValidationService: ConfigValidationService,
 ) {
 
     internal class ServerError(
@@ -92,7 +92,7 @@ internal class WebOperations(
         @RequestParam(name = "value") value: String?,
     ): ResponseEntity<List<DTOs.ValidationMessageKey>> = runCatching {
         logger.trace { "validating string value: '$value'" }
-        val validationResult: DTOs.ValidationResult = validationService.validateIsNotBlank(value, DomainObjects.ConfigurationItem.UNKNOWN)
+        val validationResult: DTOs.ValidationResult = configValidationService.validateIsNotBlank(value, DomainObjects.ConfigurationItem.UNKNOWN)
         ResponseEntity
             .ok(
                 if (validationResult is DTOs.ValidationResult.Failure)
@@ -128,11 +128,11 @@ internal class WebOperations(
             validationResult +=
                 when (validation) {
                     DIR_READ_WRITABLE -> {
-                        validationService.validateDirectoryIsReadWritable(directory)
+                        configValidationService.validateDirectoryIsReadWritable(directory)
                     }
 
                     DIR_SINGLE_USE -> {
-                        validationService.validateDirectoryOverlap(config)
+                        configValidationService.validateDirectoryOverlap(config)
                     }
                 }
         }
@@ -207,13 +207,18 @@ internal class WebOperations(
         val healthStatus: SystemHealth = healthEndpoint.health() as SystemHealth
         logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
 
-        val status = when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
-            FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
-            FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED
-            else -> DTOs.StatusResponse.StatusCode.UNKNOWN
-            // TODO: add checks for error scenarios: configuration errors, CDR API not reachable, IdP not reachable, etc.
-            //   all other error scenarios would probably prevent the client service from starting altogether;
-            //   remember result of last attempt to reach remote endpoints instead of pinging them?
+
+        val status = if (configValidationService.isConfigValid) {
+            when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
+                FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
+                FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED
+                else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+                // TODO: add checks for error scenarios: configuration errors, CDR API not reachable, IdP not reachable, etc.
+                //   all other error scenarios would probably prevent the client service from starting altogether;
+                //   remember result of last attempt to reach remote endpoints instead of pinging them?
+            }
+        } else {
+            DTOs.StatusResponse.StatusCode.ERROR
         }
 
         return ResponseEntity.ok(

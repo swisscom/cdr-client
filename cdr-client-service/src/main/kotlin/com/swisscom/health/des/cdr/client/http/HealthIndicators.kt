@@ -18,7 +18,7 @@ internal class HealthIndicators(
     @Bean
     fun fileSynchronizationHealthIndicator(): HealthIndicator =
         HealthIndicator {
-            when (config.isFileSynchronizationEnabled.value) {
+            when (config.fileSynchronizationEnabled.value) {
                 true -> Health.Builder(Status(FILE_SYNCHRONIZATION_STATUS_ENABLED)).withDetail("fileSynchronizationEnabled", true)
                 false -> Health.Builder(Status(FILE_SYNCHRONIZATION_STATUS_DISABLED)).withDetail("fileSynchronizationEnabled", false)
             }.build()
