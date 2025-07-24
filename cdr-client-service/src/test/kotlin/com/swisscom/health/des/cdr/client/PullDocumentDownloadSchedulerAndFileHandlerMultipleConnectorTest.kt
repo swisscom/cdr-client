@@ -13,6 +13,7 @@ import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CONNECTOR_ID_HEADER
+import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.PULL_RESULT_ID_HEADER
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import com.swisscom.health.des.cdr.client.scheduling.DocumentDownloadScheduler
@@ -59,6 +60,9 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
     @MockK
     private lateinit var config: CdrClientConfig
+
+    @MockK
+    private lateinit var configValidationService: ConfigValidationService
 
     @MockK
     private lateinit var tracer: Tracer
@@ -144,6 +148,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         every { config.cdrApi } returns endpoint
         every { config.localFolder } returns TempDownloadDir(localDir)
         every { config.idpCredentials.tenantId } returns TenantId("something")
+        every { configValidationService.isConfigSourceUnambiguous } returns true
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } answers { "Mocked Result" }
 
@@ -160,6 +165,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         pullFileHandling = PullFileHandling(tracer, cdrApiClient, xmlParser)
         documentDownloadScheduler = DocumentDownloadScheduler(
             config,
+            configValidationService,
             pullFileHandling,
             Dispatchers.IO,
         )

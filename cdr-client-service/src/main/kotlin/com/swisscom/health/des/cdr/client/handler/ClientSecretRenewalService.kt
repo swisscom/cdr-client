@@ -63,6 +63,10 @@ internal class ClientSecretRenewalService(
             ConfigurationWriter.ConfigLookupResult.NotWritable -> false.also {
                 logger.info { "Configuration item with property path '$property' is not sourced from a writable resource.'" }
             }
+
+            ConfigurationWriter.ConfigLookupResult.MultipleOrigins -> false.also {
+                logger.info { "Configuration item with property path '$property' has multiple origins.'" }
+            }
         }
 
     private fun writeNewSecret(secret: String): RenewClientSecretResult {

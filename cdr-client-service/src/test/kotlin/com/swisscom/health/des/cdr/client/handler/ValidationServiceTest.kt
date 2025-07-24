@@ -18,12 +18,17 @@ import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.xml.DocumentType
+import io.mockk.every
+import io.mockk.impl.annotations.MockK
+import io.mockk.junit5.MockKExtension
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertInstanceOf
+import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
+import org.springframework.core.env.Environment
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
 import java.net.URL
@@ -31,6 +36,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 
+@ExtendWith(MockKExtension::class)
 internal class ValidationServiceTest {
 
     @TempDir
@@ -81,19 +87,26 @@ internal class ValidationServiceTest {
     @TempDir
     private lateinit var multiPurposeTempDir: Path
 
+    @MockK
+    private lateinit var configurationWriter: ConfigurationWriter
+
+    @MockK
+    private lateinit var environment: Environment
+
     private lateinit var allGoodCdrClientConfig: CdrClientConfig
 
-    private lateinit var validationService: ValidationService
+    private lateinit var configValidationService: ConfigValidationService
 
     @BeforeEach
     fun setUp() {
+        every { environment.activeProfiles } returns arrayOf("test")
         allGoodCdrClientConfig = createCdrClientConfig(blueSkyConnectors())
-        validationService = ValidationService(allGoodCdrClientConfig)
+        configValidationService = ConfigValidationService(allGoodCdrClientConfig, configurationWriter, environment)
     }
 
     @Test
     fun `test blue sky configuration`() {
-        val validationResult: DTOs.ValidationResult = validationService.validateAllConfigurationItems(allGoodCdrClientConfig.toDto())
+        val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(allGoodCdrClientConfig.toDto())
         assertEquals(DTOs.ValidationResult.Success, validationResult)
     }
 
@@ -101,7 +114,7 @@ internal class ValidationServiceTest {
     fun `test validation error if local directory does not exist`() {
         val filePath = localFolder0.resolve("deeper")
         val clientConfig = allGoodCdrClientConfig.copy(localFolder = TempDownloadDir(filePath))
-        val validationResult: DTOs.ValidationResult = validationService.validateAllConfigurationItems(clientConfig.toDto())
+        val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(clientConfig.toDto())
 
         assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
         assertEquals(1, validationResult.validationDetails.size)
@@ -117,7 +130,7 @@ internal class ValidationServiceTest {
         val filePath = localFolder0.resolve("file.txt")
         Files.createFile(filePath)
         val clientConfig = allGoodCdrClientConfig.copy(localFolder = TempDownloadDir(filePath))
-        val validationResult: DTOs.ValidationResult = validationService.validateAllConfigurationItems(clientConfig.toDto())
+        val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(clientConfig.toDto())
 
         assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
         assertEquals(1, validationResult.validationDetails.size)
@@ -132,7 +145,7 @@ internal class ValidationServiceTest {
     fun `test validation error if no customer is configured`() {
         val cdrClientConfig = createCdrClientConfig(emptyList())
 
-        val validationResult: DTOs.ValidationResult = validationService.validateAllConfigurationItems(cdrClientConfig.toDto())
+        val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(cdrClientConfig.toDto())
 
         assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
         assertEquals(1, validationResult.validationDetails.size)
@@ -149,7 +162,7 @@ internal class ValidationServiceTest {
         connectorDirsAsLocalDirs().forEach { localDir ->
             val cdrClientConfig = createCdrClientConfig(blueSkyConnectors(), localDir)
 
-            val validationResult: DTOs.ValidationResult = validationService.validateAllConfigurationItems(cdrClientConfig.toDto())
+            val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(cdrClientConfig.toDto())
 
             assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
             assertEquals(1, validationResult.validationDetails.size)
@@ -180,7 +193,7 @@ internal class ValidationServiceTest {
         listOf(overlappingSourceWithinSameConnector, overlappingSourceAcrossTwoConnectors).forEach { overlappingSource ->
             val cdrClientConfig = createCdrClientConfig(overlappingSource)
 
-            val validationResult: DTOs.ValidationResult = validationService.validateAllConfigurationItems(cdrClientConfig.toDto())
+            val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(cdrClientConfig.toDto())
 
             assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
             assertEquals(1, validationResult.validationDetails.size)
@@ -206,7 +219,7 @@ internal class ValidationServiceTest {
         listOf(overlappingSourceAndTargetAcrossTwoConnectors, overlappingSourceAndTargetWithinSameConnector).forEach { overlappingSourceAndTarget ->
             val cdrClientConfig = createCdrClientConfig(overlappingSourceAndTarget)
 
-            val validationResult: DTOs.ValidationResult = validationService.validateAllConfigurationItems(cdrClientConfig.toDto())
+            val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(cdrClientConfig.toDto())
 
             assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
             assertEquals(1, validationResult.validationDetails.size)
@@ -227,7 +240,7 @@ internal class ValidationServiceTest {
 
         val cdrClientConfig = createCdrClientConfig(overlappingSourceWithErrorOrArchive)
 
-        val validationResult: DTOs.ValidationResult = validationService.validateAllConfigurationItems(cdrClientConfig.toDto())
+        val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(cdrClientConfig.toDto())
         assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
         assertEquals(2, validationResult.validationDetails.size)
         validationResult.validationDetails.first().let { validationDetail ->
@@ -260,7 +273,7 @@ internal class ValidationServiceTest {
 
         val cdrClientConfig = createCdrClientConfig(overlappingSourceWithDocTypeFolders)
 
-        val validationResult: DTOs.ValidationResult = validationService.validateAllConfigurationItems(cdrClientConfig.toDto())
+        val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(cdrClientConfig.toDto())
         assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
         assertEquals(1, validationResult.validationDetails.size)
         validationResult.validationDetails.first().let { validationDetail ->
@@ -279,7 +292,7 @@ internal class ValidationServiceTest {
 
         val cdrClientConfig = createCdrClientConfig(sameModeTwice)
 
-        val validationResult: DTOs.ValidationResult = validationService.validateAllConfigurationItems(cdrClientConfig.toDto())
+        val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(cdrClientConfig.toDto())
         assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
         assertEquals(1, validationResult.validationDetails.size)
         validationResult.validationDetails.first().let { validationDetail ->

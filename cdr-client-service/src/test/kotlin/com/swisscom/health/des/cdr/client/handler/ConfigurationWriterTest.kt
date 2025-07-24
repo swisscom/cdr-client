@@ -21,7 +21,6 @@ import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
 import io.mockk.junit5.MockKExtension.CheckUnnecessaryStub
 import io.mockk.mockk
-import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -228,42 +227,13 @@ class ConfigurationWriterTest {
     }
 
     @Test
-    fun `multiple known origins for property should update first in list`() {
-        val configFile = tempConfigDir.resolve("unknown_config_format.yaml").apply {
-            createFile()
-            writeText(FILE_SYNC_YAML)
-        }
-
+    fun `multiple known origins for property should fail`() {
         val propOrigin1 = mockk<TextResourceOrigin>()
         val propOrigin2 = mockk<TextResourceOrigin>()
-        val fileSystemResource = FileSystemResource(configFile)
-        every { propOrigin1.resource } returns fileSystemResource
         val propSource1 = mockk<OriginTrackedMapPropertySource>()
         val propSource2 = mockk<OriginTrackedMapPropertySource>()
-        every { propSource1.getOrigin("client.file-synchronization-enabled") } returns propOrigin1
-        every { propSource2.getOrigin("client.file-synchronization-enabled") } returns propOrigin2
-        every { propSource1.getOrigin("client.idp-credentials.renew-credential") } returns propOrigin1
-        every { propSource2.getOrigin("client.idp-credentials.renew-credential") } returns null
-        every { propSource1.getOrigin("client.idp-credentials.client-secret") } returns propOrigin1
-        every { propSource2.getOrigin("client.idp-credentials.client-secret") } returns null
-        every { propSource1.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin1
-        every { propSource2.getOrigin("client.idp-credentials.tenant-id") } returns null
-        every { propSource1.getOrigin("client.idp-credentials.client-id") } returns propOrigin1
-        every { propSource2.getOrigin("client.idp-credentials.client-id") } returns null
-        every { propSource1.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin1
-        every { propSource2.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns null
-        every { propSource1.getOrigin("client.customer") } returns propOrigin1
-        every { propSource2.getOrigin("client.customer") } returns null
         every { propSource1.getOrigin("client.local-folder") } returns propOrigin1
-        every { propSource2.getOrigin("client.local-folder") } returns null
-        every { propSource1.getOrigin("client.file-busy-test-strategy") } returns propOrigin1
-        every { propSource2.getOrigin("client.file-busy-test-strategy") } returns null
-        every { propSource1.getOrigin("client.customer") } returns propOrigin1
-        every { propSource2.getOrigin("client.customer") } returns null
-        every { propSource1.getOrigin("client.credential-api.host") } returns propOrigin1
-        every { propSource2.getOrigin("client.credential-api.host") } returns null
-        every { propSource1.getOrigin("client.cdr-api.host") } returns propOrigin1
-        every { propSource2.getOrigin("client.cdr-api.host") } returns null
+        every { propSource2.getOrigin("client.local-folder") } returns propOrigin2
         val propertySources = MutablePropertySources().apply {
             addLast(propSource1)
             addLast(propSource2)
@@ -272,18 +242,7 @@ class ConfigurationWriterTest {
 
         val result = configurationWriter.updateClientServiceConfiguration(config.copy(fileSynchronizationEnabled = FileSynchronization.DISABLED))
 
-        assertInstanceOf<ConfigurationWriter.UpdateResult.Success>(result) { "Expected Success, but got $result" }
-        val newFileSyncValue = YAMLMapper().run {
-            readTree(configFile.inputStream()).run {
-                get("client")
-                    .get("file-synchronization-enabled")
-                    .booleanValue()
-            }
-        }
-        assertEquals(FileSynchronization.DISABLED.value, newFileSyncValue)
-
-        // make sure no attempt was made to access the second property source
-        verify(exactly = 0) { propOrigin2.resource }
+        assertInstanceOf<ConfigurationWriter.UpdateResult.Failure>(result) { "Expected Failure, but got $result" }
     }
 
     @Test

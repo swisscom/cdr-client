@@ -54,6 +54,7 @@ internal class ConfigurationWriter(
         object NotFound : ConfigLookupResult
         object NotWritable : ConfigLookupResult
         data class Writable(val resource: Resource) : ConfigLookupResult
+        object MultipleOrigins : ConfigLookupResult
     }
 
     /**
@@ -64,11 +65,17 @@ internal class ConfigurationWriter(
      * @param propertyPath the property path of the configuration item to check, e.g.,
      * `client.idp-credentials.client-secret`
      * @return [ConfigLookupResult.NotFound] if the property at the given path is not updatable,
-     * [ConfigLookupResult.NotWritable] if the property is updatable
-     *   but was not sourced from a writable resource, or [ConfigLookupResult.Writable] if the
-     *   property is updatable and sourced from a writable resource.
+     *
+     * [ConfigLookupResult.NotWritable] if the property is updatable but was not sourced from a writable resource,
+     *
+     * [ConfigLookupResult.Writable] if the property is updatable and sourced from a writable resource,
+     *
+     * [ConfigLookupResult.MultipleOrigins] if the property is updatable but has multiple origins, which means that it is ambiguous which writable resource
+     * to use.
      */
-    fun isWritableConfigurationItem(propertyPath: String): ConfigLookupResult =
+    // TODO: Refactoring, as this method checks the full configuration tree for unambiguous updatable configuration items (which was deliberately used in
+    //       ConfigValidationService.isConfigFromOneSource() with a dummy value).
+    fun isWritableConfigurationItem(propertyPath: String): ConfigLookupResult = try {
         collectUpdatableConfigurationItems(currentConfig, currentConfig)
             .firstOrNull { it.propertyPath == propertyPath }
             .let { updatableConfigItem: UpdatableConfigurationItem? ->
@@ -80,6 +87,9 @@ internal class ConfigurationWriter(
                     )
                 }
             }
+    } catch (_: AmbiguousPropertySourcesException) {
+        ConfigLookupResult.MultipleOrigins
+    }
 
     sealed interface UpdateResult {
         object Success : UpdateResult
@@ -145,7 +155,7 @@ internal class ConfigurationWriter(
             }
         }
     }.getOrElse { exception ->
-        UpdateResult.Failure(mapOf("error" to exception)).also {
+        UpdateResult.Failure(mapOf("error" to (exception.message ?: exception))).also {
             logger.error(exception) { "Failed to update configuration items" }
         }
     }
@@ -360,9 +370,7 @@ internal class ConfigurationWriter(
      * [SpringBoot Feature Request](https://github.com/spring-projects/spring-boot/issues/21613)
      *
      * As we cannot determine the effective origin and then check whether it is an updatable text resource, we search all
-     * available property sources for the client secret property and fail if we find no origin. The local development setup
-     * may report more than one origin as it uses multiple profiles. If more than once origin is found we log a warning
-     * and return the first one from the list of origins.
+     * available property sources for the given property and fail if we find no origin. If more than one origin is found we throw an error.
      */
     private fun findPropertyOrigin(propertyPath: String): Origin? {
         @Suppress("UNCHECKED_CAST")
@@ -380,7 +388,7 @@ internal class ConfigurationWriter(
                 logger.debug { "No origin found for property `$propertyPath`" }
 
             origins.size > 1 -> {
-                logger.warn { "Multiple origins found for property `$propertyPath`: '$origins'; picking first one, your mileage might vary!" }
+                throw AmbiguousPropertySourcesException("Multiple origins found for property `$propertyPath`, expected only one origin, but found: $origins")
             }
         }
 
@@ -457,3 +465,5 @@ internal class ConfigurationWriter(
         ) : UpdatableConfigurationItem
     }
 }
+
+class AmbiguousPropertySourcesException(message: String) : RuntimeException(message)

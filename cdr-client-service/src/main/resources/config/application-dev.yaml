@@ -1,18 +1,25 @@
 client:
+  file-synchronization-enabled: true
   schedule-delay: PT30S
   local-folder: ${CDR_CLIENT_LOCAL_FOLDER:${HOME}/Documents/cdr/inflight}
   idp-credentials:
+    tenant-id: ${CDR_B2C_TENANT_ID:test-tenant-client-id} # `test-tenant-client-id` is the required value if the MockOauth2Server is used; see its `config.json`
+    client-id: ${CDR_CLIENT_ID:easy-system-test-user-id}
     scopes:
       - https://dev.identity.health.swisscom.ch/CdrApi/.default
     client-secret: ${CDR_CLIENT_SECRET:Placeholder_test-secret}
     renew-credential: true
     last-credential-renewal-time: 2030-01-01T00:00:00Z
+  file-busy-test-strategy: file_size_changed # valid values are `never_busy`, `file_size_changed`, `always_busy`
   cdr-api:
     scheme: http
     port: 9090
     host: localhost
     base-path: documents
   credential-api:
+    scheme: ${client.cdr-api.scheme}
+    port: ${client.cdr-api.port}
+    host: ${client.cdr-api.host}
     base-path: client-credentials
   retry-template:
     retries: 1

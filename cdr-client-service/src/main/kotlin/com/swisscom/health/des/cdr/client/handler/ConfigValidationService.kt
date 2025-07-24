@@ -22,6 +22,7 @@ import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PostConstruct
+import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import java.nio.file.Path
 import java.time.Duration
@@ -33,9 +34,13 @@ import kotlin.io.path.notExists
 private val logger = KotlinLogging.logger {}
 
 @Service
-internal class ValidationService(
-    private val config: CdrClientConfig
+internal class ConfigValidationService(
+    private val config: CdrClientConfig,
+    private val configurationWriter: ConfigurationWriter,
+    private val environment: Environment
 ) {
+
+    val isConfigSourceUnambiguous: Boolean by lazy { isConfigFromOneSource() }
 
     /**
      * TODO: This is temporary! Ultimately, we need to fail softly instead and disable the scheduling of
@@ -43,11 +48,32 @@ internal class ValidationService(
      */
     @PostConstruct
     fun validateConfigAndFailHardOnValidationError() {
-        logger.info { "CDR client configuration: '$config'" }
-        logger.debug { "CDR client configuration as DTO: '${config.toDto()}'" }
-        val validationResult = validateAllConfigurationItems(config.toDto())
-        if (validationResult is ValidationResult.Failure) {
-            error("CdrClientConfig validation failed: '$validationResult'")
+        val activeProfiles = environment.activeProfiles.toList()
+        if (!activeProfiles.contains("test")) {
+            logger.info { "CDR client configuration: '$config'" }
+            logger.debug { "CDR client configuration as DTO: '${config.toDto()}'" }
+            val validationResult = validateAllConfigurationItems(config.toDto())
+            if (validationResult is ValidationResult.Failure) {
+                error("CdrClientConfig validation failed: '$validationResult'")
+            }
+        }
+    }
+
+    @PostConstruct
+    fun isConfigFromOneSource(): Boolean {
+        val activeProfiles = environment.activeProfiles.toList()
+        return if (!activeProfiles.contains("test")) {
+            when (configurationWriter.isWritableConfigurationItem("dummy")) {
+                ConfigurationWriter.ConfigLookupResult.MultipleOrigins -> {
+                    false
+                }
+
+                else -> {
+                    true
+                }
+            }
+        } else {
+            true
         }
     }
 
@@ -118,8 +144,8 @@ internal class ValidationService(
             }
         }.fold(
             initial = ValidationResult.Success,
-            operation = {
-                acc: ValidationResult, validationResult: ValidationResult -> acc + validationResult
+            operation = { acc: ValidationResult, validationResult: ValidationResult ->
+                acc + validationResult
             }
         )
 

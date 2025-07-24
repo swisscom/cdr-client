@@ -3,6 +3,7 @@ package com.swisscom.health.des.cdr.client.scheduling
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
+import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.TraceContext
@@ -29,6 +30,9 @@ internal class DocumentDownloadSchedulerTest {
 
     @MockK
     private lateinit var config: CdrClientConfig
+
+    @MockK
+    private lateinit var configValidationService: ConfigValidationService
 
     @MockK
     private lateinit var tracer: Tracer
@@ -68,6 +72,7 @@ internal class DocumentDownloadSchedulerTest {
             )
         every { config.customer } returns Customer(mutableListOf(connector))
         every { config.localFolder } returns TempDownloadDir(inflightDir)
+        every { configValidationService.isConfigSourceUnambiguous } returns true
         mockTracer()
     }
 
@@ -92,6 +97,7 @@ internal class DocumentDownloadSchedulerTest {
 
         val documentDownloadScheduler = DocumentDownloadScheduler(
             cdrClientConfig = config,
+            configValidationService = configValidationService,
             pullFileHandling = pullFileHandling,
             cdrDownloadsDispatcher = Dispatchers.IO,
         )
@@ -108,6 +114,7 @@ internal class DocumentDownloadSchedulerTest {
 
         val documentDownloadScheduler = DocumentDownloadScheduler(
             cdrClientConfig = config,
+            configValidationService = configValidationService,
             pullFileHandling = pullFileHandling,
             cdrDownloadsDispatcher = Dispatchers.IO,
         )

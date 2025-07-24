@@ -7,6 +7,7 @@ import com.swisscom.health.des.cdr.client.TraceSupport.startSpan
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.FileBusyTester
 import com.swisscom.health.des.cdr.client.config.getConnectorForSourceFile
+import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.RetryUploadFileHandling
 import io.github.irgaly.kfswatch.KfsDirectoryWatcher
 import io.github.irgaly.kfswatch.KfsDirectoryWatcherEvent
@@ -62,6 +63,7 @@ private val logger = KotlinLogging.logger {}
 @Suppress("LongParameterList")
 internal class EventTriggerUploadScheduler(
     private val config: CdrClientConfig,
+    private val configValidationService: ConfigValidationService,
     private val tracer: Tracer,
     @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
@@ -96,17 +98,19 @@ internal class EventTriggerUploadScheduler(
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFileWatcher(): Unit = runCatching {
-        logger.info { "Starting file watcher process..." }
-        config.customer.forEach { connector ->
-            logger.info { "Watching source directory: '${connector.sourceFolder}'" }
-            connector.docTypeFolders.filter { map -> map.value.sourceFolder != null }
-                .forEach { (_, typeFolders) -> logger.info { "Watching additional source directory: '${connector.effectiveSourceFolder(typeFolders)}'" } }
-        }
+        if (configValidationService.isConfigSourceUnambiguous) {
+            logger.info { "Starting file watcher process..." }
+            config.customer.forEach { connector ->
+                logger.info { "Watching source directory: '${connector.sourceFolder}'" }
+                connector.docTypeFolders.filter { map -> map.value.sourceFolder != null }
+                    .forEach { (_, typeFolders) -> logger.info { "Watching additional source directory: '${connector.effectiveSourceFolder(typeFolders)}'" } }
+            }
 
-        coroutineScope {
-            launch(Dispatchers.IO) {
-                KfsDirectoryWatcher(scope = this, dispatcher = Dispatchers.IO).run {
-                    uploadFiles(watchForNewFilesToUpload(this))
+            coroutineScope {
+                launch(Dispatchers.IO) {
+                    KfsDirectoryWatcher(scope = this, dispatcher = Dispatchers.IO).run {
+                        uploadFiles(watchForNewFilesToUpload(this))
+                    }
                 }
             }
         }
@@ -193,6 +197,7 @@ internal class EventTriggerUploadScheduler(
 @Suppress("LongParameterList")
 internal class PollingUploadScheduler(
     private val config: CdrClientConfig,
+    private val configValidationService: ConfigValidationService,
     private val tracer: Tracer,
     @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
@@ -227,23 +232,25 @@ internal class PollingUploadScheduler(
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFilePoller(): Unit = runCatching {
-        logger.info { "Starting directory polling process..." }
-        config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let { humanReadableDelay ->
-            config.customer.forEach { connector ->
-                logger.info { "Polling source directory every '$humanReadableDelay': '${connector.sourceFolder}'" }
-                connector.docTypeFolders.filter { map -> map.value.sourceFolder != null }
-                    .forEach { (_, typeFolders) ->
-                        logger.info {
-                            "Polling additional source directory every '$humanReadableDelay': '${connector.effectiveSourceFolder(typeFolders)}'"
+        if (configValidationService.isConfigSourceUnambiguous) {
+            logger.info { "Starting directory polling process..." }
+            config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let { humanReadableDelay ->
+                config.customer.forEach { connector ->
+                    logger.info { "Polling source directory every '$humanReadableDelay': '${connector.sourceFolder}'" }
+                    connector.docTypeFolders.filter { map -> map.value.sourceFolder != null }
+                        .forEach { (_, typeFolders) ->
+                            logger.info {
+                                "Polling additional source directory every '$humanReadableDelay': '${connector.effectiveSourceFolder(typeFolders)}'"
+                            }
                         }
-                    }
+                }
             }
-        }
-        coroutineScope {
-            withContext(Dispatchers.IO) {
-                val fileFlow = pollForNewFilesToUpload(this)
-                launch {
-                    uploadFiles(fileFlow)
+            coroutineScope {
+                withContext(Dispatchers.IO) {
+                    val fileFlow = pollForNewFilesToUpload(this)
+                    launch {
+                        uploadFiles(fileFlow)
+                    }
                 }
             }
         }

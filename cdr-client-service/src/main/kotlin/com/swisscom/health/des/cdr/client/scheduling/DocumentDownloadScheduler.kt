@@ -1,6 +1,7 @@
 package com.swisscom.health.des.cdr.client.scheduling
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import com.swisscom.health.des.cdr.client.handler.pathIsDirectoryAndWritable
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -25,6 +26,7 @@ private val logger = KotlinLogging.logger {}
 @ConditionalOnProperty(prefix = "client", name = ["file-synchronization-enabled"])
 internal class DocumentDownloadScheduler(
     private val cdrClientConfig: CdrClientConfig,
+    private val configValidationService: ConfigValidationService,
     private val pullFileHandling: PullFileHandling,
     @param:Qualifier("limitedParallelismCdrDownloadsDispatcher")
     private val cdrDownloadsDispatcher: CoroutineDispatcher
@@ -35,8 +37,10 @@ internal class DocumentDownloadScheduler(
      */
     @Scheduled(fixedDelayString = $$"${client.schedule-delay}")
     suspend fun syncFilesToClientDirectories() {
-        logger.info { "Triggered pull sync" }
-        callPullFileHandling()
+        if (configValidationService.isConfigSourceUnambiguous) {
+            logger.info { "Triggered pull sync" }
+            callPullFileHandling()
+        }
     }
 
     /**
