@@ -1,6 +1,8 @@
 package com.swisscom.health.des.cdr.client.scheduling
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Connector
+import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
@@ -63,8 +65,8 @@ internal class DocumentDownloadSchedulerTest {
         val sourceDir0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
 
         val connector =
-            CdrClientConfig.Connector(
-                connectorId = "1234",
+            Connector(
+                connectorId = ConnectorId("1234"),
                 targetFolder = targetDir0,
                 sourceFolder = sourceDir0,
                 contentType = "application/forumdatenaustausch+xml;charset=UTF-8",

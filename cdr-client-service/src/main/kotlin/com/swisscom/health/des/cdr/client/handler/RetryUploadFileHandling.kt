@@ -2,6 +2,7 @@ package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.getConnectorForSourceFile
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentResult
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -42,7 +43,7 @@ internal class RetryUploadFileHandling(
      * Retries the upload of a file until it is successful or a 4xx error occurred.
      */
     @Suppress("NestedBlockDepth", "LongMethod")
-    suspend fun uploadRetrying(file: Path, connector: CdrClientConfig.Connector) {
+    suspend fun uploadRetrying(file: Path, connector: Connector) {
         logger.debug { "Uploading file '$file'" }
         var retryCount = 0
         var retryNeeded: Boolean
@@ -56,9 +57,9 @@ internal class RetryUploadFileHandling(
                 val retryIndex = min(retryCount, cdrClientConfig.retryDelay.size - 1)
 
                 val response: UploadDocumentResult = cdrApiClient.uploadDocument(
-                    contentType = connector.contentType.toString(),
+                    contentType = connector.contentType,
                     file = uploadFile,
-                    connectorId = connector.connectorId,
+                    connectorId = connector.connectorId.id,
                     mode = connector.mode,
                     traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
                 )
@@ -132,7 +133,7 @@ internal class RetryUploadFileHandling(
     )
 
     /**
-     * For an error case renames the file to '.error' and creates a file with the response body.
+     * For an error case, renames the file to '.error' and creates a file with the response body.
      */
     private fun renameFileToErrorAndCreateLogFile(file: Path, responseBdy: String): Unit = runCatching {
         val uuidString = UUID.randomUUID().toString()

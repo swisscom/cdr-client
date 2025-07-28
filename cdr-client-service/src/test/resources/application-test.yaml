@@ -42,4 +42,12 @@ client:
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
       target-folder: ${java.io.tmpdir}
       source-folder: ${java.io.tmpdir}/cdr-client-test-source # If you change this, then you need to change com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory as well
+      source-archive-enabled: false
+      source-archive-folder: ${java.io.tmpdir}
+      source-error-folder: ${java.io.tmpdir}
       mode: test
+      doc-type-folders:
+        invoice:
+          target-folder: ${client.customer[0].target-folder}
+          source-folder: ${client.customer[0].source-folder}
+

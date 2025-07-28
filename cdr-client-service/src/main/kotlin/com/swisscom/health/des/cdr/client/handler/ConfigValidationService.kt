@@ -63,15 +63,7 @@ internal class ConfigValidationService(
     fun isConfigFromOneSource(): Boolean {
         val activeProfiles = environment.activeProfiles.toList()
         return if (!activeProfiles.contains("test")) {
-            when (configurationWriter.isWritableConfigurationItem("dummy")) {
-                ConfigurationWriter.ConfigLookupResult.MultipleOrigins -> {
-                    false
-                }
-
-                else -> {
-                    true
-                }
-            }
+            configurationWriter.isWriteableConfigurationUnambiguous()
         } else {
             true
         }

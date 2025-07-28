@@ -56,15 +56,15 @@ internal class ClientSecretRenewalService(
         when (configurationWriter.isWritableConfigurationItem(property)) {
             is ConfigurationWriter.ConfigLookupResult.Writable -> true
 
-            ConfigurationWriter.ConfigLookupResult.NotFound -> false.also {
+            is ConfigurationWriter.ConfigLookupResult.NotFound -> false.also {
                 logger.info { "No updatable configuration item found with property path '$property'" }
             }
 
-            ConfigurationWriter.ConfigLookupResult.NotWritable -> false.also {
+            is ConfigurationWriter.ConfigLookupResult.NotWritable -> false.also {
                 logger.info { "Configuration item with property path '$property' is not sourced from a writable resource.'" }
             }
 
-            ConfigurationWriter.ConfigLookupResult.MultipleOrigins -> false.also {
+            is ConfigurationWriter.ConfigLookupResult.Ambiguous -> false.also {
                 logger.info { "Configuration item with property path '$property' has multiple origins.'" }
             }
         }

@@ -7,6 +7,8 @@ import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.microsoft.aad.msal4j.TokenSource
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Connector
+import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
@@ -123,16 +125,16 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
             port = cdrServiceMock.port,
         )
         val connector1 =
-            CdrClientConfig.Connector(
-                connectorId = connectorId1,
+            Connector(
+                connectorId = ConnectorId(connectorId1),
                 targetFolder = tmpDir.resolve(directory1),
                 sourceFolder = tmpDir.resolve(directory1).resolve("source"),
                 contentType = forumDatenaustauschMediaType.toString(),
                 mode = CdrClientConfig.Mode.TEST,
             )
         val connector2 =
-            CdrClientConfig.Connector(
-                connectorId = connectorId2,
+            Connector(
+                connectorId = ConnectorId(connectorId2),
                 targetFolder = tmpDir.resolve(directory2),
                 sourceFolder = tmpDir.resolve(directory2).resolve("source"),
                 contentType = forumDatenaustauschMediaType.toString(),
@@ -195,11 +197,9 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
     }
 
     private fun handleDispatcher(request: RecordedRequest, practOneMaxCount: Int, practTwoMaxCount: Int): MockResponse {
-        return if (request.method == "GET" && request.headers[CONNECTOR_ID_HEADER] == connectorId1
-        ) {
+        return if (request.method == "GET" && request.headers[CONNECTOR_ID_HEADER] == connectorId1) {
             mockResponseDependingOnPath(request) { handleConnectorOne(practOneMaxCount) }
-        } else if (request.method == "GET" && request.headers[CONNECTOR_ID_HEADER] == connectorId2
-        ) {
+        } else if (request.method == "GET" && request.headers[CONNECTOR_ID_HEADER] == connectorId2) {
             mockResponseDependingOnPath(request) { handleConnectorTwo(practTwoMaxCount) }
         } else if (request.method == "DELETE") {
             MockResponse().setResponseCode(HttpStatus.OK.value())

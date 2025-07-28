@@ -5,6 +5,8 @@ import com.microsoft.aad.msal4j.ClientCredentialParameters
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Connector
+import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
@@ -141,14 +143,14 @@ internal class PullFileHandlingTest {
 
         val invoiceDir = tmpDir.resolve("invoice").also { it.createDirectories() }
 
-        val connector = CdrClientConfig.Connector(
-            connectorId = "1-2-3-4",
+        val connector = Connector(
+            connectorId = ConnectorId("1-2-3-4"),
             targetFolder = tmpDir.resolve(targetDirectory),
             sourceFolder = tmpDir.resolve(sourceDirectory),
             contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
-                DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
+                DocumentType.INVOICE to Connector.DocTypeFolders(
                     targetFolder = invoiceDir,
                 )
             )
@@ -179,14 +181,14 @@ internal class PullFileHandlingTest {
         val invoiceDir = tmpDir.resolve("invoice").also { it.createDirectories() }
         val targetDir = tmpDir.resolve(targetDirectory)
 
-        val connector = CdrClientConfig.Connector(
-            connectorId = "1-2-3-4",
+        val connector = Connector(
+            connectorId = ConnectorId("1-2-3-4"),
             targetFolder = targetDir,
             sourceFolder = tmpDir.resolve(sourceDirectory),
             contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
-                DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
+                DocumentType.INVOICE to Connector.DocTypeFolders(
                     targetFolder = invoiceDir,
                 )
             )
@@ -217,14 +219,14 @@ internal class PullFileHandlingTest {
         val invoiceDir = tmpDir.resolve("invoice").also { it.createDirectories() }
         val targetDir = tmpDir.resolve(targetDirectory)
 
-        val connector = CdrClientConfig.Connector(
-            connectorId = "1-2-3-4",
+        val connector = Connector(
+            connectorId = ConnectorId("1-2-3-4"),
             targetFolder = targetDir,
             sourceFolder = tmpDir.resolve(sourceDirectory),
             contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
-                DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(
+                DocumentType.INVOICE to Connector.DocTypeFolders(
                     targetFolder = invoiceDir,
                 )
             )
@@ -337,9 +339,9 @@ internal class PullFileHandlingTest {
         connectorId0: String,
         targetDir0: Path = tmpDir.resolve(targetDirectory),
         sourceDir0: Path = tmpDir.resolve(sourceDirectory),
-    ): CdrClientConfig.Connector =
-        CdrClientConfig.Connector(
-            connectorId = connectorId0,
+    ): Connector =
+        Connector(
+            connectorId = ConnectorId(connectorId0),
             targetFolder = targetDir0,
             sourceFolder = sourceDir0,
             contentType = "application/forumdatenaustausch+xml;charset=UTF-8",

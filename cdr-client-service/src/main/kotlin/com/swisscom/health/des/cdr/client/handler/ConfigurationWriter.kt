@@ -1,11 +1,13 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
+import com.fasterxml.jackson.module.kotlin.kotlinModule
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.PropertyNameAware
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -54,7 +56,7 @@ internal class ConfigurationWriter(
         object NotFound : ConfigLookupResult
         object NotWritable : ConfigLookupResult
         data class Writable(val resource: Resource) : ConfigLookupResult
-        object MultipleOrigins : ConfigLookupResult
+        data class Ambiguous(val resources: List<Resource>) : ConfigLookupResult
     }
 
     /**
@@ -70,26 +72,24 @@ internal class ConfigurationWriter(
      *
      * [ConfigLookupResult.Writable] if the property is updatable and sourced from a writable resource,
      *
-     * [ConfigLookupResult.MultipleOrigins] if the property is updatable but has multiple origins, which means that it is ambiguous which writable resource
+     * [ConfigLookupResult.Ambiguous] if the property is updatable but has multiple origins, which means that it is ambiguous which writable resource
      * to use.
      */
-    // TODO: Refactoring, as this method checks the full configuration tree for unambiguous updatable configuration items (which was deliberately used in
-    //       ConfigValidationService.isConfigFromOneSource() with a dummy value).
-    fun isWritableConfigurationItem(propertyPath: String): ConfigLookupResult = try {
+    fun isWritableConfigurationItem(propertyPath: String): ConfigLookupResult =
         collectUpdatableConfigurationItems(currentConfig, currentConfig)
             .firstOrNull { it.propertyPath == propertyPath }
             .let { updatableConfigItem: UpdatableConfigurationItem? ->
                 return when (updatableConfigItem) {
                     null -> ConfigLookupResult.NotFound
-                    is UpdatableConfigurationItem.UnknownSourceConfigurationItem -> ConfigLookupResult.NotWritable
-                    is UpdatableConfigurationItem.WritableResourceConfigurationItem -> ConfigLookupResult.Writable(
-                        resource = updatableConfigItem.writableResource
-                    )
+                    is UpdatableConfigurationItem.UnknownSource -> ConfigLookupResult.NotWritable
+                    is UpdatableConfigurationItem.WritableSource -> ConfigLookupResult.Writable(resource = updatableConfigItem.writableResource)
+                    is UpdatableConfigurationItem.AmbiguousWritableSource -> ConfigLookupResult.Ambiguous(resources = updatableConfigItem.writableResources)
                 }
             }
-    } catch (_: AmbiguousPropertySourcesException) {
-        ConfigLookupResult.MultipleOrigins
-    }
+
+    fun isWriteableConfigurationUnambiguous() =
+        collectUpdatableConfigurationItems(currentConfig, currentConfig)
+            .none { it is UpdatableConfigurationItem.AmbiguousWritableSource }
 
     sealed interface UpdateResult {
         object Success : UpdateResult
@@ -126,7 +126,7 @@ internal class ConfigurationWriter(
                     .filter { updatableConfigItem ->
                         updatableConfigItem.newValue != updatableConfigItem.currentValue
                     }.filter { changedConfigItem ->
-                        (changedConfigItem is UpdatableConfigurationItem.WritableResourceConfigurationItem)
+                        (changedConfigItem is UpdatableConfigurationItem.WritableSource)
                             .also { isWritable ->
                                 if (!isWritable) {
                                     // Not really cool as we will create partial updates. But as we do not have a rollback strategy (yet),
@@ -139,8 +139,8 @@ internal class ConfigurationWriter(
                                 }
                             }
                     }.map { changedWritableConfigItem ->
-                        changedWritableConfigItem as UpdatableConfigurationItem.WritableResourceConfigurationItem
-                    }.forEach { changedWritableConfigItem: UpdatableConfigurationItem.WritableResourceConfigurationItem ->
+                        changedWritableConfigItem as UpdatableConfigurationItem.WritableSource
+                    }.forEach { changedWritableConfigItem: UpdatableConfigurationItem.WritableSource ->
                         logger.info { "Updating configuration item: '${changedWritableConfigItem.propertyPath}'" }
                         logger.trace { "Configuration item details: '$changedWritableConfigItem'" }
                         when (changedWritableConfigItem.writableResource.fileTypeFromExtension) {
@@ -161,17 +161,23 @@ internal class ConfigurationWriter(
     }
 
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
-    private fun updateYamlSource(changedConfigItem: UpdatableConfigurationItem.WritableResourceConfigurationItem): Unit =
-        YAMLMapper(
-            YAMLFactory()
-                .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
-                .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR)
-                .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+    private fun updateYamlSource(changedConfigItem: UpdatableConfigurationItem.WritableSource): Unit =
+        YAMLMapper.Builder(
+            YAMLMapper(
+                YAMLFactory()
+                    .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
+                    .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR)
+                    .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
+            )
         ).run {
+            addModule(kotlinModule())
+            build()
+                .apply { setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE) }
+        }.run {
             // unmarshal the YAML file the to-be-updated value belongs to
             val yamlNode: JsonNode = readTree(changedConfigItem.writableResource.inputStream)
             var tmpNode = yamlNode as ObjectNode
-            val remainingNodeNames = ArrayDeque(changedConfigItem.propertyPath.split("."))
+            val remainingNodeNames = ArrayDeque(changedConfigItem.propertyPath.split(".").map { it.replace("""\[\d+]$""", "") })
             val toBeUpdatedNodeName = remainingNodeNames.removeLast()
             while (remainingNodeNames.isNotEmpty()) {
                 tmpNode = tmpNode.get(remainingNodeNames.removeFirst()) as ObjectNode
@@ -245,7 +251,7 @@ internal class ConfigurationWriter(
         }
 
     // the trick to search the unboxing method on Java class was stolen from com.fasterxml.jackson.module.kotlin.ValueClassUnboxSerializer.serialize
-    // the method is not listed as member of the KClass, probably because it is generated and not declared
+    // the method is not listed as member of the KClass, maybe because it is generated and not declared?
     private fun Any.unbox(): Any = if (this::class.isValue) this::class.java.getMethod("unbox-impl").invoke(this) else this
 
     // TODO
@@ -256,18 +262,14 @@ internal class ConfigurationWriter(
 //            store(propertiesResource.outputStream.writer(), null)
 //        }
 
+    @Suppress("CyclomaticComplexMethod")
     private fun collectUpdatableConfigurationItems(
-        currentConfigItemValue: PropertyNameAware, newConfigItemValue: PropertyNameAware,
+        currentConfigItem: PropertyNameAware, newConfigItem: PropertyNameAware,
     ): List<UpdatableConfigurationItem> {
 
-        data class ConfigItemContainer(
-            val current: PropertyNameAware,
-            val new: PropertyNameAware,
-            val propertyPath: List<String>,
-        )
-
-        tailrec fun walkConfigurationItemTree(
-            configItems: ArrayDeque<ConfigItemContainer>,
+        @Suppress("LongMethod", "DestructuringDeclarationWithTooManyEntries")
+        tailrec fun walkUpdatableConfigurationItemTree(
+            configItems: ArrayDeque<NamedConfigurationItem>,
             updatableConfigItemCollector: MutableList<UpdatableConfigurationItem>,
         ) {
             if (configItems.isEmpty()) {
@@ -276,73 +278,63 @@ internal class ConfigurationWriter(
             }
 
             // pop the most recently added configuration node from the stack
-            val (currentConfigItem, newConfigItem, propertyPath) = configItems.removeLast()
+            val currentConfigItem: NamedConfigurationItem = configItems.removeLast()
 
-            // some sanity checks to try and make sure the object tree of the new and old configuration is the same
-            require(currentConfigItem::class == newConfigItem::class) {
-                "Current and new configuration items must be of the same type: '${currentConfigItem::class}' vs '${newConfigItem::class}'"
-            }
-            require(currentConfigItem.propertyName == newConfigItem.propertyName) {
-                "Current and new configuration items must have the same property name: '${currentConfigItem.propertyName}' vs '${newConfigItem.propertyName}'"
-            }
+            // the current configuration is reflected in the environment of the spring context -> use the current config to decide whether we reached a leaf
+            // node in the tree of updatable configuration items and if so, find the property source for that item in the environment
+            val currentNamedChildren: List<PropertyNameAware> = getPropertyNameAwareChildren(currentConfigItem.currentValue)
 
-            // get the updatable configuration item children from both configuration object tree nodes, to gather both the before and after values
-            val propertyNameAwareChildren: List<Pair<PropertyNameAware, PropertyNameAware>> =
-                getPropertyNameAwareChildren(currentConfigItem).zip(getPropertyNameAwareChildren(newConfigItem))
+            if (currentNamedChildren.isEmpty()) {
+                // if we have reached a leaf node in the tree of updatable configuration items, then
+                // we try to resolve its property source and keep the node for potential updates
+                val propertyPathString = currentConfigItem.propertyPath.joinToString(separator = ".")
+                val configItemToUpdate: NamedConfigurationItem.SinglePath =
+                    when (currentConfigItem) {
+                        is NamedConfigurationItem.SinglePath -> currentConfigItem
+                        is NamedConfigurationItem.MultiPath -> currentConfigItem.singlePathItem
+                    }
+                configItemToUpdate.toUpdatableConfigurationItem(getPropertySources(propertyPathString))
+                    .also {
+                        when (it) {
+                            is UpdatableConfigurationItem.UnknownSource ->
+                                logger.warn { "No writable resource found for configuration item '${it.propertyPath}'" }
 
-            if (propertyNameAwareChildren.isEmpty()) {
-                val propertyPathString = propertyPath.joinToString(separator = ".")
-                // if we have reached a leaf node in the tree of updatable configuration items (no more updatable child nodes),
-                // we try to resolve its property source and store the node for potential updates
-                getPropertySource(propertyPathString)?.let { propertySource ->
-                    logger.debug { "Writable resource found for configuration item '$propertyPathString': '$propertySource'" }
-                    updatableConfigItemCollector.add(
-                        UpdatableConfigurationItem.WritableResourceConfigurationItem(
-                            propertyPath = propertyPathString,
-                            writableResource = propertySource,
-                            currentValue = currentConfigItem,
-                            newValue = newConfigItem,
-                        )
-                    )
+                            is UpdatableConfigurationItem.WritableSource ->
+                                logger.debug { "Writable resource found for configuration item '${it.propertyPath}': '${it.writableResource}'" }
 
-                } ?: run {
-                    logger.debug { "No writable resource found for configuration item '$propertyPathString'" }
-                    updatableConfigItemCollector.add(
-                        UpdatableConfigurationItem.UnknownSourceConfigurationItem(
-                            propertyPath = propertyPathString,
-                            currentValue = currentConfigItem,
-                            newValue = newConfigItem,
-                        )
-                    )
-                }
+                            is UpdatableConfigurationItem.AmbiguousWritableSource ->
+                                logger.warn { "Multiple writable resources found for configuration item '${it.propertyPath}': '${it.writableResources}'" }
+                        }
+                        updatableConfigItemCollector.add(it)
+                    }
             } else {
-                // if more updatable child nodes are present, then push all updatable child nodes onto the stack
-                propertyNameAwareChildren.forEach { (currentChild, newChild) ->
-                    val propertyNameAwarePair = ConfigItemContainer(
-                        current = currentChild,
-                        new = newChild,
-                        propertyPath = propertyPath + currentChild.propertyName
-                    )
-                    configItems.add(propertyNameAwarePair)
+                val newNamedChildren: List<PropertyNameAware> = getPropertyNameAwareChildren(currentConfigItem.newValue)
+                currentNamedChildren.forEachIndexed { idx: Int, currentChild: PropertyNameAware ->
+                    currentConfigItem.newChild(
+                        currentValue = currentChild,
+                        newValue = newNamedChildren.getOrNull(idx),
+                    ).also { configItems.add(it) }
                 }
             }
 
             // continue descending into the tree of updatable configuration items until we hit a leaf node
-            walkConfigurationItemTree(
+            walkUpdatableConfigurationItemTree(
                 configItems = configItems,
                 updatableConfigItemCollector = updatableConfigItemCollector,
             )
         }
 
+        require(currentConfigItem !is Collection<*>) { "The top-level configuration item must not be a collection, but was: '${currentConfigItem::class}'" }
+
         val updatableConfigItems = mutableListOf<UpdatableConfigurationItem>()
         // start walking the tree of updatable configuration items, starting with the root node
-        walkConfigurationItemTree(
+        walkUpdatableConfigurationItemTree(
             configItems = ArrayDeque(
                 listOf(
-                    ConfigItemContainer(
-                        current = currentConfigItemValue,
-                        new = newConfigItemValue,
-                        propertyPath = listOf(currentConfigItemValue.propertyName),
+                    NamedConfigurationItem.SinglePath(
+                        currentValue = currentConfigItem,
+                        newValue = newConfigItem,
+                        propertyPath = listOf(currentConfigItem.propertyName),
                     )
                 )
             ),
@@ -352,13 +344,13 @@ internal class ConfigurationWriter(
         return updatableConfigItems as List<UpdatableConfigurationItem>
     }
 
-    private fun getPropertySource(propertyPath: String): WritableResource? {
-        val origin: WritableResource? = runCatching {
+    private fun getPropertySources(propertyPath: String): List<WritableResource> {
+        val origin: List<WritableResource> = runCatching {
             findPropertyOrigin(propertyPath)
-        }.mapCatching { origin ->
-            origin?.fileBackedResource
-        }.mapCatching { resource: Resource? ->
-            resource?.writeableResource
+        }.mapCatching { origins: Set<Origin> ->
+            origins.mapNotNull { origin -> origin.fileBackedResource }
+        }.mapCatching { resources: List<Resource> ->
+            resources.mapNotNull { resource -> resource.writeableResource }
         }.getOrThrow()
 
         return origin
@@ -372,7 +364,7 @@ internal class ConfigurationWriter(
      * As we cannot determine the effective origin and then check whether it is an updatable text resource, we search all
      * available property sources for the given property and fail if we find no origin. If more than one origin is found we throw an error.
      */
-    private fun findPropertyOrigin(propertyPath: String): Origin? {
+    private fun findPropertyOrigin(propertyPath: String): Set<Origin> {
         @Suppress("UNCHECKED_CAST")
         val origins = context.environment.propertySources
             // at the time of writing, there exist only OriginLookup<String> implementations on the classpath
@@ -388,19 +380,37 @@ internal class ConfigurationWriter(
                 logger.debug { "No origin found for property `$propertyPath`" }
 
             origins.size > 1 -> {
-                throw AmbiguousPropertySourcesException("Multiple origins found for property `$propertyPath`, expected only one origin, but found: $origins")
+                logger.debug { "Multiple origins found for property `$propertyPath`" }
             }
         }
 
-        return origins.firstOrNull()
+        return origins
     }
 
-    private fun getPropertyNameAwareChildren(value: PropertyNameAware): List<PropertyNameAware> =
-        value::class.memberProperties
-            .mapNotNull { kProperty -> kProperty.call(value) }
-            .filter { propertyValue -> propertyValue is PropertyNameAware }
-            .map { propertyValue -> propertyValue as PropertyNameAware }
-            .toList()
+    private fun getPropertyNameAwareChildren(value: Any?): List<PropertyNameAware> =
+        when (value) {
+            null -> {
+                emptyList()
+            }
+
+            is Collection<*> -> {
+                value.firstOrNull()?.let {
+                    // NOTE: The name of the type contained in the collection does not appear in the configuration, and so we skip over it and call
+                    //   getPropertyNameAwareChildren() on the first element of the collection, and not consider the first element itself as a child.
+                    //   E.g., `client.customer` is the property name of the connector list. But "connector" is not in the property name path. Instead,
+                    //   it is in the index of the list, e.g., `client.customer[0].connector-id`.
+                    getPropertyNameAwareChildren(it)
+                } ?: emptyList()
+            }
+
+            else -> {
+                value::class.memberProperties
+                    .mapNotNull { kProperty -> kProperty.call(value) }
+                    .filter { propertyValue -> propertyValue is PropertyNameAware }
+                    .map { propertyValue -> propertyValue as PropertyNameAware }
+                    .toList()
+            }
+        }
 
     /**
      * TODO: Implement!
@@ -446,24 +456,159 @@ internal class ConfigurationWriter(
         PROPERTIES
     }
 
+    private sealed interface NamedConfigurationItem {
+        val currentValue: PropertyNameAware
+        val newValue: PropertyNameAware?
+        val propertyPath: List<String>
+
+        fun newChild(
+            currentValue: PropertyNameAware,
+            newValue: PropertyNameAware? = null,
+        ): NamedConfigurationItem
+
+        fun toUpdatableConfigurationItem(writableResources: List<WritableResource>): UpdatableConfigurationItem {
+            val singlePathValue =
+                when (this) {
+                    is SinglePath -> this
+                    is MultiPath -> this.singlePathItem
+                }
+            val updatableConfigItem = when (writableResources.size) {
+                0 -> UpdatableConfigurationItem.UnknownSource(
+                    propertyPath = singlePathValue.propertyPath.joinToString(separator = "."),
+                    currentValue = singlePathValue.currentValue,
+                    newValue = singlePathValue.newValue!!
+                )
+
+                1 -> UpdatableConfigurationItem.WritableSource(
+                    propertyPath = singlePathValue.propertyPath.joinToString(separator = "."),
+                    currentValue = singlePathValue.currentValue,
+                    newValue = singlePathValue.newValue!!,
+                    writableResource = writableResources.first()
+                )
+
+                else -> UpdatableConfigurationItem.AmbiguousWritableSource(
+                    propertyPath = singlePathValue.propertyPath.joinToString(separator = "."),
+                    currentValue = singlePathValue.currentValue,
+                    newValue = singlePathValue.newValue!!,
+                    writableResources = writableResources
+                )
+            }
+
+            return updatableConfigItem
+        }
+
+        sealed class ValidatedItem(
+            override val currentValue: PropertyNameAware,
+            override val newValue: PropertyNameAware? = null,
+            override val propertyPath: List<String>,
+        ) : NamedConfigurationItem {
+
+            init {
+                require(newValue == null || currentValue::class == newValue!!::class) {
+                    "Current and new configuration items must be of the same type: '${currentValue::class}' vs '${newValue!!::class}'"
+                }
+                require(newValue == null || currentValue.propertyName == newValue!!.propertyName) {
+                    "Current and new configuration items must have the same property name: '${currentValue.propertyName}' vs '${newValue!!.propertyName}'"
+                }
+                require(newValue == null || currentValue.propertyName == newValue!!.propertyName) {
+                    "Current and new configuration items must have the same property name but are: current: " +
+                            "'${currentValue.propertyName}'; new '${newValue!!.propertyName}'"
+                }
+            }
+
+        }
+
+        data class SinglePath(
+            override val currentValue: PropertyNameAware,
+            override val newValue: PropertyNameAware? = null,
+            override val propertyPath: List<String>,
+        ) : ValidatedItem(currentValue, newValue, propertyPath) {
+
+            override fun newChild(
+                currentValue: PropertyNameAware,
+                newValue: PropertyNameAware?
+            ): NamedConfigurationItem {
+                if (currentValue is Collection<*>) {
+                    // if the current item is a collection, then we create a new `NamedConfigurationItem.Collection`, which remembers the collection item in an
+                    // additional `SingleValuedConfigItemContainer`
+                    return MultiPath(
+                        currentValue = currentValue,
+                        newValue = newValue,
+                        propertyPath = this.propertyPath + currentValue.collectionItemPropertyName,
+                        singlePathItem = SinglePath(
+                            currentValue = currentValue,
+                            newValue = newValue,
+                            propertyPath = this.propertyPath + currentValue.propertyName,
+                        )
+                    )
+                } else {
+                    // if the current item is not a collection, then we create a new single valued config item container
+                    return SinglePath(
+                        currentValue = currentValue,
+                        newValue = newValue,
+                        propertyPath = this.propertyPath + currentValue.collectionItemPropertyName,
+                    )
+                }
+            }
+
+        }
+
+        data class MultiPath(
+            override val currentValue: PropertyNameAware,
+            override val newValue: PropertyNameAware? = null,
+            override val propertyPath: List<String>,
+            val singlePathItem: SinglePath
+        ) : ValidatedItem(currentValue, newValue, propertyPath) {
+
+            override fun newChild(
+                currentValue: PropertyNameAware,
+                newValue: PropertyNameAware?
+            ): NamedConfigurationItem =
+                // never overwrite the config item for the top-level collection -> always inherit the `singlePathItem` from the parent object
+                this.copy(
+                    currentValue = currentValue,
+                    newValue = newValue,
+                    propertyPath = this.propertyPath + currentValue.collectionItemPropertyName,
+                )
+
+        }
+
+    }
+
     internal sealed interface UpdatableConfigurationItem {
         val propertyPath: String
         val currentValue: Any
         val newValue: Any
 
-        data class WritableResourceConfigurationItem(
+        data class WritableSource(
             override val propertyPath: String,
             override val currentValue: Any,
             override val newValue: Any,
             val writableResource: WritableResource,
         ) : UpdatableConfigurationItem
 
-        data class UnknownSourceConfigurationItem(
+        data class AmbiguousWritableSource(
+            override val propertyPath: String,
+            override val currentValue: Any,
+            override val newValue: Any,
+            val writableResources: List<WritableResource>,
+        ) : UpdatableConfigurationItem {
+            init {
+                require(writableResources.size > 1) { "This type is used for multiple writable resources, but only one was provided" }
+            }
+        }
+
+        data class UnknownSource(
             override val propertyPath: String,
             override val currentValue: Any,
             override val newValue: Any,
         ) : UpdatableConfigurationItem
     }
+
 }
 
-class AmbiguousPropertySourcesException(message: String) : RuntimeException(message)
+private val PropertyNameAware.collectionItemPropertyName: String
+    get() = when (this) {
+        is Collection<*> -> "${this.propertyName}${if (isNotEmpty()) "[0]" else ""}"
+        else -> this.propertyName
+    }
