@@ -53,7 +53,7 @@ internal class CdrClientApiClient {
      */
     suspend fun validateValueIsNotBlank(value: String?): Result<List<DTOs.ValidationMessageKey>> =
         getAnything<List<DTOs.ValidationMessageKey>>(
-            CDR_CLIENT_VALIDATE_VALUE_NOT_BLANK.addQueryParams(
+            CDR_CLIENT_VALIDATE_VALUE_NOT_BLANK_AND_NOT_PLACEHOLDER.addQueryParams(
                 "value" to value
             ),
             "Validate value is not blank"
@@ -326,7 +326,7 @@ internal class CdrClientApiClient {
         private val CDR_CLIENT_VALIDATE_DIRECTORY_URL = "$CDR_CLIENT_BASE_URL/validate-directory".toHttpUrl()
 
         @JvmStatic
-        private val CDR_CLIENT_VALIDATE_VALUE_NOT_BLANK = "$CDR_CLIENT_BASE_URL/validate-not-blank".toHttpUrl()
+        private val CDR_CLIENT_VALIDATE_VALUE_NOT_BLANK_AND_NOT_PLACEHOLDER = "$CDR_CLIENT_BASE_URL/validate-not-blank-and-not-placeholder".toHttpUrl()
 
         @JvmStatic
         private val JSON = Json {}

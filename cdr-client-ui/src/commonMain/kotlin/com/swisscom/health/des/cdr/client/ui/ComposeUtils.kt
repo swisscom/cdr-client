@@ -51,6 +51,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.a
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.arrow_drop_up_24dp_000000_FILL0_wght400_GRAD0_opsz24
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_directory_not_found
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_duplicate_mode
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_is_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_no_connector
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_not_a_directory
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_not_read_writable
@@ -97,6 +98,7 @@ internal val DTOs.ValidationMessageKey.stringResource: StringResource
             DTOs.ValidationMessageKey.DUPLICATE_MODE -> Res.string.error_duplicate_mode
             DTOs.ValidationMessageKey.FILE_BUSY_TEST_TIMEOUT_TOO_LONG -> Res.string.error_test_timeout_too_long
             DTOs.ValidationMessageKey.NO_CONNECTOR_CONFIGURED -> Res.string.error_no_connector
+            DTOs.ValidationMessageKey.VALUE_IS_PLACEHOLDER -> Res.string.error_is_placeholder
         }
 
 @Composable

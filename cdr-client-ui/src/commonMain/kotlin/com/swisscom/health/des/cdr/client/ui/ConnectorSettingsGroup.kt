@@ -76,19 +76,21 @@ internal fun ConnectorSettingsGroup(
 
         // Connector ID
         var connectorIdValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-        LaunchedEffect(uiState.clientServiceConfig.customer[0].connectorId) {
-            connectorIdValidationResult =
-                remoteViewValidations.validateNotBlank(
-                    uiState.clientServiceConfig.customer[0].connectorId,
-                    DomainObjects.ConfigurationItem.CONNECTOR_ID
-                )
+        if (uiState.clientServiceConfig.customer.isNotEmpty()) {
+            LaunchedEffect(uiState.clientServiceConfig.customer[0].connectorId) {
+                connectorIdValidationResult =
+                    remoteViewValidations.validateNotBlank(
+                        uiState.clientServiceConfig.customer[0].connectorId,
+                        DomainObjects.ConfigurationItem.CONNECTOR_ID
+                    )
+            }
         }
         ValidatedTextField(
             name = DomainObjects.ConfigurationItem.CONNECTOR_ID,
             modifier = modifier.fillMaxWidth(),
             validatable = { connectorIdValidationResult },
             label = { Text(text = stringResource(Res.string.label_client_connector_id)) },
-            value = uiState.clientServiceConfig.customer[0].connectorId,
+            value = uiState.clientServiceConfig.customer.getOrNull(0)?.connectorId,
             placeHolder = { Text(text = stringResource(Res.string.label_client_connector_id_placeholder)) },
             onValueChange = { viewModel.setConnectorId(it) },
         )
@@ -102,7 +104,7 @@ internal fun ConnectorSettingsGroup(
             options = { DTOs.CdrClientConfig.Mode.entries.filter { it != DTOs.CdrClientConfig.Mode.NONE } },
             label = { Text(text = stringResource(Res.string.label_client_connector_mode)) },
             placeHolder = { Text(text = stringResource(Res.string.label_client_connector_mode_placeholder)) },
-            value = uiState.clientServiceConfig.customer[0].mode.toString(),
+            value = uiState.clientServiceConfig.customer.getOrNull(0)?.mode.toString(),
             onValueChange = { viewModel.setConnectorMode(it) }
         )
 
@@ -129,11 +131,11 @@ internal fun ConnectorSettingsGroup(
 
         // Error directory
         var errorDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-        LaunchedEffect(uiState.clientServiceConfig.customer[0].sourceErrorFolder) {
-            errorDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer[0].sourceErrorFolder) +
+        LaunchedEffect(uiState.clientServiceConfig.customer.getOrNull(0)?.sourceErrorFolder) {
+            errorDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer.getOrNull(0)?.sourceErrorFolder) +
                     remoteViewValidations.validateDirectory(
                         uiState.clientServiceConfig,
-                        uiState.clientServiceConfig.customer[0].sourceErrorFolder,
+                        uiState.clientServiceConfig.customer.getOrNull(0)?.sourceErrorFolder,
                         DomainObjects.ConfigurationItem.ERROR_DIRECTORY
                     )
         }
@@ -142,7 +144,7 @@ internal fun ConnectorSettingsGroup(
             modifier = modifier.fillMaxWidth(),
             validatable = { errorDirValidationResult },
             label = { Text(text = stringResource(Res.string.label_client_connector_error_dir)) },
-            value = uiState.clientServiceConfig.customer[0].sourceErrorFolder,
+            value = uiState.clientServiceConfig.customer.getOrNull(0)?.sourceErrorFolder,
             placeHolder = { Text(text = stringResource(Res.string.label_client_connector_error_dir_placeholder)) },
             onValueChange = { viewModel.setConnectorErrorDir(it) },
         )
@@ -154,17 +156,17 @@ internal fun ConnectorSettingsGroup(
             modifier = modifier.padding(bottom = 16.dp),
             title = stringResource(Res.string.label_enable_document_archive),
             subtitle = stringResource(Res.string.label_enable_document_archive_subtitle),
-            checked = uiState.clientServiceConfig.customer[0].sourceArchiveEnabled,
+            checked = uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveEnabled ?: false,
             onValueChange = { viewModel.setConnectorArchiveEnabled(it) },
         )
 
         // Archive directory
         var archiveDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-        LaunchedEffect(uiState.clientServiceConfig.customer[0].sourceArchiveFolder) {
-            archiveDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer[0].sourceArchiveFolder) +
+        LaunchedEffect(uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder) {
+            archiveDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder) +
                     remoteViewValidations.validateDirectory(
                         uiState.clientServiceConfig,
-                        uiState.clientServiceConfig.customer[0].sourceArchiveFolder,
+                        uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder,
                         DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
                     )
         }
@@ -173,7 +175,7 @@ internal fun ConnectorSettingsGroup(
             modifier = modifier.fillMaxWidth(),
             validatable = { archiveDirValidationResult },
             label = { Text(text = stringResource(Res.string.label_client_connector_archive_dir)) },
-            value = uiState.clientServiceConfig.customer[0].sourceArchiveFolder,
+            value = uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder,
             placeHolder = { Text(text = stringResource(Res.string.label_client_connector_archive_dir_placeholder)) },
             onValueChange = { viewModel.setConnectorArchiveDir(it) },
         )
@@ -185,11 +187,11 @@ internal fun ConnectorSettingsGroup(
 
         // Base target directory
         var targetDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-        LaunchedEffect(uiState.clientServiceConfig.customer[0].targetFolder) {
-            targetDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer[0].targetFolder) +
+        LaunchedEffect(uiState.clientServiceConfig.customer.getOrNull(0)?.targetFolder) {
+            targetDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer.getOrNull(0)?.targetFolder) +
                     remoteViewValidations.validateDirectory(
                         uiState.clientServiceConfig,
-                        uiState.clientServiceConfig.customer[0].targetFolder,
+                        uiState.clientServiceConfig.customer.getOrNull(0)?.targetFolder,
                         DomainObjects.ConfigurationItem.TARGET_DIRECTORY
                     )
         }
@@ -198,16 +200,16 @@ internal fun ConnectorSettingsGroup(
             modifier = modifier.fillMaxWidth(),
             validatable = { targetDirValidationResult },
             label = { Text(text = stringResource(Res.string.label_client_connector_base_target_dir)) },
-            value = uiState.clientServiceConfig.customer[0].targetFolder,
+            value = uiState.clientServiceConfig.customer.getOrNull(0)?.targetFolder,
             placeHolder = { Text(text = stringResource(Res.string.label_client_connector_base_target_dir_placeholder)) },
             onValueChange = { viewModel.setConnectorBaseTargetDir(it) },
         )
 
         // Document-type-specific target directories
         for (doctype in DTOs.CdrClientConfig.DocumentType.entries.filter { it != DTOs.CdrClientConfig.DocumentType.UNDEFINED }) {
-            val docTypeFolder: String? = uiState.clientServiceConfig.customer[0].docTypeFolders[doctype]?.targetFolder
+            val docTypeFolder: String? = uiState.clientServiceConfig.customer.getOrNull(0)?.docTypeFolders[doctype]?.targetFolder
             var docTypeDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-            LaunchedEffect(uiState.clientServiceConfig.customer[0].docTypeFolders) {
+            LaunchedEffect(uiState.clientServiceConfig.customer.getOrNull(0)?.docTypeFolders) {
                 docTypeDirValidationResult =
                     if (docTypeFolder.isNullOrBlank()) {
                         DTOs.ValidationResult.Success
@@ -243,11 +245,11 @@ internal fun ConnectorSettingsGroup(
 
         // Base source directory
         var sourceDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-        LaunchedEffect(uiState.clientServiceConfig.customer[0].sourceFolder) {
-            sourceDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer[0].sourceFolder) +
+        LaunchedEffect(uiState.clientServiceConfig.customer.getOrNull(0)?.sourceFolder) {
+            sourceDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer.getOrNull(0)?.sourceFolder) +
                     remoteViewValidations.validateDirectory(
                         uiState.clientServiceConfig,
-                        uiState.clientServiceConfig.customer[0].sourceFolder,
+                        uiState.clientServiceConfig.customer.getOrNull(0)?.sourceFolder,
                         DomainObjects.ConfigurationItem.SOURCE_DIRECTORY
                     )
         }
@@ -256,16 +258,16 @@ internal fun ConnectorSettingsGroup(
             modifier = modifier.fillMaxWidth(),
             validatable = { sourceDirValidationResult },
             label = { Text(text = stringResource(Res.string.label_client_connector_base_source_dir)) },
-            value = uiState.clientServiceConfig.customer[0].sourceFolder,
+            value = uiState.clientServiceConfig.customer.getOrNull(0)?.sourceFolder,
             placeHolder = { Text(text = stringResource(Res.string.label_client_connector_base_source_dir_placeholder)) },
             onValueChange = { viewModel.setConnectorBaseSourceDir(it) },
         )
 
         // Document-type-specific source directories
         for (doctype in DTOs.CdrClientConfig.DocumentType.entries.filter { it != DTOs.CdrClientConfig.DocumentType.UNDEFINED }) {
-            val docTypeFolder: String? = uiState.clientServiceConfig.customer[0].docTypeFolders[doctype]?.sourceFolder
+            val docTypeFolder: String? = uiState.clientServiceConfig.customer.getOrNull(0)?.docTypeFolders[doctype]?.sourceFolder
             var docTypeDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-            LaunchedEffect(uiState.clientServiceConfig.customer[0].docTypeFolders) {
+            LaunchedEffect(uiState.clientServiceConfig.customer.getOrNull(0)?.docTypeFolders) {
                 docTypeDirValidationResult =
                     if (docTypeFolder.isNullOrBlank()) {
                         DTOs.ValidationResult.Success

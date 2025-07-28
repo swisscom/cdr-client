@@ -74,7 +74,7 @@ internal class DocumentDownloadSchedulerTest {
             )
         every { config.customer } returns Customer(mutableListOf(connector))
         every { config.localFolder } returns TempDownloadDir(inflightDir)
-        every { configValidationService.isConfigSourceUnambiguous } returns true
+        every { configValidationService.isSchedulingAllowed } returns true
         mockTracer()
     }
 

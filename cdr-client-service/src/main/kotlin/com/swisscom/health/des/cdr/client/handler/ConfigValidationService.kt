@@ -13,6 +13,7 @@ import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.NOT_R
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.NO_CONNECTOR_CONFIGURED
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.TARGET_DIR_OVERLAPS_SOURCE_DIRS
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.VALUE_IS_BLANK
+import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.VALUE_IS_PLACEHOLDER
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem.CONNECTOR
@@ -26,6 +27,7 @@ import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import java.nio.file.Path
 import java.time.Duration
+import kotlin.collections.fold
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.isWritable
@@ -34,30 +36,17 @@ import kotlin.io.path.notExists
 private val logger = KotlinLogging.logger {}
 
 @Service
+@Suppress("TooManyFunctions")
 internal class ConfigValidationService(
     private val config: CdrClientConfig,
     private val configurationWriter: ConfigurationWriter,
     private val environment: Environment
 ) {
 
+    val isSchedulingAllowed: Boolean by lazy { isConfigSourceUnambiguous && isConfigValid }
     val isConfigSourceUnambiguous: Boolean by lazy { isConfigFromOneSource() }
 
-    /**
-     * TODO: This is temporary! Ultimately, we need to fail softly instead and disable the scheduling of
-     *   document upload/download if the configuration is not valid.
-     */
-    @PostConstruct
-    fun validateConfigAndFailHardOnValidationError() {
-        val activeProfiles = environment.activeProfiles.toList()
-        if (!activeProfiles.contains("test")) {
-            logger.info { "CDR client configuration: '$config'" }
-            logger.debug { "CDR client configuration as DTO: '${config.toDto()}'" }
-            val validationResult = validateAllConfigurationItems(config.toDto())
-            if (validationResult is ValidationResult.Failure) {
-                error("CdrClientConfig validation failed: '$validationResult'")
-            }
-        }
-    }
+    val isConfigValid: Boolean by lazy { validateAllConfigurationItems(config.toDto()) is ValidationResult.Success }
 
     @PostConstruct
     fun isConfigFromOneSource(): Boolean {
@@ -77,6 +66,7 @@ internal class ConfigValidationService(
         validations.add(validateModeOverlap(config.customer))
         validations.add(validateFileBusyTestTimeout(fileBusyTestTimeout = config.fileBusyTestTimeout, fileBusyTestInterval = config.fileBusyTestInterval))
         validations.add(validateConnectorIsPresent(config.customer))
+        validations.add(validateCredentialValues(config.idpCredentials))
 
         return validations.fold(
             initial = ValidationResult.Success,
@@ -158,10 +148,14 @@ internal class ConfigValidationService(
             ValidationResult.Success
         }
 
-    fun validateIsNotBlank(value: String?, configItem: DomainObjects.ConfigurationItem): ValidationResult =
+    fun validateIsNotBlankOrPlaceholder(value: String?, configItem: DomainObjects.ConfigurationItem): ValidationResult =
         if (value.isNullOrBlank()) {
             ValidationResult.Failure(
                 listOf(DTOs.ValidationDetail.ConfigItemDetail(configItem = configItem, messageKey = VALUE_IS_BLANK))
+            )
+        } else if (value == PLACEHOLDER_VALUE) {
+            ValidationResult.Failure(
+                listOf(DTOs.ValidationDetail.ConfigItemDetail(configItem = configItem, messageKey = VALUE_IS_PLACEHOLDER))
             )
         } else {
             ValidationResult.Success
@@ -306,6 +300,33 @@ internal class ConfigValidationService(
         // target dirs may overlap with each other
 
         return localDirSourceDirsOverlap + localDirTargetDirsOverlap + sourceDirsOverlap + targetDirsOverlapWithSourceDirs
+    }
+
+    fun validateCredentialValues(credentials: DTOs.CdrClientConfig.IdpCredentials): ValidationResult {
+        val validations = mutableListOf<ValidationResult>()
+        validateIsNotBlankOrPlaceholder(
+            value = credentials.clientId,
+            configItem = DomainObjects.ConfigurationItem.IDP_CLIENT_ID
+        ).let { validations.add(it) }
+        validateIsNotBlankOrPlaceholder(
+            value = credentials.clientSecret,
+            configItem = DomainObjects.ConfigurationItem.IDP_CLIENT_PASSWORD
+        ).let { validations.add(it) }
+        validateIsNotBlankOrPlaceholder(
+            value = credentials.tenantId,
+            configItem = DomainObjects.ConfigurationItem.IDP_TENANT_ID
+        )
+
+        return validations.fold(
+            initial = ValidationResult.Success,
+            operation = { acc: ValidationResult, validationResult: ValidationResult ->
+                acc + validationResult
+            }
+        )
+    }
+
+    companion object {
+        private const val PLACEHOLDER_VALUE = "value-required"
     }
 
 }

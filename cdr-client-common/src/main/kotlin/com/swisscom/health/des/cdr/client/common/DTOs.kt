@@ -110,6 +110,7 @@ class DTOs {
         VALUE_IS_BLANK,
         FILE_BUSY_TEST_TIMEOUT_TOO_LONG,
         NO_CONNECTOR_CONFIGURED,
+        VALUE_IS_PLACEHOLDER
     }
 
 
@@ -124,6 +125,7 @@ class DTOs {
             SYNCHRONIZING(true),
             DISABLED(true),
             ERROR(true),
+            BROKEN(true),
             OFFLINE(false);
 
             val isOfflineState: Boolean
@@ -224,7 +226,7 @@ class DTOs {
                     connectorId = EMPTY_STRING,
                     targetFolder = EMPTY_STRING,
                     sourceFolder = EMPTY_STRING,
-                    contentType = EMPTY_STRING,
+                    contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
                     sourceArchiveEnabled = false,
                     sourceArchiveFolder = EMPTY_STRING,
                     sourceErrorFolder = null,

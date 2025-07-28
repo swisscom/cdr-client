@@ -2,9 +2,9 @@ client:
   file-synchronization-enabled: true
   local-folder: ${java.io.tmpdir}
   idp-credentials:
-    tenant-id: blah
-    client-id: blah
-    client-secret: blah
+    tenant-id: value-required
+    client-id: value-required
+    client-secret: value-required
     scopes:
       - https://identity.health.swisscom.ch/CdrApi/.default
     renew-credential: false
@@ -21,16 +21,3 @@ client:
     host: ${client.cdr-api.host}
     base-path: api/client-credentials
   customer:
-    - connector-id: 1
-      content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[0].connector-id}/test
-      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[0].connector-id}/test
-      source-error-folder: errors
-      source-archive-folder: archive
-      mode: test
-      doc-type-folders:
-        invoice:
-          target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[0].connector-id}/test/invoice
-          source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[0].connector-id}/test/invoice
-        credit:
-          source-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[0].connector-id}/test/credit
