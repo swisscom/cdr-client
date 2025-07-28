@@ -1,7 +1,7 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
-import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.DownloadDocumentResult
 import com.swisscom.health.des.cdr.client.xml.DocumentType
 import com.swisscom.health.des.cdr.client.xml.XmlUtil
@@ -35,7 +35,7 @@ internal class PullFileHandling(
      *
      * @param connector the connector to synchronize
      */
-    suspend fun pullSyncConnector(connector: CdrClientConfig.Connector) {
+    suspend fun pullSyncConnector(connector: Connector) {
         tracer.withSpan("Pull Sync Connector ${connector.connectorId}") {
             logger.info { "Sync connector '${connector.connectorId}' (${connector.mode}) - pulling" }
             var counter = 0
@@ -66,15 +66,15 @@ internal class PullFileHandling(
      * @return whether to try the next file
      */
     @Suppress("NestedBlockDepth")
-    private fun tryDownloadNextDocument(connector: CdrClientConfig.Connector): DownloadDocumentResult =
+    private fun tryDownloadNextDocument(connector: Connector): DownloadDocumentResult =
         cdrApiClient.downloadDocument(
-            connectorId = connector.connectorId,
+            connectorId = connector.connectorId.id,
             mode = connector.mode,
             traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
         ).let { downloadResult: DownloadDocumentResult ->
             if (downloadResult is DownloadDocumentResult.DownloadSuccess) {
                 cdrApiClient.acknowledgeDocumentDownload(
-                    connectorId = connector.connectorId,
+                    connectorId = connector.connectorId.id,
                     mode = connector.mode,
                     downloadId = downloadResult.pullResultId,
                     traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
@@ -100,7 +100,7 @@ internal class PullFileHandling(
      * @param connector the connector for whom the file was requested
      * @param file the file to move
      */
-    private fun moveFileToClientDirectory(connector: CdrClientConfig.Connector, file: Path) {
+    private fun moveFileToClientDirectory(connector: Connector, file: Path) {
         logger.debug { "Move file to target directory start" }
         val targetDir =
             if (connector.docTypeFolders.isEmpty()) {

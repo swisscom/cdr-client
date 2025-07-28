@@ -12,7 +12,7 @@ import kotlin.reflect.KClass
  * BEGIN - Spring Configuration -> Configuration DTOs
  */
 internal fun CdrClientConfig.toDto(): DTOs.CdrClientConfig {
-    fun List<CdrClientConfig.Connector>.toDto(): List<DTOs.CdrClientConfig.Connector> = map { it.toDto() }
+    fun List<Connector>.toDto(): List<DTOs.CdrClientConfig.Connector> = map { it.toDto() }
     fun FileBusyTestStrategyProperty.toDto(): DTOs.CdrClientConfig.FileBusyTestStrategy =
         DTOs.CdrClientConfig.FileBusyTestStrategy.entries.first { it.name == strategy.name }
 
@@ -36,8 +36,8 @@ internal fun CdrClientConfig.toDto(): DTOs.CdrClientConfig {
     )
 }
 
-internal fun CdrClientConfig.Connector.toDto(): DTOs.CdrClientConfig.Connector {
-    fun Map<DocumentType, CdrClientConfig.Connector.DocTypeFolders>.toDto():
+internal fun Connector.toDto(): DTOs.CdrClientConfig.Connector {
+    fun Map<DocumentType, Connector.DocTypeFolders>.toDto():
             Map<DTOs.CdrClientConfig.DocumentType, DTOs.CdrClientConfig.Connector.DocTypeFolders> {
         return map { (key, value) ->
             DTOs.CdrClientConfig.DocumentType.entries.first { it.name == key.name } to DTOs.CdrClientConfig.Connector.DocTypeFolders(
@@ -48,7 +48,7 @@ internal fun CdrClientConfig.Connector.toDto(): DTOs.CdrClientConfig.Connector {
     }
 
     return DTOs.CdrClientConfig.Connector(
-        connectorId = connectorId,
+        connectorId = connectorId.id,
         targetFolder = targetFolder.absolutePathString(),
         sourceFolder = sourceFolder.absolutePathString(),
         contentType = contentType,
@@ -94,7 +94,7 @@ internal fun RetryTemplateConfig.toDto(): DTOs.CdrClientConfig.RetryTemplateConf
  * BEGIN - Configuration DTOs -> Spring Configuration
  */
 internal fun DTOs.CdrClientConfig.toCdrClientConfig(): CdrClientConfig {
-    fun List<DTOs.CdrClientConfig.Connector>.toCdrClientConfig(): MutableList<CdrClientConfig.Connector> = map { it.toCdrClientConfig() }.toMutableList()
+    fun List<DTOs.CdrClientConfig.Connector>.toCdrClientConfig(): MutableList<Connector> = map { it.toCdrClientConfig() }.toMutableList()
     fun DTOs.CdrClientConfig.FileBusyTestStrategy.toCdrClientConfig(): FileBusyTestStrategyProperty = FileBusyTestStrategyProperty.valueOf(name)
 
     return CdrClientConfig(
@@ -117,18 +117,18 @@ internal fun DTOs.CdrClientConfig.toCdrClientConfig(): CdrClientConfig {
     )
 }
 
-internal fun DTOs.CdrClientConfig.Connector.toCdrClientConfig(): CdrClientConfig.Connector {
+internal fun DTOs.CdrClientConfig.Connector.toCdrClientConfig(): Connector {
     fun Map<DTOs.CdrClientConfig.DocumentType, DTOs.CdrClientConfig.Connector.DocTypeFolders>.toCdrClientConfig():
-            Map<DocumentType, CdrClientConfig.Connector.DocTypeFolders> =
+            Map<DocumentType, Connector.DocTypeFolders> =
         map { (key, value) ->
-            DocumentType.valueOf(key.name) to CdrClientConfig.Connector.DocTypeFolders(
+            DocumentType.valueOf(key.name) to Connector.DocTypeFolders(
                 sourceFolder = if (value.sourceFolder != null) Path.of(value.sourceFolder!!) else null,
                 targetFolder = if (value.targetFolder != null) Path.of(value.targetFolder!!) else null,
             )
         }.toMap()
 
-    return CdrClientConfig.Connector(
-        connectorId = connectorId,
+    return Connector(
+        connectorId = ConnectorId(connectorId),
         targetFolder = Path.of(targetFolder),
         sourceFolder = Path.of(sourceFolder),
         contentType = contentType,

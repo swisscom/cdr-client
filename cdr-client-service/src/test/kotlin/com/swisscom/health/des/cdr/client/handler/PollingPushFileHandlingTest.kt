@@ -10,6 +10,8 @@ import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Connector
+import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
@@ -106,8 +108,8 @@ internal class PollingPushFileHandlingTest {
         )
         every { config.customer } returns Customer(
             mutableListOf(
-                CdrClientConfig.Connector(
-                    connectorId = "2345",
+                Connector(
+                    connectorId = ConnectorId("2345"),
                     targetFolder = targetDir0,
                     sourceFolder = sourceDir0,
                     contentType = forumDatenaustauschMediaType.toString(),
@@ -184,8 +186,8 @@ internal class PollingPushFileHandlingTest {
         val targetDir0 = tmpDir.resolve(targetDirectory)
         every { config.customer } returns Customer(
             mutableListOf(
-                CdrClientConfig.Connector(
-                    connectorId = "2345",
+                Connector(
+                    connectorId = ConnectorId("2345"),
                     targetFolder = targetDir0,
                     sourceFolder = sourceDir0,
                     contentType = forumDatenaustauschMediaType.toString(),
@@ -237,15 +239,15 @@ internal class PollingPushFileHandlingTest {
         val invoiceSourceDir = sourceDir0.resolve("invoice").also { it.createDirectories() }
         every { config.customer } returns Customer(
             mutableListOf(
-                CdrClientConfig.Connector(
-                    connectorId = "2345",
+                Connector(
+                    connectorId = ConnectorId("2345"),
                     targetFolder = targetDir0,
                     sourceFolder = sourceDir0,
                     contentType = forumDatenaustauschMediaType.toString(),
                     mode = CdrClientConfig.Mode.TEST,
                     sourceArchiveEnabled = true,
                     sourceArchiveFolder = relativeArchiveDir,
-                    docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = invoiceSourceDir)),
+                    docTypeFolders = mapOf(DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = invoiceSourceDir)),
                 )
             )
         )
@@ -292,15 +294,15 @@ internal class PollingPushFileHandlingTest {
         val invoiceSourceDir = sourceDir0.resolve("invoice").also { it.createDirectories() }
         every { config.customer } returns Customer(
             mutableListOf(
-                CdrClientConfig.Connector(
-                    connectorId = "2345",
+                Connector(
+                    connectorId = ConnectorId("2345"),
                     targetFolder = targetDir0,
                     sourceFolder = sourceDir0,
                     contentType = forumDatenaustauschMediaType.toString(),
                     mode = CdrClientConfig.Mode.TEST,
                     sourceArchiveEnabled = true,
                     sourceArchiveFolder = absoluteArchiveDir,
-                    docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = invoiceSourceDir)),
+                    docTypeFolders = mapOf(DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = invoiceSourceDir)),
                 )
             )
         )
@@ -412,8 +414,8 @@ internal class PollingPushFileHandlingTest {
         val targetDir0 = tmpDir.resolve(targetDirectory)
         every { config.customer } returns Customer(
             mutableListOf(
-                CdrClientConfig.Connector(
-                    connectorId = "2345",
+                Connector(
+                    connectorId = ConnectorId("2345"),
                     targetFolder = targetDir0,
                     sourceFolder = sourceDir0,
                     contentType = forumDatenaustauschMediaType.toString(),
@@ -472,14 +474,14 @@ internal class PollingPushFileHandlingTest {
 
         every { config.customer } returns Customer(
             mutableListOf(
-                CdrClientConfig.Connector(
-                    connectorId = "2345",
+                Connector(
+                    connectorId = ConnectorId("2345"),
                     targetFolder = targetDir0,
                     sourceFolder = sourceDir0,
                     contentType = forumDatenaustauschMediaType.toString(),
                     mode = CdrClientConfig.Mode.TEST,
                     sourceErrorFolder = absoluteErrorDir,
-                    docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = invoiceSourceDir)),
+                    docTypeFolders = mapOf(DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = invoiceSourceDir)),
                 )
             )
         )
@@ -534,14 +536,14 @@ internal class PollingPushFileHandlingTest {
 
         every { config.customer } returns Customer(
             mutableListOf(
-                CdrClientConfig.Connector(
-                    connectorId = "2345",
+                Connector(
+                    connectorId = ConnectorId("2345"),
                     targetFolder = targetDir0,
                     sourceFolder = sourceDir0,
                     contentType = forumDatenaustauschMediaType.toString(),
                     mode = CdrClientConfig.Mode.TEST,
                     sourceErrorFolder = relativeErrorDir,
-                    docTypeFolders = mapOf(DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = invoiceSourceDir))
+                    docTypeFolders = mapOf(DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = invoiceSourceDir))
                 )
             )
         )

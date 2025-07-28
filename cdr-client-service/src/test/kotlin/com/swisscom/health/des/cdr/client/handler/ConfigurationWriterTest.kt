@@ -6,6 +6,8 @@ import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
+import com.swisscom.health.des.cdr.client.config.Connector
+import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.CredentialApi
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
@@ -64,8 +66,8 @@ class ConfigurationWriterTest {
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
             customer = Customer(
                 mutableListOf(
-                    CdrClientConfig.Connector(
-                        connectorId = "1",
+                    Connector(
+                        connectorId = ConnectorId("1"),
                         targetFolder = CURRENT_WORKING_DIR,
                         sourceFolder = CURRENT_WORKING_DIR,
                         contentType = MediaType.APPLICATION_OCTET_STREAM.toString(),
@@ -142,10 +144,9 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
-        every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.customer[0].connector-id") } returns propOrigin
         every { propSource.getOrigin("client.local-folder") } returns propOrigin
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
-        every { propSource.getOrigin("client.customer") } returns propOrigin
         every { propSource.getOrigin("client.credential-api.host") } returns propOrigin
         every { propSource.getOrigin("client.cdr-api.host") } returns propOrigin
         val propertySources = MutablePropertySources().apply {
@@ -173,7 +174,7 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
         every { propSource.getOrigin("client.local-folder") } returns propOrigin
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
-        every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.customer[0].connector-id") } returns propOrigin
         every { propSource.getOrigin("client.credential-api.host") } returns propOrigin
         every { propSource.getOrigin("client.cdr-api.host") } returns propOrigin
         val propertySources = MutablePropertySources().apply {
@@ -202,10 +203,9 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
-        every { propSource.getOrigin("client.customer") } returns propOrigin
+        every { propSource.getOrigin("client.customer[0].connector-id") } returns propOrigin
         every { propSource.getOrigin("client.local-folder") } returns propOrigin
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
-        every { propSource.getOrigin("client.customer") } returns propOrigin
         every { propSource.getOrigin("client.credential-api.host") } returns propOrigin
         every { propSource.getOrigin("client.cdr-api.host") } returns propOrigin
         val propertySources = MutablePropertySources().apply {
@@ -263,10 +263,9 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns null
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns null
         every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns null
-        every { propSource.getOrigin("client.customer") } returns null
+        every { propSource.getOrigin("client.customer[0].connector-id") } returns null
         every { propSource.getOrigin("client.local-folder") } returns null
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns null
-        every { propSource.getOrigin("client.customer") } returns null
         every { propSource.getOrigin("client.credential-api.host") } returns null
         every { propSource.getOrigin("client.cdr-api.host") } returns null
         val propertySources = MutablePropertySources().apply {

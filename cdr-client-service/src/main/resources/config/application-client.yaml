@@ -28,13 +28,13 @@ client:
     initial-delay: 250ms
     multiplier: 5.0
     max-delay: 10m
-  #  MUST BE SET IN ENVIRONMENT
-  #customer:
-  #   - connector-id: 1
-  #     content-type: application/forumdatenaustausch+xml;charset=UTF-8
-  #     target-folder: /tmp/download
-  #     source-folder: /tmp/upload
-  #     source-archive-enabled: true
-  #     source-archive-folder: /tmp/archive/success  (absolute path)   or     success (relative path to source-folder: /tmp/upload/success)
-  #     source-error-folder: /tmp/archive/error  (absolute path)       or     error (relative path to source-folder: /tmp/upload/error)
-  #     mode: test|production
+  customer:
+#    # MUST BE SET IN ENVIRONMENT
+#     - connector-id: 1
+#       content-type: application/forumdatenaustausch+xml;charset=UTF-8
+#       target-folder: /tmp/download
+#       source-folder: /tmp/upload
+#       source-archive-enabled: true
+#       source-archive-folder: /tmp/archive/success  (absolute path)   or     success (relative path to source-folder: /tmp/upload/success)
+#       source-error-folder: /tmp/archive/error  (absolute path)       or     error (relative path to source-folder: /tmp/upload/error)
+#       mode: test|production

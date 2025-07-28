@@ -1,11 +1,11 @@
 package com.swisscom.health.des.cdr.client.config
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
-import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Connector
+import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Mode
 import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
-import net.minidev.json.annotate.JsonIgnore
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.util.unit.DataSize
 import java.net.URL
@@ -22,7 +22,6 @@ import kotlin.io.path.isDirectory
 
 private val logger = KotlinLogging.logger {}
 
-// `@JsonIgnore` had no effect when used on implementing class members
 @JsonIgnoreProperties(value = ["propertyName"])
 internal interface PropertyNameAware {
     val propertyName: String
@@ -86,219 +85,6 @@ internal data class CdrClientConfig(
 
     private companion object {
         const val PROPERTY_NAME = "client"
-
-        @JvmStatic
-        val TEMP_DIR_PATH: Path = Path.of(System.getProperty("java.io.tmpdir"))
-    }
-
-    /**
-     * Clients identified by their customer id
-     */
-    data class Connector(
-
-        /** Unique identifier for the connector; log into CDR web app to look up your connector ID(s). */
-        val connectorId: String,
-
-        /** Destination directory where the CDR client will download files to. */
-        val targetFolder: Path,
-
-        /** Source directory where the CDR client will upload files from. */
-        val sourceFolder: Path,
-
-        /** Media type to set for file uploads; currently only `application/forumdatenaustausch+xml;charset=UTF-8` is supported. */
-        val contentType: String,
-
-        /**
-         * Whether to enable the archiving of successfully uploaded files. If not enabled, files that have been uploaded get deleted.
-         * If you enable archiving, beware that the client does not perform any housekeeping of the archive. Housekeeping is the
-         * responsibility of the system's administrator.
-         *
-         * Defaults to `false`
-         *
-         * @see sourceArchiveFolder
-         * @see getEffectiveSourceArchiveFolder
-         */
-        val sourceArchiveEnabled: Boolean = false,
-
-        /**
-         * Directory to archive uploaded files to. If you specify a relative path, it will be resolved relative to the source directory.
-         * If you specify an absolute path, the path will be used as is for all archive directories (see [docTypeFolders]).
-         *
-         * Beware: On Linux empty string, `.`, and `./` all resolve to the current working directory, while `./archive` (and just `archive`) resolve
-         * to `<source_dir>/archive`.
-         *
-         * Default is the system temp directory.
-         *
-         * @see sourceArchiveEnabled
-         * @see getEffectiveSourceArchiveFolder
-         * @see sourceFolder
-         */
-        val sourceArchiveFolder: Path = TEMP_DIR_PATH,
-
-        /**
-         * directory to move documents to for which the upload has failed. If you specify a relative path, it will be resolved relative
-         * to the source directory. If you specify an absolute path, the path will be used as is for all error directories, such as for all [docTypeFolders].
-         *
-         * Beware: On Linux empty string, `.`, and `./` all resolve to the current working directory, while `./archive` (and just `archive`) resolve
-         * to `<source_dir>/archive`.
-         *
-         * Default is the system temp directory.
-         *
-         * @see getEffectiveSourceErrorFolder
-         * @see sourceFolder
-         */
-        val sourceErrorFolder: Path? = null,
-
-        /** Mode of the connector; either `test` or `production`; attempting to upload documents with a mismatching mode attribute value will fail. */
-        val mode: Mode,
-
-        /**
-         * Forum Datenaustausch message types related directories. In case that the files come from different source directories or received files need to be
-         * stored in different target directories, depending on the message type
-         */
-        val docTypeFolders: Map<DocumentType, DocTypeFolders> = emptyMap(),
-    ) : PropertyNameAware {
-
-        override val propertyName: String
-            get() = PROPERTY_NAME
-
-        companion object {
-            const val PROPERTY_NAME = "connector"
-        }
-
-        /**
-         * If [sourceArchiveEnabled] is set to `true` returns the archive directory resolved against the source directory with a subdirectory
-         * for the current date. The directories will be created if they do not exist. If [sourceArchiveEnabled] is `false` returns an
-         * empty path.
-         *
-         * @see sourceArchiveEnabled
-         * @see sourceArchiveFolder
-         * @see sourceFolder
-         */
-        @JsonIgnore
-        fun getEffectiveSourceArchiveFolder(path: Path): Path? =
-            if (sourceArchiveEnabled) {
-                if (path.isDirectory()) {
-                    path
-                } else {
-                    path.parent
-                }.resolve(sourceArchiveFolder.resolve(getDateNow()))
-                    .also { createDirectoryIfMissing(it) }
-            } else {
-                null
-            }
-
-        /**
-         * Convenience property to get the connector archive directory that is used in all cases where no message type related directories are defined.
-         * @see getEffectiveSourceArchiveFolder
-         */
-        val effectiveConnectorSourceArchiveFolder: Path?
-            @JsonIgnore
-            get() =
-                if (sourceArchiveEnabled)
-                    sourceFolder.resolve(sourceArchiveFolder.resolve(getDateNow()))
-                        .also { createDirectoryIfMissing(it) }
-                else
-                    null
-
-        /**
-         * Returns all source directories for all document types of this connector. If a [DocTypeFolders.sourceFolder] is not set, the entry is omitted.
-         */
-        @JsonIgnore
-        fun getAllSourceDocTypeFolders(): List<Path> = this.docTypeFolders.values.mapNotNull { this.effectiveSourceFolder(it) }
-
-        /**
-         * Returns the effective source directory for a given [DocTypeFolders] instance. If the [DocTypeFolders.sourceFolder] is not set, returns `null`.
-         * @see DocTypeFolders
-         */
-        @JsonIgnore
-        fun effectiveSourceFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.sourceFolder?.let { this.sourceFolder.resolve(it) }
-
-        /**
-         * Returns the effective target directory for a given [DocTypeFolders] instance. If the [DocTypeFolders.targetFolder] is not set, returns `null`.
-         * @see DocTypeFolders
-         */
-        @JsonIgnore
-        fun effectiveTargetFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.targetFolder?.let { this.targetFolder.resolve(it) }
-
-        @Suppress("TooGenericExceptionCaught")
-        private fun createDirectoryIfMissing(path: Path): Path = try {
-            path.createDirectories()
-        } catch (t: Throwable) {
-            logger.error { "Failed to create directory '$path' for connector '$connectorId': $t" }
-            throw t
-        }
-
-        private fun getDateNow(): String = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
-
-        /**
-         * Returns the error directory resolved against the source directory with a subdirectory for the current date. The directories will be
-         * created if they do not exist.
-         *
-         * @see sourceErrorFolder
-         * @see sourceFolder
-         */
-        @JsonIgnore
-        fun getEffectiveSourceErrorFolder(path: Path): Path =
-            (sourceErrorFolder ?: Path.of(EMPTY_STRING)).let { errorDir ->
-                if (path.isDirectory()) {
-                    path
-                } else {
-                    path.parent
-                }.resolve(errorDir.resolve(getDateNow()))
-                    .also { createDirectoryIfMissing(it) }
-            }
-
-
-        /**
-         * Convenience property to get the connector error directory that is used in all cases where no message type related directories are defined.
-         * @see getEffectiveSourceErrorFolder
-         */
-        val effectiveConnectorSourceErrorFolder: Path
-            @JsonIgnore
-            get() = (sourceErrorFolder ?: Path.of(EMPTY_STRING)).let { errorDir ->
-                sourceFolder.resolve(errorDir.resolve(getDateNow()))
-                    .also { createDirectoryIfMissing(it) }
-            }
-
-        override fun toString(): String {
-            return "Connector(connectorId='$connectorId', targetFolder=$targetFolder, sourceFolder=$sourceFolder, " +
-                    if (docTypeFolders.isNotEmpty())
-                        "additionalDocTypeFolders=[${
-                            docTypeFolders.entries.joinToString("; ") { "${it.key}=source=${it.value.sourceFolder},target=${it.value.targetFolder}" }
-                        }], "
-                    else {
-                        EMPTY_STRING
-                    } +
-                    "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
-                    "effectiveSourceArchiveFolder=${effectiveConnectorSourceArchiveFolder}, " +
-                    if (sourceArchiveEnabled && docTypeFolders.isNotEmpty())
-                        "additionalEffectiveSourceArchiveFolders=[${
-                            docTypeFolders.entries.joinToString("; ") { "${it.key}=${getEffectiveSourceArchiveFolder(it.value.sourceFolder!!)}" }
-                        }], "
-                    else {
-                        EMPTY_STRING
-                    } +
-                    "sourceErrorFolder=$sourceErrorFolder, effectiveSourceErrorFolder=${effectiveConnectorSourceErrorFolder} " +
-                    if (docTypeFolders.isNotEmpty())
-                        "additionalEffectiveSourceErrorFolders=[${
-                            docTypeFolders.entries.filter { it.value.sourceFolder != null }
-                                .joinToString(", ") { "${it.key}=${getEffectiveSourceErrorFolder(it.value.sourceFolder!!)}" }
-                        }], "
-                    else {
-                        EMPTY_STRING
-                    } +
-                    "mode=$mode)"
-        }
-
-        /**
-         * Specified directories for a specific document type (e.g., Invoice). Can be absolute or relative (to the [Connector.sourceFolder]) paths.
-         */
-        data class DocTypeFolders(
-            val sourceFolder: Path? = null,
-            val targetFolder: Path? = null,
-        )
-
     }
 
     data class RetryTemplateConfig(
@@ -334,6 +120,229 @@ internal data class CdrClientConfig(
         ALWAYS_BUSY,
     }
 
+}
+
+/**
+ * Clients identified by their customer id
+ */
+internal data class Connector(
+
+    /** Unique identifier for the connector; log into CDR web app to look up your connector ID(s). */
+    val connectorId: ConnectorId,
+
+    /** Destination directory where the CDR client will download files to. */
+    val targetFolder: Path,
+
+    /** Source directory where the CDR client will upload files from. */
+    val sourceFolder: Path,
+
+    /** Media type to set for file uploads; currently only `application/forumdatenaustausch+xml;charset=UTF-8` is supported. */
+    val contentType: String,
+
+    /**
+     * Whether to enable the archiving of successfully uploaded files. If not enabled, files that have been uploaded get deleted.
+     * If you enable archiving, beware that the client does not perform any housekeeping of the archive. Housekeeping is the
+     * responsibility of the system's administrator.
+     *
+     * Defaults to `false`
+     *
+     * @see sourceArchiveFolder
+     * @see getEffectiveSourceArchiveFolder
+     */
+    val sourceArchiveEnabled: Boolean = false,
+
+    /**
+     * Directory to archive uploaded files to. If you specify a relative path, it will be resolved relative to the source directory.
+     * If you specify an absolute path, the path will be used as is for all archive directories (see [docTypeFolders]).
+     *
+     * Beware: On Linux empty string, `.`, and `./` all resolve to the current working directory, while `./archive` (and just `archive`) resolve
+     * to `<source_dir>/archive`.
+     *
+     * Default is the system temp directory.
+     *
+     * @see sourceArchiveEnabled
+     * @see getEffectiveSourceArchiveFolder
+     * @see sourceFolder
+     */
+    val sourceArchiveFolder: Path = TEMP_DIR_PATH,
+
+    /**
+     * Directory to move documents to for which the upload has failed. If you specify a relative path, it will be resolved relative
+     * to the source directory. If you specify an absolute path, the path will be used as is for all error directories, such as for all [docTypeFolders].
+     *
+     * Beware: On Linux empty string, `.`, and `./` all resolve to the current working directory, while `./archive` (and just `archive`) resolve
+     * to `<source_dir>/archive`.
+     *
+     * Default is the system temp directory.
+     *
+     * @see getEffectiveSourceErrorFolder
+     * @see sourceFolder
+     */
+    val sourceErrorFolder: Path? = null,
+
+    /** Mode of the connector; either `test` or `production`; attempting to upload documents with a mismatching mode attribute value will fail. */
+    val mode: Mode,
+
+    /**
+     * Forum Datenaustausch message types related directories. In case that the files come from different source directories or received files need to be
+     * stored in different target directories, depending on the message type
+     */
+    val docTypeFolders: Map<DocumentType, DocTypeFolders> = emptyMap(),
+) : PropertyNameAware {
+
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    companion object {
+        const val PROPERTY_NAME = ""
+
+        @JvmStatic
+        val TEMP_DIR_PATH: Path = Path.of(System.getProperty("java.io.tmpdir"))
+    }
+
+    /**
+     * If [sourceArchiveEnabled] is set to `true` returns the archive directory resolved against the source directory with a subdirectory
+     * for the current date. The directories will be created if they do not exist. If [sourceArchiveEnabled] is `false` returns an
+     * empty path.
+     *
+     * @see sourceArchiveEnabled
+     * @see sourceArchiveFolder
+     * @see sourceFolder
+     */
+    @JsonIgnore
+    fun getEffectiveSourceArchiveFolder(path: Path): Path? =
+        if (sourceArchiveEnabled) {
+            if (path.isDirectory()) {
+                path
+            } else {
+                path.parent
+            }.resolve(sourceArchiveFolder.resolve(getDateNow()))
+                .also { createDirectoryIfMissing(it) }
+        } else {
+            null
+        }
+
+    /**
+     * Convenience property to get the connector archive directory that is used in all cases where no message type related directories are defined.
+     * @see getEffectiveSourceArchiveFolder
+     */
+    val effectiveConnectorSourceArchiveFolder: Path?
+        @JsonIgnore
+        get() =
+            if (sourceArchiveEnabled)
+                sourceFolder.resolve(sourceArchiveFolder.resolve(getDateNow()))
+                    .also { createDirectoryIfMissing(it) }
+            else
+                null
+
+    /**
+     * Returns all source directories for all document types of this connector. If a [DocTypeFolders.sourceFolder] is not set, the entry is omitted.
+     */
+    @JsonIgnore
+    fun getAllSourceDocTypeFolders(): List<Path> = this.docTypeFolders.values.mapNotNull { this.effectiveSourceFolder(it) }
+
+    /**
+     * Returns the effective source directory for a given [DocTypeFolders] instance. If the [DocTypeFolders.sourceFolder] is not set, returns `null`.
+     * @see DocTypeFolders
+     */
+    @JsonIgnore
+    fun effectiveSourceFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.sourceFolder?.let { this.sourceFolder.resolve(it) }
+
+    /**
+     * Returns the effective target directory for a given [DocTypeFolders] instance. If the [DocTypeFolders.targetFolder] is not set, returns `null`.
+     * @see DocTypeFolders
+     */
+    @JsonIgnore
+    fun effectiveTargetFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.targetFolder?.let { this.targetFolder.resolve(it) }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun createDirectoryIfMissing(path: Path): Path = try {
+        path.createDirectories()
+    } catch (t: Throwable) {
+        logger.error { "Failed to create directory '$path' for connector '$connectorId': $t" }
+        throw t
+    }
+
+    private fun getDateNow(): String = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
+
+    /**
+     * Returns the error directory resolved against the source directory with a subdirectory for the current date. The directories will be
+     * created if they do not exist.
+     *
+     * @see sourceErrorFolder
+     * @see sourceFolder
+     */
+    @JsonIgnore
+    fun getEffectiveSourceErrorFolder(path: Path): Path =
+        (sourceErrorFolder ?: Path.of(EMPTY_STRING)).let { errorDir ->
+            if (path.isDirectory()) {
+                path
+            } else {
+                path.parent
+            }.resolve(errorDir.resolve(getDateNow()))
+                .also { createDirectoryIfMissing(it) }
+        }
+
+
+    /**
+     * Convenience property to get the connector error directory that is used in all cases where no message type related directories are defined.
+     * @see getEffectiveSourceErrorFolder
+     */
+    val effectiveConnectorSourceErrorFolder: Path
+        @JsonIgnore
+        get() = (sourceErrorFolder ?: Path.of(EMPTY_STRING)).let { errorDir ->
+            sourceFolder.resolve(errorDir.resolve(getDateNow()))
+                .also { createDirectoryIfMissing(it) }
+        }
+
+    override fun toString(): String {
+        return "Connector(connectorId='$connectorId', targetFolder=$targetFolder, sourceFolder=$sourceFolder, " +
+                if (docTypeFolders.isNotEmpty())
+                    "additionalDocTypeFolders=[${
+                        docTypeFolders.entries.joinToString("; ") { "${it.key}=source=${it.value.sourceFolder},target=${it.value.targetFolder}" }
+                    }], "
+                else {
+                    EMPTY_STRING
+                } +
+                "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
+                "effectiveSourceArchiveFolder=${effectiveConnectorSourceArchiveFolder}, " +
+                if (sourceArchiveEnabled && docTypeFolders.isNotEmpty())
+                    "additionalEffectiveSourceArchiveFolders=[${
+                        docTypeFolders.entries.joinToString("; ") { "${it.key}=${getEffectiveSourceArchiveFolder(it.value.sourceFolder!!)}" }
+                    }], "
+                else {
+                    EMPTY_STRING
+                } +
+                "sourceErrorFolder=$sourceErrorFolder, effectiveSourceErrorFolder=${effectiveConnectorSourceErrorFolder} " +
+                if (docTypeFolders.isNotEmpty())
+                    "additionalEffectiveSourceErrorFolders=[${
+                        docTypeFolders.entries.filter { it.value.sourceFolder != null }
+                            .joinToString(", ") { "${it.key}=${getEffectiveSourceErrorFolder(it.value.sourceFolder!!)}" }
+                    }], "
+                else {
+                    EMPTY_STRING
+                } +
+                "mode=$mode)"
+    }
+
+    /**
+     * Specified directories for a specific document type (e.g., Invoice). Can be absolute or relative (to the [Connector.sourceFolder]) paths.
+     */
+    data class DocTypeFolders(
+        val sourceFolder: Path? = null,
+        val targetFolder: Path? = null,
+    )
+}
+
+@JvmInline
+internal value class ConnectorId(val id: String) : PropertyNameAware {
+
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    companion object {
+        const val PROPERTY_NAME = "connector-id"
+    }
 }
 
 internal interface Endpoint {
@@ -384,7 +393,7 @@ internal data class Customer(
     val customer: MutableList<Connector>
 ) : PropertyNameAware, MutableList<Connector> by customer {
 
-    // required by SringBoot
+    // required by SpringBoot
     constructor() : this(mutableListOf())
 
     override val propertyName: String

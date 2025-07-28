@@ -129,6 +129,8 @@ internal class CdrClientContext {
             config.idpCredentials.clientId.id,
             ClientCredentialFactory.createFromSecret(config.idpCredentials.clientSecret.value)
         ).authority(config.idpEndpoint.toString())
+            // TODO: Implement application level retry of all remote calls and then comment in the line below
+            // .disableInternalRetries()
             .build()
 
     /**

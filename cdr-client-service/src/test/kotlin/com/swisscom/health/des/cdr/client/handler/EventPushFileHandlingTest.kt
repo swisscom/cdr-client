@@ -10,6 +10,8 @@ import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Connector
+import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.Host
 import io.mockk.every
@@ -100,8 +102,8 @@ internal class EventPushFileHandlingTest {
         )
         every { config.customer } returns Customer(
             mutableListOf(
-                CdrClientConfig.Connector(
-                    connectorId = "2345",
+                Connector(
+                    connectorId = ConnectorId("2345"),
                     targetFolder = targetDir0,
                     sourceFolder = sourceDir0,
                     contentType = forumDatenaustauschMediaType.toString(),
