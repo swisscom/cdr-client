@@ -22,7 +22,7 @@ import kotlin.io.path.isDirectory
 
 private val logger = KotlinLogging.logger {}
 
-@JsonIgnoreProperties(value = ["propertyName"])
+@JsonIgnoreProperties(value = ["propertyName", "property-name"])
 internal interface PropertyNameAware {
     val propertyName: String
 }
@@ -195,7 +195,6 @@ internal data class Connector(
         get() = docTypeFolders ?: emptyMap()
 
     override val propertyName: String
-        @JsonIgnore
         get() = PROPERTY_NAME
 
     companion object {
