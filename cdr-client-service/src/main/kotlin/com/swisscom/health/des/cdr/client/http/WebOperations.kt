@@ -3,6 +3,7 @@ package com.swisscom.health.des.cdr.client.http
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.Constants.SHUTDOWN_DELAY
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DIR_READ_WRITABLE
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DIR_SINGLE_USE
@@ -87,15 +88,15 @@ internal class WebOperations(
      * @return a list of [DTOs.ValidationMessageKey] if the value is null or blank, or an empty list
      * if the value contains any text characters
      */
-    @GetMapping("api/validate-not-blank")
-    internal suspend fun validateIsNotBlank(
+    @GetMapping("api/validate-not-blank-and-not-placeholder")
+    internal suspend fun validateIsNotBlankAndNotPlaceholder(
         @RequestParam(name = "value") value: String?,
     ): ResponseEntity<List<DTOs.ValidationMessageKey>> = runCatching {
         logger.trace { "validating string value: '$value'" }
-        val validationResult: DTOs.ValidationResult = configValidationService.validateIsNotBlank(value, DomainObjects.ConfigurationItem.UNKNOWN)
+        val validationResult: ValidationResult = configValidationService.validateIsNotBlankOrPlaceholder(value, DomainObjects.ConfigurationItem.UNKNOWN)
         ResponseEntity
             .ok(
-                if (validationResult is DTOs.ValidationResult.Failure)
+                if (validationResult is ValidationResult.Failure)
                     validationResult.validationDetails.map { it.messageKey }
                 else
                     emptyList()
@@ -121,9 +122,9 @@ internal class WebOperations(
         @RequestBody config: DTOs.CdrClientConfig,
         @RequestParam(name = "dir") directory: Path,
         @RequestParam(name = "validation") validations: List<DomainObjects.ValidationType>,
-    ): ResponseEntity<DTOs.ValidationResult> = runCatching {
+    ): ResponseEntity<ValidationResult> = runCatching {
         logger.debug { "validating dir: '$directory', validations: '$validations'" }
-        var validationResult: DTOs.ValidationResult = DTOs.ValidationResult.Success
+        var validationResult: ValidationResult = ValidationResult.Success
         for (validation in validations) {
             validationResult +=
                 when (validation) {
@@ -208,17 +209,17 @@ internal class WebOperations(
         logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
 
 
-        val status = if (configValidationService.isConfigSourceUnambiguous) {
-            when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
+        val status = when {
+            !configValidationService.isConfigSourceUnambiguous -> DTOs.StatusResponse.StatusCode.BROKEN
+            !configValidationService.isConfigValid -> DTOs.StatusResponse.StatusCode.ERROR
+            else -> when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
                 FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
                 FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED
                 else -> DTOs.StatusResponse.StatusCode.UNKNOWN
-                // TODO: add checks for error scenarios: configuration errors, CDR API not reachable, IdP not reachable, etc.
-                //   all other error scenarios would probably prevent the client service from starting altogether;
-                //   remember result of last attempt to reach remote endpoints instead of pinging them?
             }
-        } else {
-            DTOs.StatusResponse.StatusCode.ERROR
+            // TODO: add checks for error scenarios: configuration errors, CDR API not reachable, IdP not reachable, etc.
+            //   all other error scenarios would probably prevent the client service from starting altogether;
+            //   remember result of last attempt to reach remote endpoints instead of pinging them?
         }
 
         return ResponseEntity.ok(

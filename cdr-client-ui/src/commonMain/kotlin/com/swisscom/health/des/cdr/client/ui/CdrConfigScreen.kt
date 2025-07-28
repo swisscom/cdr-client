@@ -34,14 +34,15 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.R
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_apply
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cancel
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_close
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_file_busy_strategy
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_file_busy_strategy_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_service_status
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_close
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service_subtitle
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_broken
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_disabled
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_error
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_offline
@@ -78,7 +79,7 @@ internal fun CdrConfigScreen(
 
             Divider(modifier = modifier)
 
-            // client service staus
+            // client service status
             Row(modifier = modifier.padding(16.dp)) {
                 Text(text = stringResource(Res.string.label_client_service_status))
                 Spacer(Modifier.weight(1f))
@@ -177,6 +178,7 @@ private fun statusStringResource(status: DTOs.StatusResponse.StatusCode): String
         DTOs.StatusResponse.StatusCode.DISABLED -> stringResource(Res.string.status_disabled)
         DTOs.StatusResponse.StatusCode.ERROR -> stringResource(Res.string.status_error)
         DTOs.StatusResponse.StatusCode.OFFLINE -> stringResource(Res.string.status_offline)
+        DTOs.StatusResponse.StatusCode.BROKEN -> stringResource(Res.string.status_broken)
         DTOs.StatusResponse.StatusCode.UNKNOWN -> stringResource(Res.string.status_unknown)
     }
 

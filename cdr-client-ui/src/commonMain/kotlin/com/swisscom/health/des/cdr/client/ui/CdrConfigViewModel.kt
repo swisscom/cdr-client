@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_client_communication
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_client_configuration
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_client_validation
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -480,6 +481,10 @@ internal class CdrConfigViewModel(
                     // if we went from an offline state to an online state, we also need to refresh the client service configuration
                     queryClientServiceConfiguration()
                 }
+                if (status == DTOs.StatusResponse.StatusCode.ERROR && _uiState.value.clientServiceStatus.isNotError()) {
+                    queryClientServiceConfiguration()
+                    reportError(Res.string.error_client_configuration)
+                }
                 _uiState.update {
                     it.copy(
                         clientServiceStatus = status
@@ -487,6 +492,9 @@ internal class CdrConfigViewModel(
                 }
             }
         }
+
+    private fun DTOs.StatusResponse.StatusCode.isNotError(): Boolean =
+        this != DTOs.StatusResponse.StatusCode.ERROR
 
     /**
      * Clears the error message key from the UI state.

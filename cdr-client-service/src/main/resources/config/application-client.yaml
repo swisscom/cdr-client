@@ -28,8 +28,8 @@ client:
     initial-delay: 250ms
     multiplier: 5.0
     max-delay: 10m
-  customer:
   #  MUST BE SET IN ENVIRONMENT
+  #customer:
   #   - connector-id: 1
   #     content-type: application/forumdatenaustausch+xml;charset=UTF-8
   #     target-folder: /tmp/download

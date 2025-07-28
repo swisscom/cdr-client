@@ -49,6 +49,7 @@
     <string name="label_client_connector_doctype_target_dir_placeholder">Default download directory if no document type specific directory is defined</string>
 
     <!-- Enumerations -->
+    <string name="status_broken">broken - contact support or re-install</string>
     <string name="status_synchronizing">synchronizing</string>
     <string name="status_disabled">disabled</string>
     <string name="status_error">error</string>
@@ -60,6 +61,7 @@
 
     <!-- Error messages -->
     <string name="error_client_communication">Failed to communicate with the client service. Details:\n%1$s</string>
+    <string name="error_client_configuration">There is an error in your config. Check the UI for remarks</string>
     <string name="error_client_validation">CDR client reported an error. Details:\n%1$s</string>
     <string name="error_value_is_mandatory">A value is required</string>
     <string name="error_directory_not_found">This directory does not exist</string>
@@ -73,5 +75,6 @@
     <string name="error_duplicate_mode">Mode is already set for this connector</string>
     <string name="error_test_timeout_too_long">Timeout cannot be longer than test interval</string>
     <string name="error_no_connector">Connector configuration is missing</string>
+    <string name="error_is_placeholder">Placeholder value, needs to be replaced</string>
     <string name="error_multiple_connector_definitions_found">Multiple connector configurations found: %1$s\nONLY THE FIRST CONFIGURATION WILL BE PRESERVED!</string>
 </resources>

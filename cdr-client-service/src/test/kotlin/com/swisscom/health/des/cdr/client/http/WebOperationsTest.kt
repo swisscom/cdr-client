@@ -155,6 +155,8 @@ internal class WebOperationsTest {
     @CsvSource(
         "ENABLED, SYNCHRONIZING",
         "DISABLED, DISABLED",
+        "DISABLED, ERROR",
+        "DISABLED, BROKEN",
         "FOO, UNKNOWN"
     )
     fun `test status endpoint`(healthStatusString: String, responseStatusString: String) = runTest {
@@ -166,14 +168,21 @@ internal class WebOperationsTest {
         val responseStatus = when (responseStatusString) {
             "SYNCHRONIZING" -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
             "DISABLED" -> DTOs.StatusResponse.StatusCode.DISABLED
+            "BROKEN" -> DTOs.StatusResponse.StatusCode.BROKEN
+            "ERROR" -> DTOs.StatusResponse.StatusCode.ERROR
             else -> DTOs.StatusResponse.StatusCode.UNKNOWN
         }
+        every { configValidationService.isConfigSourceUnambiguous } returns (responseStatus != DTOs.StatusResponse.StatusCode.BROKEN)
+        every { configValidationService.isConfigValid } returns (responseStatus != DTOs.StatusResponse.StatusCode.ERROR)
+        every { configValidationService.isSchedulingAllowed } returns (
+            responseStatus != DTOs.StatusResponse.StatusCode.BROKEN &&
+            responseStatus != DTOs.StatusResponse.StatusCode.ERROR
+        )
 
         val systemHealth = mockk<SystemHealth>()
         every { healthEndpoint.health() } returns systemHealth
         every { systemHealth.toString() } returns "fake health status"
         every { systemHealth.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code } returns healthStatus
-        every { configValidationService.isConfigSourceUnambiguous } returns true
 
         val response = webOperations.status()
         assertEquals(HttpStatus.OK, response.statusCode)
