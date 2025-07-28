@@ -53,10 +53,10 @@ internal fun Connector.toDto(): DTOs.CdrClientConfig.Connector {
         sourceFolder = sourceFolder.absolutePathString(),
         contentType = contentType,
         sourceArchiveEnabled = sourceArchiveEnabled,
-        sourceArchiveFolder = sourceArchiveFolder.absolutePathString(),
+        sourceArchiveFolder = sourceArchiveFolder?.absolutePathString(),
         sourceErrorFolder = sourceErrorFolder?.absolutePathString(),
         mode = DTOs.CdrClientConfig.Mode.entries.first { it.name == mode.name },
-        docTypeFolders = docTypeFolders.toDto(),
+        docTypeFolders = effectiveDocTypeFolders.toDto(),
     )
 }
 
@@ -133,7 +133,7 @@ internal fun DTOs.CdrClientConfig.Connector.toCdrClientConfig(): Connector {
         sourceFolder = Path.of(sourceFolder),
         contentType = contentType,
         sourceArchiveEnabled = sourceArchiveEnabled,
-        sourceArchiveFolder = Path.of(sourceArchiveFolder),
+        sourceArchiveFolder = if (sourceArchiveFolder != null) Path.of(sourceArchiveFolder!!) else null,
         sourceErrorFolder = if (sourceErrorFolder != null) Path.of(sourceErrorFolder!!) else null,
         mode = CdrClientConfig.Mode.valueOf(mode.name),
         docTypeFolders = docTypeFolders.toCdrClientConfig(),

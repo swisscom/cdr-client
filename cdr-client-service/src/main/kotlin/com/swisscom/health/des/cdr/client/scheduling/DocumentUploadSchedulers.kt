@@ -102,7 +102,7 @@ internal class EventTriggerUploadScheduler(
             logger.info { "Starting file watcher process..." }
             config.customer.forEach { connector ->
                 logger.info { "Watching source directory: '${connector.sourceFolder}'" }
-                connector.docTypeFolders.filter { map -> map.value.sourceFolder != null }
+                connector.effectiveDocTypeFolders.filter { map -> map.value.sourceFolder != null }
                     .forEach { (_, typeFolders) -> logger.info { "Watching additional source directory: '${connector.effectiveSourceFolder(typeFolders)}'" } }
             }
 
@@ -237,7 +237,7 @@ internal class PollingUploadScheduler(
             config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let { humanReadableDelay ->
                 config.customer.forEach { connector ->
                     logger.info { "Polling source directory every '$humanReadableDelay': '${connector.sourceFolder}'" }
-                    connector.docTypeFolders.filter { map -> map.value.sourceFolder != null }
+                    connector.effectiveDocTypeFolders.filter { map -> map.value.sourceFolder != null }
                         .forEach { (_, typeFolders) ->
                             logger.info {
                                 "Polling additional source directory every '$humanReadableDelay': '${connector.effectiveSourceFolder(typeFolders)}'"
