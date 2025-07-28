@@ -67,6 +67,7 @@ internal class ConfigValidationService(
         validations.add(validateFileBusyTestTimeout(fileBusyTestTimeout = config.fileBusyTestTimeout, fileBusyTestInterval = config.fileBusyTestInterval))
         validations.add(validateConnectorIsPresent(config.customer))
         validations.add(validateCredentialValues(config.idpCredentials))
+        validations.add(validateConnectorIdIsPresent(config.customer))
 
         return validations.fold(
             initial = ValidationResult.Success,
@@ -83,6 +84,20 @@ internal class ConfigValidationService(
 
     fun validateConnectorIsPresent(customer: List<DTOs.CdrClientConfig.Connector>?): ValidationResult =
         if (customer.isNullOrEmpty()) {
+            ValidationResult.Failure(
+                listOf(
+                    DTOs.ValidationDetail.ConfigItemDetail(
+                        configItem = CONNECTOR,
+                        messageKey = NO_CONNECTOR_CONFIGURED
+                    )
+                )
+            )
+        } else {
+            ValidationResult.Success
+        }
+
+    fun validateConnectorIdIsPresent(customer: List<DTOs.CdrClientConfig.Connector>?): ValidationResult =
+        if (customer != null && customer.any { it.connectorId.isBlank() }) {
             ValidationResult.Failure(
                 listOf(
                     DTOs.ValidationDetail.ConfigItemDetail(
