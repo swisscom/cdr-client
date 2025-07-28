@@ -165,7 +165,7 @@ internal fun ConnectorSettingsGroup(
             uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder
         ) {
             archiveDirValidationResult =
-                if (uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveEnabled ?: false) {
+                if (uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveEnabled == true) {
                     validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder) +
                             remoteViewValidations.validateDirectory(
                                 uiState.clientServiceConfig,
