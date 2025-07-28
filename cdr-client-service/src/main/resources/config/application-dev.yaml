@@ -25,9 +25,11 @@ client:
     retries: 1
   customer:
     - connector-id: 1
-      content-type: application/forumdatenaustausch+xml;charset=UTF-8
       target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[0].connector-id}/test
       source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[0].connector-id}/test
+      content-type: application/forumdatenaustausch+xml;charset=UTF-8
+      source-archive-enabled: false
+      source-archive-folder: ${java.io.tmpdir}
       source-error-folder: errors
       mode: test
       doc-type-folders:
@@ -36,33 +38,33 @@ client:
           source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[0].connector-id}/test/invoice
         credit:
           source-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[0].connector-id}/test/credit
-    - connector-id: 1
-      content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[1].connector-id}
-      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[1].connector-id}
-      mode: production
-    - connector-id: 1234
-      content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[2].connector-id}
-      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[2].connector-id}
-      source-archive-enabled: true
-      source-archive-folder: archive
-      mode: test
-      doc-type-folders:
-        invoice:
-          source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[2].connector-id}/invoice
-    - connector-id: 5
-      content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[3].connector-id}
-      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[3].connector-id}
-      mode: test
-    - connector-id: 666
-      content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[4].connector-id}
-      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[4].connector-id}
-      mode: production
-    - connector-id: 2345
-      content-type: application/forumdatenaustausch+xml;charset=UTF-8
-      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[5].connector-id}
-      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[5].connector-id}
-      mode: production
+#    - connector-id: 1
+#      content-type: application/forumdatenaustausch+xml;charset=UTF-8
+#      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[1].connector-id}
+#      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[1].connector-id}
+#      mode: production
+#    - connector-id: 1234
+#      content-type: application/forumdatenaustausch+xml;charset=UTF-8
+#      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[2].connector-id}
+#      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[2].connector-id}
+#      source-archive-enabled: true
+#      source-archive-folder: archive
+#      mode: test
+#      doc-type-folders:
+#        invoice:
+#          source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[2].connector-id}/invoice
+#    - connector-id: 5
+#      content-type: application/forumdatenaustausch+xml;charset=UTF-8
+#      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[3].connector-id}
+#      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[3].connector-id}
+#      mode: test
+#    - connector-id: 666
+#      content-type: application/forumdatenaustausch+xml;charset=UTF-8
+#      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[4].connector-id}
+#      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[4].connector-id}
+#      mode: production
+#    - connector-id: 2345
+#      content-type: application/forumdatenaustausch+xml;charset=UTF-8
+#      target-folder: ${CDR_CLIENT_TARGET_FOLDER:${HOME}/Documents/cdr/target}/${client.customer[5].connector-id}
+#      source-folder: ${CDR_CLIENT_SOURCE_FOLDER:${HOME}/Documents/cdr/source}/${client.customer[5].connector-id}
+#      mode: production

@@ -6,6 +6,8 @@ import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
+import com.swisscom.health.des.cdr.client.config.Connector
+import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.CredentialApi
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
@@ -261,12 +263,12 @@ internal class ValidationServiceTest {
             blueSkyConnectors().first().copy(
                 sourceFolder = sourceFolder2,
                 docTypeFolders = mapOf(
-                    DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir),
-                    DocumentType.CREDIT to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir),
-                    DocumentType.FORM to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir),
-                    DocumentType.HOSPITAL_MCD to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir),
-                    DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir),
-                    DocumentType.NOTIFICATION to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir)
+                    DocumentType.CONTAINER to Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir),
+                    DocumentType.CREDIT to Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir),
+                    DocumentType.FORM to Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir),
+                    DocumentType.HOSPITAL_MCD to Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir),
+                    DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir),
+                    DocumentType.NOTIFICATION to Connector.DocTypeFolders(sourceFolder = multiPurposeTempDir)
                 )
             )
         )
@@ -303,7 +305,7 @@ internal class ValidationServiceTest {
     }
 
 
-    private fun createCdrClientConfig(customers: List<CdrClientConfig.Connector>, defaultLocalFolder: Path = localFolder0): CdrClientConfig =
+    private fun createCdrClientConfig(customers: List<Connector>, defaultLocalFolder: Path = localFolder0): CdrClientConfig =
         CdrClientConfig(
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
             scheduleDelay = Duration.ofSeconds(1),
@@ -346,23 +348,23 @@ internal class ValidationServiceTest {
         )
 
     private fun blueSkyConnectors() = listOf(
-        CdrClientConfig.Connector(
-            connectorId = "connectorId",
+        Connector(
+            connectorId = ConnectorId("connectorId"),
             targetFolder = targetFolder0,
             sourceFolder = sourceFolder0,
             contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE.toString(),
             mode = CdrClientConfig.Mode.TEST,
             docTypeFolders = mapOf(
-                DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
-                DocumentType.CREDIT to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
-                DocumentType.FORM to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
-                DocumentType.HOSPITAL_MCD to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
-                DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
-                DocumentType.NOTIFICATION to CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetFolder0),
+                DocumentType.CONTAINER to Connector.DocTypeFolders(targetFolder = targetFolder0),
+                DocumentType.CREDIT to Connector.DocTypeFolders(targetFolder = targetFolder0),
+                DocumentType.FORM to Connector.DocTypeFolders(targetFolder = targetFolder0),
+                DocumentType.HOSPITAL_MCD to Connector.DocTypeFolders(targetFolder = targetFolder0),
+                DocumentType.INVOICE to Connector.DocTypeFolders(targetFolder = targetFolder0),
+                DocumentType.NOTIFICATION to Connector.DocTypeFolders(targetFolder = targetFolder0),
             )
         ),
-        CdrClientConfig.Connector(
-            connectorId = "connectorId",
+        Connector(
+            connectorId = ConnectorId("connectorId"),
             targetFolder = targetFolder1,
             sourceFolder = sourceFolder1,
             sourceErrorFolder = sourceErrorDir1,
@@ -370,30 +372,30 @@ internal class ValidationServiceTest {
             contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE.toString(),
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
-                DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub")),
-                DocumentType.CREDIT to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub1")),
-                DocumentType.FORM to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub2")),
-                DocumentType.HOSPITAL_MCD to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub3")),
-                DocumentType.INVOICE to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub4")),
-                DocumentType.NOTIFICATION to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub5")),
+                DocumentType.CONTAINER to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub")),
+                DocumentType.CREDIT to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub1")),
+                DocumentType.FORM to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub2")),
+                DocumentType.HOSPITAL_MCD to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub3")),
+                DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub4")),
+                DocumentType.NOTIFICATION to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub5")),
             )
         ),
-        CdrClientConfig.Connector(
-            connectorId = "connectorId2",
+        Connector(
+            connectorId = ConnectorId("connectorId2"),
             targetFolder = targetFolder2,
             sourceFolder = sourceFolder2,
             contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE.toString(),
             mode = CdrClientConfig.Mode.TEST
         ),
-        CdrClientConfig.Connector(
-            connectorId = "connectorId3",
+        Connector(
+            connectorId = ConnectorId("connectorId3"),
             targetFolder = targetFolder3,
             sourceFolder = sourceFolder3,
             contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE.toString(),
             mode = CdrClientConfig.Mode.PRODUCTION
         ),
-        CdrClientConfig.Connector(
-            connectorId = "connectorId4",
+        Connector(
+            connectorId = ConnectorId("connectorId4"),
             targetFolder = targetFolder4,
             sourceFolder = sourceFolder4,
             sourceErrorFolder = sourceErrorDir4,

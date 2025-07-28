@@ -17,8 +17,8 @@ class ConfigConverterTest {
         fileSynchronizationEnabled = FileSynchronization.ENABLED,
         customer = Customer(
             mutableListOf(
-                CdrClientConfig.Connector(
-                    connectorId = "1",
+                Connector(
+                    connectorId = ConnectorId("1"),
                     targetFolder = RELATIVE_PATH,
                     sourceFolder = RELATIVE_PATH,
                     contentType = MediaType.APPLICATION_OCTET_STREAM.toString(),
@@ -27,8 +27,8 @@ class ConfigConverterTest {
                     sourceErrorFolder = RELATIVE_PATH,
                     mode = CdrClientConfig.Mode.PRODUCTION,
                     docTypeFolders = mapOf(
-                        DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = RELATIVE_PATH),
-                        DocumentType.CREDIT to CdrClientConfig.Connector.DocTypeFolders(targetFolder = RELATIVE_PATH),
+                        DocumentType.CONTAINER to Connector.DocTypeFolders(sourceFolder = RELATIVE_PATH),
+                        DocumentType.CREDIT to Connector.DocTypeFolders(targetFolder = RELATIVE_PATH),
                     ),
                 )
             )
@@ -76,8 +76,8 @@ class ConfigConverterTest {
         fileSynchronizationEnabled = FileSynchronization.ENABLED,
         customer = Customer(
             mutableListOf(
-                CdrClientConfig.Connector(
-                    connectorId = "1",
+                Connector(
+                    connectorId = ConnectorId("1"),
                     targetFolder = ABSOLUTE_PATH,
                     sourceFolder = ABSOLUTE_PATH,
                     contentType = MediaType.APPLICATION_OCTET_STREAM.toString(),
@@ -86,8 +86,8 @@ class ConfigConverterTest {
                     sourceErrorFolder = ABSOLUTE_PATH,
                     mode = CdrClientConfig.Mode.PRODUCTION,
                     docTypeFolders = mapOf(
-                        DocumentType.CONTAINER to CdrClientConfig.Connector.DocTypeFolders(sourceFolder = ABSOLUTE_PATH),
-                        DocumentType.CREDIT to CdrClientConfig.Connector.DocTypeFolders(targetFolder = ABSOLUTE_PATH),
+                        DocumentType.CONTAINER to Connector.DocTypeFolders(sourceFolder = ABSOLUTE_PATH),
+                        DocumentType.CREDIT to Connector.DocTypeFolders(targetFolder = ABSOLUTE_PATH),
                     ),
                 )
             )),

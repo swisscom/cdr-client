@@ -7,6 +7,8 @@ import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
+import com.swisscom.health.des.cdr.client.config.Connector
+import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.CredentialApi
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
@@ -209,8 +211,8 @@ internal class WebOperationsTest {
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
             customer = Customer(
                 mutableListOf(
-                    CdrClientConfig.Connector(
-                        connectorId = "1",
+                    Connector(
+                        connectorId = ConnectorId("1"),
                         targetFolder = CURRENT_WORKING_DIR,
                         sourceFolder = CURRENT_WORKING_DIR,
                         contentType = MediaType.APPLICATION_OCTET_STREAM.toString(),
