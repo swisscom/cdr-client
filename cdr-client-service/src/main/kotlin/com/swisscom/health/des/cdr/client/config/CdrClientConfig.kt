@@ -22,7 +22,7 @@ import kotlin.io.path.isDirectory
 
 private val logger = KotlinLogging.logger {}
 
-@JsonIgnoreProperties(value = ["propertyName"])
+@JsonIgnoreProperties(value = ["propertyName", "property-name"])
 internal interface PropertyNameAware {
     val propertyName: String
 }
@@ -164,7 +164,7 @@ internal data class Connector(
      * @see getEffectiveSourceArchiveFolder
      * @see sourceFolder
      */
-    val sourceArchiveFolder: Path = TEMP_DIR_PATH,
+    val sourceArchiveFolder: Path? = null,
 
     /**
      * Directory to move documents to for which the upload has failed. If you specify a relative path, it will be resolved relative
@@ -187,8 +187,12 @@ internal data class Connector(
      * Forum Datenaustausch message types related directories. In case that the files come from different source directories or received files need to be
      * stored in different target directories, depending on the message type
      */
-    val docTypeFolders: Map<DocumentType, DocTypeFolders> = emptyMap(),
+    val docTypeFolders: Map<DocumentType, DocTypeFolders>? = null,
 ) : PropertyNameAware {
+
+    val effectiveDocTypeFolders: Map<DocumentType, DocTypeFolders>
+        @JsonIgnore
+        get() = docTypeFolders ?: emptyMap()
 
     override val propertyName: String
         get() = PROPERTY_NAME
@@ -216,7 +220,7 @@ internal data class Connector(
                 path
             } else {
                 path.parent
-            }.resolve(sourceArchiveFolder.resolve(getDateNow()))
+            }.resolve((sourceArchiveFolder ?: TEMP_DIR_PATH).resolve(getDateNow()))
                 .also { createDirectoryIfMissing(it) }
         } else {
             null
@@ -230,7 +234,7 @@ internal data class Connector(
         @JsonIgnore
         get() =
             if (sourceArchiveEnabled)
-                sourceFolder.resolve(sourceArchiveFolder.resolve(getDateNow()))
+                sourceFolder.resolve((sourceArchiveFolder ?: TEMP_DIR_PATH).resolve(getDateNow()))
                     .also { createDirectoryIfMissing(it) }
             else
                 null
@@ -239,7 +243,7 @@ internal data class Connector(
      * Returns all source directories for all document types of this connector. If a [DocTypeFolders.sourceFolder] is not set, the entry is omitted.
      */
     @JsonIgnore
-    fun getAllSourceDocTypeFolders(): List<Path> = this.docTypeFolders.values.mapNotNull { this.effectiveSourceFolder(it) }
+    fun getAllSourceDocTypeFolders(): List<Path> = this.effectiveDocTypeFolders.values.mapNotNull { this.effectiveSourceFolder(it) }
 
     /**
      * Returns the effective source directory for a given [DocTypeFolders] instance. If the [DocTypeFolders.sourceFolder] is not set, returns `null`.
@@ -297,26 +301,26 @@ internal data class Connector(
 
     override fun toString(): String {
         return "Connector(connectorId='$connectorId', targetFolder=$targetFolder, sourceFolder=$sourceFolder, " +
-                if (docTypeFolders.isNotEmpty())
+                if (effectiveDocTypeFolders.isNotEmpty())
                     "additionalDocTypeFolders=[${
-                        docTypeFolders.entries.joinToString("; ") { "${it.key}=source=${it.value.sourceFolder},target=${it.value.targetFolder}" }
+                        effectiveDocTypeFolders.entries.joinToString("; ") { "${it.key}=source=${it.value.sourceFolder},target=${it.value.targetFolder}" }
                     }], "
                 else {
                     EMPTY_STRING
                 } +
                 "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
                 "effectiveSourceArchiveFolder=${effectiveConnectorSourceArchiveFolder}, " +
-                if (sourceArchiveEnabled && docTypeFolders.isNotEmpty())
+                if (sourceArchiveEnabled && effectiveDocTypeFolders.isNotEmpty())
                     "additionalEffectiveSourceArchiveFolders=[${
-                        docTypeFolders.entries.joinToString("; ") { "${it.key}=${getEffectiveSourceArchiveFolder(it.value.sourceFolder!!)}" }
+                        effectiveDocTypeFolders.entries.joinToString("; ") { "${it.key}=${getEffectiveSourceArchiveFolder(it.value.sourceFolder!!)}" }
                     }], "
                 else {
                     EMPTY_STRING
                 } +
                 "sourceErrorFolder=$sourceErrorFolder, effectiveSourceErrorFolder=${effectiveConnectorSourceErrorFolder} " +
-                if (docTypeFolders.isNotEmpty())
+                if (effectiveDocTypeFolders.isNotEmpty())
                     "additionalEffectiveSourceErrorFolders=[${
-                        docTypeFolders.entries.filter { it.value.sourceFolder != null }
+                        effectiveDocTypeFolders.entries.filter { it.value.sourceFolder != null }
                             .joinToString(", ") { "${it.key}=${getEffectiveSourceErrorFolder(it.value.sourceFolder!!)}" }
                     }], "
                 else {

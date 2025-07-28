@@ -103,7 +103,7 @@ internal class PullFileHandling(
     private fun moveFileToClientDirectory(connector: Connector, file: Path) {
         logger.debug { "Move file to target directory start" }
         val targetDir =
-            if (connector.docTypeFolders.isEmpty()) {
+            if (connector.effectiveDocTypeFolders.isEmpty()) {
                 connector.targetFolder
             } else {
                 val documentType: DocumentType =
@@ -116,7 +116,7 @@ internal class PullFileHandling(
                             DocumentType.UNDEFINED
                         }
                     )
-                connector.docTypeFolders[documentType]?.let { docTypeFolder -> connector.effectiveTargetFolder(docTypeFolder) }
+                connector.effectiveDocTypeFolders[documentType]?.let { docTypeFolder -> connector.effectiveTargetFolder(docTypeFolder) }
                     ?: connector.targetFolder.also { logger.debug { "No specific target directory defined for files of type '${documentType}'" } }
             }
         val targetTmpFile = targetDir.resolve(file.name)

@@ -76,14 +76,12 @@ internal fun ConnectorSettingsGroup(
 
         // Connector ID
         var connectorIdValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-        if (uiState.clientServiceConfig.customer.isNotEmpty()) {
-            LaunchedEffect(uiState.clientServiceConfig.customer[0].connectorId) {
-                connectorIdValidationResult =
-                    remoteViewValidations.validateNotBlank(
-                        uiState.clientServiceConfig.customer[0].connectorId,
-                        DomainObjects.ConfigurationItem.CONNECTOR_ID
-                    )
-            }
+        LaunchedEffect(uiState.clientServiceConfig.customer.getOrNull(0)?.connectorId) {
+            connectorIdValidationResult =
+                remoteViewValidations.validateNotBlank(
+                    uiState.clientServiceConfig.customer.getOrNull(0)?.connectorId ?: "",
+                    DomainObjects.ConfigurationItem.CONNECTOR_ID
+                )
         }
         ValidatedTextField(
             name = DomainObjects.ConfigurationItem.CONNECTOR_ID,
@@ -162,13 +160,21 @@ internal fun ConnectorSettingsGroup(
 
         // Archive directory
         var archiveDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-        LaunchedEffect(uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder) {
-            archiveDirValidationResult = validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder) +
-                    remoteViewValidations.validateDirectory(
-                        uiState.clientServiceConfig,
-                        uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder,
-                        DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
-                    )
+        LaunchedEffect(
+            uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveEnabled,
+            uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder
+        ) {
+            archiveDirValidationResult =
+                if (uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveEnabled == true) {
+                    validateNeitherBlankNorRoot(uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder) +
+                            remoteViewValidations.validateDirectory(
+                                uiState.clientServiceConfig,
+                                uiState.clientServiceConfig.customer.getOrNull(0)?.sourceArchiveFolder,
+                                DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
+                            )
+                } else {
+                    DTOs.ValidationResult.Success
+                }
         }
         ValidatedTextField(
             name = DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY,
