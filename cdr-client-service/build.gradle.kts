@@ -183,6 +183,15 @@ jacoco {
     toolVersion = libs.versions.jacoco.get()
 }
 
+tasks.withType<Jar> {
+    manifest {
+        attributes(
+            "Implementation-Title" to project.name,
+            "Implementation-Version" to project.version
+        )
+    }
+}
+
 tasks.named<BootJar>("bootJar") {
     manifest {
         // Required so application name and version get rendered in the banner.txt; see
