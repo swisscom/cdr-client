@@ -215,33 +215,21 @@ private fun initLogbackConfig() =
                     "The logback configuration file path '$logbackConfigFile' exists but does not point to a readable regular file."
                 }
                 println("logback config file '$logbackConfigFile' exists, skipping creation of default configuration file")
+
+                val configContent = logbackConfigFile.readText()
+                val logsDirectoryEnvVar = System.getenv("LOGS_DIRECTORY")
+                // should only be relevant for LINUX installations, as the logback-ui.xml file is copied as is to the destination by conveyor
+                if (configContent.contains("@@LOG_DIR@@") && logsDirectoryEnvVar == null) {
+                    println("logback config file exists but contains unreplaced @@LOG_DIR@@ placeholder and LOGS_DIRECTORY is not set")
+                    val (logDir, _) = determineLogDirectoryAndDefaultLogbackConfigFile()
+                    println("Using log directory: $logDir")
+                    val updatedContent = configContent.replace("@@LOG_DIR@@", logDir.toString())
+                    logbackConfigFile.writeText(updatedContent)
+                    println("Updated logback configuration file at: '$logbackConfigFile'")
+                }
             } else {
                 println("logback config file '$logbackConfigFile' does not exist, creating default logback configuration file")
-                val pwd: Path = ProcessHandle.current().info().command().get().let { cdrServiceCmd: String ->
-                    Path.of(cdrServiceCmd).parent.absolute()
-                }
-                val defaultLogbackConfigFile: List<Path> = escalatingFind(UI_LOGBACK_FILE, pwd)
-                check(defaultLogbackConfigFile.size == 1) {
-                    "Expected exactly one default logback configuration file with name '$UI_LOGBACK_FILE', but found " +
-                            "'${defaultLogbackConfigFile.size}' files: '$defaultLogbackConfigFile'; search started in '$pwd'"
-                }
-                println("found logback configuration template at: '${defaultLogbackConfigFile.first()}'")
-                val logDir: Path =
-                    requireNotNull(System.getProperty("cdr.client.log.directory")) {
-                        "log directory system property 'cdr.client.log.directory' is not set"
-                    }
-                        .run(Path::of)
-                        .run {
-                            if (isAbsolute) {
-                                this
-                            } else {
-                                // should only be relevant for macOS where configuration, logs, etc., should go into `$HOME/Library/Application Support/...`
-                                // on other platforms use absolute paths!
-                                requireNotNull(System.getProperty("user.home")) {
-                                    "User home directory is not set but is required to resolve the relative log directory '$this'"
-                                }.run(Path::of).resolve(this).absolute()
-                            }
-                        }
+                val (logDir: Path, defaultLogbackConfigFile: List<Path>) = determineLogDirectoryAndDefaultLogbackConfigFile()
                 logDir.createDirectories()
                 defaultLogbackConfigFile
                     .first()
@@ -257,5 +245,35 @@ private fun initLogbackConfig() =
         }
         ?.let { logbackConfigFile: Path ->
             // update property with the absolute path to the logback configuration file
+            println("Setting system property '$LOGBACK_CONFIGURATION_FILE_PROPERTY' to '$logbackConfigFile'")
             System.setProperty(LOGBACK_CONFIGURATION_FILE_PROPERTY, logbackConfigFile.toString())
         }
+
+private fun determineLogDirectoryAndDefaultLogbackConfigFile(): Pair<Path, List<Path>> {
+    val pwd: Path = ProcessHandle.current().info().command().get().let { cdrServiceCmd: String ->
+        Path.of(cdrServiceCmd).parent.absolute()
+    }
+    val defaultLogbackConfigFile: List<Path> = escalatingFind(UI_LOGBACK_FILE, pwd)
+    check(defaultLogbackConfigFile.size == 1) {
+        "Expected exactly one default logback configuration file with name '$UI_LOGBACK_FILE', but found " +
+                "'${defaultLogbackConfigFile.size}' files: '$defaultLogbackConfigFile'; search started in '$pwd'"
+    }
+    println("found logback configuration template at: '${defaultLogbackConfigFile.first()}'")
+    val logDir: Path =
+        requireNotNull(System.getProperty("cdr.client.log.directory")) {
+            "log directory system property 'cdr.client.log.directory' is not set"
+        }
+            .run(Path::of)
+            .run {
+                if (isAbsolute) {
+                    this
+                } else {
+                    // should only be relevant for macOS where configuration, logs, etc., should go into `$HOME/Library/Application Support/...`
+                    // on other platforms use absolute paths!
+                    requireNotNull(System.getProperty("user.home")) {
+                        "User home directory is not set but is required to resolve the relative log directory '$this'"
+                    }.run(Path::of).resolve(this).absolute()
+                }
+            }
+    return logDir to defaultLogbackConfigFile
+}

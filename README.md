@@ -142,6 +142,11 @@ redirect them to `localhost`. The other properties are used to make the JRE trus
 
 You can use [Hydraulic Conveyor](https://conveyor.hydraulic.dev) to build installable artifacts
 
+Run following to build the project and create and install the package on your DEBIAN system:
+```
+./gradlew clean build -x test && conveyor -f conveyor-dev.conf make site && sudo dpkg -i output/debian/swisscom-schweiz-ag-cdr-client_1.0.0_amd64.deb
+```
+
 ### Running the Fat-JAR
 
 If the built SpringBoot fat-jar should be run directly, the following command can be used:

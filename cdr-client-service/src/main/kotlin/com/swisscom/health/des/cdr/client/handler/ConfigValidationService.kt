@@ -27,7 +27,6 @@ import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import java.nio.file.Path
 import java.time.Duration
-import kotlin.collections.fold
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.isWritable
@@ -74,7 +73,18 @@ internal class ConfigValidationService(
             operation = { acc: ValidationResult, validationResult: ValidationResult ->
                 acc + validationResult
             }
-        )
+        ).also {
+            if (it is ValidationResult.Failure) {
+                logger.warn { """
+                    |#############################################################################################
+                    |#############################################################################################
+                    |No file upload/download will be possible due to configuration validation failure.
+                    |Details: ${it.validationDetails}.
+                    |#############################################################################################
+                    |#############################################################################################
+                    |""".trimMargin() }
+            }
+        }
     }
 
     fun validateAvailableDiskspace(connectors: List<DTOs.CdrClientConfig.Connector>): ValidationResult {
