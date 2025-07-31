@@ -166,14 +166,14 @@ internal class ConfigValidationService(
         fun getAllBaseSourceFolders(): List<Path> = config.customer.map { connector ->
             Path.of(connector.sourceFolder)
                 .also {
-                    logger.debug { "connector [${connector.connectorId}] base source folder: [${connector.sourceFolder}]" }
+                    logger.debug { "connector [${connector.connectorId}-${connector.mode}] base source folder: [${connector.sourceFolder}]" }
                 }
         }
 
         fun getAllBaseTargetFolders(): List<Path> = config.customer.map { connector ->
             Path.of(connector.targetFolder)
                 .also {
-                    logger.debug { "connector [${connector.connectorId}] base target folder: [${connector.targetFolder}]" }
+                    logger.debug { "connector [${connector.connectorId}-${connector.mode}] base target folder: [${connector.targetFolder}]" }
                 }
         }
 
@@ -187,7 +187,7 @@ internal class ConfigValidationService(
             .map { connector ->
                 (connector.sourceFolder to connector.docTypeFolders.values)
                     .also {
-                        logger.debug { "connector [${connector.connectorId}] doctype directories: [${connector.docTypeFolders}]" }
+                        logger.debug { "connector [${connector.connectorId}-${connector.mode}] doctype directories: [${connector.docTypeFolders}]" }
                     }
             }
             .flatMap { (sourceFolder, docTypeFolders) ->
@@ -209,7 +209,7 @@ internal class ConfigValidationService(
                 listOf(connector.sourceArchiveFolder, connector.sourceErrorFolder)
                     .also {
                         logger.debug {
-                            "connector [${connector.connectorId}] source archive folder: [${connector.sourceArchiveFolder}], " +
+                            "connector [${connector.connectorId}-${connector.mode}] source archive folder: [${connector.sourceArchiveFolder}], " +
                                     "source error folder: [${connector.sourceErrorFolder}]"
                         }
                     }

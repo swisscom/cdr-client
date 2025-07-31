@@ -19,10 +19,7 @@ import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_S
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.actuate.health.HealthEndpoint
 import org.springframework.boot.actuate.health.SystemHealth
-import org.springframework.http.HttpStatus
-import org.springframework.http.ProblemDetail
 import org.springframework.http.ResponseEntity
-import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -46,35 +43,6 @@ internal class WebOperations(
     private val config: CdrClientConfig,
     private val configValidationService: ConfigValidationService,
 ) {
-
-    internal class ServerError(
-        message: String,
-        cause: Throwable? = null,
-    ) : Exception(message, cause)
-
-    internal class BadRequest(
-        message: String,
-        cause: Throwable? = null,
-        val props: Map<String, Any>? = null
-    ) : Exception(message, cause)
-
-    @ExceptionHandler
-    internal fun handleError(error: ServerError): ProblemDetail {
-        logger.error(error.cause) { "server error: $error" }
-        return ProblemDetail.forStatus(HttpStatus.INTERNAL_SERVER_ERROR).apply {
-            detail = error.message
-        }
-    }
-
-    @ExceptionHandler
-    internal fun handleError(error: BadRequest): ProblemDetail {
-        logger.debug { "bad request: $error" }
-        return ProblemDetail.forStatus(HttpStatus.BAD_REQUEST).apply {
-            detail = error.message
-            properties = error.props
-        }
-    }
-
     /*
      * BEGIN - (Configuration) Validation Endpoints
      *
@@ -102,7 +70,7 @@ internal class WebOperations(
                     emptyList()
             )
     }.getOrElse { error: Throwable ->
-        throw ServerError("Failed to validate value '$value': '$error'", error)
+        throw WebOperationsAdvice.ServerError("Failed to validate value '$value': '$error'", error)
     }
 
     /**
@@ -142,7 +110,7 @@ internal class WebOperations(
                 validationResult
             )
     }.getOrElse { error: Throwable ->
-        throw ServerError("Failed to validate directory: '$directory'", error)
+        throw WebOperationsAdvice.ServerError("Failed to validate directory: '$directory'", error)
     }
 
     //
@@ -165,7 +133,7 @@ internal class WebOperations(
      *
      * @param config the new configuration to apply
      * @return the configuration as it was received in the request body if the update was successful,
-     * or a [BadRequest] if the configuration is invalid
+     * or a [WebOperationsAdvice.BadRequest] if the configuration is invalid
      */
     @PutMapping("api/service-configuration")
     internal suspend fun updateServiceConfiguration(
@@ -180,7 +148,7 @@ internal class WebOperations(
                 }
 
                 is ConfigurationWriter.UpdateResult.Failure -> {
-                    throw BadRequest(
+                    throw WebOperationsAdvice.BadRequest(
                         message = "Invalid configuration",
                         props = result.errors
                     )
@@ -189,8 +157,8 @@ internal class WebOperations(
         }
     }.getOrElse { error: Throwable ->
         when (error) {
-            is BadRequest -> throw error
-            else -> throw ServerError("Failed to update service configuration: $error", error)
+            is WebOperationsAdvice.BadRequest -> throw error
+            else -> throw WebOperationsAdvice.ServerError("Failed to update service configuration: $error", error)
         }
     }
 
@@ -228,7 +196,7 @@ internal class WebOperations(
             )
         )
     }.getOrElse { error: Throwable ->
-        throw ServerError("Failed to retrieve service status: $error", error)
+        throw WebOperationsAdvice.ServerError("Failed to retrieve service status: $error", error)
     }
 
     /**
@@ -238,7 +206,7 @@ internal class WebOperations(
      * @param reason the reason for the shutdown, which is used to determine the exit code
      * @return a [DTOs.ShutdownResponse] containing the scheduled shutdown time, the trigger, and
      * the exit code
-     * @throws [BadRequest] if the reason is invalid or blank
+     * @throws [WebOperationsAdvice.BadRequest] if the reason is invalid or blank
      */
     @GetMapping("/api/shutdown")
     internal suspend fun shutdown(
@@ -249,7 +217,7 @@ internal class WebOperations(
         val response: ResponseEntity<DTOs.ShutdownResponse> =
             when (shutdownTrigger) {
                 ShutdownService.ShutdownTrigger.UNKNOWN -> {
-                    throw BadRequest(
+                    throw WebOperationsAdvice.BadRequest(
                         message = "Invalid shutdown reason: '$reason'",
                     )
                 }
@@ -272,8 +240,8 @@ internal class WebOperations(
         return response
     }.getOrElse { error: Throwable ->
         when (error) {
-            is BadRequest -> throw error
-            else -> throw ServerError("Failed to schedule shutdown: $error", error)
+            is WebOperationsAdvice.BadRequest -> throw error
+            else -> throw WebOperationsAdvice.ServerError("Failed to schedule shutdown: $error", error)
         }
     }
 

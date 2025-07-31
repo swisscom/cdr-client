@@ -45,8 +45,8 @@ internal class CdrClientContext {
     @Bean
     fun okHttpClient(
         builder: OkHttpClient.Builder,
-        @Value("\${client.connection-timeout-ms}") timeout: Long,
-        @Value("\${client.read-timeout-ms}") readTimeout: Long
+        @Value($$"${client.connection-timeout-ms}") timeout: Long,
+        @Value($$"${client.read-timeout-ms}") readTimeout: Long
     ): OkHttpClient =
         builder
             .connectTimeout(timeout, TimeUnit.MILLISECONDS).readTimeout(readTimeout, TimeUnit.MILLISECONDS)
@@ -102,7 +102,7 @@ internal class CdrClientContext {
 
     /**
      * Creates a cache to store fully qualified file names of files that are currently being processed
-     * in order to avoid a race condition between processing files by the polling and event trigger processes.
+     * to avoid a race condition between processing files by the polling and event trigger processes.
      */
     @Bean
     fun processingInProgressCache(config: CdrClientConfig): ObjectKache<String, Path> =
@@ -146,13 +146,13 @@ internal class CdrClientContext {
     @Bean(name = ["retryIoAndServerErrors"])
     @Suppress("MagicNumber")
     fun retryIOExceptionsAndServerErrorsTemplate(
-        @Value("\${client.retry-template.retries}")
+        @Value($$"${client.retry-template.retries}")
         retries: Int,
-        @Value("\${client.retry-template.initial-delay}")
+        @Value($$"${client.retry-template.initial-delay}")
         initialDelay: Duration,
-        @Value("\${client.retry-template.multiplier}")
+        @Value($$"${client.retry-template.multiplier}")
         multiplier: Double,
-        @Value("\${client.retry-template.max-delay}")
+        @Value($$"${client.retry-template.max-delay}")
         maxDelay: Duration
     ): RetryTemplate = RetryTemplate.builder()
         .maxAttempts(retries) // 1 initial attempt + retries
@@ -164,7 +164,7 @@ internal class CdrClientContext {
 
     @Bean
     @ConditionalOnProperty(prefix = "client", name = ["file-busy-test-strategy"], havingValue = "FILE_SIZE_CHANGED")
-    fun fileSizeChanged(@Value("\${client.file-size-busy-test-interval:PT0.25S}") testInterval: Duration): FileBusyTester =
+    fun fileSizeChanged(@Value($$"${client.file-size-busy-test-interval:PT0.25S}") testInterval: Duration): FileBusyTester =
         require(!testInterval.isZero && !testInterval.isNegative).run {
             FileBusyTester.FileSizeChanged(testInterval)
                 .also { logger.info { "Using file-busy-test strategy 'FILE_SIZE_CHANGED', sampling file at interval '$testInterval'" } }

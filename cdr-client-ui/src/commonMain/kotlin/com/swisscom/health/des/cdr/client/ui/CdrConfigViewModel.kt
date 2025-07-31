@@ -231,26 +231,45 @@ internal class CdrConfigViewModel(
     }
 
     /**
+     * Replaces an existing connector in the client service configuration with a new
+     * (updated) one.
+     *
+     * Reference equality with [old] identifies the connector in the list of connectors
+     * that should be replaced. This works as the "feedback loop" is not broken and the
+     * only place where new connector instances are created is here in the [CdrConfigViewModel]:
+     * `CdrConfigUiState --connector_instance_x--> @Composable --connector_instance_x--> CdrConfigUiState`.
+     *
+     * @param old The existing connector to replace.
+     * @param new The new connector to replace the old one with.
+     * @see addEmptyConnector
+     * @see deleteConnector
+     */
+    private fun replaceConnector(old: DTOs.CdrClientConfig.Connector, new: DTOs.CdrClientConfig.Connector) {
+        logger.debug { "setConnector; old: '$old', new: '$new'" }
+        _uiState.update { state: CdrConfigUiState ->
+            state.clientServiceConfig.customer
+                .map { connector: DTOs.CdrClientConfig.Connector ->
+                    if (connector === old) new else connector
+                }.let { updatedConnectorList ->
+                    state.copy(
+                        clientServiceConfig = state.clientServiceConfig.copy(
+                            customer = updatedConnectorList
+                        )
+                    )
+                }
+        }
+    }
+
+    /**
      * Sets the connector ID in the client service configuration.
      *
      * @param connectorId The ID of the connector to set.
+     * @param connector The connector to update.
      */
-    fun setConnectorId(connectorId: String) {
+    fun setConnectorId(connectorId: String, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorId: '$connectorId'" }
-        _uiState.update {
-            val connector =
-                if (it.clientServiceConfig.customer.isEmpty()) {
-                    DTOs.CdrClientConfig.Connector.EMPTY.copy(connectorId = connectorId)
-                } else {
-                    it.clientServiceConfig.customer[0].copy(connectorId = connectorId)
-                }
-
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    customer = listOf(connector)
-                )
-            )
-        }
+        val updatedConnector: DTOs.CdrClientConfig.Connector = connector.copy(connectorId = connectorId)
+        replaceConnector(connector, updatedConnector)
     }
 
     /**
@@ -258,117 +277,93 @@ internal class CdrConfigViewModel(
      *
      * @param mode The mode of the connector to set. Must be one of the values defined in
      * [DTOs.CdrClientConfig.Mode].
+     * @param connector The connector to update.
      * @see DTOs.CdrClientConfig.Mode
      */
-    fun setConnectorMode(mode: String) {
+    fun setConnectorMode(mode: String, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorMode: '$mode'" }
-        _uiState.update {
-            val connector =
-                if (it.clientServiceConfig.customer.isEmpty()) {
-                    DTOs.CdrClientConfig.Connector.EMPTY.copy(mode = DTOs.CdrClientConfig.Mode.valueOf(mode))
-                } else {
-                    it.clientServiceConfig.customer[0].copy(mode = DTOs.CdrClientConfig.Mode.valueOf(mode))
-                }
-
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    customer = listOf(connector)
-                )
-            )
-        }
+        val updatedConnector: DTOs.CdrClientConfig.Connector = connector.copy(mode = DTOs.CdrClientConfig.Mode.valueOf(mode))
+        replaceConnector(connector, updatedConnector)
     }
 
     /**
      * Sets the base archive directory for the connector in the client service configuration.
      *
      * @param archiveDir The base directory to use for archiving successfully uploaded files.
+     * @param connector The connector to update.
      */
-    fun setConnectorArchiveDir(archiveDir: String) {
+    fun setConnectorArchiveDir(archiveDir: String, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorArchiveDir: '$archiveDir'" }
-        _uiState.update {
-            val connector =
-                if (it.clientServiceConfig.customer.isEmpty()) {
-                    DTOs.CdrClientConfig.Connector.EMPTY.copy(sourceArchiveFolder = archiveDir)
-                } else {
-                    it.clientServiceConfig.customer[0].copy(sourceArchiveFolder = archiveDir)
-                }
-
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    customer = listOf(connector)
-                )
-            )
-        }
+        val updatedConnector: DTOs.CdrClientConfig.Connector = connector.copy(sourceArchiveFolder = archiveDir)
+        replaceConnector(connector, updatedConnector)
     }
 
     /**
      * Sets whether the connector archive is enabled in the client service configuration.
      *
      * @param enabled Whether the connector archive is enabled or not.
+     * @param connector The connector to update.
      */
-    fun setConnectorArchiveEnabled(enabled: Boolean) {
+    fun setConnectorArchiveEnabled(enabled: Boolean, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorArchiveEnabled: '$enabled'" }
-        _uiState.update {
-            val connector =
-                if (it.clientServiceConfig.customer.isEmpty()) {
-                    DTOs.CdrClientConfig.Connector.EMPTY.copy(sourceArchiveEnabled = enabled)
-                } else {
-                    it.clientServiceConfig.customer[0].copy(sourceArchiveEnabled = enabled)
-                }
-
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    customer = listOf(connector)
-                )
-            )
-        }
+        val updatedConnector: DTOs.CdrClientConfig.Connector = connector.copy(sourceArchiveEnabled = enabled)
+        replaceConnector(connector, updatedConnector)
     }
 
     /**
      * Sets the base error directory for the connector in the client service configuration.
      *
      * @param errorDir The base directory to use for storing files that could not be processed.
+     * @param connector The connector to update.
      */
-    fun setConnectorErrorDir(errorDir: String) {
+    fun setConnectorErrorDir(errorDir: String, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorErrorDir: '$errorDir'" }
-        _uiState.update {
-            val connector =
-                if (it.clientServiceConfig.customer.isEmpty()) {
-                    DTOs.CdrClientConfig.Connector.EMPTY.copy(sourceErrorFolder = errorDir)
-                } else {
-                    it.clientServiceConfig.customer[0].copy(sourceErrorFolder = errorDir)
-                }
-
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    customer = listOf(connector)
-                )
-            )
-        }
+        val updatedConnector: DTOs.CdrClientConfig.Connector = connector.copy(sourceErrorFolder = errorDir)
+        replaceConnector(connector, updatedConnector)
     }
 
     /**
      * Sets the base download directory for the connector in the client service configuration.
      *
      * @param targetDir The base directory to use for storing files that have been downloaded
+     * @param connector The connector to update.
      * @see [setConnectorDocTypeTargetDir]
      */
-    fun setConnectorBaseTargetDir(targetDir: String) {
+    fun setConnectorBaseTargetDir(targetDir: String, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorBaseTargetDir: '$targetDir'" }
-        _uiState.update {
-            val connector =
-                if (it.clientServiceConfig.customer.isEmpty()) {
-                    DTOs.CdrClientConfig.Connector.EMPTY.copy(targetFolder = targetDir)
-                } else {
-                    it.clientServiceConfig.customer[0].copy(targetFolder = targetDir)
-                }
+        val updatedConnector: DTOs.CdrClientConfig.Connector = connector.copy(targetFolder = targetDir)
+        replaceConnector(connector, updatedConnector)
+    }
 
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    customer = listOf(connector)
-                )
-            )
-        }
+    /**
+     * Updates the document type directories of the connector.
+     *
+     * If the resulting [DocTypeFolders][DTOs.CdrClientConfig.Connector.DocTypeFolders] entry for the
+     * document type ends up as empty, then it is removed from the map of document type directories.
+     * If it is non-empty, it is added to or updated in the map of document type specific directories.
+     *
+     * @param connector The connector to update.
+     * @param docTypeDirs The document type specific directories to set.
+     * @param docType The document type for which to set the directories.
+     * @return A new [Connector][DTOs.CdrClientConfig.Connector] instance with the updated document type directories.
+     * @see [setConnectorDocTypeTargetDir]
+     * @see [setConnectorDocTypeSourceDir]
+     */
+    private fun updateDocTypeDirs(
+        connector: DTOs.CdrClientConfig.Connector,
+        docTypeDirs: DTOs.CdrClientConfig.Connector.DocTypeFolders,
+        docType: DTOs.CdrClientConfig.DocumentType
+    ): DTOs.CdrClientConfig.Connector {
+        logger.debug { "updateDocTypeDirs: '$docTypeDirs'" }
+        val updatedConnector: DTOs.CdrClientConfig.Connector =
+            if (docTypeDirs == DTOs.CdrClientConfig.Connector.DocTypeFolders.EMPTY) {
+                // if the target and source dir are both empty, we remove the docType from the map
+                connector.copy(docTypeFolders = connector.docTypeFolders - docType)
+            } else {
+                // otherwise, we add to or update the docType directories map
+                connector.copy(docTypeFolders = connector.docTypeFolders + (docType to docTypeDirs))
+            }
+        return updatedConnector
     }
 
     /**
@@ -378,53 +373,30 @@ internal class CdrConfigViewModel(
      *
      * @param docType The document type for which to set the target directory.
      * @param targetDir The target directory to use for this document type.
+     * @param connector The connector to update.
      * @see DTOs.CdrClientConfig.DocumentType
      * @see [setConnectorBaseTargetDir]
      */
-    fun setConnectorDocTypeTargetDir(docType: DTOs.CdrClientConfig.DocumentType, targetDir: String) {
+    fun setConnectorDocTypeTargetDir(docType: DTOs.CdrClientConfig.DocumentType, targetDir: String, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorDocTypeTargetDir: '$docType' -> '$targetDir'" }
-        _uiState.update {
-            val connector: DTOs.CdrClientConfig.Connector = it.clientServiceConfig.customer.firstOrNull() ?: DTOs.CdrClientConfig.Connector.EMPTY
-            val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
-                connector.docTypeFolders[docType]?.copy(targetFolder = targetDir) ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetDir)
-            val updatedConnector: DTOs.CdrClientConfig.Connector =
-                if (docTypeFolders == DTOs.CdrClientConfig.Connector.DocTypeFolders.EMPTY) {
-                    // if the target and source dir are both empty, we remove the docType from the map
-                    connector.copy(docTypeFolders = (connector.docTypeFolders as MutableMap).apply { remove(docType) })
-                } else {
-                    // otherwise, we add or update the docType directories map
-                    connector.copy(docTypeFolders = connector.docTypeFolders + (docType to docTypeFolders))
-                }
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    customer = listOf(updatedConnector)
-                )
-            )
-        }
+        val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
+            connector.docTypeFolders[docType]?.copy(targetFolder = targetDir.ifBlank { null })
+                ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(targetFolder = targetDir.ifBlank { null })
+        val updatedConnector: DTOs.CdrClientConfig.Connector = updateDocTypeDirs(connector, docTypeFolders, docType)
+        replaceConnector(connector, updatedConnector)
     }
 
     /**
      * Sets the base source directory for the connector in the client service configuration.
      *
      * @param sourceDir The base directory to use for processing files that are uploaded to the CDR API.
+     * @param connector The connector to update.
      * @see [setConnectorDocTypeSourceDir]
      */
-    fun setConnectorBaseSourceDir(sourceDir: String) {
+    fun setConnectorBaseSourceDir(sourceDir: String, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorBaseSourceDir: '$sourceDir'" }
-        _uiState.update {
-            val connector =
-                if (it.clientServiceConfig.customer.isEmpty()) {
-                    DTOs.CdrClientConfig.Connector.EMPTY.copy(sourceFolder = sourceDir)
-                } else {
-                    it.clientServiceConfig.customer[0].copy(sourceFolder = sourceDir)
-                }
-
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    customer = listOf(connector)
-                )
-            )
-        }
+        val updatedConnector: DTOs.CdrClientConfig.Connector = connector.copy(sourceFolder = sourceDir)
+        replaceConnector(connector, updatedConnector)
     }
 
     /**
@@ -434,31 +406,56 @@ internal class CdrConfigViewModel(
      *
      * @param docType The document type for which to set the source directory.
      * @param sourceDir The source directory to use for this document type.
+     * @param connector The connector to update.
      * @see DTOs.CdrClientConfig.DocumentType
      * @see [setConnectorBaseSourceDir]
      */
-    fun setConnectorDocTypeSourceDir(docType: DTOs.CdrClientConfig.DocumentType, sourceDir: String) {
+    fun setConnectorDocTypeSourceDir(docType: DTOs.CdrClientConfig.DocumentType, sourceDir: String, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorDocTypeSourceDir: '$docType' -> '$sourceDir'" }
-        _uiState.update {
-            val connector: DTOs.CdrClientConfig.Connector = it.clientServiceConfig.customer.firstOrNull() ?: DTOs.CdrClientConfig.Connector.EMPTY
-            val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
-                connector.docTypeFolders[docType]?.copy(sourceFolder = sourceDir) ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceDir)
-            val updatedConnector: DTOs.CdrClientConfig.Connector =
-                if (docTypeFolders == DTOs.CdrClientConfig.Connector.DocTypeFolders.EMPTY) {
-                    // if the target and source dir are both empty, we remove the docType from the map
-                    connector.copy(docTypeFolders = (connector.docTypeFolders as MutableMap).apply { remove(docType) })
-                } else {
-                    // otherwise, we add or update the docType directories map
-                    connector.copy(docTypeFolders = connector.docTypeFolders + (docType to docTypeFolders))
-                }
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    customer = listOf(updatedConnector)
+        val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
+            connector.docTypeFolders[docType]?.copy(sourceFolder = sourceDir) ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceDir)
+        val updatedConnector: DTOs.CdrClientConfig.Connector = updateDocTypeDirs(connector, docTypeFolders, docType)
+        replaceConnector(connector, updatedConnector)
+    }
+
+    /**
+     * Deletes the provided connector instance from the list of connectors.
+     *
+     * Reference equality with [connector] identifies the connector in the list of connectors
+     * that should be removed. This works as long as the "feedback loop" is not broken, and the
+     * only place where new connector instances are created is here in the [CdrConfigViewModel].
+     *
+     * @see replaceConnector
+     * @see addEmptyConnector
+     */
+    fun deleteConnector(connector: DTOs.CdrClientConfig.Connector) {
+        logger.debug { "deleteConnector: '${connector.connectorId}'" }
+        _uiState.update { state: CdrConfigUiState ->
+            state.copy(
+                clientServiceConfig = state.clientServiceConfig.copy(
+                    customer = state.clientServiceConfig.customer.filterNot { it === connector }
                 )
             )
         }
     }
 
+    /**
+     * Adds a new, empty connector instance to the list of connectors.
+     *
+     * @see replaceConnector
+     * @see deleteConnector
+     */
+    fun addEmptyConnector() {
+        logger.debug { "addEmptyConnector" }
+        _uiState.update { state: CdrConfigUiState ->
+            state.copy(
+                clientServiceConfig = state.clientServiceConfig.copy(
+                    // EMPTY.copy() is required; every entry in the connector list must be a unique instance
+                    customer = state.clientServiceConfig.customer + DTOs.CdrClientConfig.Connector.EMPTY.copy()
+                )
+            )
+        }
+    }
 
     /**
      * The intention is to restart the client service, but all we have to do is command it to shut down

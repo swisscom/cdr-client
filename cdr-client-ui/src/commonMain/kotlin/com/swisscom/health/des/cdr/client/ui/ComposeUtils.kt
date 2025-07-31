@@ -9,11 +9,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Divider
 import androidx.compose.material.Icon
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -32,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -207,7 +207,8 @@ internal fun DropDownList(
 //            colors = ExposedDropdownMenuDefaults.textFieldColors(),
             trailingIcon = {
                 ExposedDropdownMenuDefaults.TrailingIcon(
-                    expanded = isExpanded
+                    expanded = isExpanded,
+                    modifier = Modifier.border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = OutlinedTextFieldDefaults.shape),
                 )
             },
             supportingText = supportingText,
@@ -242,7 +243,7 @@ internal fun DropDownList(
 internal fun CollapsibleGroup(
     containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
     modifier: Modifier,
-    title: StringResource,
+    title: String,
     initiallyExpanded: Boolean = false,
     content: @Composable (containerColor: Color) -> Unit,
 ) {
@@ -254,24 +255,26 @@ internal fun CollapsibleGroup(
             Res.drawable.arrow_drop_down_24dp_000000_FILL0_wght400_GRAD0_opsz24
 
     Row(modifier = modifier.padding(16.dp)) {
-        Text(text = stringResource(title), fontWeight = FontWeight.Bold)
+        Text(text = title, fontWeight = FontWeight.Bold)
         Spacer(Modifier.weight(1f))
         Icon(
             painter = painterResource(icon),
-            modifier = modifier.clickable { isExpanded = !isExpanded },
+            modifier = Modifier
+                .border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = OutlinedTextFieldDefaults.shape)
+                .clickable { isExpanded = !isExpanded },
             contentDescription = null,
         )
     }
     AnimatedVisibility(
         modifier = modifier
+            .offset(y = (-8).dp)
             .background(containerColor)
             .fillMaxWidth(),
         visible = isExpanded
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceAround,
-            modifier = modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             content(containerColor)
         }
@@ -357,12 +360,12 @@ internal fun ButtonWithToolTip(
                 isPersistent = true, // set as `false` to make the tooltip automatically disappear after a short time
             ),
         ) {
-            Button(
+            ElevatedButton(
                 onClick = onClick,
             ) { Text(text = label) }
         }
     } else {
-        Button(
+        ElevatedButton(
             onClick = onClick,
         ) {
             Text(text = label)

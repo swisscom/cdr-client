@@ -132,7 +132,7 @@ internal fun CdrConfigScreen(
 
             Divider(modifier = modifier)
 
-            ConnectorSettingsGroup(
+            ConnectorList(
                 modifier = modifier,
                 remoteViewValidations = remoteViewValidations,
                 viewModel = viewModel,

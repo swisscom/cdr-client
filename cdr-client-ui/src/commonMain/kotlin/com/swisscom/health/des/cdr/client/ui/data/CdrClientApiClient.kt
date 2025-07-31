@@ -72,18 +72,23 @@ internal class CdrClientApiClient {
         directory: String?,
         validations: List<DomainObjects.ValidationType>
     ): Result<DTOs.ValidationResult> =
-        putAnything<DTOs.CdrClientConfig, DTOs.ValidationResult>(
-            CDR_CLIENT_VALIDATE_DIRECTORY_URL
-                .run {
-                    addQueryParams(
-                        "dir" to directory
-                    )
-                }.run {
-                    addQueryParams(*(validations.map { validation -> "validation" to validation.name }.toTypedArray()))
-                },
-            config,
-            "Validate directory is read/writable"
-        )
+        when (directory) {
+            null -> Result.Success(DTOs.ValidationResult.Success)
+            else -> {
+                putAnything<DTOs.CdrClientConfig, DTOs.ValidationResult>(
+                    CDR_CLIENT_VALIDATE_DIRECTORY_URL
+                        .run {
+                            addQueryParams(
+                                "dir" to directory
+                            )
+                        }.run {
+                            addQueryParams(*(validations.map { validation -> "validation" to validation.name }.toTypedArray()))
+                        },
+                    config,
+                    "Validate directory is read/writable"
+                )
+            }
+        }
 
     /**
      * Retrieves the current client service configuration.
@@ -222,6 +227,7 @@ internal class CdrClientApiClient {
                 .INSTANCE
                 .newCall(
                     HttpClient.put(url, JSON.encodeToString(body), MEDIA_TYPE_APPLICATION_JSON)
+                        .also { logger.trace { "request json body: '${JSON.encodeToString(body)}'" } }
                 )
                 .execute()
                 .use { response: Response ->
