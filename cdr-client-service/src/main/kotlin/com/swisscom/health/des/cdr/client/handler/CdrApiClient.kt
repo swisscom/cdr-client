@@ -355,6 +355,8 @@ internal class CdrApiClient(
             this[CONNECTOR_ID_HEADER] = connectorId
             this[CDR_PROCESSING_MODE_HEADER] = mode.value
             this[AZURE_TRACE_ID_HEADER] = traceId
+            this[CLIENT_TYPE_HEADER] = clientType ?: "cdr-client"
+            this[CLIENT_VERSION_HEADER] = clientVersion ?: "unknown"
             if (accessToken.isNotBlank()) {
                 this[HttpHeaders.AUTHORIZATION] = "Bearer $accessToken"
             }
@@ -440,6 +442,10 @@ internal class CdrApiClient(
         const val CONNECTOR_ID_HEADER = "cdr-connector-id"
         const val CDR_PROCESSING_MODE_HEADER = "cdr-processing-mode"
         const val AZURE_TRACE_ID_HEADER = "x-ms-request-id"
+        const val CLIENT_TYPE_HEADER = "SWISSCOM-CLIENT-TYPE"
+        const val CLIENT_VERSION_HEADER = "SWISSCOM-CLIENT-VERSION"
+        val clientType: String? = CdrApiClient::class.java.`package`.implementationTitle
+        val clientVersion: String? = CdrApiClient::class.java.`package`.implementationVersion
     }
 
     sealed interface DownloadDocumentResult {
