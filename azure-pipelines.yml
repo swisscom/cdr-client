@@ -84,6 +84,7 @@ steps:
       export CONTACT_EMAIL="$(contactEmail)"
       export CONVEYOR_AGREE_TO_LICENSE="1"
       export KEY_VAULT_NAME="$(keyVaultName)"
+      export SIGNING_KEY_ALIAS="$(signingKeyAlias)"
       echo "Running Conveyor command: ${{ variables.conveyorCommand }}"
       conveyor --cache-dir="${{ variables.conveyorCachePath }}/cache" -Kapp.signing-key="$(signingKey)" -Kapp.site.base-url="$(uploadStorageHostnamePath)/$(containerName)" ${{ variables.conveyorCommand }}
     displayName: 'Run Conveyor Command'
