@@ -18,6 +18,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -76,6 +77,18 @@ internal fun CdrConfigScreen(
                 .padding(16.dp),
         ) {
             SwisscomLogo(modifier.size(86.dp).padding(16.dp))
+
+            var showAboutDialog by remember { mutableStateOf(false) }
+            TextButton(
+                onClick = { showAboutDialog = true },
+                modifier = modifier
+            ) {
+                Text("About")
+            }
+            showAboutDialog(
+                show = showAboutDialog,
+                onDismiss = { showAboutDialog = false }
+            )
 
             Divider(modifier = modifier)
 

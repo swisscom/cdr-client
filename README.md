@@ -109,8 +109,10 @@ file.
 ### Client Service Configuration
 
 To test some use cases, there is a [docker-compose.yaml](./docker-compose/docker-compose.yaml) with wiremock that
-simulates the CDR API. Run with
-`docker-compose down && docker-compose up --build`.
+simulates the CDR API. Run with 
+```
+docker compose down && docker compose up --build
+```
 
 If you want to work with a deployed CDR API you need to change
 the [application-dev.yaml](./src/main/resources/config/application-dev.yaml)
