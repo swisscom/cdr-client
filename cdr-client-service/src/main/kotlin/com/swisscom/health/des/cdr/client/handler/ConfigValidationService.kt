@@ -6,6 +6,7 @@ import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.DIREC
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.DUPLICATE_MODE
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.DUPLICATE_SOURCE_DIRS
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.FILE_BUSY_TEST_TIMEOUT_TOO_LONG
+import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.ILLEGAL_MODE
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.LOCAL_DIR_OVERLAPS_WITH_SOURCE_DIRS
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.LOCAL_DIR_OVERLAPS_WITH_TARGET_DIRS
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.NOT_A_DIRECTORY
@@ -27,7 +28,6 @@ import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import java.nio.file.Path
 import java.time.Duration
-import kotlin.collections.fold
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.isWritable
@@ -63,6 +63,7 @@ internal class ConfigValidationService(
 
         validations.add(validateDirectoryIsReadWritable(Path.of(config.localFolder)))
         validations.add(validateDirectoryOverlap(config))
+        validations.add(validateModeValue(config.customer))
         validations.add(validateModeOverlap(config.customer))
         validations.add(validateFileBusyTestTimeout(fileBusyTestTimeout = config.fileBusyTestTimeout, fileBusyTestInterval = config.fileBusyTestInterval))
         validations.add(validateConnectorIsPresent(config.customer))
@@ -109,27 +110,51 @@ internal class ConfigValidationService(
             ValidationResult.Success
         }
 
-
-    fun validateModeOverlap(customer: List<DTOs.CdrClientConfig.Connector>): ValidationResult =
-        customer.groupBy { it.connectorId }.filter { cd -> cd.value.size > 1 }.values.map { connector ->
-            if (connector.groupingBy { cr -> cr.mode }.eachCount().any { it.value > 1 }) {
-                ValidationResult.Failure(
-                    listOf(
-                        DTOs.ValidationDetail.ConfigItemDetail(
-                            configItem = CONNECTOR_MODE,
-                            messageKey = DUPLICATE_MODE
-                        )
-                    )
-                )
-            } else {
-                ValidationResult.Success
-            }
-        }.fold(
+    fun validateModeValue(connectors: List<DTOs.CdrClientConfig.Connector>): ValidationResult =
+        connectors.fold(
             initial = ValidationResult.Success,
-            operation = { acc: ValidationResult, validationResult: ValidationResult ->
-                acc + validationResult
+            operation = { acc: ValidationResult, connector: DTOs.CdrClientConfig.Connector ->
+                when (connector.mode) {
+                    DTOs.CdrClientConfig.Mode.TEST, DTOs.CdrClientConfig.Mode.PRODUCTION -> acc
+                    DTOs.CdrClientConfig.Mode.NONE -> {
+                        acc + ValidationResult.Failure(
+                            listOf(
+                                DTOs.ValidationDetail.ConnectorDetail(
+                                    connectorId = connector.connectorId,
+                                    configItem = CONNECTOR_MODE,
+                                    messageKey = ILLEGAL_MODE
+                                )
+                            )
+                        )
+                    }
+                }
             }
         )
+
+    fun validateModeOverlap(connectors: List<DTOs.CdrClientConfig.Connector>): ValidationResult =
+        connectors
+            .groupBy { it.connectorId }
+            .filter { cd -> cd.value.size > 1 }
+            .map { (connectorId: String, connectors: List<DTOs.CdrClientConfig.Connector>) ->
+                if (connectors.groupingBy { connector -> connector.mode }.eachCount().any { it.value > 1 }) {
+                    ValidationResult.Failure(
+                        listOf(
+                            DTOs.ValidationDetail.ConnectorDetail(
+                                connectorId = connectorId,
+                                configItem = CONNECTOR_MODE,
+                                messageKey = DUPLICATE_MODE
+                            )
+                        )
+                    )
+                } else {
+                    ValidationResult.Success
+                }
+            }.fold(
+                initial = ValidationResult.Success,
+                operation = { acc: ValidationResult, validationResult: ValidationResult ->
+                    acc + validationResult
+                }
+            )
 
     fun validateDirectoryIsReadWritable(path: Path?): ValidationResult =
         if (path == null || path.notExists()) {

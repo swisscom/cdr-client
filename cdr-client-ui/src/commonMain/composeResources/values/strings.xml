@@ -72,9 +72,9 @@
     <string name="error_overlaps_with_upload_dir">Overlaps with upload directory</string>
     <string name="error_overlaps_with_download_dir">Overlaps with download directory</string>
     <string name="error_overlaps_with_other_upload_dir">Overlaps with another upload directory</string>
-    <string name="error_duplicate_mode">Mode is already set for this connector</string>
+    <string name="error_duplicate_mode">Mode is already set for this connector ID</string>
+    <string name="error_illegal_mode">Illegal mode value</string>
     <string name="error_test_timeout_too_long">Timeout cannot be longer than test interval</string>
     <string name="error_no_connector">Connector configuration is missing</string>
     <string name="error_is_placeholder">Placeholder value, needs to be replaced</string>
-    <string name="error_multiple_connector_definitions_found">Multiple connector configurations found: %1$s\nONLY THE FIRST CONFIGURATION WILL BE PRESERVED!</string>
 </resources>

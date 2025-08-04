@@ -21,15 +21,17 @@ class DomainObjects {
         IDP_TENANT_ID,
         IDP_CLIENT_SECRET_RENWAL_TIME,
         IDP_CLIENT_SECRET_RENWAL,
-        CONNECTOR_MODE,
         FILE_BUSY_TEST_TIMEOUT,
         CONNECTOR,
+        CONNECTOR_MODE,
         CONNECTOR_ID,
     }
 
     enum class ValidationType {
         DIR_READ_WRITABLE,
         DIR_SINGLE_USE,
+        MODE_OVERLAP,
+        MODE_VALUE,
     }
 
 }

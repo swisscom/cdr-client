@@ -55,7 +55,7 @@ import org.jetbrains.compose.resources.stringResource
 import java.io.File
 
 /**
- * A composable function that displays the connector settings group in the CDR client configuration view.
+ * Displays the list of connectors in the CDR client configuration view.
  */
 @Composable
 internal fun ConnectorList(
@@ -128,6 +128,9 @@ internal fun ConnectorList(
 
 }
 
+/**
+ * Displays the settings for a single connector in the CDR client configuration view.
+ */
 @Composable
 private fun ConnectorSettingsGroup(
     modifier: Modifier,
@@ -151,17 +154,12 @@ private fun ConnectorSettingsGroup(
             connector = connector,
         )
 
-        // TODO: add validation for overlapping modes per connector once multiple connectors are supported
-        // Connector mode
-        DropDownList(
-            name = DomainObjects.ConfigurationItem.CONNECTOR_MODE,
+        ValidatedMode(
             modifier = modifier.fillMaxWidth(),
-            initiallyExpanded = false,
-            options = { DTOs.CdrClientConfig.Mode.entries.filter { it != DTOs.CdrClientConfig.Mode.NONE } },
-            label = { Text(text = stringResource(Res.string.label_client_connector_mode)) },
-            placeHolder = { Text(text = stringResource(Res.string.label_client_connector_mode_placeholder)) },
-            value = connector.mode.toString(),
-            onValueChange = { viewModel.setConnectorMode(it, connector) }
+            remoteViewValidations = remoteViewValidations,
+            viewModel = viewModel,
+            clientConfig = uiState.clientServiceConfig,
+            connector = connector,
         )
 
         ValidatedErrorDir(
@@ -307,6 +305,36 @@ private fun ValidatedConnectorId(
         value = connector.connectorId,
         placeHolder = { Text(text = stringResource(Res.string.label_client_connector_id_placeholder)) },
         onValueChange = { viewModel.setConnectorId(it, connector) },
+    )
+}
+
+@Composable
+private fun ValidatedMode(
+    modifier: Modifier,
+    remoteViewValidations: CdrConfigViewRemoteValidations,
+    viewModel: CdrConfigViewModel,
+    clientConfig: DTOs.CdrClientConfig,
+    connector: DTOs.CdrClientConfig.Connector,
+) {
+    var connectorModeValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
+    LaunchedEffect(connector.connectorId, connector.mode) {
+        connectorModeValidationResult =
+            remoteViewValidations.validateConnectorMode(
+                connectorId = connector.connectorId,
+                config = clientConfig,
+                fieldName = DomainObjects.ConfigurationItem.CONNECTOR_MODE
+            )
+    }
+    DropDownList(
+        name = DomainObjects.ConfigurationItem.CONNECTOR_MODE,
+        modifier = modifier,
+        validatable = { connectorModeValidationResult },
+        initiallyExpanded = false,
+        options = { DTOs.CdrClientConfig.Mode.entries.filter { it != DTOs.CdrClientConfig.Mode.NONE } },
+        label = { Text(text = stringResource(Res.string.label_client_connector_mode)) },
+        value = connector.mode.toString(),
+        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_mode_placeholder)) },
+        onValueChange = { viewModel.setConnectorMode(it, connector) },
     )
 }
 

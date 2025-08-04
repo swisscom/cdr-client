@@ -69,8 +69,12 @@ internal class WebOperationsTest {
 
     private lateinit var webOperations: WebOperations
 
+    private lateinit var webOperationsAdvice: WebOperationsAdvice
+
     @BeforeEach
     fun setUp() {
+        webOperationsAdvice = WebOperationsAdvice()
+
         webOperations = WebOperations(
             shutdownService = shutdownService,
             configWriter = configWriter,
@@ -95,15 +99,15 @@ internal class WebOperationsTest {
 
     @Test
     fun `test shutdown with empty reason`() = runTest {
-        val exception = assertThrows<WebOperations.BadRequest> { webOperations.shutdown(EMPTY_STRING) }
-        val probDetail = webOperations.handleError(exception)
+        val exception = assertThrows<WebOperationsAdvice.BadRequest> { webOperations.shutdown(EMPTY_STRING) }
+        val probDetail = webOperationsAdvice.handleError(exception)
         assertEquals(HttpStatus.BAD_REQUEST.value(), probDetail.status)
     }
 
     @Test
     fun `test shutdown with unknown reason`() = runTest {
-        val exception = assertThrows<WebOperations.BadRequest> { webOperations.shutdown("go-figure") }
-        val probDetail = webOperations.handleError(exception)
+        val exception = assertThrows<WebOperationsAdvice.BadRequest> { webOperations.shutdown("go-figure") }
+        val probDetail = webOperationsAdvice.handleError(exception)
         assertEquals(HttpStatus.BAD_REQUEST.value(), probDetail.status)
     }
 
@@ -111,8 +115,8 @@ internal class WebOperationsTest {
     fun `test shutdown with exception`() = runTest {
         every { shutdownService.scheduleShutdown(any()) } throws IllegalStateException("BANG!")
 
-        val exception = assertThrows<WebOperations.ServerError> { webOperations.shutdown(ShutdownService.ShutdownTrigger.CONFIG_CHANGE.reason) }
-        val probDetail = webOperations.handleError(exception)
+        val exception = assertThrows<WebOperationsAdvice.ServerError> { webOperations.shutdown(ShutdownService.ShutdownTrigger.CONFIG_CHANGE.reason) }
+        val probDetail = webOperationsAdvice.handleError(exception)
         assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.value(), probDetail.status)
     }
 
@@ -137,8 +141,8 @@ internal class WebOperationsTest {
             mapOf("error" to "Invalid configuration")
         )
 
-        val exception = assertThrows<WebOperations.BadRequest> { webOperations.updateServiceConfiguration(DEFAULT_CDR_CONFIG.toDto()) }
-        val probDetail = webOperations.handleError(exception)
+        val exception = assertThrows<WebOperationsAdvice.BadRequest> { webOperations.updateServiceConfiguration(DEFAULT_CDR_CONFIG.toDto()) }
+        val probDetail = webOperationsAdvice.handleError(exception)
 
         assertEquals(mapOf("error" to "Invalid configuration"), probDetail.properties)
     }
@@ -147,8 +151,8 @@ internal class WebOperationsTest {
     fun `test update service configuration - exception`() = runTest {
         every { configWriter.updateClientServiceConfiguration(any()) } throws IllegalStateException("BANG!")
 
-        val exception = assertThrows<WebOperations.ServerError> { webOperations.updateServiceConfiguration(DEFAULT_CDR_CONFIG.toDto()) }
-        val probDetail = webOperations.handleError(exception)
+        val exception = assertThrows<WebOperationsAdvice.ServerError> { webOperations.updateServiceConfiguration(DEFAULT_CDR_CONFIG.toDto()) }
+        val probDetail = webOperationsAdvice.handleError(exception)
 
         assertEquals("Failed to update service configuration: java.lang.IllegalStateException: BANG!", probDetail.detail)
     }
@@ -196,8 +200,8 @@ internal class WebOperationsTest {
     fun `test status endpoint with exception`() = runTest {
         every { healthEndpoint.health() } throws IllegalStateException("BANG!")
 
-        val exception = assertThrows<WebOperations.ServerError> { webOperations.status() }
-        val probDetail = webOperations.handleError(exception)
+        val exception = assertThrows<WebOperationsAdvice.ServerError> { webOperations.status() }
+        val probDetail = webOperationsAdvice.handleError(exception)
 
         assertEquals("Failed to retrieve service status: java.lang.IllegalStateException: BANG!", probDetail.detail)
     }

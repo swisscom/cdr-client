@@ -127,7 +127,8 @@ internal fun CdrConfigScreen(
                 label = { Text(text = stringResource(Res.string.label_client_file_busy_strategy)) },
                 placeHolder = { Text(text = stringResource(Res.string.label_client_file_busy_strategy_placeholder)) },
                 value = uiState.clientServiceConfig.fileBusyTestStrategy.toString(),
-                onValueChange = { viewModel.setFileBusyTestStrategy(it) }
+                onValueChange = { viewModel.setFileBusyTestStrategy(it) },
+                validatable = { DTOs.ValidationResult.Success },
             )
 
             Divider(modifier = modifier)

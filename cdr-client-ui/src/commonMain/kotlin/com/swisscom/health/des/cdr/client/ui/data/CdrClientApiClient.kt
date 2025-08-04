@@ -44,6 +44,18 @@ internal class CdrClientApiClient {
         data class ServiceError<Nothing>(val errors: Map<String, Any>) : Result<Nothing>
     }
 
+    suspend fun validateConnectorMode(
+        validations: List<DomainObjects.ValidationType>,
+        connectors: List<DTOs.CdrClientConfig.Connector>,
+    ): Result<DTOs.ValidationResult> =
+        putAnything<List<DTOs.CdrClientConfig.Connector>, DTOs.ValidationResult>(
+            CDR_CLIENT_VALIDATE_CONNECTOR_MODE.addQueryParams(
+                *(validations.map { validation -> "validation" to validation.name }.toTypedArray())
+            ),
+            connectors,
+            "Validate connector mode"
+        )
+
     /**
      * Validates that the given value is not blank.
      *
@@ -333,6 +345,9 @@ internal class CdrClientApiClient {
 
         @JvmStatic
         private val CDR_CLIENT_VALIDATE_VALUE_NOT_BLANK_AND_NOT_PLACEHOLDER = "$CDR_CLIENT_BASE_URL/validate-not-blank-and-not-placeholder".toHttpUrl()
+
+        @JvmStatic
+        private val CDR_CLIENT_VALIDATE_CONNECTOR_MODE = "$CDR_CLIENT_BASE_URL/validate-connector-mode".toHttpUrl()
 
         @JvmStatic
         private val JSON = Json {}
