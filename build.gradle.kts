@@ -2,7 +2,7 @@ import io.gitlab.arturbosch.detekt.Detekt
 import org.gradle.kotlin.dsl.withType
 
 allprojects {
-    version = "4.0.0"
+    version = "4.0.1-SNAPSHOT"
 }
 
 plugins {
