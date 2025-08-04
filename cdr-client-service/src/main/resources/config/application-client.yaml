@@ -1,0 +1,40 @@
+---
+client:
+  idp-credentials:
+    # Do not define the `client-secret` property here; defining the property here effectively prevents the password-auto-renewal from working
+    # as the internal yaml file cannot be updated and the property also cannot be overridden in an external file as that would lead to two secret
+    # locations, which currently also fails the update
+    max-credential-age: 365d
+  idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/
+  schedule-delay: PT10M
+  files-in-progress-cache-size: 10MB
+  connection-timeout-ms: 5000
+  #we want the read timeout to be longer than a connection timeout between backend and db
+  read-timeout-ms: 35000
+  # max number of connectors to be processed in parallel, one download per connector at any given time
+  pull-thread-pool-size: 5
+  # max number of parallel document uploads (independent of connector)
+  push-thread-pool-size: 5
+  retry-delay:
+    - 1s
+    - 2s
+    - 8s
+    - 32s
+    - 10m
+  file-busy-test-interval: 250ms
+  file-busy-test-timeout: 30s
+  retry-template:
+    retries: 5
+    initial-delay: 250ms
+    multiplier: 5.0
+    max-delay: 10m
+  #  MUST BE SET IN ENVIRONMENT
+  #customer:
+  #   - connector-id: 1
+  #     content-type: application/forumdatenaustausch+xml;charset=UTF-8
+  #     target-folder: /tmp/download
+  #     source-folder: /tmp/upload
+  #     source-archive-enabled: true
+  #     source-archive-folder: /tmp/archive/success  (absolute path)   or     success (relative path to source-folder: /tmp/upload/success)
+  #     source-error-folder: /tmp/archive/error  (absolute path)       or     error (relative path to source-folder: /tmp/upload/error)
+  #     mode: test|production

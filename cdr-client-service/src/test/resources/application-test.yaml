@@ -1,0 +1,53 @@
+client:
+  file-synchronization-enabled: true
+  idp-credentials:
+    renew-credential: true
+    # if you change this value, you must also change it in the mock-oauth2-server/config.json file and caddy/Caddyfile
+    tenant-id: test-tenant-client-id
+    client-id: easy-system-test-user-id
+    client-secret: test-client-secret
+    last-credential-renewal-time: 1970-01-01T00:00:00Z
+    scopes:
+      - https://dev.identity.health.swisscom.ch/CdrApi/.default
+  local-folder: ${java.io.tmpdir}/cdr_download
+  # if you change the idp-endpoint issuer host name, you also need to change add in caddy/Caddyfile and you need to add the new host to the `test_hosts` file;
+  # no matter what you change it to, unless you use one of the trusted issuer hosts (com.microsoft.aad.msal4j.AadInstanceDiscoveryProvider.TRUSTED_HOSTS_SET),
+  # msal4j's initial request will go to `login.microsoftonline.com` to retrieve some MS specific metadata; see wiremock/mappings/discovery.json
+  schedule-delay: PT1S
+  files-in-progress-cache-size: 1MB
+  connection-timeout-ms: 500
+  #we want the read timeout to be longer than a connection timeout between backend and db
+  read-timeout-ms: 350
+  # max number of connectors to be processed in parallel, one download per connector at any given time
+  pull-thread-pool-size: 5
+  # max number of parallel document uploads (independent of connector)
+  push-thread-pool-size: 5
+  retry-delay:
+    - 100ms
+    - 100ms
+    - 100ms
+  file-busy-test-strategy: file_size_changed # valid values are `never_busy`, `file_size_changed`, `always_busy`
+  cdr-api:
+    scheme: http
+    port: 80
+    host: localhost
+    base-path: documents
+  credential-api:
+    scheme: ${client.cdr-api.scheme}
+    port: ${client.cdr-api.port}
+    host: ${client.cdr-api.host}
+    base-path: api/client-credentials
+  customer:
+    - connector-id: 1
+      content-type: application/forumdatenaustausch+xml;charset=UTF-8
+      target-folder: ${java.io.tmpdir}
+      source-folder: ${java.io.tmpdir}/cdr-client-test-source # If you change this, then you need to change com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory as well
+      source-archive-enabled: false
+      source-archive-folder: ${java.io.tmpdir}
+      source-error-folder: ${java.io.tmpdir}
+      mode: test
+      doc-type-folders:
+        invoice:
+          target-folder: ${client.customer[0].target-folder}
+          source-folder: ${client.customer[0].source-folder}
+
