@@ -20,6 +20,7 @@ import kotlin.io.path.writeText
 private const val DEFAULT_CUSTOMER_CONFIG_FILE = "default-application-customer.yaml"
 private const val SERVICE_LOGBACK_FILE = "logback-service.xml"
 private const val SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY = "spring.config.additional-location"
+private const val LOGBACK_CONFIGURATION_FILE_PROPERTY = "logback.configurationFile"
 private const val SPRING_BOOT_LOGBACK_CONFIG_LOCATION_PROPERTY = "logging.config"
 
 /**
@@ -176,4 +177,6 @@ private fun initLogbackConfig() =
         ?.let { logbackConfigFile: Path ->
             // update property with the absolute path to the logback configuration file
             System.setProperty(SPRING_BOOT_LOGBACK_CONFIG_LOCATION_PROPERTY, logbackConfigFile.toString())
+            // overwrite the logback-ui config that is set because of the conveyor.conf settings
+            System.setProperty(LOGBACK_CONFIGURATION_FILE_PROPERTY, logbackConfigFile.toString())
         }

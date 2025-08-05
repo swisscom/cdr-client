@@ -47,6 +47,9 @@
     <string name="label_client_connector_base_target_dir_placeholder">Default download directory if no document type specific directory is defined</string>
     <string name="label_client_connector_doctype_target_dir">%1$s download directory</string>
     <string name="label_client_connector_doctype_target_dir_placeholder">Default download directory if no document type specific directory is defined</string>
+    <string name="label_swisscom">Swisscom (Switzerland) Ltd</string>
+    <string name="label_project_source">Source</string>
+    <string name="label_version">Version</string>
 
     <!-- Enumerations -->
     <string name="status_broken">broken - contact support or re-install</string>

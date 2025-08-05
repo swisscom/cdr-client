@@ -68,13 +68,25 @@ internal class ConfigValidationService(
         validations.add(validateFileBusyTestTimeout(fileBusyTestTimeout = config.fileBusyTestTimeout, fileBusyTestInterval = config.fileBusyTestInterval))
         validations.add(validateConnectorIsPresent(config.customer))
         validations.add(validateCredentialValues(config.idpCredentials))
+        validations.add(validateConnectorIdIsPresent(config.customer))
 
         return validations.fold(
             initial = ValidationResult.Success,
             operation = { acc: ValidationResult, validationResult: ValidationResult ->
                 acc + validationResult
             }
-        )
+        ).also {
+            if (it is ValidationResult.Failure) {
+                logger.warn { """
+                    |#############################################################################################
+                    |#############################################################################################
+                    |No file upload/download will be possible due to configuration validation failure.
+                    |Details: ${it.validationDetails}.
+                    |#############################################################################################
+                    |#############################################################################################
+                    |""".trimMargin() }
+            }
+        }
     }
 
     fun validateAvailableDiskspace(connectors: List<DTOs.CdrClientConfig.Connector>): ValidationResult {
@@ -84,6 +96,20 @@ internal class ConfigValidationService(
 
     fun validateConnectorIsPresent(customer: List<DTOs.CdrClientConfig.Connector>?): ValidationResult =
         if (customer.isNullOrEmpty()) {
+            ValidationResult.Failure(
+                listOf(
+                    DTOs.ValidationDetail.ConfigItemDetail(
+                        configItem = CONNECTOR,
+                        messageKey = NO_CONNECTOR_CONFIGURED
+                    )
+                )
+            )
+        } else {
+            ValidationResult.Success
+        }
+
+    fun validateConnectorIdIsPresent(customer: List<DTOs.CdrClientConfig.Connector>?): ValidationResult =
+        if (customer != null && customer.any { it.connectorId.isBlank() }) {
             ValidationResult.Failure(
                 listOf(
                     DTOs.ValidationDetail.ConfigItemDetail(

@@ -109,8 +109,10 @@ file.
 ### Client Service Configuration
 
 To test some use cases, there is a [docker-compose.yaml](./docker-compose/docker-compose.yaml) with wiremock that
-simulates the CDR API. Run with
-`docker-compose down && docker-compose up --build`.
+simulates the CDR API. Run with 
+```
+docker compose down && docker compose up --build
+```
 
 If you want to work with a deployed CDR API you need to change
 the [application-dev.yaml](./src/main/resources/config/application-dev.yaml)
@@ -130,8 +132,8 @@ The following environment variables can be set (to override their `dev` profile 
 
 The application JRE has to be started with the following system properties:
 
-* `-Djdk.net.hosts.file=src/test/resources/msal4j_hosts`
-* `-Djavax.net.ssl.trustStore=src/test/resources/caddy_truststore.p12`
+* `-Djdk.net.hosts.file=cdr-client-service/src/test/resources/msal4j_hosts`
+* `-Djavax.net.ssl.trustStore=cdr-client-service/src/test/resources/caddy_truststore.p12`
 * `-Djavax.net.ssl.trustStorePassword=changeit`
 
 The first property sets a custom hosts file to resolve external servers that MSAL4J has hardcoded as valid IdPs and
@@ -141,6 +143,11 @@ redirect them to `localhost`. The other properties are used to make the JRE trus
 ### Hydraulic Conveyor
 
 You can use [Hydraulic Conveyor](https://conveyor.hydraulic.dev) to build installable artifacts
+
+Run following to build the project and create and install the package on your DEBIAN system:
+```
+./gradlew clean build -x test && conveyor -f conveyor-dev.conf make site && sudo dpkg -i output/debian/swisscom-schweiz-ag-cdr-client_1.0.0_amd64.deb
+```
 
 ### Running the Fat-JAR
 

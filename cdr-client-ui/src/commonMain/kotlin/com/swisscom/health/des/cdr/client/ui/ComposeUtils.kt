@@ -8,11 +8,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.Divider
 import androidx.compose.material.Icon
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.alorma.compose.settings.ui.SettingsMenuLink
 import com.alorma.compose.settings.ui.base.internal.SettingsTileColors
 import com.alorma.compose.settings.ui.base.internal.SettingsTileDefaults
@@ -47,6 +54,7 @@ import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.app_name
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.arrow_drop_down_24dp_000000_FILL0_wght400_GRAD0_opsz24
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.arrow_drop_up_24dp_000000_FILL0_wght400_GRAD0_opsz24
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_directory_not_found
@@ -61,6 +69,9 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.e
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_overlaps_with_upload_dir
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_test_timeout_too_long
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_value_is_mandatory
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_project_source
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_swisscom
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_version
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.painterResource
@@ -382,4 +393,69 @@ internal fun ButtonWithToolTip(
         ) {
             Text(text = label)
         }
+    }
+
+@Composable
+internal fun showAboutDialog(show: Boolean, onDismiss: () -> Unit) {
+    if (show) {
+        Dialog(onDismissRequest = onDismiss) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .padding(16.dp),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.Start,
+                ) {
+                    Text(
+                        text = "${stringResource(Res.string.app_name)} by ${stringResource(Res.string.label_swisscom)}",
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "${stringResource(Res.string.label_version)}: $appVersion",
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Start,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(text = "${stringResource(Res.string.label_project_source)}: ")
+                        SelectionContainer {
+                            Text(
+                                text = "https://github.com/swisscom/cdr-client",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private val appVersion = getAppVersion()
+private fun getAppVersion(): String =
+    try {
+        val clazz = ::getAppVersion.javaClass
+        val packageName = clazz.packageName
+        val pkg = Package.getPackages()
+        pkg?.firstOrNull { it.name == packageName }
+            ?.implementationVersion
+            ?: "unknown"
+    } catch (e: Exception) {
+        println("exception while trying to get app version: ${e.message}")
+        "unknown"
     }

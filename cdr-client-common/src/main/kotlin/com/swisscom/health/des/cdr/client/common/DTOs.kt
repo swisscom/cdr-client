@@ -210,7 +210,7 @@ class DTOs {
             val sourceFolder: String,
             val contentType: String,
             val sourceArchiveEnabled: Boolean,
-            val sourceArchiveFolder: String,
+            val sourceArchiveFolder: String? = null,
             val sourceErrorFolder: String? = null,
             val mode: Mode,
             val docTypeFolders: Map<DocumentType, DocTypeFolders>,
@@ -238,7 +238,7 @@ class DTOs {
                     sourceFolder = EMPTY_STRING,
                     contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
                     sourceArchiveEnabled = false,
-                    sourceArchiveFolder = EMPTY_STRING,
+                    sourceArchiveFolder = null,
                     sourceErrorFolder = null,
                     mode = Mode.NONE,
                     docTypeFolders = emptyMap()

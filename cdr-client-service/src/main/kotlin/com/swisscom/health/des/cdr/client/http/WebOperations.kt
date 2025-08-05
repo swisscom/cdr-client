@@ -15,6 +15,9 @@ import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_BROKEN
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_ERROR
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
@@ -219,9 +222,9 @@ internal class WebOperations(
         logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
 
 
-        val status = when {
-            !configValidationService.isConfigSourceUnambiguous -> DTOs.StatusResponse.StatusCode.BROKEN
-            !configValidationService.isConfigValid -> DTOs.StatusResponse.StatusCode.ERROR
+        val status = when (healthStatus.components[CONFIG_INDICATOR_NAME]?.status?.code) {
+            CONFIG_BROKEN -> DTOs.StatusResponse.StatusCode.BROKEN
+            CONFIG_ERROR -> DTOs.StatusResponse.StatusCode.ERROR
             else -> when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
                 FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
                 FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED

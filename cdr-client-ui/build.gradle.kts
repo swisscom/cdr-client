@@ -73,6 +73,15 @@ compose.desktop {
     }
 }
 
+tasks.withType<Jar> {
+    manifest {
+        attributes(
+            "Implementation-Title" to project.name,
+            "Implementation-Version" to project.version
+        )
+    }
+}
+
 // region Work around temporary Compose bugs.
 configurations.all {
     attributes {
