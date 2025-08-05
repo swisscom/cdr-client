@@ -41,7 +41,7 @@ internal fun IdpSettingsGroup(
 ) {
     CollapsibleGroup(
         modifier = modifier,
-        title = Res.string.label_client_idp_settings,
+        title = stringResource(Res.string.label_client_idp_settings),
         initiallyExpanded = false,
     ) { containerColor ->
 

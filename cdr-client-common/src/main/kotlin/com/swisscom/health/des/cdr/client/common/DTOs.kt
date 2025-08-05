@@ -78,6 +78,7 @@ class DTOs {
     @JsonSubTypes(
         JsonSubTypes.Type(value = ValidationDetail.ConfigItemDetail::class, name = "configItemDetail"),
         JsonSubTypes.Type(value = ValidationDetail.PathDetail::class, name = "pathDetail"),
+        JsonSubTypes.Type(value = ValidationDetail.ConnectorDetail::class, name = "connectorDetail"),
     )
     @Serializable
     sealed interface ValidationDetail {
@@ -96,6 +97,14 @@ class DTOs {
             val path: String,
             override val messageKey: ValidationMessageKey
         ) : ValidationDetail
+
+        @Serializable
+        @SerialName("connectorDetail")
+        data class ConnectorDetail(
+            val connectorId: String,
+            val configItem: DomainObjects.ConfigurationItem,
+            override val messageKey: ValidationMessageKey
+        ) : ValidationDetail
     }
 
     enum class ValidationMessageKey {
@@ -107,6 +116,7 @@ class DTOs {
         TARGET_DIR_OVERLAPS_SOURCE_DIRS,
         DUPLICATE_SOURCE_DIRS,
         DUPLICATE_MODE,
+        ILLEGAL_MODE,
         VALUE_IS_BLANK,
         FILE_BUSY_TEST_TIMEOUT_TOO_LONG,
         NO_CONNECTOR_CONFIGURED,

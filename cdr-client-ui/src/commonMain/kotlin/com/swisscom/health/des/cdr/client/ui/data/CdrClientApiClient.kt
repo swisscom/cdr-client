@@ -44,6 +44,18 @@ internal class CdrClientApiClient {
         data class ServiceError<Nothing>(val errors: Map<String, Any>) : Result<Nothing>
     }
 
+    suspend fun validateConnectorMode(
+        validations: List<DomainObjects.ValidationType>,
+        connectors: List<DTOs.CdrClientConfig.Connector>,
+    ): Result<DTOs.ValidationResult> =
+        putAnything<List<DTOs.CdrClientConfig.Connector>, DTOs.ValidationResult>(
+            CDR_CLIENT_VALIDATE_CONNECTOR_MODE.addQueryParams(
+                *(validations.map { validation -> "validation" to validation.name }.toTypedArray())
+            ),
+            connectors,
+            "Validate connector mode"
+        )
+
     /**
      * Validates that the given value is not blank.
      *
@@ -72,18 +84,23 @@ internal class CdrClientApiClient {
         directory: String?,
         validations: List<DomainObjects.ValidationType>
     ): Result<DTOs.ValidationResult> =
-        putAnything<DTOs.CdrClientConfig, DTOs.ValidationResult>(
-            CDR_CLIENT_VALIDATE_DIRECTORY_URL
-                .run {
-                    addQueryParams(
-                        "dir" to directory
-                    )
-                }.run {
-                    addQueryParams(*(validations.map { validation -> "validation" to validation.name }.toTypedArray()))
-                },
-            config,
-            "Validate directory is read/writable"
-        )
+        when (directory) {
+            null -> Result.Success(DTOs.ValidationResult.Success)
+            else -> {
+                putAnything<DTOs.CdrClientConfig, DTOs.ValidationResult>(
+                    CDR_CLIENT_VALIDATE_DIRECTORY_URL
+                        .run {
+                            addQueryParams(
+                                "dir" to directory
+                            )
+                        }.run {
+                            addQueryParams(*(validations.map { validation -> "validation" to validation.name }.toTypedArray()))
+                        },
+                    config,
+                    "Validate directory is read/writable"
+                )
+            }
+        }
 
     /**
      * Retrieves the current client service configuration.
@@ -222,6 +239,7 @@ internal class CdrClientApiClient {
                 .INSTANCE
                 .newCall(
                     HttpClient.put(url, JSON.encodeToString(body), MEDIA_TYPE_APPLICATION_JSON)
+                        .also { logger.trace { "request json body: '${JSON.encodeToString(body)}'" } }
                 )
                 .execute()
                 .use { response: Response ->
@@ -327,6 +345,9 @@ internal class CdrClientApiClient {
 
         @JvmStatic
         private val CDR_CLIENT_VALIDATE_VALUE_NOT_BLANK_AND_NOT_PLACEHOLDER = "$CDR_CLIENT_BASE_URL/validate-not-blank-and-not-placeholder".toHttpUrl()
+
+        @JvmStatic
+        private val CDR_CLIENT_VALIDATE_CONNECTOR_MODE = "$CDR_CLIENT_BASE_URL/validate-connector-mode".toHttpUrl()
 
         @JvmStatic
         private val JSON = Json {}
