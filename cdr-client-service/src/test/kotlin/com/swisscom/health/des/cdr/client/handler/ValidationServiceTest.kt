@@ -298,7 +298,7 @@ internal class ValidationServiceTest {
         assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
         assertEquals(1, validationResult.validationDetails.size)
         validationResult.validationDetails.first().let { validationDetail ->
-            assertInstanceOf<DTOs.ValidationDetail.ConfigItemDetail>(validationDetail)
+            assertInstanceOf<DTOs.ValidationDetail.ConnectorDetail>(validationDetail)
             assertEquals(DomainObjects.ConfigurationItem.CONNECTOR_MODE, validationDetail.configItem)
             assertEquals(DTOs.ValidationMessageKey.DUPLICATE_MODE, validationDetail.messageKey)
         }
