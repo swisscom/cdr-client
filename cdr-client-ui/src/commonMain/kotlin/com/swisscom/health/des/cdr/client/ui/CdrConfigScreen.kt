@@ -85,10 +85,12 @@ internal fun CdrConfigScreen(
             ) {
                 Text("About")
             }
-            showAboutDialog(
-                show = showAboutDialog,
-                onDismiss = { showAboutDialog = false }
-            )
+            if (showAboutDialog) {
+                AboutDialog(
+                    modifier = modifier,
+                    onDismissRequest = { showAboutDialog = false }
+                )
+            }
 
             Divider(modifier = modifier)
 

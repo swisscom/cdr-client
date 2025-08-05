@@ -376,12 +376,16 @@ private fun ValidatedArchiveDir(
 ) {
     var archiveDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
     LaunchedEffect(clientConfig) {
-        archiveDirValidationResult = validateNeitherBlankNorRoot(connector.sourceArchiveFolder) +
-                remoteViewValidations.validateDirectory(
-                    clientConfig,
-                    connector.sourceArchiveFolder,
-                    DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
-                )
+        if (connector.sourceArchiveEnabled) {
+            archiveDirValidationResult = validateNeitherBlankNorRoot(connector.sourceArchiveFolder) +
+                    remoteViewValidations.validateDirectory(
+                        clientConfig,
+                        connector.sourceArchiveFolder,
+                        DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
+                    )
+        } else {
+            DTOs.ValidationResult.Success
+        }
     }
     ValidatedTextField(
         name = DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY,
