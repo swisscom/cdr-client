@@ -6,12 +6,14 @@ import com.swisscom.health.des.cdr.client.common.Constants.UNKNOWN_EXIT_CODE
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.time.delay
 import org.springframework.boot.SpringApplication
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.stereotype.Service
+import java.util.concurrent.Executors
 import kotlin.system.exitProcess
 
 private val logger = KotlinLogging.logger {}
@@ -24,20 +26,13 @@ internal class ShutdownService(
     @OptIn(DelicateCoroutinesApi::class)
     internal fun scheduleShutdown(shutdownTrigger: ShutdownTrigger) {
         if (SHUTDOWN_GUARD.tryLock()) {
-            GlobalScope.launch {
+            // newSingleThreadExecutor is used to ensure that the shutdown logic runs in a non daemon thread so that SpringApplication.exit won't kill
+            // the application context before the shutdown logic is executed (and would therefore never return our defined exit code)
+            GlobalScope.launch(Executors.newSingleThreadExecutor().asCoroutineDispatcher()) {
                 logger.info { "Shutdown requested for reason: '$shutdownTrigger'" }
                 // Wait a bit to allow the http response to be sent before shutting down
                 delay(SHUTDOWN_DELAY)
-                // previously producing the exit code was a single line:
-                // `exitProcess(SpringApplication.exit(context, { shutdownTrigger.exitCode }))`
-                // however, there must be some sort of race condition present; half the time the exit code was 0 instead of the code specified in the
-                // `shutdownTrigger`
-                SpringApplication.exit(context).let { contextExitCode ->
-                    if (contextExitCode != 0) {
-                        logger.warn { "Spring application context did not exit cleanly, exit code: '$contextExitCode'" }
-                    }
-                }
-                exitProcess(shutdownTrigger.exitCode)
+                exitProcess(SpringApplication.exit(context, { shutdownTrigger.exitCode }))
             }
         } else {
             logger.info { "Shutdown already scheduled, ignoring request with given reason: '$shutdownTrigger'" }
