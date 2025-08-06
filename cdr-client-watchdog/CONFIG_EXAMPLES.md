@@ -6,10 +6,9 @@ This file contains different configuration examples for different installation s
 ```json
 {
   "ServiceExecutablePath": "cdr-client-service.exe",
-  "RestartDelaySeconds": 5,
+  "RestartDelaySeconds": 2,
   "HealthCheckIntervalSeconds": 30,
-  "MaxConsecutiveFailures": 5,
-  "EnableLogging": true
+  "MaxConsecutiveFailures": 5
 }
 ```
 

@@ -17,20 +17,18 @@ Edit `appsettings.json` to configure the watchdog behavior:
 ```json
 {
   "ServiceExecutablePath": "C:\\Program Files\\CDR Client\\cdr-client-service.exe",
-  "RestartDelaySeconds": 5,
+  "RestartDelaySeconds": 2,
   "HealthCheckIntervalSeconds": 30,
-  "MaxConsecutiveFailures": 5,
-  "EnableLogging": true
+  "MaxConsecutiveFailures": 5
 }
 ```
 
 ### Configuration Options
 
 - **ServiceExecutablePath**: Full path to the `cdr-client-service.exe` file
-- **RestartDelaySeconds**: Delay before restarting after a failure (default: 5 seconds)
+- **RestartDelaySeconds**: Delay before restarting after a failure (default: 2 seconds)
 - **HealthCheckIntervalSeconds**: How often to check if the service is running (default: 30 seconds)
 - **MaxConsecutiveFailures**: Maximum number of consecutive failures before stopping the watchdog (default: 5)
-- **EnableLogging**: Enable detailed logging of service output (default: true)
 
 ## Installation
 
@@ -70,7 +68,12 @@ Edit `appsettings.json` to configure the watchdog behavior:
 
 The service logs events to:
 - **Windows Event Log**: Application log, source "CDRClientWatchdog"
-- **Console**: When running in development mode
+
+**To view logs in Windows Event Viewer:**
+1. Open Event Viewer (`eventvwr.msc`)
+2. Navigate to: Windows Logs → Application
+3. Filter by Source: "CDRClientWatchdog"
+4. Set Event Level to include: Information, Warning, Error
 
 ### Service Status
 
@@ -123,7 +126,6 @@ windows {
 
 ### Performance Issues
 - Increase `HealthCheckIntervalSeconds` to reduce monitoring frequency
-- Disable detailed logging by setting `EnableLogging` to false
 
 ## Development
 

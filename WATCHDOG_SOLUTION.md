@@ -52,10 +52,9 @@ Your `conveyor.conf` has been updated to:
 ```json
 {
   "ServiceExecutablePath": "%BASE%\\cdr-client-service.exe",
-  "RestartDelaySeconds": 5,
+  "RestartDelaySeconds": 2,
   "HealthCheckIntervalSeconds": 30,
-  "MaxConsecutiveFailures": 5,
-  "EnableLogging": true
+  "MaxConsecutiveFailures": 5
 }
 ```
 
@@ -150,7 +149,6 @@ This error means the watchdog can't find the `cdr-client-service.exe` file. Here
 
 3. **Performance Issues**:
    - Increase `HealthCheckIntervalSeconds` to reduce monitoring frequency
-   - Disable detailed logging by setting `EnableLogging` to false
 
 ## Testing the Watchdog
 

@@ -23,10 +23,10 @@ public class Program
             configure.AddConsole();
             if (OperatingSystem.IsWindows())
             {
-                configure.AddEventLog(new EventLogSettings
+                configure.AddEventLog(eventLogSettings =>
                 {
-                    SourceName = "CDRClientWatchdog",
-                    LogName = "Application"
+                    eventLogSettings.SourceName = "CDRClientWatchdog";
+                    eventLogSettings.LogName = "Application";
                 });
             }
         });

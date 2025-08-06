@@ -13,21 +13,29 @@ using System.Threading.Tasks;
 
 namespace CdrClientWatchdog;
 
+/// <summary>
+/// Windows service that monitors the CDR Client service and automatically restarts it on failures.
+/// Implements intelligent restart logic with failure protection and graceful shutdown handling.
+/// </summary>
 public class WatchdogService : BackgroundService
 {
+    #region Private Fields
+    
     private readonly ILogger<WatchdogService> _logger;
     private readonly IConfiguration _configuration;
     private readonly IHostApplicationLifetime _hostLifetime;
-    private string _serviceExecutablePath; // Made non-readonly to allow updates during path resolution
+    
+    private string _serviceExecutablePath;
     private readonly TimeSpan _restartDelay;
     private readonly TimeSpan _healthCheckInterval;
     private readonly int _maxConsecutiveFailures;
-    private readonly bool _enableLogging;
     
     private Process? _serviceProcess;
     private int _consecutiveFailures = 0;
     private DateTime _lastStartTime = DateTime.MinValue;
-    private bool _isStoppingSelf = false; // Track when we're actively stopping the service
+    private bool _isStoppingSelf = false;
+    
+    #endregion
 
     public WatchdogService(ILogger<WatchdogService> logger, IConfiguration configuration, IHostApplicationLifetime hostLifetime)
     {
@@ -35,108 +43,136 @@ public class WatchdogService : BackgroundService
         _configuration = configuration;
         _hostLifetime = hostLifetime;
         
-        // Read configuration settings
-        var rawPath = _configuration["ServiceExecutablePath"] ?? "cdr-client-service.exe";
-        
-        // Resolve environment variables and relative paths
-        _serviceExecutablePath = ResolvePath(rawPath);
-        
-        _restartDelay = TimeSpan.FromSeconds(_configuration.GetValue<int>("RestartDelaySeconds", 5));
+        _serviceExecutablePath = ResolvePath(_configuration["ServiceExecutablePath"] ?? "cdr-client-service.exe");
+        _restartDelay = TimeSpan.FromSeconds(_configuration.GetValue<int>("RestartDelaySeconds", 2));
         _healthCheckInterval = TimeSpan.FromSeconds(_configuration.GetValue<int>("HealthCheckIntervalSeconds", 30));
         _maxConsecutiveFailures = _configuration.GetValue<int>("MaxConsecutiveFailures", 5);
-        _enableLogging = _configuration.GetValue<bool>("EnableLogging", true);
     }
+
+    #region Path Resolution Methods
 
     private string ResolvePath(string path)
     {
         try
         {
-            // Expand environment variables
-            path = Environment.ExpandEnvironmentVariables(path);
+            // Step 1: Expand any environment variables (e.g., %BASE%, %USERPROFILE%)
+            var expandedPath = Environment.ExpandEnvironmentVariables(path);
             
-            // Convert to absolute path if relative
-            if (!Path.IsPathRooted(path))
+            // Step 2: Convert relative paths to absolute paths
+            if (!Path.IsPathRooted(expandedPath))
             {
-                var serviceDirectory = Path.GetDirectoryName(Environment.ProcessPath) ?? Environment.CurrentDirectory;
-                _logger.LogInformation("Resolving relative path. Service directory: {ServiceDirectory}", serviceDirectory);
-                
-                var baseDirectory = DetermineBaseDirectory(serviceDirectory);
-                path = Path.Combine(baseDirectory, path);
-                _logger.LogInformation("Resolved relative path to: {Path}", path);
+                var watchdogDirectory = GetWatchdogServiceDirectory();
+                var baseDirectory = DetermineBaseDirectory(watchdogDirectory);
+                expandedPath = Path.Combine(baseDirectory, expandedPath);
+                _logger.LogInformation("Resolved relative path '{OriginalPath}' to '{ResolvedPath}' via base directory '{BaseDirectory}'", 
+                    path, expandedPath, baseDirectory);
+            }
+            else
+            {
+                _logger.LogInformation("Using absolute service executable path: {Path}", expandedPath);
             }
             
-            _logger.LogInformation("Resolved service executable path to: {Path}", path);
-            return path;
+            return expandedPath;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error resolving path: {Path}", path);
-            return path; // Return original path as fallback
+            _logger.LogError(ex, "Error resolving path: {Path}. Using original path as fallback.", path);
+            return path;
         }
     }
 
-    private string DetermineBaseDirectory(string serviceDirectory)
+    private string GetWatchdogServiceDirectory()
     {
-        if (serviceDirectory.Contains("WindowsApps"))
+        return Path.GetDirectoryName(Environment.ProcessPath) ?? Environment.CurrentDirectory;
+    }
+
+    private string DetermineBaseDirectory(string watchdogDirectory)
+    {
+        if (IsRunningInMsixEnvironment(watchdogDirectory))
         {
-            return ResolveMsixBaseDirectory(serviceDirectory);
+            var resolvedDirectory = ResolveMsixBaseDirectory(watchdogDirectory);
+            _logger.LogInformation("Detected MSIX environment, resolved base directory: {Directory}", resolvedDirectory);
+            return resolvedDirectory;
         }
-        else if (serviceDirectory.Contains("bin\\watchdog"))
+        else if (IsTraditionalConveyorStructure(watchdogDirectory))
         {
             // Traditional Conveyor structure: bin/watchdog/ -> bin/
-            return Path.GetDirectoryName(serviceDirectory) ?? serviceDirectory;
+            var parentDirectory = Path.GetDirectoryName(watchdogDirectory);
+            _logger.LogInformation("Detected traditional Conveyor structure, using parent directory: {Directory}", parentDirectory);
+            return parentDirectory ?? watchdogDirectory;
         }
         else
         {
-            // Traditional installation
-            return Path.GetDirectoryName(serviceDirectory) ?? serviceDirectory;
+            // Traditional installation - go up one level from watchdog directory
+            var parentDirectory = Path.GetDirectoryName(watchdogDirectory);
+            _logger.LogInformation("Detected traditional installation, using parent directory: {Directory}", parentDirectory);
+            return parentDirectory ?? watchdogDirectory;
         }
     }
 
-    private string ResolveMsixBaseDirectory(string serviceDirectory)
+    private bool IsRunningInMsixEnvironment(string directory)
     {
-        if (serviceDirectory.Contains("app\\bin\\watchdog"))
+        return directory.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsTraditionalConveyorStructure(string directory)
+    {
+        return directory.Contains("bin\\watchdog", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string ResolveMsixBaseDirectory(string watchdogDirectory)
+    {
+        if (HasMsixAppStructure(watchdogDirectory))
         {
-            return ResolveMsixAppStructure(serviceDirectory);
+            return ResolveMsixAppStructure(watchdogDirectory);
         }
         else
         {
-            return FindMsixRootAndAddBin(serviceDirectory);
+            return FindMsixRootAndAddBin(watchdogDirectory);
         }
     }
 
-    private string ResolveMsixAppStructure(string serviceDirectory)
+    private bool HasMsixAppStructure(string directory)
     {
-        // In MSIX: app/bin/watchdog/ -> go to MSIX root/bin/
-        var parts = serviceDirectory.Split('\\');
-        var appIndex = Array.FindIndex(parts, p => p.Equals("app", StringComparison.OrdinalIgnoreCase));
+        return directory.Contains("app\\bin\\watchdog", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string ResolveMsixAppStructure(string watchdogDirectory)
+    {
+        var pathParts = watchdogDirectory.Split('\\');
+        var appIndex = Array.FindIndex(pathParts, part => 
+            part.Equals("app", StringComparison.OrdinalIgnoreCase));
         
         if (appIndex >= 0)
         {
             // Take everything up to (but not including) "app", then add "bin"
-            var rootParts = parts.Take(appIndex).ToArray();
-            return Path.Combine(string.Join("\\", rootParts), "bin");
+            var msixRootParts = pathParts.Take(appIndex).ToArray();
+            var resolvedPath = Path.Combine(string.Join("\\", msixRootParts), "bin");
+            return resolvedPath;
         }
         else
         {
-            return Path.GetDirectoryName(serviceDirectory) ?? serviceDirectory;
+            _logger.LogWarning("Expected 'app' directory not found in MSIX path, using parent directory");
+            return Path.GetDirectoryName(watchdogDirectory) ?? watchdogDirectory;
         }
     }
 
-    private string FindMsixRootAndAddBin(string serviceDirectory)
+    private string FindMsixRootAndAddBin(string watchdogDirectory)
     {
-        // Try to find MSIX root and add bin
-        var parts = serviceDirectory.Split('\\');
-        var packageIndex = FindMsixPackageIndex(parts);
+        var pathParts = watchdogDirectory.Split('\\');
+        var packageIndex = FindMsixPackageIndex(pathParts);
         
         if (packageIndex >= 0)
         {
-            var rootParts = parts.Take(packageIndex + 1).ToArray();
-            return Path.Combine(string.Join("\\", rootParts), "bin");
+            var msixRootParts = pathParts.Take(packageIndex + 1).ToArray();
+            var resolvedPath = Path.Combine(string.Join("\\", msixRootParts), "bin");
+            _logger.LogInformation("Found MSIX package root, resolved path: {Path}", resolvedPath);
+            return resolvedPath;
         }
         else
         {
-            return Path.GetDirectoryName(serviceDirectory) ?? serviceDirectory;
+            _logger.LogWarning("MSIX package directory pattern not found, using parent directory");
+            return Path.GetDirectoryName(watchdogDirectory) ?? watchdogDirectory;
         }
     }
 
@@ -144,232 +180,332 @@ public class WatchdogService : BackgroundService
     {
         for (int i = pathParts.Length - 1; i >= 0; i--)
         {
-            if (pathParts[i].Contains("_") && (pathParts[i].Contains("x64") || pathParts[i].Contains("x86")))
+            var part = pathParts[i];
+            if (IsMsixPackageDirectory(part))
             {
+                _logger.LogDebug("Found MSIX package directory: {Directory} at index {Index}", part, i);
                 return i;
             }
         }
+        
+        _logger.LogDebug("No MSIX package directory pattern found in path");
         return -1;
     }
 
+    private bool IsMsixPackageDirectory(string directoryName)
+    {
+        return directoryName.Contains("_") && 
+               (directoryName.Contains("x64", StringComparison.OrdinalIgnoreCase) || 
+                directoryName.Contains("x86", StringComparison.OrdinalIgnoreCase));
+    }
+
+    #endregion
+
+    #region Service Monitoring and Control
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("CDRClientWatchdog Service started");
-        _logger.LogInformation("Monitoring executable: {ExecutablePath}", _serviceExecutablePath);
-        _logger.LogInformation("Health check interval: {Interval} seconds", _healthCheckInterval.TotalSeconds);
-        _logger.LogInformation("Restart delay: {Delay} seconds", _restartDelay.TotalSeconds);
-
-        while (!stoppingToken.IsCancellationRequested)
+        LogServiceStartup();
+        
+        try
         {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                await MonitorService(stoppingToken);
-                await Task.Delay(_healthCheckInterval, stoppingToken);
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogInformation("Watchdog monitoring cancelled - service is being stopped");
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in watchdog monitoring loop");
-                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                await MonitorServiceHealth(stoppingToken);
+                await WaitForNextHealthCheck(stoppingToken);
             }
         }
+        catch (OperationCanceledException)
+        {
+            _logger.LogInformation("Watchdog monitoring cancelled - service shutdown requested");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error in watchdog monitoring loop");
+        }
+        finally
+        {
+            await PerformShutdownCleanup();
+        }
+    }
 
+    private void LogServiceStartup()
+    {
+        _logger.LogInformation("CDRClientWatchdog Service started. Monitoring: {ExecutablePath}, Health check: {Interval}s, Restart delay: {Delay}s, Max failures: {MaxFailures}", 
+            _serviceExecutablePath, _healthCheckInterval.TotalSeconds, _restartDelay.TotalSeconds, _maxConsecutiveFailures);
+    }
+
+    private async Task WaitForNextHealthCheck(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(_healthCheckInterval, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected during shutdown - re-throw to exit the loop
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during health check delay, using fallback delay");
+            await Task.Delay(TimeSpan.FromSeconds(10), CancellationToken.None);
+        }
+    }
+
+    private async Task PerformShutdownCleanup()
+    {
         _logger.LogInformation("CDRClientWatchdog Service stopping monitoring loop");
         await StopService();
     }
 
-    private async Task MonitorService(CancellationToken cancellationToken)
+    private async Task MonitorServiceHealth(CancellationToken cancellationToken)
     {
-        // Check if service is running
-        if (_serviceProcess == null || _serviceProcess.HasExited)
+        if (IsManagedServiceRunning())
         {
-            if (_serviceProcess?.HasExited == true)
-            {
-                var exitCode = _serviceProcess.ExitCode;
-                var runDuration = DateTime.Now - _lastStartTime;
-                
-                if (_isStoppingSelf)
-                {
-                    _logger.LogInformation("CDR Client service exited as expected during watchdog shutdown (exit code: {ExitCode}, duration: {Duration})", 
-                        exitCode, runDuration);
-                    _isStoppingSelf = false; // Reset flag
-                    _serviceProcess.Dispose();
-                    _serviceProcess = null;
-                    return; // Don't restart when we're stopping
-                }
-
-                if (exitCode == 0)
-                {
-                    // Clean exit - service should remain stopped and watchdog should stop too
-                    _logger.LogInformation("CDR Client service exited cleanly (exit code 0) after running for {Duration}. Stopping watchdog service as well.", runDuration);
-                    _consecutiveFailures = 0; // Reset failure count
-                    _serviceProcess.Dispose();
-                    _serviceProcess = null;
-                    
-                    // Stop the watchdog service since the main service was intentionally shut down
-                    _logger.LogInformation("Initiating watchdog service shutdown due to clean CDR service exit.");
-                    
-                    // Use IHostApplicationLifetime to properly stop the Windows Service
-                    _hostLifetime.StopApplication();
-                    
-                    return; // Don't restart on clean exit
-                }
-                else
-                {
-                    // Non-zero exit code - service crashed or failed
-                    _consecutiveFailures++;
-                    _logger.LogWarning("CDR Client service exited with error code {ExitCode} after running for {Duration}. Consecutive failures: {Count}/{Max}", 
-                        exitCode, runDuration, _consecutiveFailures, _maxConsecutiveFailures);
-
-                    if (_consecutiveFailures >= _maxConsecutiveFailures)
-                    {
-                        _logger.LogError("Maximum consecutive failures reached ({Count}). Stopping watchdog to prevent endless restart loop.", 
-                            _maxConsecutiveFailures);
-                        _serviceProcess.Dispose();
-                        _serviceProcess = null;
-                        
-                        // Stop the entire Windows Service when max failures reached
-                        _logger.LogInformation("Stopping watchdog Windows Service due to maximum consecutive failures.");
-                        _hostLifetime.StopApplication();
-                        return;
-                    }
-                }
-
-                _serviceProcess.Dispose();
-                _serviceProcess = null;
-            }
-
-            // Wait before restarting if there was a failure
-            if (_consecutiveFailures > 0)
-            {
-                _logger.LogInformation("Waiting {Delay} seconds before restart attempt...", _restartDelay.TotalSeconds);
-                await Task.Delay(_restartDelay, cancellationToken);
-            }
-
-            // Start the service if:
-            // 1. We have failures (restart after crash)
-            // 2. We have no failures AND no process (initial start or after clean exit with restart needed)
-            if (_consecutiveFailures > 0 || _serviceProcess == null)
-            {
-                await StartService();
-            }
-            // If _consecutiveFailures == 0 AND _serviceProcess != null, it means clean exit - don't restart
+            await HandleRunningService();
         }
         else
         {
-            // Service is running, reset consecutive failures
-            if (_consecutiveFailures > 0)
-            {
-                _logger.LogInformation("Service is running normally. Resetting failure counter.");
-                _consecutiveFailures = 0;
-            }
-
-            // Optional: Check if service is responsive (can be extended)
-            if (_enableLogging && DateTime.Now - _lastStartTime > TimeSpan.FromMinutes(5))
-            {
-                _logger.LogDebug("CDR Client service is running (PID: {ProcessId}, Started: {StartTime})", 
-                    _serviceProcess.Id, _lastStartTime);
-            }
+            await HandleStoppedService(cancellationToken);
         }
     }
 
-    private Task StartService()
+    private bool IsManagedServiceRunning()
+    {
+        return _serviceProcess != null && !_serviceProcess.HasExited;
+    }
+
+    private async Task HandleRunningService()
+    {
+        if (_consecutiveFailures > 0)
+        {
+            _logger.LogInformation("CDR Client service is running normally. Resetting failure counter.");
+            _consecutiveFailures = 0;
+        }
+
+        await LogServiceStatusIfEnabled();
+    }
+
+    private async Task LogServiceStatusIfEnabled()
+    {
+        if (_serviceProcess != null && DateTime.Now - _lastStartTime > TimeSpan.FromMinutes(5))
+        {
+            await Task.Run(() =>
+            {
+                _logger.LogDebug("CDR Client service is running (PID: {ProcessId}, Started: {StartTime}, Uptime: {Uptime})", 
+                    _serviceProcess.Id, _lastStartTime, DateTime.Now - _lastStartTime);
+            });
+        }
+    }
+
+    private async Task HandleStoppedService(CancellationToken cancellationToken)
+    {
+        if (_serviceProcess?.HasExited == true)
+        {
+            await AnalyzeServiceExit();
+        }
+
+        await AttemptServiceRestartIfNeeded(cancellationToken);
+    }
+
+    private async Task AnalyzeServiceExit()
+    {
+        if (_serviceProcess == null) return;
+
+        var exitCode = _serviceProcess.ExitCode;
+        var runDuration = DateTime.Now - _lastStartTime;
+
+        if (_isStoppingSelf)
+        {
+            await HandleExpectedShutdown(exitCode, runDuration);
+            return;
+        }
+
+        if (exitCode == 0)
+        {
+            await HandleCleanExit(runDuration);
+        }
+        else
+        {
+            await HandleErrorExit(exitCode, runDuration);
+        }
+
+        CleanupServiceProcess();
+    }
+
+    private async Task HandleExpectedShutdown(int exitCode, TimeSpan runDuration)
+    {
+        _logger.LogInformation(
+            "CDR Client service exited as expected during watchdog shutdown (exit code: {ExitCode}, duration: {Duration})", 
+            exitCode, runDuration);
+        
+        _isStoppingSelf = false;
+        await Task.CompletedTask; // For consistency with async pattern
+    }
+
+    private async Task HandleCleanExit(TimeSpan runDuration)
+    {
+        _logger.LogInformation(
+            "CDR Client service exited cleanly (exit code 0) after running for {Duration}. Stopping watchdog service as well.", 
+            runDuration);
+        
+        _consecutiveFailures = 0;
+        
+        _logger.LogInformation("Initiating watchdog service shutdown due to clean CDR service exit.");
+        _hostLifetime.StopApplication();
+        
+        await Task.CompletedTask; // For consistency with async pattern
+    }
+
+    private async Task HandleErrorExit(int exitCode, TimeSpan runDuration)
+    {
+        _consecutiveFailures++;
+        
+        _logger.LogWarning(
+            "CDR Client service exited with error code {ExitCode} after running for {Duration}. Consecutive failures: {Count}/{Max}", 
+            exitCode, runDuration, _consecutiveFailures, _maxConsecutiveFailures);
+
+        if (_consecutiveFailures >= _maxConsecutiveFailures)
+        {
+            await HandleMaxFailuresReached();
+        }
+        
+        await Task.CompletedTask; // For consistency with async pattern
+    }
+
+    private async Task HandleMaxFailuresReached()
+    {
+        _logger.LogError(
+            "Maximum consecutive failures reached ({Count}). Stopping watchdog to prevent endless restart loop.", 
+            _maxConsecutiveFailures);
+        
+        _logger.LogInformation("Stopping watchdog Windows Service due to maximum consecutive failures.");
+        _hostLifetime.StopApplication();
+        
+        await Task.CompletedTask; // For consistency with async pattern
+    }
+
+    private void CleanupServiceProcess()
+    {
+        _serviceProcess?.Dispose();
+        _serviceProcess = null;
+    }
+
+    private async Task AttemptServiceRestartIfNeeded(CancellationToken cancellationToken)
+    {
+        if (ShouldRestartService())
+        {
+            await WaitBeforeRestart(cancellationToken);
+            await StartManagedService();
+        }
+    }
+
+    private bool ShouldRestartService()
+    {
+        return _consecutiveFailures > 0 || _serviceProcess == null;
+    }
+
+    private async Task WaitBeforeRestart(CancellationToken cancellationToken)
+    {
+        if (_consecutiveFailures > 0)
+        {
+            _logger.LogInformation("Waiting {Delay} seconds before restart attempt (consecutive failures: {Count})", 
+                _restartDelay.TotalSeconds, _consecutiveFailures);
+            await Task.Delay(_restartDelay, cancellationToken);
+        }
+    }
+
+    #endregion
+
+    #region Service Lifecycle Management
+
+    private async Task StartManagedService()
     {
         try
         {
-            if (!File.Exists(_serviceExecutablePath))
+            if (!ValidateServiceExecutable())
             {
-                _logger.LogError("Service executable not found at configured path: {Path}. " +
-                    "Please verify the ServiceExecutablePath configuration in appsettings.json. " +
-                    "Current working directory: {WorkingDirectory}. " +
-                    "Watchdog executable location: {WatchdogPath}. " +
-                    "Stopping watchdog service due to configuration error. Fix the ServiceExecutablePath and restart the service.",
-                    _serviceExecutablePath, Environment.CurrentDirectory, Environment.ProcessPath);
-                
-                // This is a configuration error, not a runtime failure - stop the watchdog service
-                _hostLifetime.StopApplication();
-                return Task.CompletedTask;
+                return; // Validation failed, watchdog will be stopped
             }
 
-            _logger.LogInformation("Starting CDR Client service: {Path}", _serviceExecutablePath);
-
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = _serviceExecutablePath,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = _enableLogging,
-                RedirectStandardError = _enableLogging,
-                WorkingDirectory = Path.GetDirectoryName(_serviceExecutablePath) ?? Environment.CurrentDirectory
-            };
-
-            _logger.LogInformation("Working directory: {WorkingDirectory}", startInfo.WorkingDirectory);
-
-            _serviceProcess = Process.Start(startInfo);
+            var processStartInfo = CreateProcessStartInfo();
+            _serviceProcess = StartServiceProcess(processStartInfo);
             
             if (_serviceProcess == null)
             {
                 _logger.LogError("Failed to start CDR Client service process");
                 _consecutiveFailures++;
-                return Task.CompletedTask;
+                return;
             }
 
-            _lastStartTime = DateTime.Now;
-            _logger.LogInformation("CDR Client service started successfully (PID: {ProcessId})", _serviceProcess.Id);
-
-            // Optional: Capture output for logging (in a separate task to avoid blocking)
-            if (_enableLogging && _serviceProcess.StartInfo.RedirectStandardOutput)
-            {
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        while (!_serviceProcess.HasExited && _serviceProcess.StandardOutput != null)
-                        {
-                            var line = await _serviceProcess.StandardOutput.ReadLineAsync();
-                            if (!string.IsNullOrEmpty(line))
-                            {
-                                _logger.LogInformation("[CDR-Service] {Output}", line);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "Error reading service output");
-                    }
-                });
-
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        while (!_serviceProcess.HasExited && _serviceProcess.StandardError != null)
-                        {
-                            var line = await _serviceProcess.StandardError.ReadLineAsync();
-                            if (!string.IsNullOrEmpty(line))
-                            {
-                                _logger.LogWarning("[CDR-Service-Error] {Error}", line);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "Error reading service error output");
-                    }
-                });
-            }
+            RecordSuccessfulStart();
+            await Task.CompletedTask; // For consistency with async pattern
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error starting CDR Client service");
             _consecutiveFailures++;
         }
+    }
+
+    private bool ValidateServiceExecutable()
+    {
+        if (File.Exists(_serviceExecutablePath))
+        {
+            return true;
+        }
+
+        _logger.LogError(
+            "Service executable not found at configured path: {Path}. " +
+            "Please verify the ServiceExecutablePath configuration in appsettings.json. " +
+            "Current working directory: {WorkingDirectory}. " +
+            "Watchdog executable location: {WatchdogPath}. " +
+            "Stopping watchdog service due to configuration error. Fix the ServiceExecutablePath and restart the service.",
+            _serviceExecutablePath, Environment.CurrentDirectory, Environment.ProcessPath);
+
+        // This is a configuration error, not a runtime failure - stop the watchdog service
+        _hostLifetime.StopApplication();
+        return false;
+    }
+
+    private ProcessStartInfo CreateProcessStartInfo()
+    {
+        var workingDirectory = Path.GetDirectoryName(_serviceExecutablePath) ?? Environment.CurrentDirectory;
         
-        return Task.CompletedTask;
+        _logger.LogInformation("Starting CDR Client service: {Path} from working directory: {WorkingDirectory}", 
+            _serviceExecutablePath, workingDirectory);
+
+        return new ProcessStartInfo
+        {
+            FileName = _serviceExecutablePath,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = false,
+            RedirectStandardError = false,
+            WorkingDirectory = workingDirectory
+        };
+    }
+
+    private Process? StartServiceProcess(ProcessStartInfo startInfo)
+    {
+        try
+        {
+            return Process.Start(startInfo);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to start service process");
+            return null;
+        }
+    }
+
+    private void RecordSuccessfulStart()
+    {
+        if (_serviceProcess == null) return;
+        
+        _lastStartTime = DateTime.Now;
+        _logger.LogInformation("CDR Client service started successfully (PID: {ProcessId})", _serviceProcess.Id);
     }
 
     private async Task StopService()
@@ -459,4 +595,6 @@ public class WatchdogService : BackgroundService
         await base.StopAsync(cancellationToken);
         _logger.LogInformation("=== Watchdog service stopped successfully ===");
     }
+
+    #endregion
 }
