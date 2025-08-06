@@ -7,7 +7,7 @@ The project is split into two parts:
 2. the client UI, which can be used to configure the client service and monitor its status
 
 On a Linux system, the service part runs as a systemd unit. On a Windows system it runs as a Windows service 
-(wrapped by [winsw](https://github.com/winsw/winsw)).
+managed by a dedicated watchdog service.
 
 On macOS, the client UI application starts the client service and shuts it down again when itself is shut down.
 

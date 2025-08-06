@@ -40,3 +40,5 @@ build/
 bin/
 .kotlin/
 output/
+publish/
+cdr-client-watchdog/obj/
