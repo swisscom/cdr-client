@@ -185,7 +185,7 @@ class DTOs {
             @JvmStatic
             val EMPTY = CdrClientConfig(
                 fileSynchronizationEnabled = false,
-                customer = listOf(Connector.EMPTY),
+                customer = emptyList(),
                 cdrApi = Endpoint.EMPTY,
                 filesInProgressCacheSize = EMPTY_STRING,
                 idpCredentials = IdpCredentials.EMPTY,

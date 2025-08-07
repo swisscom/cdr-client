@@ -130,6 +130,7 @@ internal fun OnOffSwitch(
     title: String,
     subtitle: String,
     checked: Boolean,
+    enabled: Boolean,
     onValueChange: (Boolean) -> Unit,
 ) {
     // whole line is clickable, click changes switch state
@@ -163,7 +164,7 @@ internal fun OnOffSwitch(
         title = { Text(text = title) },
         subtitle = { Text(text = subtitle) },
         modifier = modifier.border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = OutlinedTextFieldDefaults.shape),
-        enabled = true,
+        enabled = enabled,
         action = {
             Switch(
                 checked = checked,
@@ -196,7 +197,7 @@ private val DTOs.ValidationResult.message: @Composable (() -> Unit)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DropDownList(
-    enabled: Boolean = true,
+    enabled: Boolean,
     name: DomainObjects.ConfigurationItem,
     modifier: Modifier,
     initiallyExpanded: Boolean = false,
@@ -289,7 +290,7 @@ internal fun CollapsibleGroup(
             .offset(y = (-8).dp)
             .background(containerColor)
             .fillMaxWidth(),
-        visible = isExpanded
+        visible = isExpanded,
     ) {
         Column(
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -308,7 +309,7 @@ internal fun ValidatedTextField(
     label: @Composable (() -> Unit)? = null,
     placeHolder: @Composable (() -> Unit)? = null,
     value: String? = null,
-    enabled: Boolean = true,
+    enabled: Boolean,
     onValueChange: (String) -> Unit,
 ) {
     val validationResult = validatable.validate()
@@ -355,6 +356,7 @@ internal fun DisabledTextField(
 internal fun ButtonWithToolTip(
     label: String,
     toolTip: String = EMPTY_STRING,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) =
     if (toolTip.isNotBlank()) {
@@ -373,11 +375,13 @@ internal fun ButtonWithToolTip(
             ),
         ) {
             ElevatedButton(
+                enabled = enabled,
                 onClick = onClick,
             ) { Text(text = label) }
         }
     } else {
         ElevatedButton(
+            enabled = enabled,
             onClick = onClick,
         ) {
             Text(text = label)

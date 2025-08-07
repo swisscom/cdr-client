@@ -3,7 +3,7 @@
     <string name="app_name">CDR Client Manager</string>
     <string name="label_open_application_window">Open application window</string>
     <string name="label_exit">Exit</string>
-    <string name="label_cancel">Cancel</string>
+    <string name="label_reset">Reset</string>
     <string name="label_close">Close</string>
     <string name="label_apply">Apply</string>
     <string name="label_client_status">Client status</string>
@@ -59,6 +59,8 @@
     <string name="status_offline">offline</string>
     <string name="status_unknown">unknown</string>
 
+    <!-- Messages -->
+    <string name="message_loading_initial_config">Loading initial configuration...</string>
 
     <!-- Tooltips -->
 
