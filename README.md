@@ -171,33 +171,41 @@ If you do not provide a value for `LOGGING_FILE_NAME` the log file gets auto cre
 
 ```
 client:
+  file-synchronization-enabled: true
+  schedule-delay: PT30M
   local-folder: /tmp/download/in-flight # temporary directory for files that are currently downloaded from CDR API
+  file-busy-test-strategy: never_busy # valid values are `never_busy` and `file_size_changed`
   idp-credentials:
     tenant-id: swisscom-health-tenant-id # provided by Swisscom Health
     client-id: my-client-id # Self-service on CDR website
     client-secret: my-secret # Self-service on CDR website
-    renew-credential: false
+    scopes:
+      - https://identity.health.swisscom.ch/CdrApi/.default
+    renew-credential: true
     max-credential-age: 365d
     last-credential-renewal-time: 2025-06-05T14:01:42Z
   cdr-api:
+    scheme: https
+    port: 443
     host: cdr.health.swisscom.ch
-  retry-delay: 
-    - 1s # delay on first retry
-    - 2s
-    - 8s
-    - 32s
-    - 10m # delay after fifth retry and all following retries
-  file-busy-test-strategy: never_busy # valid values are `never_busy` and `file_size_changed`
+    base-path: api/documents
+  credential-api:
+    scheme: ${client.cdr-api.scheme}
+    port: ${client.cdr-api.port}
+    host: ${client.cdr-api.host}
+    base-path: api/client-credentials
   customer:
     - connector-id: 8000000000000 # provided by Swisscom Health
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
       target-folder: /tmp/download/test/8000000000000
       source-folder: /tmp/upload/test/8000000000000
+      source-archive-enabled: false
       mode: test
     - connector-id: 8000000000000 # provided by Swisscom Health
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
       target-folder: /tmp/download/8000000000000
-      source-folder: /tmp/upload/8000000000000
+      source-folder: /tmp/upload/
+      source-archive-enabled: false
       mode: production
 ```
 
