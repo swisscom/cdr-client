@@ -65,10 +65,10 @@ internal class EventTriggerUploadScheduler(
     private val config: CdrClientConfig,
     private val configValidationService: ConfigValidationService,
     private val tracer: Tracer,
-    @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
-    private val cdrUploadsDispatcher: CoroutineDispatcher,
     @param:Value("\${management.tracing.sampling.probability:0.0}")
     private val samplerProbability: Double,
+    @Qualifier("limitedParallelismCdrUploadsDispatcher")
+    cdrUploadsDispatcher: CoroutineDispatcher,
     retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
     fileBusyTester: FileBusyTester
@@ -405,7 +405,7 @@ internal abstract class BaseUploadScheduler(
 
     private suspend fun dispatchForUpload(file: Path): Boolean =
         config.customer.getConnectorForSourceFile(file).let { connector ->
-            if (!file.isBusy()) {
+            if (!withContext(Dispatchers.Default) { file.isBusy() }) {
                 retryUploadFileHandling.uploadRetrying(file, connector)
                 true
             } else {
@@ -416,13 +416,13 @@ internal abstract class BaseUploadScheduler(
 
     private suspend fun Path.isBusy(): Boolean =
         runCatching {
-            withTimeout(config.fileBusyTestTimeout.toMillis()) {
-                while (fileBusyTester.isBusy(this@isBusy)) {
-                    logger.debug { "'${this@isBusy}' is still busy; waiting '${config.fileBusyTestInterval}' for it to become available" }
-                    delay(config.fileBusyTestInterval)
+                withTimeout(config.fileBusyTestTimeout.toMillis()) {
+                    while (fileBusyTester.isBusy(this@isBusy)) {
+                        logger.debug { "'${this@isBusy}' is still busy; waiting '${config.fileBusyTestInterval}' for it to become available" }
+                        delay(config.fileBusyTestInterval)
+                    }
+                    false
                 }
-                false
-            }
         }.fold(
             onSuccess = { it },
             onFailure = { t: Throwable ->
@@ -430,7 +430,7 @@ internal abstract class BaseUploadScheduler(
                     is TimeoutCancellationException -> true // file is still busy
                     is CancellationException -> throw t
                     else -> {
-                        logger.error { "Error while checking whether '${this@isBusy}' is still busy: : '${t.message}'" }
+                        logger.error { "Error while checking whether '${this@isBusy}' is still busy: '${t.message}'" }
                         throw t
                     }
                 }
