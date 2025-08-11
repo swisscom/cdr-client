@@ -10,9 +10,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import com.github.pgreze.process.ProcessResult
 import com.github.pgreze.process.Redirect
 import com.github.pgreze.process.process
@@ -84,7 +87,10 @@ fun main() = application {
         }
     }
 
+    val windowState = rememberWindowState(size = DpSize(600.dp, 800.dp))
+
     Window(
+        state = windowState,
         onCloseRequest = { isWindowVisible = false },
         visible = isWindowVisible,
         title = stringResource(Res.string.app_name),
