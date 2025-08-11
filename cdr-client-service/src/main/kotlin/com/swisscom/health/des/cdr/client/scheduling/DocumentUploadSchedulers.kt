@@ -107,7 +107,7 @@ internal class EventTriggerUploadScheduler(
             }
 
             coroutineScope {
-                launch(Dispatchers.IO) {
+                launch(Dispatchers.Default) {
                     KfsDirectoryWatcher(scope = this, dispatcher = Dispatchers.IO).run {
                         uploadFiles(watchForNewFilesToUpload(this))
                     }
@@ -246,7 +246,7 @@ internal class PollingUploadScheduler(
                 }
             }
             coroutineScope {
-                withContext(Dispatchers.IO) {
+                withContext(Dispatchers.Default) {
                     val fileFlow = pollForNewFilesToUpload(this)
                     launch {
                         uploadFiles(fileFlow)
@@ -367,7 +367,7 @@ internal abstract class BaseUploadScheduler(
             .onEach { (file: Path, span) ->
                 continueSpan(tracer, span) {
                     logger.info { "queuing '${file}' for upload" }
-                    launch(cdrUploadsDispatcher + SpanContextElement(span, tracer)) {
+                    launch(SpanContextElement(span, tracer)) {
                         runCatching {
                             dispatchForUpload(file)
                         }.fold(
@@ -405,8 +405,11 @@ internal abstract class BaseUploadScheduler(
 
     private suspend fun dispatchForUpload(file: Path): Boolean =
         config.customer.getConnectorForSourceFile(file).let { connector ->
-            if (!withContext(Dispatchers.Default) { file.isBusy() }) {
-                retryUploadFileHandling.uploadRetrying(file, connector)
+            if (!file.isBusy()) {
+                // limit parallelism of uploads; cdrUploadsDispatcher is defined as a limited parallelism IO dispatcher
+                withContext(cdrUploadsDispatcher) {
+                    retryUploadFileHandling.uploadRetrying(file, connector)
+                }
                 true
             } else {
                 logger.warn { "'$file' is still busy after '${config.fileBusyTestTimeout}'; giving up; file will be picked up again on next poll" }
@@ -416,13 +419,13 @@ internal abstract class BaseUploadScheduler(
 
     private suspend fun Path.isBusy(): Boolean =
         runCatching {
-                withTimeout(config.fileBusyTestTimeout.toMillis()) {
-                    while (fileBusyTester.isBusy(this@isBusy)) {
-                        logger.debug { "'${this@isBusy}' is still busy; waiting '${config.fileBusyTestInterval}' for it to become available" }
-                        delay(config.fileBusyTestInterval)
-                    }
-                    false
+            withTimeout(config.fileBusyTestTimeout.toMillis()) {
+                while (fileBusyTester.isBusy(this@isBusy)) {
+                    logger.debug { "'${this@isBusy}' is still busy; waiting '${config.fileBusyTestInterval}' for it to become available" }
+                    delay(config.fileBusyTestInterval)
                 }
+                false
+            }
         }.fold(
             onSuccess = { it },
             onFailure = { t: Throwable ->

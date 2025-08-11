@@ -26,6 +26,7 @@ import java.nio.file.Path
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.fileSize
+import kotlin.io.path.name
 
 private val logger = KotlinLogging.logger {}
 
@@ -201,9 +202,11 @@ sealed interface FileBusyTester {
 
     class FileSizeChanged(private val testInterval: Duration) : FileBusyTester {
         override suspend fun isBusy(file: Path): Boolean = runCatching {
+            logger.debug { "'${file.name}' busy state check..." }
             val startSize = file.fileSize()
             delay(testInterval)
-            startSize != file.fileSize()
+            val endSize = file.fileSize()
+            (startSize != endSize).also { logger.debug { "'${file.name}' busy state: '$it'; start size: '$startSize', end size: '$endSize'" } }
         }.fold(
             onSuccess = { it },
             onFailure = { t: Throwable ->

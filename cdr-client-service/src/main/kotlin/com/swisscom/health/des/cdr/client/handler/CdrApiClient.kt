@@ -412,8 +412,10 @@ internal class CdrApiClient(
     }
 
     /**
-     *
+     * Retrieves the JWT token required to call the CDR API function; MSAL4J caches
+     * tokens for as long as they are valid.
      */
+    @Synchronized
     private fun getAccessToken(): String = runCatching {
         retryIOExceptionsAndServerErrors.execute<String, Exception> { retry: RetryContext ->
             if (retry.retryCount > 0) {
