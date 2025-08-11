@@ -8,6 +8,7 @@ import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentRes
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.time.delay
 import org.springframework.stereotype.Component
 import java.nio.file.Files
@@ -39,6 +40,8 @@ internal class RetryUploadFileHandling(
     private val cdrApiClient: CdrApiClient,
 ) {
 
+    private val uploadGuard = Semaphore(cdrClientConfig.pushThreadPoolSize)
+
     /**
      * Retries the upload of a file until it is successful or a 4xx error occurred.
      */
@@ -48,11 +51,13 @@ internal class RetryUploadFileHandling(
         var retryCount = 0
         var retryNeeded: Boolean
 
-        // a successful rename of the file to upload should guarantee that we can also delete it after a successful upload,
-        // and thus prevent duplicate uploads of a file if we fail to delete or archive it after a successful upload
-        val uploadFile = file.moveTo(file.resolveSibling("${file.nameWithoutExtension}.upload"))
+        val uploadFile: Path = file.resolveSibling("${file.nameWithoutExtension}.upload")
 
         runCatching {
+            uploadGuard.acquire()
+            // a successful rename of the file to upload should guarantee that we can also delete it after a successful upload,
+            // and thus prevent duplicate uploads of a file if we fail to delete or archive it after a successful upload
+            file.moveTo(uploadFile)
             do {
                 val retryIndex = min(retryCount, cdrClientConfig.retryDelay.size - 1)
 
@@ -104,13 +109,32 @@ internal class RetryUploadFileHandling(
                 }
             } while (retryNeeded)
         }.fold(
-            onSuccess = {},
+            onSuccess = {
+                logger.debug { "Upload of file '${uploadFile.fileName}' done." }
+                uploadGuard.release()
+            },
             onFailure = { t: Throwable ->
-                if (t is CancellationException) {
-                    // we are getting shut down; moving the file back to its original location so it gets picked up again on restart
-                    runCatching { if (uploadFile.exists()) uploadFile.moveTo(file) }
+                when (t) {
+                    is CancellationException -> {
+                        // don't release the semaphore if we are getting cancelled; the CancellationException might have been thrown by the `acquire()` call;
+                        // calling release() without the matching successful acquire() might throw an IllegalStateException
+                        throw t.also {
+                            if (uploadFile.exists()) {
+                                logger.debug {
+                                    "Upload of file '${uploadFile.fileName}' was cancelled due to shutdown, " +
+                                            "renaming it to original name '$file' for a future upload."
+                                }
+                                // we are getting shut down; moving the file back to its original location so it gets picked up again on restart
+                                runCatching { uploadFile.moveTo(file) }
+                            }
+                        }
+                    }
+
+                    else -> throw t.also {
+                        logger.error(t) { "Upload of file '${uploadFile.fileName}' has failed." }
+                        uploadGuard.release()
+                    }
                 }
-                throw t
             }
         )
     }
