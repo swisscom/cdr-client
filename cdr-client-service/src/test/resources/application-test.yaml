@@ -9,7 +9,8 @@ client:
     last-credential-renewal-time: 1970-01-01T00:00:00Z
     scopes:
       - https://dev.identity.health.swisscom.ch/CdrApi/.default
-  local-folder: ${java.io.tmpdir}/cdr_download
+  # If you change this, then you need to change com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory as well
+  local-folder: ${java.io.tmpdir}/cdr-client-test-source/cdr_download
   # if you change the idp-endpoint issuer host name, you also need to change add in caddy/Caddyfile and you need to add the new host to the `test_hosts` file;
   # no matter what you change it to, unless you use one of the trusted issuer hosts (com.microsoft.aad.msal4j.AadInstanceDiscoveryProvider.TRUSTED_HOSTS_SET),
   # msal4j's initial request will go to `login.microsoftonline.com` to retrieve some MS specific metadata; see wiremock/mappings/discovery.json
@@ -49,5 +50,5 @@ client:
       doc-type-folders:
         invoice:
           target-folder: ${client.customer[0].target-folder}
-          source-folder: ${client.customer[0].source-folder}
+          source-folder: ${client.customer[0].source-folder}/i-will-fail-soon
 

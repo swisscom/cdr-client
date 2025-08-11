@@ -13,6 +13,7 @@ import org.springframework.scheduling.config.ScheduledTaskHolder
 import org.springframework.scheduling.config.TaskExecutionOutcome.Status.STARTED
 import org.springframework.scheduling.config.TaskExecutionOutcome.Status.SUCCESS
 import org.springframework.test.context.ActiveProfiles
+import java.nio.file.Files
 import java.nio.file.Path
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
@@ -50,7 +51,7 @@ internal class CdrClientApplicationTest {
 
         // the secret renewal task is scheduled to run immediately as `application-test.yaml` sets the last-updated timestamp to the start of the Unix epoch
         val secretRenewalTask = scheduledTaskHolder.scheduledTasks.first { it.task.toString().endsWith("renewClientSecret") }
-        await().until {secretRenewalTask.task.lastExecutionOutcome.status == SUCCESS}
+        await().until { secretRenewalTask.task.lastExecutionOutcome.status == SUCCESS }
         // successful secret renewal triggers a shutdown of the application context;
         // but the call to the mockserver fails, and thus no restart gets triggered
     }
@@ -60,6 +61,12 @@ internal class CdrClientApplicationTest {
         @JvmStatic
         @Suppress("unused")
         private lateinit var inflightDirInApplicationTestYaml: Path
+
+        @JvmStatic
+        @BeforeAll
+        fun createDirs() {
+            Files.createDirectories(inflightDirInApplicationTestYaml.resolve("cdr_download"))
+        }
 
         @JvmStatic
         @BeforeAll

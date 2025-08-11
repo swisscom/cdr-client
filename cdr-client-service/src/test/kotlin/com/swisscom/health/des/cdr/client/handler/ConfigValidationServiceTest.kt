@@ -39,7 +39,7 @@ import java.nio.file.Path
 import java.time.Duration
 
 @ExtendWith(MockKExtension::class)
-internal class ValidationServiceTest {
+internal class ConfigValidationServiceTest {
 
     @TempDir
     private lateinit var localFolder0: Path
