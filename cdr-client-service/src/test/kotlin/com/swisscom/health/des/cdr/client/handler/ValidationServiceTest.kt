@@ -418,8 +418,6 @@ internal class ValidationServiceTest {
         assertEquals(DTOs.ValidationMessageKey.FILE_BUSY_TEST_TIMEOUT_TOO_LONG, validationDetail.messageKey)
     }
 
-
-
     private fun createCdrClientConfig(customers: List<Connector>, defaultLocalFolder: Path = localFolder0): CdrClientConfig =
         CdrClientConfig(
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
@@ -542,14 +540,14 @@ internal class ValidationServiceTest {
             sourceArchiveEnabled = false
         )
 
-    companion object {
-        @JvmStatic
-        val FORUM_DATENAUSTAUSCH_MEDIA_TYPE = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
-    }
-
     private fun createResolvedDirectory(path: Path): Path {
         Files.createDirectories(path)
         return path
+    }
+
+    companion object {
+        @JvmStatic
+        val FORUM_DATENAUSTAUSCH_MEDIA_TYPE = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
     }
 
 }
