@@ -2,19 +2,35 @@
 # This script builds the watchdog service and prepares it for Conveyor packaging
 
 param(
-    [string]$Configuration = "Release",
-    [string]$Runtime = "win-x64",
-    [switch]$SelfContained = $false
+    [string]$SelfContained = "true",
+    [string]$Configuration = "Release", 
+    [string]$Runtime = "win-x64"
 )
 
 Write-Host "Building CDR Client Watchdog Service..." -ForegroundColor Green
 
-# Check if .NET SDK is available
+# Check if .NET SDK is available - prefer local (if called from Gradle), fall back to system
+$localDotnetPath = "..\build\dotnet-sdk\dotnet.exe"
+if (Test-Path $localDotnetPath) {
+    $dotnetCmd = $localDotnetPath
+    Write-Host "Using local .NET SDK (downloaded by Gradle)" -ForegroundColor Yellow
+} else {
+    $dotnetCmd = "dotnet"
+    Write-Host "Using system .NET SDK" -ForegroundColor Yellow
+}
+
+# Test if .NET SDK works and get version
 try {
-    $dotnetVersion = dotnet --version
+    $dotnetVersion = & $dotnetCmd --version 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrEmpty($dotnetVersion)) {
+        throw "Command failed or returned empty version"
+    }
     Write-Host "Using .NET SDK version: $dotnetVersion" -ForegroundColor Yellow
 } catch {
-    Write-Error ".NET SDK is not installed or not in PATH. Please install .NET 8.0 SDK or later."
+    Write-Error ".NET SDK command failed or returned empty version."
+    Write-Host "Please either:" -ForegroundColor Red
+    Write-Host "  1. Install .NET 8.0 SDK system-wide, or" -ForegroundColor Red
+    Write-Host "  2. Run 'gradlew buildWatchdog' to auto-download a local SDK" -ForegroundColor Red
     exit 1
 }
 
@@ -35,12 +51,12 @@ $publishArgs = @(
     "publish"
     "-c", $Configuration
     "-r", $Runtime
-    "--self-contained", $SelfContained.ToString().ToLower()
+    "--self-contained", $SelfContained.ToLower()
     "-o", "publish"
     "--verbosity", "minimal"
 )
 
-$buildResult = & dotnet @publishArgs
+$buildResult = & $dotnetCmd @publishArgs
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Build completed successfully!" -ForegroundColor Green

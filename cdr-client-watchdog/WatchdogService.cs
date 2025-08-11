@@ -30,7 +30,7 @@ public class WatchdogService : BackgroundService
     private readonly TimeSpan _healthCheckInterval;
     private readonly int _maxConsecutiveFailures;
     
-    private Process? _serviceProcess;
+    private Process? _watchedProcess;
     private int _consecutiveFailures = 0;
     private DateTime _lastStartTime = DateTime.MinValue;
     private bool _isStoppingSelf = false;
@@ -273,7 +273,7 @@ public class WatchdogService : BackgroundService
 
     private bool IsManagedServiceRunning()
     {
-        return _serviceProcess != null && !_serviceProcess.HasExited;
+        return _watchedProcess != null && !_watchedProcess.HasExited;
     }
 
     private async Task HandleRunningService()
@@ -289,19 +289,19 @@ public class WatchdogService : BackgroundService
 
     private async Task LogServiceStatusIfEnabled()
     {
-        if (_serviceProcess != null && DateTime.Now - _lastStartTime > TimeSpan.FromMinutes(5))
+        if (_watchedProcess != null && DateTime.Now - _lastStartTime > TimeSpan.FromMinutes(5))
         {
             await Task.Run(() =>
             {
                 _logger.LogDebug("CDR Client service is running (PID: {ProcessId}, Started: {StartTime}, Uptime: {Uptime})", 
-                    _serviceProcess.Id, _lastStartTime, DateTime.Now - _lastStartTime);
+                    _watchedProcess.Id, _lastStartTime, DateTime.Now - _lastStartTime);
             });
         }
     }
 
     private async Task HandleStoppedService(CancellationToken cancellationToken)
     {
-        if (_serviceProcess?.HasExited == true)
+        if (_watchedProcess?.HasExited == true)
         {
             await AnalyzeServiceExit();
         }
@@ -311,9 +311,9 @@ public class WatchdogService : BackgroundService
 
     private async Task AnalyzeServiceExit()
     {
-        if (_serviceProcess == null) return;
+        if (_watchedProcess == null) return;
 
-        var exitCode = _serviceProcess.ExitCode;
+        var exitCode = _watchedProcess.ExitCode;
         var runDuration = DateTime.Now - _lastStartTime;
 
         if (_isStoppingSelf)
@@ -388,8 +388,8 @@ public class WatchdogService : BackgroundService
 
     private void CleanupServiceProcess()
     {
-        _serviceProcess?.Dispose();
-        _serviceProcess = null;
+        _watchedProcess?.Dispose();
+        _watchedProcess = null;
     }
 
     private async Task AttemptServiceRestartIfNeeded(CancellationToken cancellationToken)
@@ -403,7 +403,7 @@ public class WatchdogService : BackgroundService
 
     private bool ShouldRestartService()
     {
-        return _consecutiveFailures > 0 || _serviceProcess == null;
+        return _consecutiveFailures > 0 || _watchedProcess == null;
     }
 
     private async Task WaitBeforeRestart(CancellationToken cancellationToken)
@@ -430,9 +430,9 @@ public class WatchdogService : BackgroundService
             }
 
             var processStartInfo = CreateProcessStartInfo();
-            _serviceProcess = StartServiceProcess(processStartInfo);
+            _watchedProcess = StartServiceProcess(processStartInfo);
             
-            if (_serviceProcess == null)
+            if (_watchedProcess == null)
             {
                 _logger.LogError("Failed to start CDR Client service process");
                 _consecutiveFailures++;
@@ -502,34 +502,34 @@ public class WatchdogService : BackgroundService
 
     private void RecordSuccessfulStart()
     {
-        if (_serviceProcess == null) return;
+        if (_watchedProcess == null) return;
         
         _lastStartTime = DateTime.Now;
-        _logger.LogInformation("CDR Client service started successfully (PID: {ProcessId})", _serviceProcess.Id);
+        _logger.LogInformation("CDR Client service started successfully (PID: {ProcessId})", _watchedProcess.Id);
     }
 
     private async Task StopService()
     {
-        if (_serviceProcess != null && !_serviceProcess.HasExited)
+        if (_watchedProcess != null && !_watchedProcess.HasExited)
         {
             _isStoppingSelf = true; // Mark that we're actively stopping the service
             
             try
             {
-                _logger.LogInformation("Stopping CDR Client service (PID: {ProcessId})", _serviceProcess.Id);
+                _logger.LogInformation("Stopping CDR Client service (PID: {ProcessId})", _watchedProcess.Id);
                 _logger.LogInformation("Service has been running for: {Duration}", DateTime.Now - _lastStartTime);
                 
                 // For console applications, CloseMainWindow() typically doesn't work
                 // Try a more direct approach by sending SIGTERM first
                 _logger.LogInformation("Sending termination signal to CDR Client service...");
                 
-                _serviceProcess.Kill(entireProcessTree: false);
+                _watchedProcess.Kill(entireProcessTree: false);
                 
                 // Wait for graceful shutdown
                 _logger.LogInformation("Waiting up to 30 seconds for graceful shutdown...");
-                if (_serviceProcess.WaitForExit(TimeSpan.FromSeconds(30)))
+                if (_watchedProcess.WaitForExit(TimeSpan.FromSeconds(30)))
                 {
-                    _logger.LogInformation("CDR Client service stopped gracefully (exit code: {ExitCode})", _serviceProcess.ExitCode);
+                    _logger.LogInformation("CDR Client service stopped gracefully (exit code: {ExitCode})", _watchedProcess.ExitCode);
                 }
                 else
                 {
@@ -537,11 +537,11 @@ public class WatchdogService : BackgroundService
                     
                     try
                     {
-                        if (!_serviceProcess.HasExited)
+                        if (!_watchedProcess.HasExited)
                         {
-                            _serviceProcess.Kill(entireProcessTree: true);
-                            await _serviceProcess.WaitForExitAsync();
-                            _logger.LogWarning("CDR Client service forcefully terminated (exit code: {ExitCode})", _serviceProcess.ExitCode);
+                            _watchedProcess.Kill(entireProcessTree: true);
+                            await _watchedProcess.WaitForExitAsync();
+                            _logger.LogWarning("CDR Client service forcefully terminated (exit code: {ExitCode})", _watchedProcess.ExitCode);
                         }
                     }
                     catch (Exception ex)
@@ -557,15 +557,15 @@ public class WatchdogService : BackgroundService
             finally
             {
                 _logger.LogInformation("Cleaning up service process resources");
-                _serviceProcess?.Dispose();
-                _serviceProcess = null;
+                _watchedProcess?.Dispose();
+                _watchedProcess = null;
             }
         }
-        else if (_serviceProcess != null)
+        else if (_watchedProcess != null)
         {
-            _logger.LogInformation("CDR Client service process already exited (PID was: {ProcessId})", _serviceProcess.Id);
-            _serviceProcess?.Dispose();
-            _serviceProcess = null;
+            _logger.LogInformation("CDR Client service process already exited (PID was: {ProcessId})", _watchedProcess.Id);
+            _watchedProcess?.Dispose();
+            _watchedProcess = null;
         }
         else
         {

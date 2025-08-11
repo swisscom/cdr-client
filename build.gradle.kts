@@ -135,7 +135,11 @@ tasks.register("ensureDotnetSdk") {
         val downloadUrl = when {
             os.isWindows -> "https://builds.dotnet.microsoft.com/dotnet/Sdk/$dotnetVersion/dotnet-sdk-$dotnetVersion-win-x64.zip"
             os.isMacOsX -> "https://builds.dotnet.microsoft.com/dotnet/Sdk/$dotnetVersion/dotnet-sdk-$dotnetVersion-osx-x64.tar.gz"
-            else -> "https://builds.dotnet.microsoft.com/dotnet/Sdk/$dotnetVersion/dotnet-sdk-$dotnetVersion-linux-x64.tar.gz"
+            os.isLinux -> "https://builds.dotnet.microsoft.com/dotnet/Sdk/$dotnetVersion/dotnet-sdk-$dotnetVersion-linux-x64.tar.gz"
+            else -> {
+                logger.error("Unsupported operating system: ${os.name}. Supported platforms: Windows, macOS, Linux")
+                throw GradleException("Unsupported operating system for automatic .NET SDK download: ${os.name}. Please install .NET 8 SDK manually.")
+            }
         }
         
         val downloadFile = File(temporaryDir, "dotnet-sdk.${if (os.isWindows) "zip" else "tar.gz"}")
@@ -153,11 +157,14 @@ tasks.register("ensureDotnetSdk") {
                 from(zipTree(downloadFile))
                 into(dotnetInstallDir)
             }
-        } else {
+        } else if (os.isMacOsX || os.isLinux) {
             ProcessBuilder("tar", "-xzf", downloadFile.absolutePath, "-C", dotnetInstallDir.absolutePath, "--strip-components=0")
                 .inheritIO()
                 .start()
                 .waitFor()
+        } else {
+            // This should not happen due to the check above, but just in case
+            throw GradleException("Unsupported platform for extraction: ${os.name}")
         }
         
         // Make dotnet executable on Unix systems and set proper permissions
@@ -262,42 +269,31 @@ tasks.register("buildWatchdog") {
     group = "dotnet"
     description = "Builds the CDR Client Watchdog Windows service"
     
-    dependsOn("dotnetRestore")
+    // Ensure .NET SDK is available if not present on system
+    dependsOn("ensureDotnetSdk")
     
     inputs.files(fileTree("cdr-client-watchdog") {
-        include("**/*.cs", "**/*.csproj", "**/*.json")
+        include("**/*.cs", "**/*.csproj", "**/*.json", "build.sh", "build.bat")
     })
     outputs.dir("cdr-client-watchdog/publish")
     
     doLast {
-        val dotnetCmd = getDotnetCommand()
+        logger.info("Building CDR Client Watchdog using build.sh script")
         
-        logger.info("Building CDR Client Watchdog with: $dotnetCmd")
+        val buildScript = if (System.getProperty("os.name").lowercase().contains("windows")) {
+            "build.bat" // Use batch script on Windows
+        } else {
+            "./build.sh" // Use shell script on Linux/WSL
+        }
         
-        val processBuilder = ProcessBuilder(
-            dotnetCmd, 
-            "publish", 
-            "--configuration", "Release",
-            "--runtime", "win-x64",
-            "--self-contained", "false",
-            "--output", "publish"
-        )
+        val processBuilder = ProcessBuilder(buildScript, "true") // Pass "true" for self-contained
             .directory(file("cdr-client-watchdog"))
             .inheritIO()
-        
-        // Set DOTNET environment variables if we're using our local installation
-        if (dotnetCmd == dotnetExecutable.absolutePath) {
-            processBuilder.environment().apply {
-                put("DOTNET_ROOT", dotnetInstallDir.absolutePath)
-                put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
-                put("PATH", "${dotnetInstallDir.absolutePath}${File.pathSeparator}${get("PATH") ?: ""}")
-            }
-        }
         
         val process = processBuilder.start()
         val exitCode = process.waitFor()
         if (exitCode != 0) {
-            throw GradleException("dotnet publish failed with exit code $exitCode")
+            throw GradleException("Watchdog build script failed with exit code $exitCode")
         }
         
         logger.info("CDR Client Watchdog built and published successfully")
