@@ -108,7 +108,7 @@ internal class EventTriggerUploadScheduler(
 
             coroutineScope {
                 launch(Dispatchers.Default) {
-                    KfsDirectoryWatcher(scope = this, dispatcher = Dispatchers.IO).run {
+                    KfsDirectoryWatcher(scope = this).run {
                         uploadFiles(watchForNewFilesToUpload(this))
                     }
                 }
