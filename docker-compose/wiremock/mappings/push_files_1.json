@@ -16,11 +16,17 @@
         }
       },
       "response": {
-        "status": 400,
-        "headers": {
-          "Content-Type": "application/problem+json; charset=utf-8"
+        "status": 202,
+        "delayDistribution": {
+          "type": "lognormal",
+          "median": 50,
+          "sigma": 5,
+          "maxValue": 5000
         },
-        "body": "{\"type\":\"about:blank\",\"title\":\"Bad Request\",\"status\":400,\"detail\":\"Invalid input.\"}"
+        "headers": {
+          "Content-Type": "application/json; charset=utf-8"
+        },
+        "body": "{\"message\": \"Upload successful\"}"
       }
     },
     {
@@ -37,11 +43,11 @@
         }
       },
       "response": {
-        "status": 202,
+        "status": 400,
         "headers": {
-          "Content-Type": "application/json; charset=utf-8"
+          "Content-Type": "application/problem+json; charset=utf-8"
         },
-        "body": "{\"message\": \"Upload successful\"}"
+        "body": "{\"type\":\"about:blank\",\"title\":\"Bad Request\",\"status\":400,\"detail\":\"Invalid input.\"}"
       }
     }
   ]
