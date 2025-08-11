@@ -23,8 +23,6 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
 import io.github.oshai.kotlinlogging.KotlinLogging
-import jakarta.annotation.PostConstruct
-import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import java.nio.file.Path
 import java.time.Duration
@@ -38,26 +36,12 @@ private val logger = KotlinLogging.logger {}
 @Service
 @Suppress("TooManyFunctions")
 internal class ConfigValidationService(
-    private val config: CdrClientConfig,
-    private val configurationWriter: ConfigurationWriter,
-    private val environment: Environment
+    private val config: CdrClientConfig
 ) {
-
-    val isSchedulingAllowed: Boolean by lazy { isConfigSourceUnambiguous && isConfigValid }
-    val isConfigSourceUnambiguous: Boolean by lazy { isConfigFromOneSource() }
 
     val isConfigValid: Boolean by lazy { validateAllConfigurationItems(config.toDto()) is ValidationResult.Success }
 
-    @PostConstruct
-    fun isConfigFromOneSource(): Boolean {
-        val activeProfiles = environment.activeProfiles.toList()
-        return if (!activeProfiles.contains("test")) {
-            configurationWriter.isWriteableConfigurationUnambiguous()
-        } else {
-            true
-        }
-    }
-
+    @Suppress("LongMethod")
     fun validateAllConfigurationItems(config: DTOs.CdrClientConfig): ValidationResult {
         val validations = mutableListOf<ValidationResult>()
 
@@ -69,6 +53,39 @@ internal class ConfigValidationService(
         validations.add(validateConnectorIsPresent(config.customer))
         validations.add(validateCredentialValues(config.idpCredentials))
         validations.add(validateConnectorIdIsPresent(config.customer))
+        config.customer.forEach {
+            validations.add(validateDirectoryIsReadWritable(Path.of(it.sourceFolder)))
+            validations.add(validateDirectoryIsReadWritable(Path.of(it.targetFolder)))
+            if (it.sourceArchiveEnabled) {
+                val validateIsNotBlankOrPlaceholder = validateIsNotBlankOrPlaceholder(it.sourceArchiveFolder, DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY)
+                validations.add(validateIsNotBlankOrPlaceholder)
+                if (validateIsNotBlankOrPlaceholder is ValidationResult.Success) {
+                    validations.add(validateDirectoryIsReadWritable(Path.of(it.sourceArchiveFolder!!)))
+                }
+            }
+            val validateIsNotBlankOrPlaceholder = validateIsNotBlankOrPlaceholder(it.sourceErrorFolder, DomainObjects.ConfigurationItem.ERROR_DIRECTORY)
+            if (validateIsNotBlankOrPlaceholder is ValidationResult.Success) {
+                validations.add(validateDirectoryIsReadWritable(Path.of(it.sourceErrorFolder!!)))
+            }
+            it.docTypeFolders.forEach { docTypeFolder ->
+                val sourceFolderValidation = validateIsNotBlankOrPlaceholder(
+                    value = docTypeFolder.value.sourceFolder,
+                    configItem = DomainObjects.ConfigurationItem.DOC_TYPE_SOURCE_DIRECTORY
+                )
+                if (sourceFolderValidation is ValidationResult.Success) {
+                    validations.add(validateDirectoryIsReadWritable(Path.of(docTypeFolder.value.sourceFolder!!)))
+                }
+
+                val targetFolderValidation = validateIsNotBlankOrPlaceholder(
+                    value = docTypeFolder.value.targetFolder,
+                    configItem = DomainObjects.ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY
+                )
+                if (targetFolderValidation is ValidationResult.Success) {
+                    validations.add(validateDirectoryIsReadWritable(Path.of(docTypeFolder.value.targetFolder!!)))
+                }
+
+            }
+        }
 
         return validations.fold(
             initial = ValidationResult.Success,
@@ -77,14 +94,16 @@ internal class ConfigValidationService(
             }
         ).also {
             if (it is ValidationResult.Failure) {
-                logger.warn { """
+                logger.warn {
+                    """
                     |#############################################################################################
                     |#############################################################################################
                     |No file upload/download will be possible due to configuration validation failure.
                     |Details: ${it.validationDetails}.
                     |#############################################################################################
                     |#############################################################################################
-                    |""".trimMargin() }
+                    |""".trimMargin()
+                }
             }
         }
     }
@@ -366,7 +385,7 @@ internal class ConfigValidationService(
         validateIsNotBlankOrPlaceholder(
             value = credentials.tenantId,
             configItem = DomainObjects.ConfigurationItem.IDP_TENANT_ID
-        )
+        ).let { validations.add(it) }
 
         return validations.fold(
             initial = ValidationResult.Success,

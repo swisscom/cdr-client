@@ -1,7 +1,7 @@
 package com.swisscom.health.des.cdr.client.scheduling
 
 import com.swisscom.health.des.cdr.client.handler.ClientSecretRenewalService
-import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
+import com.swisscom.health.des.cdr.client.handler.SchedulingValidation
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
 import com.swisscom.health.des.cdr.client.handler.withSpan
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -27,7 +27,7 @@ private val logger = KotlinLogging.logger {}
 @ConditionalOnProperty(prefix = "client.idp-credentials", name = ["renew-credential"], havingValue = "true")
 internal class ClientSecretRenewalScheduler(
     private val clientSecretRenewalService: ClientSecretRenewalService,
-    private val configValidationService: ConfigValidationService,
+    private val schedulingValidation: SchedulingValidation,
     private val shutdownService: ShutdownService,
     private val tracer: Tracer,
 ) {
@@ -40,7 +40,7 @@ internal class ClientSecretRenewalScheduler(
         initialDelayString= "#{ @'client-com.swisscom.health.des.cdr.client.config.CdrClientConfig'.getIdpCredentials().getMillisUntilNextCredentialRenewal() }"
     )
     fun renewClientSecret(): Unit = tracer.withSpan("Renew Client Secret") {
-        if(configValidationService.isSchedulingAllowed) {
+        if(schedulingValidation.isSchedulingAllowed) {
             logger.info { "Renewing client secret..." }
             val result = clientSecretRenewalService.renewClientSecret()
             when (result) {

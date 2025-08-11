@@ -2,6 +2,7 @@ package com.swisscom.health.des.cdr.client.http
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
+import com.swisscom.health.des.cdr.client.handler.SchedulingValidation
 import org.springframework.boot.actuate.health.Health
 import org.springframework.boot.actuate.health.HealthIndicator
 import org.springframework.boot.actuate.health.Status
@@ -11,7 +12,8 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 internal class HealthIndicators(
     private val config: CdrClientConfig,
-    private val configValidationService: ConfigValidationService
+    private val configValidationService: ConfigValidationService,
+    private val schedulingValidation: SchedulingValidation
 ) {
 
     /**
@@ -30,7 +32,7 @@ internal class HealthIndicators(
     fun configHealthIndicator(): HealthIndicator =
         HealthIndicator {
             when {
-                !configValidationService.isConfigSourceUnambiguous -> Health.Builder(Status(CONFIG_BROKEN))
+                !schedulingValidation.isConfigSourceUnambiguous -> Health.Builder(Status(CONFIG_BROKEN))
                     .withDetail("configStatus", "ambiguous config source")
 
                 !configValidationService.isConfigValid -> Health.Builder(Status(CONFIG_ERROR))

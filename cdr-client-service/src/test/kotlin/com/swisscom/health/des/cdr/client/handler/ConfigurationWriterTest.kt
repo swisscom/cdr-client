@@ -2,6 +2,9 @@ package com.swisscom.health.des.cdr.client.handler
 
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
+import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
+import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
@@ -18,6 +21,7 @@ import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
+import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
@@ -54,10 +58,12 @@ class ConfigurationWriterTest {
     @MockK
     private lateinit var applicationContext: ConfigurableApplicationContext
 
+    @MockK
+    private lateinit var configValidationService: ConfigValidationService
+
     private lateinit var config: CdrClientConfig
 
     private lateinit var configurationWriter: ConfigurationWriter
-
 
     @Suppress("LongMethod")
     @BeforeEach
@@ -118,9 +124,12 @@ class ConfigurationWriterTest {
             fileBusyTestStrategy = FileBusyTestStrategyProperty(CdrClientConfig.FileBusyTestStrategy.NEVER_BUSY)
         )
 
+        every { configValidationService.validateAllConfigurationItems(any()) } returns ValidationResult.Success
+
         configurationWriter = ConfigurationWriter(
             currentConfig = config,
             context = applicationContext,
+            configValidationService = configValidationService
         )
     }
 
@@ -247,6 +256,7 @@ class ConfigurationWriterTest {
 
     @Test
     fun `test property source not found, not writable, and found`() {
+        clearMocks(configValidationService)
         val configFile = tempConfigDir.resolve("unknown_config_format.yaml").apply {
             createFile()
         }
@@ -255,7 +265,7 @@ class ConfigurationWriterTest {
         every { propOriginWritable.resource } returns fileSystemResource
         val propOriginNotWritable = mockk<TextResourceOrigin>()
         val fileSystemResourceNotWritable = FileSystemResource(tempConfigDir)
-        every {  propOriginNotWritable.resource } returns fileSystemResourceNotWritable
+        every { propOriginNotWritable.resource } returns fileSystemResourceNotWritable
         val propSource = mockk<OriginTrackedMapPropertySource>()
         every { propSource.getOrigin("client.file-synchronization-enabled") } returns propOriginWritable // writable
         every { propSource.getOrigin("client.idp-credentials.renew-credential") } returns propOriginNotWritable // not writable
@@ -273,14 +283,55 @@ class ConfigurationWriterTest {
         }
         every { applicationContext.environment.propertySources } returns propertySources
 
-        assertEquals(ConfigurationWriter.ConfigLookupResult.Writable(resource = fileSystemResource),
-            configurationWriter.isWritableConfigurationItem("client.file-synchronization-enabled"))
-        assertEquals(ConfigurationWriter.ConfigLookupResult.NotWritable,
-            configurationWriter.isWritableConfigurationItem("client.idp-credentials.client-secret"))
-        assertEquals(ConfigurationWriter.ConfigLookupResult.NotWritable,
-            configurationWriter.isWritableConfigurationItem("client.idp-credentials.renew-credential"))
-        assertEquals(ConfigurationWriter.ConfigLookupResult.NotFound,
-            configurationWriter.isWritableConfigurationItem("client.unknown-property"))
+        assertEquals(
+            ConfigurationWriter.ConfigLookupResult.Writable(resource = fileSystemResource),
+            configurationWriter.isWritableConfigurationItem("client.file-synchronization-enabled")
+        )
+        assertEquals(
+            ConfigurationWriter.ConfigLookupResult.NotWritable,
+            configurationWriter.isWritableConfigurationItem("client.idp-credentials.client-secret")
+        )
+        assertEquals(
+            ConfigurationWriter.ConfigLookupResult.NotWritable,
+            configurationWriter.isWritableConfigurationItem("client.idp-credentials.renew-credential")
+        )
+        assertEquals(
+            ConfigurationWriter.ConfigLookupResult.NotFound,
+            configurationWriter.isWritableConfigurationItem("client.unknown-property")
+        )
+    }
+
+    @Test
+    fun `validation failure returns appropriate error messages`() {
+        val configItemDetail = DTOs.ValidationDetail.ConfigItemDetail(
+            configItem = DomainObjects.ConfigurationItem.CONNECTOR,
+            messageKey = DTOs.ValidationMessageKey.NO_CONNECTOR_CONFIGURED
+        )
+        val connectorId = "123"
+        val connectorDetail = DTOs.ValidationDetail.ConnectorDetail(
+            configItem = DomainObjects.ConfigurationItem.CONNECTOR_ID,
+            connectorId = connectorId,
+            messageKey = DTOs.ValidationMessageKey.VALUE_IS_BLANK
+        )
+        val pathDetail = DTOs.ValidationDetail.PathDetail(
+            path = "testPath",
+            messageKey = DTOs.ValidationMessageKey.NOT_A_DIRECTORY
+        )
+
+        val validationFailure = ValidationResult.Failure(
+            validationDetails = listOf(configItemDetail, connectorDetail, pathDetail)
+        )
+
+        every { configValidationService.validateAllConfigurationItems(any()) } returns validationFailure
+
+        val result = configurationWriter.updateClientServiceConfiguration(config)
+
+        assertInstanceOf<ConfigurationWriter.UpdateResult.Failure>(result)
+
+        assertEquals(3, result.errors.size)
+        assertEquals(DTOs.ValidationMessageKey.NO_CONNECTOR_CONFIGURED, result.errors[DomainObjects.ConfigurationItem.CONNECTOR.name])
+        assertEquals(DTOs.ValidationMessageKey.VALUE_IS_BLANK, result.errors["${DomainObjects.ConfigurationItem.CONNECTOR_ID.name} - $connectorId"])
+        assertEquals(DTOs.ValidationMessageKey.NOT_A_DIRECTORY, result.errors["testPath"])
     }
 
     companion object {

@@ -5,8 +5,8 @@ import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
-import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
+import com.swisscom.health.des.cdr.client.handler.SchedulingValidation
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.TraceContext
 import io.micrometer.tracing.Tracer
@@ -34,7 +34,7 @@ internal class DocumentDownloadSchedulerTest {
     private lateinit var config: CdrClientConfig
 
     @MockK
-    private lateinit var configValidationService: ConfigValidationService
+    private lateinit var schedulingValidation: SchedulingValidation
 
     @MockK
     private lateinit var tracer: Tracer
@@ -74,7 +74,7 @@ internal class DocumentDownloadSchedulerTest {
             )
         every { config.customer } returns Customer(mutableListOf(connector))
         every { config.localFolder } returns TempDownloadDir(inflightDir)
-        every { configValidationService.isSchedulingAllowed } returns true
+        every { schedulingValidation.isSchedulingAllowed } returns true
         mockTracer()
     }
 
@@ -99,7 +99,7 @@ internal class DocumentDownloadSchedulerTest {
 
         val documentDownloadScheduler = DocumentDownloadScheduler(
             cdrClientConfig = config,
-            configValidationService = configValidationService,
+            schedulingValidation = schedulingValidation,
             pullFileHandling = pullFileHandling,
             cdrDownloadsDispatcher = Dispatchers.IO,
         )
@@ -116,7 +116,7 @@ internal class DocumentDownloadSchedulerTest {
 
         val documentDownloadScheduler = DocumentDownloadScheduler(
             cdrClientConfig = config,
-            configValidationService = configValidationService,
+            schedulingValidation = schedulingValidation,
             pullFileHandling = pullFileHandling,
             cdrDownloadsDispatcher = Dispatchers.IO,
         )
