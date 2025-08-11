@@ -21,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DomainObjects
@@ -50,6 +51,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_local_folder_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_document_archive
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_document_archive_subtitle
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.message_loading_initial_config
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import java.io.File
@@ -63,67 +65,83 @@ internal fun ConnectorList(
     remoteViewValidations: CdrConfigViewRemoteValidations,
     viewModel: CdrConfigViewModel,
     uiState: CdrConfigUiState,
+    initialConfigLoaded: Boolean,
+    canEdit: Boolean,
 ) {
     CollapsibleGroup(
         modifier = modifier,
         title = stringResource(Res.string.label_client_connector_settings),
         initiallyExpanded = false,
     ) {
+        if (!initialConfigLoaded) {
+            Divider(modifier = modifier.padding(bottom = 8.dp))
+            Text(text = stringResource(Res.string.message_loading_initial_config))
+            Divider(modifier = modifier.padding(bottom = 8.dp))
+        } else {
+            ValidatedTempDownloadDir(
+                modifier = modifier.fillMaxWidth(),
+                remoteViewValidations = remoteViewValidations,
+                viewModel = viewModel,
+                clientConfig = uiState.clientServiceConfig,
+                canEdit = canEdit,
+            )
 
-        ValidatedTempDownloadDir(
-            modifier = modifier.fillMaxWidth(),
-            remoteViewValidations = remoteViewValidations,
-            viewModel = viewModel,
-            clientConfig = uiState.clientServiceConfig,
-        )
+            for (connector in uiState.clientServiceConfig.customer) {
+                Row(
+                    modifier = modifier,
+                ) {
+                    Column(
+                        modifier = modifier
+                            .border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = OutlinedTextFieldDefaults.shape)
+                            .weight(1.0F),
+                    ) {
+                        ConnectorSettingsGroup(
+                            modifier = modifier,
+                            connector = connector,
+                            remoteViewValidations = remoteViewValidations,
+                            uiState = uiState,
+                            viewModel = viewModel,
+                            canEdit = canEdit,
+                        )
+                    }
 
-        for (connector in uiState.clientServiceConfig.customer) {
+                    // Button to delete the connector on that line
+                    IconButton(
+                        onClick = { if (canEdit) viewModel.deleteConnector(connector) },
+                        modifier = modifier
+                            .offset(x = 8.dp)
+                            .align(Alignment.CenterVertically)
+                            .alpha(if (canEdit) 1.0f else 0.3f),
+                        enabled = canEdit,
+                    ) {
+                        Icon(
+                            painter = painterResource(Res.drawable.delete_24dp_000000_FILL0_wght400_GRAD0_opsz24),
+                            modifier = modifier,
+                            contentDescription = null,
+                        )
+                    }
+                }
+            }
+
+            // Button to add a new connector
             Row(
                 modifier = modifier,
             ) {
-                Column(
-                    modifier = modifier.border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = OutlinedTextFieldDefaults.shape).weight(1.0F),
-                ) {
-                    ConnectorSettingsGroup(
-                        modifier = modifier,
-                        connector = connector,
-                        remoteViewValidations = remoteViewValidations,
-                        uiState = uiState,
-                        viewModel = viewModel,
-                    )
-                }
-
-                // Button to delete the connector on that line
+                Spacer(modifier = Modifier.weight(1.0F))
                 IconButton(
-                    onClick = { viewModel.deleteConnector(connector) },
-                    modifier = modifier.offset(x = 8.dp).align(Alignment.CenterVertically)
+                    onClick = { if (canEdit) viewModel.addEmptyConnector() },
+                    modifier = modifier.offset(x = 8.dp),
+                    enabled = canEdit,
                 ) {
                     Icon(
-                        painter = painterResource(Res.drawable.delete_24dp_000000_FILL0_wght400_GRAD0_opsz24),
-                        modifier = modifier,
+                        painter = painterResource(Res.drawable.add_circle_24dp_000000_FILL0_wght400_GRAD0_opsz24),
+                        modifier = modifier.alpha(if (canEdit) 1.0f else 0.3f),
                         contentDescription = null,
                     )
                 }
             }
-        }
 
-        // Button to add a new connector
-        Row(
-            modifier = modifier,
-        ) {
-            Spacer(modifier = Modifier.weight(1.0F))
-            IconButton(
-                onClick = { viewModel.addEmptyConnector() },
-                modifier = modifier.offset(x = 8.dp)
-            ) {
-                Icon(
-                    painter = painterResource(Res.drawable.add_circle_24dp_000000_FILL0_wght400_GRAD0_opsz24),
-                    modifier = modifier,
-                    contentDescription = null,
-                )
-            }
         }
-
     }
 
 }
@@ -138,6 +156,7 @@ private fun ConnectorSettingsGroup(
     remoteViewValidations: CdrConfigViewRemoteValidations,
     uiState: CdrConfigUiState,
     viewModel: CdrConfigViewModel,
+    canEdit: Boolean,
 ) {
     CollapsibleGroup(
         modifier = modifier,
@@ -152,6 +171,7 @@ private fun ConnectorSettingsGroup(
             remoteViewValidations = remoteViewValidations,
             viewModel = viewModel,
             connector = connector,
+            canEdit = canEdit,
         )
 
         ValidatedMode(
@@ -160,6 +180,7 @@ private fun ConnectorSettingsGroup(
             viewModel = viewModel,
             clientConfig = uiState.clientServiceConfig,
             connector = connector,
+            canEdit = canEdit,
         )
 
         ValidatedErrorDir(
@@ -168,6 +189,7 @@ private fun ConnectorSettingsGroup(
             viewModel = viewModel,
             clientConfig = uiState.clientServiceConfig,
             connector = connector,
+            canEdit = canEdit,
         )
 
         NamedSectionDivider(text = stringResource(Res.string.label_client_connector_archive_dir))
@@ -179,7 +201,8 @@ private fun ConnectorSettingsGroup(
             title = stringResource(Res.string.label_enable_document_archive),
             subtitle = stringResource(Res.string.label_enable_document_archive_subtitle),
             checked = connector.sourceArchiveEnabled,
-            onValueChange = { viewModel.setConnectorArchiveEnabled(it, connector) },
+            onValueChange = { if (canEdit) viewModel.setConnectorArchiveEnabled(it, connector) },
+            enabled = canEdit,
         )
 
         ValidatedArchiveDir(
@@ -188,6 +211,7 @@ private fun ConnectorSettingsGroup(
             viewModel = viewModel,
             clientConfig = uiState.clientServiceConfig,
             connector = connector,
+            canEdit = canEdit,
         )
 
         //
@@ -201,6 +225,7 @@ private fun ConnectorSettingsGroup(
             viewModel = viewModel,
             clientConfig = uiState.clientServiceConfig,
             connector = connector,
+            canEdit = canEdit,
         )
 
         // Document-type-specific target directories
@@ -214,6 +239,7 @@ private fun ConnectorSettingsGroup(
                 doctype = doctype,
                 directory = docTypeFolder,
                 connector = connector,
+                canEdit = canEdit,
             )
         }
 
@@ -233,6 +259,7 @@ private fun ConnectorSettingsGroup(
             viewModel = viewModel,
             clientConfig = uiState.clientServiceConfig,
             connector = connector,
+            canEdit = canEdit,
         )
 
         // Document-type-specific source directories
@@ -246,6 +273,7 @@ private fun ConnectorSettingsGroup(
                 doctype = doctype,
                 directory = docTypeFolder,
                 connector = connector,
+                canEdit = canEdit,
             )
         }
 
@@ -261,6 +289,7 @@ private fun ValidatedTempDownloadDir(
     remoteViewValidations: CdrConfigViewRemoteValidations,
     viewModel: CdrConfigViewModel,
     clientConfig: DTOs.CdrClientConfig,
+    canEdit: Boolean,
 ) {
     var tmpDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
     LaunchedEffect(clientConfig) {
@@ -278,7 +307,8 @@ private fun ValidatedTempDownloadDir(
         label = { Text(text = stringResource(Res.string.label_client_local_folder)) },
         value = clientConfig.localFolder,
         placeHolder = { Text(text = stringResource(Res.string.label_client_local_folder_placeholder)) },
-        onValueChange = { viewModel.setLocalPath(it) },
+        onValueChange = { if (canEdit) viewModel.setLocalPath(it) },
+        enabled = canEdit,
     )
 }
 
@@ -288,6 +318,7 @@ private fun ValidatedConnectorId(
     remoteViewValidations: CdrConfigViewRemoteValidations,
     viewModel: CdrConfigViewModel,
     connector: DTOs.CdrClientConfig.Connector,
+    canEdit: Boolean,
 ) {
     var connectorIdValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
     LaunchedEffect(connector.connectorId) {
@@ -304,7 +335,8 @@ private fun ValidatedConnectorId(
         label = { Text(text = stringResource(Res.string.label_client_connector_id)) },
         value = connector.connectorId,
         placeHolder = { Text(text = stringResource(Res.string.label_client_connector_id_placeholder)) },
-        onValueChange = { viewModel.setConnectorId(it, connector) },
+        onValueChange = { if (canEdit) viewModel.setConnectorId(it, connector) },
+        enabled = canEdit,
     )
 }
 
@@ -315,6 +347,7 @@ private fun ValidatedMode(
     viewModel: CdrConfigViewModel,
     clientConfig: DTOs.CdrClientConfig,
     connector: DTOs.CdrClientConfig.Connector,
+    canEdit: Boolean,
 ) {
     var connectorModeValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
     LaunchedEffect(connector.connectorId, connector.mode) {
@@ -334,7 +367,8 @@ private fun ValidatedMode(
         label = { Text(text = stringResource(Res.string.label_client_connector_mode)) },
         value = connector.mode.toString(),
         placeHolder = { Text(text = stringResource(Res.string.label_client_connector_mode_placeholder)) },
-        onValueChange = { viewModel.setConnectorMode(it, connector) },
+        onValueChange = { if (canEdit) viewModel.setConnectorMode(it, connector) },
+        enabled = canEdit,
     )
 }
 
@@ -345,6 +379,7 @@ private fun ValidatedErrorDir(
     viewModel: CdrConfigViewModel,
     clientConfig: DTOs.CdrClientConfig,
     connector: DTOs.CdrClientConfig.Connector,
+    canEdit: Boolean,
 ) {
     var errorDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
     LaunchedEffect(clientConfig) {
@@ -362,7 +397,8 @@ private fun ValidatedErrorDir(
         label = { Text(text = stringResource(Res.string.label_client_connector_error_dir)) },
         value = connector.sourceErrorFolder,
         placeHolder = { Text(text = stringResource(Res.string.label_client_connector_error_dir_placeholder)) },
-        onValueChange = { viewModel.setConnectorErrorDir(it, connector) },
+        onValueChange = { if (canEdit) viewModel.setConnectorErrorDir(it, connector) },
+        enabled = canEdit,
     )
 }
 
@@ -373,19 +409,21 @@ private fun ValidatedArchiveDir(
     viewModel: CdrConfigViewModel,
     clientConfig: DTOs.CdrClientConfig,
     connector: DTOs.CdrClientConfig.Connector,
+    canEdit: Boolean,
 ) {
     var archiveDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
     LaunchedEffect(clientConfig) {
-        if (connector.sourceArchiveEnabled) {
-            archiveDirValidationResult = validateNeitherBlankNorRoot(connector.sourceArchiveFolder) +
-                    remoteViewValidations.validateDirectory(
-                        clientConfig,
-                        connector.sourceArchiveFolder,
-                        DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
-                    )
-        } else {
-            DTOs.ValidationResult.Success
-        }
+        archiveDirValidationResult =
+            if (connector.sourceArchiveEnabled) {
+                validateNeitherBlankNorRoot(connector.sourceArchiveFolder) +
+                        remoteViewValidations.validateDirectory(
+                            clientConfig,
+                            connector.sourceArchiveFolder,
+                            DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
+                        )
+            } else {
+                DTOs.ValidationResult.Success
+            }
     }
     ValidatedTextField(
         name = DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY,
@@ -394,7 +432,8 @@ private fun ValidatedArchiveDir(
         label = { Text(text = stringResource(Res.string.label_client_connector_archive_dir)) },
         value = connector.sourceArchiveFolder,
         placeHolder = { Text(text = stringResource(Res.string.label_client_connector_archive_dir_placeholder)) },
-        onValueChange = { viewModel.setConnectorArchiveDir(it, connector) },
+        onValueChange = { if (canEdit) viewModel.setConnectorArchiveDir(it, connector) },
+        enabled = canEdit,
     )
 }
 
@@ -405,6 +444,7 @@ private fun ValidatedBaseTargetDir(
     viewModel: CdrConfigViewModel,
     clientConfig: DTOs.CdrClientConfig,
     connector: DTOs.CdrClientConfig.Connector,
+    canEdit: Boolean,
 ) {
     var targetDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
     LaunchedEffect(clientConfig) {
@@ -422,7 +462,8 @@ private fun ValidatedBaseTargetDir(
         label = { Text(text = stringResource(Res.string.label_client_connector_base_target_dir)) },
         value = connector.targetFolder,
         placeHolder = { Text(text = stringResource(Res.string.label_client_connector_base_target_dir_placeholder)) },
-        onValueChange = { viewModel.setConnectorBaseTargetDir(it, connector) },
+        onValueChange = { if (canEdit) viewModel.setConnectorBaseTargetDir(it, connector) },
+        enabled = canEdit,
     )
 }
 
@@ -435,6 +476,7 @@ private fun ValidatedDocTypeTargetDir(
     doctype: DTOs.CdrClientConfig.DocumentType,
     directory: String?,
     connector: DTOs.CdrClientConfig.Connector,
+    canEdit: Boolean,
 ) {
     var docTypeDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
     LaunchedEffect(clientConfig) {
@@ -458,7 +500,8 @@ private fun ValidatedDocTypeTargetDir(
         label = { Text(text = stringResource(Res.string.label_client_connector_doctype_target_dir, doctype.name)) },
         value = directory ?: "",
         placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_target_dir_placeholder)) },
-        onValueChange = { viewModel.setConnectorDocTypeTargetDir(doctype, it.trim(), connector) },
+        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeTargetDir(doctype, it.trim(), connector) },
+        enabled = canEdit,
     )
 }
 
@@ -469,6 +512,7 @@ private fun ValidatedSourceBaseDir(
     viewModel: CdrConfigViewModel,
     clientConfig: DTOs.CdrClientConfig,
     connector: DTOs.CdrClientConfig.Connector,
+    canEdit: Boolean,
 ) {
     var sourceDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
     LaunchedEffect(clientConfig) {
@@ -486,7 +530,8 @@ private fun ValidatedSourceBaseDir(
         label = { Text(text = stringResource(Res.string.label_client_connector_base_source_dir)) },
         value = connector.sourceFolder,
         placeHolder = { Text(text = stringResource(Res.string.label_client_connector_base_source_dir_placeholder)) },
-        onValueChange = { viewModel.setConnectorBaseSourceDir(it, connector) },
+        onValueChange = { if (canEdit) viewModel.setConnectorBaseSourceDir(it, connector) },
+        enabled = canEdit,
     )
 }
 
@@ -499,6 +544,7 @@ private fun ValidatedDocTypeSourceDir(
     doctype: DTOs.CdrClientConfig.DocumentType,
     directory: String?,
     connector: DTOs.CdrClientConfig.Connector,
+    canEdit: Boolean,
 ) {
     var docTypeDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
     LaunchedEffect(clientConfig) {
@@ -522,7 +568,8 @@ private fun ValidatedDocTypeSourceDir(
         label = { Text(text = stringResource(Res.string.label_client_connector_doctype_source_dir, doctype.name)) },
         value = directory ?: "",
         placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_source_dir_placeholder)) },
-        onValueChange = { viewModel.setConnectorDocTypeSourceDir(doctype, it.trim(), connector) },
+        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeSourceDir(doctype, it.trim(), connector) },
+        enabled = canEdit,
     )
 }
 
