@@ -8,8 +8,12 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import com.fasterxml.jackson.module.kotlin.kotlinModule
+import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey
+import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.PropertyNameAware
+import com.swisscom.health.des.cdr.client.config.toDto
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.origin.Origin
 import org.springframework.boot.origin.OriginLookup
@@ -50,6 +54,7 @@ private val logger = KotlinLogging.logger {}
 internal class ConfigurationWriter(
     private val currentConfig: CdrClientConfig,
     private val context: ConfigurableApplicationContext,
+    private val configValidationService: ConfigValidationService,
 ) {
 
     sealed interface ConfigLookupResult {
@@ -86,10 +91,6 @@ internal class ConfigurationWriter(
                     is UpdatableConfigurationItem.AmbiguousWritableSource -> ConfigLookupResult.Ambiguous(resources = updatableConfigItem.writableResources)
                 }
             }
-
-    fun isWriteableConfigurationUnambiguous() =
-        collectUpdatableConfigurationItems(currentConfig, currentConfig)
-            .none { it is UpdatableConfigurationItem.AmbiguousWritableSource }
 
     sealed interface UpdateResult {
         object Success : UpdateResult
@@ -263,7 +264,7 @@ internal class ConfigurationWriter(
 //        }
 
     @Suppress("CyclomaticComplexMethod")
-    private fun collectUpdatableConfigurationItems(
+    internal fun collectUpdatableConfigurationItems(
         currentConfigItem: PropertyNameAware, newConfigItem: PropertyNameAware,
     ): List<UpdatableConfigurationItem> {
 
@@ -412,13 +413,19 @@ internal class ConfigurationWriter(
             }
         }
 
-    /**
-     * TODO: Implement!
-     */
-    private fun validate(config: CdrClientConfig): Map<String, Any> {
+    private fun validate(config: CdrClientConfig): Map<String, ValidationMessageKey> {
         logger.debug { "config to validate: '$config'" }
-//        return mapOf("fakeError1" to "fake Error 1 Value", "fakeError2" to "fake Error 2 Value")
-        return emptyMap()
+        val validateAllConfigurationItems: ValidationResult = configValidationService.validateAllConfigurationItems(config.toDto())
+        return when(validateAllConfigurationItems) {
+            is ValidationResult.Success -> emptyMap()
+            is ValidationResult.Failure -> validateAllConfigurationItems.validationDetails.associate { detail ->
+                when (detail) {
+                    is DTOs.ValidationDetail.ConfigItemDetail -> "${detail.configItem}" to detail.messageKey
+                    is DTOs.ValidationDetail.ConnectorDetail -> "${detail.configItem} - ${detail.connectorId}" to detail.messageKey
+                    is DTOs.ValidationDetail.PathDetail -> detail.path to detail.messageKey
+                }
+            }
+        }
     }
 
     private val Origin.fileBackedResource: Resource?

@@ -23,8 +23,6 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
 import io.github.oshai.kotlinlogging.KotlinLogging
-import jakarta.annotation.PostConstruct
-import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import java.nio.file.Path
 import java.time.Duration
@@ -38,25 +36,10 @@ private val logger = KotlinLogging.logger {}
 @Service
 @Suppress("TooManyFunctions")
 internal class ConfigValidationService(
-    private val config: CdrClientConfig,
-    private val configurationWriter: ConfigurationWriter,
-    private val environment: Environment
+    private val config: CdrClientConfig
 ) {
 
-    val isSchedulingAllowed: Boolean by lazy { isConfigSourceUnambiguous && isConfigValid }
-    val isConfigSourceUnambiguous: Boolean by lazy { isConfigFromOneSource() }
-
     val isConfigValid: Boolean by lazy { validateAllConfigurationItems(config.toDto()) is ValidationResult.Success }
-
-    @PostConstruct
-    fun isConfigFromOneSource(): Boolean {
-        val activeProfiles = environment.activeProfiles.toList()
-        return if (!activeProfiles.contains("test")) {
-            configurationWriter.isWriteableConfigurationUnambiguous()
-        } else {
-            true
-        }
-    }
 
     fun validateAllConfigurationItems(config: DTOs.CdrClientConfig): ValidationResult {
         val validations = mutableListOf<ValidationResult>()
@@ -69,6 +52,9 @@ internal class ConfigValidationService(
         validations.add(validateConnectorIsPresent(config.customer))
         validations.add(validateCredentialValues(config.idpCredentials))
         validations.add(validateConnectorIdIsPresent(config.customer))
+        config.customer.forEach {
+            validations.addAll(validateConnectorFolders(it))
+        }
 
         return validations.fold(
             initial = ValidationResult.Success,
@@ -77,14 +63,16 @@ internal class ConfigValidationService(
             }
         ).also {
             if (it is ValidationResult.Failure) {
-                logger.warn { """
+                logger.warn {
+                    """
                     |#############################################################################################
                     |#############################################################################################
                     |No file upload/download will be possible due to configuration validation failure.
                     |Details: ${it.validationDetails}.
                     |#############################################################################################
                     |#############################################################################################
-                    |""".trimMargin() }
+                    |""".trimMargin()
+                }
             }
         }
     }
@@ -200,17 +188,25 @@ internal class ConfigValidationService(
         }
 
     fun validateIsNotBlankOrPlaceholder(value: String?, configItem: DomainObjects.ConfigurationItem): ValidationResult =
-        if (value.isNullOrBlank()) {
-            ValidationResult.Failure(
-                listOf(DTOs.ValidationDetail.ConfigItemDetail(configItem = configItem, messageKey = VALUE_IS_BLANK))
-            )
-        } else if (value == PLACEHOLDER_VALUE) {
-            ValidationResult.Failure(
-                listOf(DTOs.ValidationDetail.ConfigItemDetail(configItem = configItem, messageKey = VALUE_IS_PLACEHOLDER))
-            )
+        when (val valueIsNotBlank = validateIsNotBlank(value, configItem)) {
+            is ValidationResult.Success -> if (value == PLACEHOLDER_VALUE) {
+                ValidationResult.Failure(
+                    listOf(DTOs.ValidationDetail.ConfigItemDetail(configItem = configItem, messageKey = VALUE_IS_PLACEHOLDER))
+                )
+            } else {
+                ValidationResult.Success
+            }
+
+            is ValidationResult.Failure -> valueIsNotBlank
+        }
+
+    fun validateIsNotBlank(value: String?, configItem: DomainObjects.ConfigurationItem): ValidationResult {
+        return if (value.isNullOrBlank()) {
+            ValidationResult.Failure(listOf(DTOs.ValidationDetail.ConfigItemDetail(configItem = configItem, messageKey = VALUE_IS_BLANK)))
         } else {
             ValidationResult.Success
         }
+    }
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     fun validateDirectoryOverlap(config: DTOs.CdrClientConfig): ValidationResult {
@@ -366,7 +362,7 @@ internal class ConfigValidationService(
         validateIsNotBlankOrPlaceholder(
             value = credentials.tenantId,
             configItem = DomainObjects.ConfigurationItem.IDP_TENANT_ID
-        )
+        ).let { validations.add(it) }
 
         return validations.fold(
             initial = ValidationResult.Success,
@@ -375,6 +371,48 @@ internal class ConfigValidationService(
             }
         )
     }
+
+    private fun validateConnectorFolders(connector: DTOs.CdrClientConfig.Connector): List<ValidationResult> {
+        val baseValidations = listOf(
+            validateDirectoryIsReadWritable(Path.of(connector.sourceFolder)),
+            validateDirectoryIsReadWritable(Path.of(connector.targetFolder))
+        )
+
+        val archiveValidations = if (connector.sourceArchiveEnabled) {
+            val placeholderValidation = validateIsNotBlankOrPlaceholder(
+                connector.sourceArchiveFolder,
+                DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
+            )
+
+            listOf(placeholderValidation) +
+                    if (placeholderValidation is ValidationResult.Success) {
+                        listOf(validateDirectoryIsReadWritable(Path.of(connector.sourceArchiveFolder!!)))
+                    } else {
+                        emptyList()
+                    }
+        } else {
+            emptyList()
+        }
+
+        val errorValidation = listOf(
+            validateNotRequiredFolder(connector.sourceErrorFolder, DomainObjects.ConfigurationItem.ERROR_DIRECTORY)
+        )
+
+        val docTypeValidations = connector.docTypeFolders.flatMap { (_, docTypeFolder) ->
+            listOf(
+                validateNotRequiredFolder(docTypeFolder.sourceFolder, DomainObjects.ConfigurationItem.DOC_TYPE_SOURCE_DIRECTORY),
+                validateNotRequiredFolder(docTypeFolder.targetFolder, DomainObjects.ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY)
+            )
+        }
+
+        return baseValidations + archiveValidations + errorValidation + docTypeValidations
+    }
+
+    private fun validateNotRequiredFolder(folder: String?, configurationItem: DomainObjects.ConfigurationItem): ValidationResult =
+        when (validateIsNotBlank(value = folder, configItem = configurationItem)) {
+            is ValidationResult.Success -> validateDirectoryIsReadWritable(Path.of(folder!!))
+            is ValidationResult.Failure -> ValidationResult.Success
+        }
 
     companion object {
         private const val PLACEHOLDER_VALUE = "value-required"

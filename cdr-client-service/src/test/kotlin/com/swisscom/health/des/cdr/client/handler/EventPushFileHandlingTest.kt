@@ -69,7 +69,7 @@ internal class EventPushFileHandlingTest {
     private lateinit var config: CdrClientConfig
 
     @SpykBean
-    private lateinit var configValidationService: ConfigValidationService
+    private lateinit var schedulingValidationService: SchedulingValidationService
 
     @MockkBean
     private lateinit var securedApp: IConfidentialClientApplication
@@ -111,7 +111,7 @@ internal class EventPushFileHandlingTest {
                 )
             )
         )
-        every { configValidationService.isSchedulingAllowed } returns true
+        every { schedulingValidationService.isSchedulingAllowed } returns true
 
         val resultMock: CompletableFuture<IAuthenticationResult> = mockk()
         val authMock: IAuthenticationResult = mockk()
