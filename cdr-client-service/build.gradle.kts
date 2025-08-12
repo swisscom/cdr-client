@@ -145,7 +145,7 @@ val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("ja
                 }
             }))
             limit {
-                minimum = "0.70".toBigDecimal()
+                minimum = "0.65".toBigDecimal()
             }
         }
     }

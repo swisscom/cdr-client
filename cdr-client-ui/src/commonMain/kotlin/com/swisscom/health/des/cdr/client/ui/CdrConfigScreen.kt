@@ -8,16 +8,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.Divider
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.TopAppBar
+import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,6 +32,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.swisscom.health.des.cdr.client.common.DTOs
@@ -33,7 +41,6 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_apply
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cancel
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_file_busy_strategy
@@ -42,6 +49,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_close
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service_subtitle
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_reset
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_broken
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_disabled
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_error
@@ -62,10 +70,23 @@ internal fun CdrConfigScreen(
     remoteViewValidations: CdrConfigViewRemoteValidations,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
+    val uiState: CdrConfigUiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
+
+    var initialConfigLoaded: Boolean by remember { mutableStateOf(false) }
+    var canEdit: Boolean by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.clientServiceConfig, uiState.clientServiceStatus) {
+        initialConfigLoaded = uiState.clientServiceConfig !== DTOs.CdrClientConfig.EMPTY
+        canEdit = initialConfigLoaded && uiState.clientServiceStatus.isOnlineState
+    }
+
     Scaffold(
+        modifier = modifier,
+        topBar = { StatusTopBar(modifier = modifier, uiState = uiState) },
+        bottomBar = { ButtonsBottomAppBar(modifier = modifier, viewModel = viewModel, enabled = canEdit) },
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colors.surface
     ) { paddingValues: PaddingValues ->
-        val uiState: CdrConfigUiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
         val scrollState: ScrollState = rememberScrollState()
 
         Column(
@@ -73,17 +94,23 @@ internal fun CdrConfigScreen(
             verticalArrangement = Arrangement.SpaceBetween,
             modifier = modifier
                 .verticalScroll(scrollState)
-                .padding(16.dp),
+                .padding(paddingValues) // contains calculated padding to account for top and bottom bars
+                .padding(16.dp), // additional padding for the content
         ) {
             SwisscomLogo(modifier.size(86.dp).padding(16.dp))
 
-            Divider(modifier = modifier)
-
-            // client service status
-            Row(modifier = modifier.padding(16.dp)) {
-                Text(text = stringResource(Res.string.label_client_service_status))
-                Spacer(Modifier.weight(1f))
-                Text(text = statusStringResource(uiState.clientServiceStatus))
+            var showAboutDialog by remember { mutableStateOf(false) }
+            TextButton(
+                onClick = { showAboutDialog = true },
+                modifier = modifier
+            ) {
+                Text("About")
+            }
+            if (showAboutDialog) {
+                AboutDialog(
+                    modifier = modifier,
+                    onDismissRequest = { showAboutDialog = false }
+                )
             }
 
             Divider(modifier = modifier)
@@ -95,7 +122,8 @@ internal fun CdrConfigScreen(
                 title = stringResource(Res.string.label_enable_client_service),
                 subtitle = stringResource(Res.string.label_enable_client_service_subtitle),
                 checked = uiState.clientServiceConfig.fileSynchronizationEnabled,
-                onValueChange = { viewModel.setFileSync(it) },
+                onValueChange = { if (canEdit) viewModel.setFileSync(it) },
+                enabled = canEdit,
             )
 
             Divider(modifier = modifier)
@@ -113,7 +141,8 @@ internal fun CdrConfigScreen(
                 label = { Text(text = stringResource(Res.string.label_cdr_api_host)) },
                 value = uiState.clientServiceConfig.cdrApi.host,
                 placeHolder = { Text(text = stringResource(Res.string.label_cdr_api_host_placeholder)) },
-                onValueChange = { viewModel.setCdrApiHost(it) },
+                onValueChange = { if (canEdit) viewModel.setCdrApiHost(it) },
+                enabled = canEdit,
             )
 
             Divider(modifier = modifier)
@@ -127,16 +156,20 @@ internal fun CdrConfigScreen(
                 label = { Text(text = stringResource(Res.string.label_client_file_busy_strategy)) },
                 placeHolder = { Text(text = stringResource(Res.string.label_client_file_busy_strategy_placeholder)) },
                 value = uiState.clientServiceConfig.fileBusyTestStrategy.toString(),
-                onValueChange = { viewModel.setFileBusyTestStrategy(it) }
+                onValueChange = { if (canEdit) viewModel.setFileBusyTestStrategy(it) },
+                validatable = { DTOs.ValidationResult.Success },
+                enabled = canEdit,
             )
 
             Divider(modifier = modifier)
 
-            ConnectorSettingsGroup(
+            ConnectorList(
                 modifier = modifier,
                 remoteViewValidations = remoteViewValidations,
                 viewModel = viewModel,
                 uiState = uiState,
+                canEdit = canEdit,
+                initialConfigLoaded = initialConfigLoaded,
             )
 
             Divider(modifier = modifier)
@@ -147,11 +180,9 @@ internal fun CdrConfigScreen(
                 viewModel = viewModel,
                 uiState = uiState,
                 remoteViewValidations = remoteViewValidations,
+                canEdit = canEdit,
+                initialConfigLoaded = initialConfigLoaded,
             )
-
-            Divider(modifier = modifier)
-
-            ButtonRow(viewModel = viewModel, modifier = modifier.fillMaxWidth(.75f).padding(16.dp))
         }
 
         uiState.errorMessageKey?.let { errorKey ->
@@ -193,30 +224,72 @@ private fun SwisscomLogo(modifier: Modifier) =
     }
 
 @Composable
-private fun ButtonRow(viewModel: CdrConfigViewModel, modifier: Modifier) =
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceAround,
+private fun StatusTopBar(
+    modifier: Modifier = Modifier,
+    uiState: CdrConfigUiState
+) {
+    TopAppBar(
         modifier = modifier,
+        backgroundColor = MaterialTheme.colors.surface
     ) {
-        CancelButton(onClick = {})
-        ApplyButton(onClick = viewModel::applyClientServiceConfiguration)
-    }.also {
-        logger.trace { "ButtonRow has been (re-)composed." }
+        Row(modifier = modifier.padding(16.dp)) {
+            Text(text = stringResource(Res.string.label_client_service_status))
+            Spacer(Modifier.weight(1f))
+            Text(text = statusStringResource(uiState.clientServiceStatus))
+        }
     }
+}
+
 
 @Composable
-private fun CancelButton(onClick: () -> Unit) =
+private fun ButtonsBottomAppBar(
+    modifier: Modifier,
+    viewModel: CdrConfigViewModel,
+    enabled: Boolean
+) {
+    BottomAppBar(
+        modifier = modifier,
+        containerColor = MaterialTheme.colors.surface,
+        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+    ) {
+        Column(
+            modifier = modifier.fillMaxHeight(),
+        ) {
+            Divider(
+                modifier = modifier.shadow(
+                    elevation = 2.dp,
+                    ambientColor = Color.Black,
+                    spotColor = Color.LightGray
+                )
+            )
+            Row(
+                modifier = modifier.fillMaxHeight(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Spacer(modifier.weight(0.5F))
+                ResetButton(enabled = enabled, onClick = viewModel::queryClientServiceConfiguration)
+                Spacer(modifier.width(30.dp))
+                ApplyButton(enabled = enabled, onClick = viewModel::applyClientServiceConfiguration)
+                Spacer(modifier.weight(0.5F))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResetButton(enabled: Boolean, onClick: () -> Unit) =
     ButtonWithToolTip(
-        label = stringResource(Res.string.label_cancel),
+        label = stringResource(Res.string.label_reset),
 //        toolTip = "Reset form values to currently active configuration",
         onClick = onClick,
+        enabled = enabled,
     ).also { logger.trace { "CancelButton has been (re-)composed." } }
 
 @Composable
-private fun ApplyButton(onClick: () -> Unit) =
+private fun ApplyButton(enabled: Boolean, onClick: () -> Unit) =
     ButtonWithToolTip(
         label = stringResource(Res.string.label_apply),
 //        toolTip = "Save new configuration and restart the client service to pick up the changes",
         onClick = onClick,
+        enabled = enabled,
     ).also { logger.trace { "ApplyButton has been (re-)composed." } }

@@ -3,7 +3,7 @@
     <string name="app_name">CDR Client Manager</string>
     <string name="label_open_application_window">Open application window</string>
     <string name="label_exit">Exit</string>
-    <string name="label_cancel">Cancel</string>
+    <string name="label_reset">Reset</string>
     <string name="label_close">Close</string>
     <string name="label_apply">Apply</string>
     <string name="label_client_status">Client status</string>
@@ -47,6 +47,9 @@
     <string name="label_client_connector_base_target_dir_placeholder">Default download directory if no document type specific directory is defined</string>
     <string name="label_client_connector_doctype_target_dir">%1$s download directory</string>
     <string name="label_client_connector_doctype_target_dir_placeholder">Default download directory if no document type specific directory is defined</string>
+    <string name="label_swisscom">Swisscom (Switzerland) Ltd</string>
+    <string name="label_project_source">Source</string>
+    <string name="label_version">Version</string>
 
     <!-- Enumerations -->
     <string name="status_broken">broken - contact support or re-install</string>
@@ -56,6 +59,8 @@
     <string name="status_offline">offline</string>
     <string name="status_unknown">unknown</string>
 
+    <!-- Messages -->
+    <string name="message_loading_initial_config">Loading initial configuration...</string>
 
     <!-- Tooltips -->
 
@@ -72,9 +77,9 @@
     <string name="error_overlaps_with_upload_dir">Overlaps with upload directory</string>
     <string name="error_overlaps_with_download_dir">Overlaps with download directory</string>
     <string name="error_overlaps_with_other_upload_dir">Overlaps with another upload directory</string>
-    <string name="error_duplicate_mode">Mode is already set for this connector</string>
+    <string name="error_duplicate_mode">Mode is already set for this connector ID</string>
+    <string name="error_illegal_mode">Illegal mode value</string>
     <string name="error_test_timeout_too_long">Timeout cannot be longer than test interval</string>
     <string name="error_no_connector">Connector configuration is missing</string>
     <string name="error_is_placeholder">Placeholder value, needs to be replaced</string>
-    <string name="error_multiple_connector_definitions_found">Multiple connector configurations found: %1$s\nONLY THE FIRST CONFIGURATION WILL BE PRESERVED!</string>
 </resources>

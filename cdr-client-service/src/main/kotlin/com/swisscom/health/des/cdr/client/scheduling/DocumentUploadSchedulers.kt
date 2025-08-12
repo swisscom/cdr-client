@@ -7,8 +7,8 @@ import com.swisscom.health.des.cdr.client.TraceSupport.startSpan
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.FileBusyTester
 import com.swisscom.health.des.cdr.client.config.getConnectorForSourceFile
-import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.RetryUploadFileHandling
+import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import io.github.irgaly.kfswatch.KfsDirectoryWatcher
 import io.github.irgaly.kfswatch.KfsDirectoryWatcherEvent
 import io.github.irgaly.kfswatch.KfsEvent
@@ -63,12 +63,12 @@ private val logger = KotlinLogging.logger {}
 @Suppress("LongParameterList")
 internal class EventTriggerUploadScheduler(
     private val config: CdrClientConfig,
-    private val configValidationService: ConfigValidationService,
+    private val schedulingValidationService: SchedulingValidationService,
     private val tracer: Tracer,
-    @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
-    private val cdrUploadsDispatcher: CoroutineDispatcher,
     @param:Value("\${management.tracing.sampling.probability:0.0}")
     private val samplerProbability: Double,
+    @Qualifier("limitedParallelismCdrUploadsDispatcher")
+    cdrUploadsDispatcher: CoroutineDispatcher,
     retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
     fileBusyTester: FileBusyTester
@@ -98,7 +98,7 @@ internal class EventTriggerUploadScheduler(
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFileWatcher(): Unit = runCatching {
-        if (configValidationService.isSchedulingAllowed) {
+        if (schedulingValidationService.isSchedulingAllowed) {
             logger.info { "Starting file watcher process..." }
             config.customer.forEach { connector ->
                 logger.info { "Watching source directory: '${connector.sourceFolder}'" }
@@ -107,8 +107,8 @@ internal class EventTriggerUploadScheduler(
             }
 
             coroutineScope {
-                launch(Dispatchers.IO) {
-                    KfsDirectoryWatcher(scope = this, dispatcher = Dispatchers.IO).run {
+                launch(Dispatchers.Default) {
+                    KfsDirectoryWatcher(scope = this).run {
                         uploadFiles(watchForNewFilesToUpload(this))
                     }
                 }
@@ -197,7 +197,7 @@ internal class EventTriggerUploadScheduler(
 @Suppress("LongParameterList")
 internal class PollingUploadScheduler(
     private val config: CdrClientConfig,
-    private val configValidationService: ConfigValidationService,
+    private val schedulingValidationService: SchedulingValidationService,
     private val tracer: Tracer,
     @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
@@ -232,7 +232,7 @@ internal class PollingUploadScheduler(
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFilePoller(): Unit = runCatching {
-        if (configValidationService.isSchedulingAllowed) {
+        if (schedulingValidationService.isSchedulingAllowed) {
             logger.info { "Starting directory polling process..." }
             config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let { humanReadableDelay ->
                 config.customer.forEach { connector ->
@@ -246,7 +246,7 @@ internal class PollingUploadScheduler(
                 }
             }
             coroutineScope {
-                withContext(Dispatchers.IO) {
+                withContext(Dispatchers.Default) {
                     val fileFlow = pollForNewFilesToUpload(this)
                     launch {
                         uploadFiles(fileFlow)
@@ -367,7 +367,7 @@ internal abstract class BaseUploadScheduler(
             .onEach { (file: Path, span) ->
                 continueSpan(tracer, span) {
                     logger.info { "queuing '${file}' for upload" }
-                    launch(cdrUploadsDispatcher + SpanContextElement(span, tracer)) {
+                    launch(SpanContextElement(span, tracer)) {
                         runCatching {
                             dispatchForUpload(file)
                         }.fold(
@@ -406,7 +406,10 @@ internal abstract class BaseUploadScheduler(
     private suspend fun dispatchForUpload(file: Path): Boolean =
         config.customer.getConnectorForSourceFile(file).let { connector ->
             if (!file.isBusy()) {
-                retryUploadFileHandling.uploadRetrying(file, connector)
+                // limit parallelism of uploads; cdrUploadsDispatcher is defined as a limited parallelism IO dispatcher
+                withContext(cdrUploadsDispatcher) {
+                    retryUploadFileHandling.uploadRetrying(file, connector)
+                }
                 true
             } else {
                 logger.warn { "'$file' is still busy after '${config.fileBusyTestTimeout}'; giving up; file will be picked up again on next poll" }
@@ -430,7 +433,7 @@ internal abstract class BaseUploadScheduler(
                     is TimeoutCancellationException -> true // file is still busy
                     is CancellationException -> throw t
                     else -> {
-                        logger.error { "Error while checking whether '${this@isBusy}' is still busy: : '${t.message}'" }
+                        logger.error { "Error while checking whether '${this@isBusy}' is still busy: '${t.message}'" }
                         throw t
                     }
                 }

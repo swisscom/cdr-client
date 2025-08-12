@@ -4,6 +4,8 @@ import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DIR_READ_WRITABLE
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DIR_SINGLE_USE
+import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MODE_VALUE
+import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MODE_OVERLAP
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.nio.file.Path
@@ -19,6 +21,35 @@ private typealias ValidationSuccessHandler<T> = suspend (T, DomainObjects.Config
 internal class CdrConfigViewRemoteValidations(
     private val cdrClientApiClient: CdrClientApiClient,
 ) {
+
+    internal suspend fun validateConnectorMode(
+        connectorId: String,
+        config: DTOs.CdrClientConfig,
+        fieldName: DomainObjects.ConfigurationItem,
+    ): DTOs.ValidationResult =
+        cdrClientApiClient.validateConnectorMode(
+            validations = listOf(MODE_VALUE, MODE_OVERLAP),
+            connectors = config.customer,
+        ).handle(
+            configurationItem = fieldName,
+            onSuccess = { validationResult: DTOs.ValidationResult, _ -> validationResult },
+        ).run {
+            when (this) {
+                is DTOs.ValidationResult.Success -> this
+                is DTOs.ValidationResult.Failure -> {
+                    // check if any connector validation error is matching the connector we are validating; if yes, return the failure
+                    if (validationDetails
+                            .any { validationDetail: DTOs.ValidationDetail ->
+                                validationDetail is DTOs.ValidationDetail.ConnectorDetail && validationDetail.connectorId == connectorId
+                            }
+                    )
+                        this
+                    // ignore connector validation errors that do not affect the connector we are validating
+                    else
+                        DTOs.ValidationResult.Success
+                }
+            }
+        }
 
     /**
      * Validates that the given value is not blank.
@@ -67,13 +98,13 @@ internal class CdrConfigViewRemoteValidations(
                 is DTOs.ValidationResult.Failure -> {
                     // check if any path validation error is matching the path we are validating; if yes, return the failure
                     if (validationDetails
-                                .any { validationDetail: DTOs.ValidationDetail ->
+                            .any { validationDetail: DTOs.ValidationDetail ->
                                 validationDetail is DTOs.ValidationDetail.PathDetail && path != null && Path.of(validationDetail.path) == Path.of(path)
                             }
                     )
                         this
+                    // ignore path validation errors that do not affect the path we are validating
                     else
-                        // ignore path validation errors that do not affect the path we are validating
                         DTOs.ValidationResult.Success
                 }
             }
@@ -90,7 +121,6 @@ internal class CdrConfigViewRemoteValidations(
             is CdrClientApiClient.Result.IOError -> onIOError(errors, configurationItem)
             is CdrClientApiClient.Result.ServiceError -> onServiceError(errors, configurationItem)
         }
-
 
     private val foldIntoValidationResult: ValidationSuccessHandler<List<DTOs.ValidationMessageKey>> =
         { errorMessageKeys: List<DTOs.ValidationMessageKey>, fieldName: DomainObjects.ConfigurationItem ->

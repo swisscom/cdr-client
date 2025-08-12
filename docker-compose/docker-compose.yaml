@@ -36,6 +36,8 @@ services:
     depends_on:
       wiremock:
         condition: service_healthy
+      mock-oauth2-server:
+        condition: service_started
     image: local.caddy.cdrclient
     container_name: cdr-client-caddy
     build: ./caddy

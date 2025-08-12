@@ -9,11 +9,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Divider
 import androidx.compose.material.Icon
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -32,7 +33,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -51,6 +51,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.a
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.arrow_drop_up_24dp_000000_FILL0_wght400_GRAD0_opsz24
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_directory_not_found
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_duplicate_mode
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_illegal_mode
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_is_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_no_connector
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_not_a_directory
@@ -64,6 +65,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import kotlin.contracts.ExperimentalContracts
+import kotlin.contracts.contract
 
 private val logger = KotlinLogging.logger { }
 
@@ -99,6 +102,7 @@ internal val DTOs.ValidationMessageKey.stringResource: StringResource
             DTOs.ValidationMessageKey.FILE_BUSY_TEST_TIMEOUT_TOO_LONG -> Res.string.error_test_timeout_too_long
             DTOs.ValidationMessageKey.NO_CONNECTOR_CONFIGURED -> Res.string.error_no_connector
             DTOs.ValidationMessageKey.VALUE_IS_PLACEHOLDER -> Res.string.error_is_placeholder
+            DTOs.ValidationMessageKey.ILLEGAL_MODE -> Res.string.error_illegal_mode
         }
 
 @Composable
@@ -126,6 +130,7 @@ internal fun OnOffSwitch(
     title: String,
     subtitle: String,
     checked: Boolean,
+    enabled: Boolean,
     onValueChange: (Boolean) -> Unit,
 ) {
     // whole line is clickable, click changes switch state
@@ -159,7 +164,7 @@ internal fun OnOffSwitch(
         title = { Text(text = title) },
         subtitle = { Text(text = subtitle) },
         modifier = modifier.border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = OutlinedTextFieldDefaults.shape),
-        enabled = true,
+        enabled = enabled,
         action = {
             Switch(
                 checked = checked,
@@ -173,12 +178,30 @@ internal fun OnOffSwitch(
     }
 }
 
+@OptIn(ExperimentalContracts::class)
+private fun DTOs.ValidationResult.isError(): Boolean {
+    contract {
+        returns(true) implies (this@isError is DTOs.ValidationResult.Failure)
+    }
+    return this is DTOs.ValidationResult.Failure
+}
+
+private val DTOs.ValidationResult.message: @Composable (() -> Unit)
+    get() =
+        if (this.isError()) {
+            { Text(text = stringResource(this.validationDetails.first().messageKey.stringResource)) }
+        } else {
+            { Text(text = EMPTY_STRING) } // reserve the screen estate for the supporting text
+        }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DropDownList(
+    enabled: Boolean,
     name: DomainObjects.ConfigurationItem,
     modifier: Modifier,
     initiallyExpanded: Boolean = false,
+    validatable: Validatable,
     options: @Composable () -> Iterable<*>,
     label: @Composable (() -> Unit)? = null,
     placeHolder: @Composable (() -> Unit)? = null,
@@ -191,35 +214,33 @@ internal fun DropDownList(
         expanded = isExpanded,
         onExpandedChange = { isExpanded = it }
     ) {
-        // TODO: implement validation and set text as for ValidatedTextField
-        val supportingText: @Composable (() -> Unit)? = { EMPTY_STRING }
+        val validationResult = validatable.validate()
 
         OutlinedTextField(
             readOnly = true,
             modifier = modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
-            enabled = true,
+            enabled = enabled,
             value = value,
             onValueChange = { },
             label = label,
-            isError = false,
+            isError = validationResult.isError(),
             singleLine = true,
             placeholder = placeHolder,
 //            colors = ExposedDropdownMenuDefaults.textFieldColors(),
             trailingIcon = {
                 ExposedDropdownMenuDefaults.TrailingIcon(
-                    expanded = isExpanded
+                    expanded = isExpanded,
+                    modifier = Modifier.border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = OutlinedTextFieldDefaults.shape),
                 )
             },
-            supportingText = supportingText,
+            supportingText = validationResult.message,
         ).also {
             logger.trace { "drop-down selection has been (re-)composed - field '$name'" }
         }
 
         ExposedDropdownMenu(
             expanded = isExpanded,
-            onDismissRequest = {
-                isExpanded = false
-            }
+            onDismissRequest = { isExpanded = false }
         ) {
             options()
                 .map { it.toString() }
@@ -242,7 +263,7 @@ internal fun DropDownList(
 internal fun CollapsibleGroup(
     containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
     modifier: Modifier,
-    title: StringResource,
+    title: String,
     initiallyExpanded: Boolean = false,
     content: @Composable (containerColor: Color) -> Unit,
 ) {
@@ -254,24 +275,26 @@ internal fun CollapsibleGroup(
             Res.drawable.arrow_drop_down_24dp_000000_FILL0_wght400_GRAD0_opsz24
 
     Row(modifier = modifier.padding(16.dp)) {
-        Text(text = stringResource(title), fontWeight = FontWeight.Bold)
+        Text(text = title, fontWeight = FontWeight.Bold)
         Spacer(Modifier.weight(1f))
         Icon(
             painter = painterResource(icon),
-            modifier = modifier.clickable { isExpanded = !isExpanded },
+            modifier = Modifier
+                .border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = OutlinedTextFieldDefaults.shape)
+                .clickable { isExpanded = !isExpanded },
             contentDescription = null,
         )
     }
     AnimatedVisibility(
         modifier = modifier
+            .offset(y = (-8).dp)
             .background(containerColor)
             .fillMaxWidth(),
-        visible = isExpanded
+        visible = isExpanded,
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceAround,
-            modifier = modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             content(containerColor)
         }
@@ -286,17 +309,10 @@ internal fun ValidatedTextField(
     label: @Composable (() -> Unit)? = null,
     placeHolder: @Composable (() -> Unit)? = null,
     value: String? = null,
-    enabled: Boolean = true,
+    enabled: Boolean,
     onValueChange: (String) -> Unit,
 ) {
     val validationResult = validatable.validate()
-    val isError: Boolean = validationResult is DTOs.ValidationResult.Failure
-    val supportingText: @Composable (() -> Unit)? =
-        if (isError) {
-            { Text(text = stringResource(validationResult.validationDetails.first().messageKey.stringResource)) }
-        } else {
-            { Text(text = EMPTY_STRING) } // reserve the screen estate for the supporting text
-        }
 
     OutlinedTextField(
         modifier = modifier,
@@ -305,9 +321,9 @@ internal fun ValidatedTextField(
         onValueChange = onValueChange,
         label = label,
         placeholder = placeHolder,
-        isError = isError,
+        isError = validationResult.isError(),
         singleLine = true,
-        supportingText = supportingText,
+        supportingText = validationResult.message,
     ).also {
         logger.trace { "text field has been (re-)composed - field '$name'" }
     }
@@ -340,6 +356,7 @@ internal fun DisabledTextField(
 internal fun ButtonWithToolTip(
     label: String,
     toolTip: String = EMPTY_STRING,
+    enabled: Boolean,
     onClick: () -> Unit,
 ) =
     if (toolTip.isNotBlank()) {
@@ -357,12 +374,14 @@ internal fun ButtonWithToolTip(
                 isPersistent = true, // set as `false` to make the tooltip automatically disappear after a short time
             ),
         ) {
-            Button(
+            ElevatedButton(
+                enabled = enabled,
                 onClick = onClick,
             ) { Text(text = label) }
         }
     } else {
-        Button(
+        ElevatedButton(
+            enabled = enabled,
             onClick = onClick,
         ) {
             Text(text = label)

@@ -39,7 +39,7 @@ import java.nio.file.Path
 import java.time.Duration
 
 @ExtendWith(MockKExtension::class)
-internal class ValidationServiceTest {
+internal class ConfigValidationServiceTest {
 
     @TempDir
     private lateinit var localFolder0: Path
@@ -90,9 +90,6 @@ internal class ValidationServiceTest {
     private lateinit var multiPurposeTempDir: Path
 
     @MockK
-    private lateinit var configurationWriter: ConfigurationWriter
-
-    @MockK
     private lateinit var environment: Environment
 
     private lateinit var allGoodCdrClientConfig: CdrClientConfig
@@ -103,7 +100,7 @@ internal class ValidationServiceTest {
     fun setUp() {
         every { environment.activeProfiles } returns arrayOf("test")
         allGoodCdrClientConfig = createCdrClientConfig(blueSkyConnectors())
-        configValidationService = ConfigValidationService(allGoodCdrClientConfig, configurationWriter, environment)
+        configValidationService = ConfigValidationService(allGoodCdrClientConfig)
     }
 
     @Test
@@ -298,12 +295,128 @@ internal class ValidationServiceTest {
         assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
         assertEquals(1, validationResult.validationDetails.size)
         validationResult.validationDetails.first().let { validationDetail ->
-            assertInstanceOf<DTOs.ValidationDetail.ConfigItemDetail>(validationDetail)
+            assertInstanceOf<DTOs.ValidationDetail.ConnectorDetail>(validationDetail)
             assertEquals(DomainObjects.ConfigurationItem.CONNECTOR_MODE, validationDetail.configItem)
             assertEquals(DTOs.ValidationMessageKey.DUPLICATE_MODE, validationDetail.messageKey)
         }
     }
 
+    @Test
+    fun `validateConnectorIdIsPresent should return Success when customer list is null`() {
+        val result = configValidationService.validateConnectorIdIsPresent(null)
+        assertEquals(DTOs.ValidationResult.Success, result)
+    }
+
+    @Test
+    fun `validateConnectorIdIsPresent should return Success when customer list is empty`() {
+        val result = configValidationService.validateConnectorIdIsPresent(emptyList())
+        assertEquals(DTOs.ValidationResult.Success, result)
+    }
+
+    @Test
+    fun `validateConnectorIdIsPresent should return Success when all connectors have non-blank connector IDs`() {
+        val connectors = listOf(
+            createConnector("connector1"),
+            createConnector("connector2")
+        )
+
+        val result = configValidationService.validateConnectorIdIsPresent(connectors)
+        assertEquals(DTOs.ValidationResult.Success, result)
+    }
+
+    @Test
+    fun `validateConnectorIdIsPresent should return Failure when at least one connector has a blank connector ID`() {
+        val connectors = listOf(
+            createConnector("connector1"),
+            createConnector("")
+        )
+
+        val result = configValidationService.validateConnectorIdIsPresent(connectors)
+
+        assertInstanceOf<DTOs.ValidationResult.Failure>(result) { "Expected Failure but got $result" }
+        assertEquals(1, result.validationDetails.size)
+
+        val validationDetail = result.validationDetails.first()
+        assertInstanceOf<DTOs.ValidationDetail.ConfigItemDetail>(validationDetail)
+        assertEquals(DomainObjects.ConfigurationItem.CONNECTOR, validationDetail.configItem)
+        assertEquals(DTOs.ValidationMessageKey.NO_CONNECTOR_CONFIGURED, validationDetail.messageKey)
+    }
+
+    @Test
+    fun `validateModeValue should return Success for empty list`() {
+        val result = configValidationService.validateModeValue(emptyList())
+        assertEquals(DTOs.ValidationResult.Success, result)
+    }
+
+    @Test
+    fun `validateModeValue should return Success when all connectors have valid modes`() {
+        val connectors = listOf(
+            createConnector("connector1", DTOs.CdrClientConfig.Mode.TEST),
+            createConnector("connector2", DTOs.CdrClientConfig.Mode.PRODUCTION)
+        )
+
+        val result = configValidationService.validateModeValue(connectors)
+        assertEquals(DTOs.ValidationResult.Success, result)
+    }
+
+    @Test
+    fun `validateModeValue should return Failure when at least one connector has invalid mode`() {
+        val connectors = listOf(
+            createConnector("connector1", DTOs.CdrClientConfig.Mode.TEST),
+            createConnector("connector2", DTOs.CdrClientConfig.Mode.NONE)
+        )
+
+        val result = configValidationService.validateModeValue(connectors)
+
+        assertInstanceOf<DTOs.ValidationResult.Failure>(result)
+        assertEquals(1, result.validationDetails.size)
+
+        val validationDetail = result.validationDetails.first()
+        assertInstanceOf<DTOs.ValidationDetail.ConnectorDetail>(validationDetail)
+        assertEquals("connector2", validationDetail.connectorId)
+        assertEquals(DomainObjects.ConfigurationItem.CONNECTOR_MODE, validationDetail.configItem)
+        assertEquals(DTOs.ValidationMessageKey.ILLEGAL_MODE, validationDetail.messageKey)
+    }
+
+    @Test
+    fun `validateFileBusyTestTimeout should return Success when timeout is greater than interval`() {
+        val timeout = Duration.ofSeconds(10)
+        val interval = Duration.ofSeconds(2)
+
+        val result = configValidationService.validateFileBusyTestTimeout(timeout, interval)
+        assertEquals(DTOs.ValidationResult.Success, result)
+    }
+
+    @Test
+    fun `validateFileBusyTestTimeout should return Failure when timeout equals interval`() {
+        val timeout = Duration.ofSeconds(5)
+
+        val result = configValidationService.validateFileBusyTestTimeout(timeout, timeout)
+
+        assertInstanceOf<DTOs.ValidationResult.Failure>(result)
+        assertEquals(1, result.validationDetails.size)
+
+        val validationDetail = result.validationDetails.first()
+        assertInstanceOf<DTOs.ValidationDetail.ConfigItemDetail>(validationDetail)
+        assertEquals(DomainObjects.ConfigurationItem.FILE_BUSY_TEST_TIMEOUT, validationDetail.configItem)
+        assertEquals(DTOs.ValidationMessageKey.FILE_BUSY_TEST_TIMEOUT_TOO_LONG, validationDetail.messageKey)
+    }
+
+    @Test
+    fun `validateFileBusyTestTimeout should return Failure when timeout is less than interval`() {
+        val timeout = Duration.ofSeconds(1)
+        val interval = Duration.ofSeconds(2)
+
+        val result = configValidationService.validateFileBusyTestTimeout(timeout, interval)
+
+        assertInstanceOf<DTOs.ValidationResult.Failure>(result)
+        assertEquals(1, result.validationDetails.size)
+
+        val validationDetail = result.validationDetails.first()
+        assertInstanceOf<DTOs.ValidationDetail.ConfigItemDetail>(validationDetail)
+        assertEquals(DomainObjects.ConfigurationItem.FILE_BUSY_TEST_TIMEOUT, validationDetail.configItem)
+        assertEquals(DTOs.ValidationMessageKey.FILE_BUSY_TEST_TIMEOUT_TOO_LONG, validationDetail.messageKey)
+    }
 
     private fun createCdrClientConfig(customers: List<Connector>, defaultLocalFolder: Path = localFolder0): CdrClientConfig =
         CdrClientConfig(
@@ -372,12 +485,12 @@ internal class ValidationServiceTest {
             contentType = FORUM_DATENAUSTAUSCH_MEDIA_TYPE.toString(),
             mode = CdrClientConfig.Mode.PRODUCTION,
             docTypeFolders = mapOf(
-                DocumentType.CONTAINER to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub")),
-                DocumentType.CREDIT to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub1")),
-                DocumentType.FORM to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub2")),
-                DocumentType.HOSPITAL_MCD to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub3")),
-                DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub4")),
-                DocumentType.NOTIFICATION to Connector.DocTypeFolders(sourceFolder = sourceFolder2.resolve("sub5")),
+                DocumentType.CONTAINER to Connector.DocTypeFolders(sourceFolder = createResolvedDirectory(sourceFolder2.resolve("sub"))),
+                DocumentType.CREDIT to Connector.DocTypeFolders(sourceFolder = createResolvedDirectory(sourceFolder2.resolve("sub1"))),
+                DocumentType.FORM to Connector.DocTypeFolders(sourceFolder = createResolvedDirectory(sourceFolder2.resolve("sub2"))),
+                DocumentType.HOSPITAL_MCD to Connector.DocTypeFolders(sourceFolder = createResolvedDirectory(sourceFolder2.resolve("sub3"))),
+                DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = createResolvedDirectory(sourceFolder2.resolve("sub4"))),
+                DocumentType.NOTIFICATION to Connector.DocTypeFolders(sourceFolder = createResolvedDirectory(sourceFolder2.resolve("sub5"))),
             )
         ),
         Connector(
@@ -412,6 +525,24 @@ internal class ValidationServiceTest {
             sourceFolder2,
             sourceErrorDir4,
         )
+    }
+
+    private fun createConnector(connectorId: String, mode: DTOs.CdrClientConfig.Mode = DTOs.CdrClientConfig.Mode.TEST): DTOs.CdrClientConfig.Connector =
+        DTOs.CdrClientConfig.Connector(
+            connectorId = connectorId,
+            sourceFolder = "/path/to/source",
+            targetFolder = "/path/to/target",
+            contentType = "application/xml",
+            mode = mode,
+            docTypeFolders = emptyMap(),
+            sourceErrorFolder = null,
+            sourceArchiveFolder = null,
+            sourceArchiveEnabled = false
+        )
+
+    private fun createResolvedDirectory(path: Path): Path {
+        Files.createDirectories(path)
+        return path
     }
 
     companion object {

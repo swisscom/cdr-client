@@ -17,6 +17,7 @@ import okhttp3.mockwebserver.RecordedRequest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -30,6 +31,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.exists
@@ -214,7 +216,9 @@ internal class CdrApiClientTest {
             traceId = DEFAULT_TRACE_ID
         )
 
-        assertInstanceOf<CdrApiClient.DownloadDocumentResult.DownloadSuccess>(result) { "CdrApiClient.DownloadDocumentResult.Success expected but got $result" }
+        assertInstanceOf<CdrApiClient.DownloadDocumentResult.DownloadSuccess>(result) {
+            "`CdrApiClient.DownloadDocumentResult.DownloadSuccess` expected but got $result"
+        }
 
         assertEquals("test-pull-result-id", result.pullResultId)
         assertTrue(result.file.exists())
@@ -327,6 +331,12 @@ internal class CdrApiClientTest {
         @JvmStatic
         @Suppress("unused")
         private lateinit var inflightDirInApplicationTestYaml: Path
+
+        @JvmStatic
+        @BeforeAll
+        fun createDirs() {
+            Files.createDirectories(inflightDirInApplicationTestYaml.resolve("cdr_download"))
+        }
     }
 
 }

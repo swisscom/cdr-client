@@ -6,6 +6,7 @@ import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.DIREC
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.DUPLICATE_MODE
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.DUPLICATE_SOURCE_DIRS
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.FILE_BUSY_TEST_TIMEOUT_TOO_LONG
+import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.ILLEGAL_MODE
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.LOCAL_DIR_OVERLAPS_WITH_SOURCE_DIRS
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.LOCAL_DIR_OVERLAPS_WITH_TARGET_DIRS
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.NOT_A_DIRECTORY
@@ -22,8 +23,6 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
 import io.github.oshai.kotlinlogging.KotlinLogging
-import jakarta.annotation.PostConstruct
-import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 import java.nio.file.Path
 import java.time.Duration
@@ -37,36 +36,25 @@ private val logger = KotlinLogging.logger {}
 @Service
 @Suppress("TooManyFunctions")
 internal class ConfigValidationService(
-    private val config: CdrClientConfig,
-    private val configurationWriter: ConfigurationWriter,
-    private val environment: Environment
+    private val config: CdrClientConfig
 ) {
 
-    val isSchedulingAllowed: Boolean by lazy { isConfigSourceUnambiguous && isConfigValid }
-    val isConfigSourceUnambiguous: Boolean by lazy { isConfigFromOneSource() }
-
     val isConfigValid: Boolean by lazy { validateAllConfigurationItems(config.toDto()) is ValidationResult.Success }
-
-    @PostConstruct
-    fun isConfigFromOneSource(): Boolean {
-        val activeProfiles = environment.activeProfiles.toList()
-        return if (!activeProfiles.contains("test")) {
-            configurationWriter.isWriteableConfigurationUnambiguous()
-        } else {
-            true
-        }
-    }
 
     fun validateAllConfigurationItems(config: DTOs.CdrClientConfig): ValidationResult {
         val validations = mutableListOf<ValidationResult>()
 
         validations.add(validateDirectoryIsReadWritable(Path.of(config.localFolder)))
         validations.add(validateDirectoryOverlap(config))
+        validations.add(validateModeValue(config.customer))
         validations.add(validateModeOverlap(config.customer))
         validations.add(validateFileBusyTestTimeout(fileBusyTestTimeout = config.fileBusyTestTimeout, fileBusyTestInterval = config.fileBusyTestInterval))
         validations.add(validateConnectorIsPresent(config.customer))
         validations.add(validateCredentialValues(config.idpCredentials))
         validations.add(validateConnectorIdIsPresent(config.customer))
+        config.customer.forEach {
+            validations.addAll(validateConnectorFolders(it))
+        }
 
         return validations.fold(
             initial = ValidationResult.Success,
@@ -75,14 +63,16 @@ internal class ConfigValidationService(
             }
         ).also {
             if (it is ValidationResult.Failure) {
-                logger.warn { """
+                logger.warn {
+                    """
                     |#############################################################################################
                     |#############################################################################################
                     |No file upload/download will be possible due to configuration validation failure.
                     |Details: ${it.validationDetails}.
                     |#############################################################################################
                     |#############################################################################################
-                    |""".trimMargin() }
+                    |""".trimMargin()
+                }
             }
         }
     }
@@ -134,27 +124,51 @@ internal class ConfigValidationService(
             ValidationResult.Success
         }
 
-
-    fun validateModeOverlap(customer: List<DTOs.CdrClientConfig.Connector>): ValidationResult =
-        customer.groupBy { it.connectorId }.filter { cd -> cd.value.size > 1 }.values.map { connector ->
-            if (connector.groupingBy { cr -> cr.mode }.eachCount().any { it.value > 1 }) {
-                ValidationResult.Failure(
-                    listOf(
-                        DTOs.ValidationDetail.ConfigItemDetail(
-                            configItem = CONNECTOR_MODE,
-                            messageKey = DUPLICATE_MODE
-                        )
-                    )
-                )
-            } else {
-                ValidationResult.Success
-            }
-        }.fold(
+    fun validateModeValue(connectors: List<DTOs.CdrClientConfig.Connector>): ValidationResult =
+        connectors.fold(
             initial = ValidationResult.Success,
-            operation = { acc: ValidationResult, validationResult: ValidationResult ->
-                acc + validationResult
+            operation = { acc: ValidationResult, connector: DTOs.CdrClientConfig.Connector ->
+                when (connector.mode) {
+                    DTOs.CdrClientConfig.Mode.TEST, DTOs.CdrClientConfig.Mode.PRODUCTION -> acc
+                    DTOs.CdrClientConfig.Mode.NONE -> {
+                        acc + ValidationResult.Failure(
+                            listOf(
+                                DTOs.ValidationDetail.ConnectorDetail(
+                                    connectorId = connector.connectorId,
+                                    configItem = CONNECTOR_MODE,
+                                    messageKey = ILLEGAL_MODE
+                                )
+                            )
+                        )
+                    }
+                }
             }
         )
+
+    fun validateModeOverlap(connectors: List<DTOs.CdrClientConfig.Connector>): ValidationResult =
+        connectors
+            .groupBy { it.connectorId }
+            .filter { cd -> cd.value.size > 1 }
+            .map { (connectorId: String, connectors: List<DTOs.CdrClientConfig.Connector>) ->
+                if (connectors.groupingBy { connector -> connector.mode }.eachCount().any { it.value > 1 }) {
+                    ValidationResult.Failure(
+                        listOf(
+                            DTOs.ValidationDetail.ConnectorDetail(
+                                connectorId = connectorId,
+                                configItem = CONNECTOR_MODE,
+                                messageKey = DUPLICATE_MODE
+                            )
+                        )
+                    )
+                } else {
+                    ValidationResult.Success
+                }
+            }.fold(
+                initial = ValidationResult.Success,
+                operation = { acc: ValidationResult, validationResult: ValidationResult ->
+                    acc + validationResult
+                }
+            )
 
     fun validateDirectoryIsReadWritable(path: Path?): ValidationResult =
         if (path == null || path.notExists()) {
@@ -174,31 +188,39 @@ internal class ConfigValidationService(
         }
 
     fun validateIsNotBlankOrPlaceholder(value: String?, configItem: DomainObjects.ConfigurationItem): ValidationResult =
-        if (value.isNullOrBlank()) {
-            ValidationResult.Failure(
-                listOf(DTOs.ValidationDetail.ConfigItemDetail(configItem = configItem, messageKey = VALUE_IS_BLANK))
-            )
-        } else if (value == PLACEHOLDER_VALUE) {
-            ValidationResult.Failure(
-                listOf(DTOs.ValidationDetail.ConfigItemDetail(configItem = configItem, messageKey = VALUE_IS_PLACEHOLDER))
-            )
+        when (val valueIsNotBlank = validateIsNotBlank(value, configItem)) {
+            is ValidationResult.Success -> if (value == PLACEHOLDER_VALUE) {
+                ValidationResult.Failure(
+                    listOf(DTOs.ValidationDetail.ConfigItemDetail(configItem = configItem, messageKey = VALUE_IS_PLACEHOLDER))
+                )
+            } else {
+                ValidationResult.Success
+            }
+
+            is ValidationResult.Failure -> valueIsNotBlank
+        }
+
+    fun validateIsNotBlank(value: String?, configItem: DomainObjects.ConfigurationItem): ValidationResult {
+        return if (value.isNullOrBlank()) {
+            ValidationResult.Failure(listOf(DTOs.ValidationDetail.ConfigItemDetail(configItem = configItem, messageKey = VALUE_IS_BLANK)))
         } else {
             ValidationResult.Success
         }
+    }
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     fun validateDirectoryOverlap(config: DTOs.CdrClientConfig): ValidationResult {
         fun getAllBaseSourceFolders(): List<Path> = config.customer.map { connector ->
             Path.of(connector.sourceFolder)
                 .also {
-                    logger.debug { "connector [${connector.connectorId}] base source folder: [${connector.sourceFolder}]" }
+                    logger.debug { "connector [${connector.connectorId}-${connector.mode}] base source folder: [${connector.sourceFolder}]" }
                 }
         }
 
         fun getAllBaseTargetFolders(): List<Path> = config.customer.map { connector ->
             Path.of(connector.targetFolder)
                 .also {
-                    logger.debug { "connector [${connector.connectorId}] base target folder: [${connector.targetFolder}]" }
+                    logger.debug { "connector [${connector.connectorId}-${connector.mode}] base target folder: [${connector.targetFolder}]" }
                 }
         }
 
@@ -212,7 +234,7 @@ internal class ConfigValidationService(
             .map { connector ->
                 (connector.sourceFolder to connector.docTypeFolders.values)
                     .also {
-                        logger.debug { "connector [${connector.connectorId}] doctype directories: [${connector.docTypeFolders}]" }
+                        logger.debug { "connector [${connector.connectorId}-${connector.mode}] doctype directories: [${connector.docTypeFolders}]" }
                     }
             }
             .flatMap { (sourceFolder, docTypeFolders) ->
@@ -234,7 +256,7 @@ internal class ConfigValidationService(
                 listOf(connector.sourceArchiveFolder, connector.sourceErrorFolder)
                     .also {
                         logger.debug {
-                            "connector [${connector.connectorId}] source archive folder: [${connector.sourceArchiveFolder}], " +
+                            "connector [${connector.connectorId}-${connector.mode}] source archive folder: [${connector.sourceArchiveFolder}], " +
                                     "source error folder: [${connector.sourceErrorFolder}]"
                         }
                     }
@@ -340,7 +362,7 @@ internal class ConfigValidationService(
         validateIsNotBlankOrPlaceholder(
             value = credentials.tenantId,
             configItem = DomainObjects.ConfigurationItem.IDP_TENANT_ID
-        )
+        ).let { validations.add(it) }
 
         return validations.fold(
             initial = ValidationResult.Success,
@@ -349,6 +371,48 @@ internal class ConfigValidationService(
             }
         )
     }
+
+    private fun validateConnectorFolders(connector: DTOs.CdrClientConfig.Connector): List<ValidationResult> {
+        val baseValidations = listOf(
+            validateDirectoryIsReadWritable(Path.of(connector.sourceFolder)),
+            validateDirectoryIsReadWritable(Path.of(connector.targetFolder))
+        )
+
+        val archiveValidations = if (connector.sourceArchiveEnabled) {
+            val placeholderValidation = validateIsNotBlankOrPlaceholder(
+                connector.sourceArchiveFolder,
+                DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
+            )
+
+            listOf(placeholderValidation) +
+                    if (placeholderValidation is ValidationResult.Success) {
+                        listOf(validateDirectoryIsReadWritable(Path.of(connector.sourceArchiveFolder!!)))
+                    } else {
+                        emptyList()
+                    }
+        } else {
+            emptyList()
+        }
+
+        val errorValidation = listOf(
+            validateNotRequiredFolder(connector.sourceErrorFolder, DomainObjects.ConfigurationItem.ERROR_DIRECTORY)
+        )
+
+        val docTypeValidations = connector.docTypeFolders.flatMap { (_, docTypeFolder) ->
+            listOf(
+                validateNotRequiredFolder(docTypeFolder.sourceFolder, DomainObjects.ConfigurationItem.DOC_TYPE_SOURCE_DIRECTORY),
+                validateNotRequiredFolder(docTypeFolder.targetFolder, DomainObjects.ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY)
+            )
+        }
+
+        return baseValidations + archiveValidations + errorValidation + docTypeValidations
+    }
+
+    private fun validateNotRequiredFolder(folder: String?, configurationItem: DomainObjects.ConfigurationItem): ValidationResult =
+        when (validateIsNotBlank(value = folder, configItem = configurationItem)) {
+            is ValidationResult.Success -> validateDirectoryIsReadWritable(Path.of(folder!!))
+            is ValidationResult.Failure -> ValidationResult.Success
+        }
 
     companion object {
         private const val PLACEHOLDER_VALUE = "value-required"
