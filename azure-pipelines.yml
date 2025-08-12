@@ -62,7 +62,7 @@ steps:
     displayName: 'build application'
     inputs:
       gradleWrapperFile: 'gradlew'
-      tasks: 'clean build -x test'
+      tasks: 'cleanAll buildAll -x test'
       publishJUnitResults: false
       javaHomeOption: 'JDKVersion'
 
