@@ -77,7 +77,7 @@ internal fun CdrConfigScreen(
 
     LaunchedEffect(uiState.clientServiceConfig, uiState.clientServiceStatus) {
         initialConfigLoaded = uiState.clientServiceConfig !== DTOs.CdrClientConfig.EMPTY
-        canEdit = initialConfigLoaded && uiState.clientServiceStatus.isOnlineState
+        canEdit = initialConfigLoaded && uiState.clientServiceStatus.isOnlineCategory
     }
 
     Scaffold(
