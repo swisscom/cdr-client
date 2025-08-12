@@ -7,7 +7,7 @@ import org.springframework.core.env.Environment
 import org.springframework.stereotype.Service
 
 @Service
-internal class SchedulingValidation(
+internal class SchedulingValidationService(
     private val configValidationService: ConfigValidationService,
     private val environment: Environment,
     private val configurationWriter: ConfigurationWriter,

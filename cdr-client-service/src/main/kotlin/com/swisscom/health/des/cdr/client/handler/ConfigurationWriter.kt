@@ -9,6 +9,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import com.fasterxml.jackson.module.kotlin.kotlinModule
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.PropertyNameAware
@@ -412,13 +413,12 @@ internal class ConfigurationWriter(
             }
         }
 
-    private fun validate(config: CdrClientConfig): Map<String, Any> {
+    private fun validate(config: CdrClientConfig): Map<String, ValidationMessageKey> {
         logger.debug { "config to validate: '$config'" }
         val validateAllConfigurationItems: ValidationResult = configValidationService.validateAllConfigurationItems(config.toDto())
-        return if (validateAllConfigurationItems is ValidationResult.Success) {
-            emptyMap()
-        } else {
-            (validateAllConfigurationItems as ValidationResult.Failure).validationDetails.associate { detail ->
+        return when(validateAllConfigurationItems) {
+            is ValidationResult.Success -> emptyMap()
+            is ValidationResult.Failure -> validateAllConfigurationItems.validationDetails.associate { detail ->
                 when (detail) {
                     is DTOs.ValidationDetail.ConfigItemDetail -> "${detail.configItem}" to detail.messageKey
                     is DTOs.ValidationDetail.ConnectorDetail -> "${detail.configItem} - ${detail.connectorId}" to detail.messageKey
