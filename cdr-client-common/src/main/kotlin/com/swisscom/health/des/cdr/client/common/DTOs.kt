@@ -130,7 +130,7 @@ class DTOs {
         val errorCodes: List<String> = emptyList(),
     ) {
 
-        enum class StatusCode(val isOnlineState: Boolean) {
+        enum class StatusCode(val isOnlineCategory: Boolean) {
             UNKNOWN(false),
             SYNCHRONIZING(true),
             DISABLED(true),
@@ -138,8 +138,8 @@ class DTOs {
             BROKEN(true),
             OFFLINE(false);
 
-            val isOfflineState: Boolean
-                get() = !isOnlineState
+            val isOfflineCategory: Boolean
+                get() = !isOnlineCategory
         }
 
     }
