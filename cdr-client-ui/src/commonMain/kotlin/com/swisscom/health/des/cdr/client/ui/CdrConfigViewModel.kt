@@ -53,10 +53,6 @@ internal class CdrConfigViewModel(
     private val _uiState = MutableStateFlow(CdrConfigUiState())
     val uiStateFlow: StateFlow<CdrConfigUiState> = _uiState.asStateFlow()
 
-    init {
-        queryClientServiceConfiguration()
-    }
-
     /**
      * Sends the current client configuration to the CDR Client service. If the service accepts the
      * configuration, the service is told to restart so it applies the new configuration.
@@ -474,11 +470,17 @@ internal class CdrConfigViewModel(
     fun queryClientServiceStatus(retryStrategy: CdrClientApiClient.RetryStrategy): Job =
         viewModelScope.launch {
             cdrClientApiClient.getClientServiceStatus(retryStrategy).let { status: DTOs.StatusResponse.StatusCode ->
-                if (status.isOnlineState && _uiState.value.clientServiceStatus.isOfflineState) {
-                    // if we went from an offline state to an online state, we also need to refresh the client service configuration
+                if (status.isOnlineCategory && _uiState.value.clientServiceStatus.isOfflineCategory) {
+                    // if we went from an offline state to an online state, we need to refresh the client service configuration
                     queryClientServiceConfiguration()
                 }
-                if (status == DTOs.StatusResponse.StatusCode.ERROR && _uiState.value.clientServiceStatus.isNotError()) {
+                if (status.isOffline && _uiState.value.clientServiceStatus.isNotOffline) {
+                    // if we just went offline, we report the problem
+                    reportError(Res.string.error_client_communication, "OFFLINE")
+                }
+                if (status.isError && _uiState.value.clientServiceStatus.isNotError) {
+                    // if we went from a non-error state to an error state, we reload the config in case the configuration was changed
+                    // with an editor outside the CDR Client UI
                     queryClientServiceConfiguration()
                     reportError(Res.string.error_client_configuration)
                 }
@@ -490,8 +492,17 @@ internal class CdrConfigViewModel(
             }
         }
 
-    private fun DTOs.StatusResponse.StatusCode.isNotError(): Boolean =
-        this != DTOs.StatusResponse.StatusCode.ERROR
+    private val DTOs.StatusResponse.StatusCode.isError: Boolean
+        get() = this == DTOs.StatusResponse.StatusCode.ERROR
+
+    private val DTOs.StatusResponse.StatusCode.isNotError: Boolean
+        get() = !this.isError
+
+    private val DTOs.StatusResponse.StatusCode.isOffline: Boolean
+        get() = this == DTOs.StatusResponse.StatusCode.OFFLINE
+
+    private val DTOs.StatusResponse.StatusCode.isNotOffline: Boolean
+        get() = !this.isOffline
 
     /**
      * Clears the error message key from the UI state.
