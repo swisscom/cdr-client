@@ -1,15 +1,20 @@
 package com.swisscom.health.des.cdr.client.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.app_name
@@ -18,6 +23,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_version
 import org.jetbrains.compose.resources.stringResource
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun AboutDialog(
     modifier: Modifier,
@@ -40,17 +46,25 @@ internal fun AboutDialog(
                 modifier = modifier,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                val appVersion by lazy(mode = LazyThreadSafetyMode.NONE) { getAppVersion() }
+                val appVersion = remember { getAppVersion() }
+                val githubUrl = "https://github.com/swisscom/cdr-client"
                 Text(
                     text = "${stringResource(Res.string.label_version)}: $appVersion",
-                    textAlign = TextAlign.Center
                 )
-                Row(modifier = modifier) {
-                    Text(modifier = modifier, text = "${stringResource(Res.string.label_project_source)}: ")
-                    SelectionContainer(modifier = modifier) {
-                        Text(modifier = modifier, text = "https://github.com/swisscom/cdr-client")
-                    }
-                }
+                Text(
+                    text = buildAnnotatedString {
+                        append("${stringResource(Res.string.label_project_source)}: ")
+                        withLink(LinkAnnotation.Url(githubUrl)) {
+                            withStyle(
+                                style = SpanStyle(
+                                    textDecoration = TextDecoration.Underline
+                                )
+                            ) {
+                                append(githubUrl)
+                            }
+                        }
+                    },
+                )
             }
         },
         confirmButton = {},
