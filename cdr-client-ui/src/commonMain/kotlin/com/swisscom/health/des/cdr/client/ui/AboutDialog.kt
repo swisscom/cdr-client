@@ -51,7 +51,15 @@ internal fun AboutDialog(
                 Text(
                     text = buildAnnotatedString {
                         append("${stringResource(Res.string.label_project_source)}: ")
-                        withLink(LinkAnnotation.Url(githubUrl)) { append(githubUrl) }
+                        withLink(LinkAnnotation.Url(githubUrl)) {
+                            withStyle(
+                                style = SpanStyle(
+                                    textDecoration = TextDecoration.Underline
+                                )
+                            ) {
+                                append(githubUrl)
+                            }
+                        }
                     },
                 )
             }
