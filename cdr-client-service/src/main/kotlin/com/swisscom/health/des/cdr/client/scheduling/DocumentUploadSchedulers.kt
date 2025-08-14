@@ -1,7 +1,6 @@
 package com.swisscom.health.des.cdr.client.scheduling
 
 import com.mayakapps.kache.ObjectKache
-import com.swisscom.health.des.cdr.client.SpanContextElement
 import com.swisscom.health.des.cdr.client.TraceSupport.continueSpan
 import com.swisscom.health.des.cdr.client.TraceSupport.startSpan
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -13,8 +12,8 @@ import io.github.irgaly.kfswatch.KfsDirectoryWatcher
 import io.github.irgaly.kfswatch.KfsDirectoryWatcherEvent
 import io.github.irgaly.kfswatch.KfsEvent
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.micrometer.tracing.Span
-import io.micrometer.tracing.Tracer
+import io.opentelemetry.api.trace.Span
+import io.opentelemetry.extension.kotlin.asContextElement
 import jakarta.annotation.PostConstruct
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -64,8 +63,7 @@ private val logger = KotlinLogging.logger {}
 internal class EventTriggerUploadScheduler(
     private val config: CdrClientConfig,
     private val schedulingValidationService: SchedulingValidationService,
-    private val tracer: Tracer,
-    @param:Value("\${management.tracing.sampling.probability:0.0}")
+    @param:Value($$"${management.tracing.sampling.probability:0.0}")
     private val samplerProbability: Double,
     @Qualifier("limitedParallelismCdrUploadsDispatcher")
     cdrUploadsDispatcher: CoroutineDispatcher,
@@ -77,7 +75,6 @@ internal class EventTriggerUploadScheduler(
     retryUploadFileHandling = retryUploadFileHandling,
     cdrUploadsDispatcher = cdrUploadsDispatcher,
     processingInProgressCache = processingInProgressCache,
-    tracer = tracer,
     fileBusyTester = fileBusyTester,
 ) {
 
@@ -117,7 +114,7 @@ internal class EventTriggerUploadScheduler(
     }.fold(
         onSuccess = { },
         onFailure = { t: Throwable ->
-            tracer.withSpan(null)
+//            tracer.withSpan(null)
             when (t) {
                 is CancellationException -> logger.info { "Shutting down file watcher task." }.also { throw t }
                 else -> {
@@ -136,7 +133,7 @@ internal class EventTriggerUploadScheduler(
 
         return watcher.onEventFlow
             .onCompletion { error: Throwable? ->
-                tracer.withSpan(null)
+//                tracer.withSpan(null)
                 when (error) {
                     !is CancellationException -> logger.error {
                         "File system event flow terminated${if (error != null) " with error: '${error::class}'; message: '${error.message}'" else "."}"
@@ -146,12 +143,12 @@ internal class EventTriggerUploadScheduler(
                 }
             }
             .map { event: KfsDirectoryWatcherEvent ->
-                startSpan(tracer, "file system event") {
+                startSpan("file system event") {
                     event
                 }
             }
             .filter { (event: KfsDirectoryWatcherEvent, span) ->
-                continueSpan(tracer, span) {
+                continueSpan(span) {
                     when (event.event) {
                         KfsEvent.Create -> true.also {
                             logger.debug {
@@ -180,7 +177,7 @@ internal class EventTriggerUploadScheduler(
                 }.first
             }
             .map { (event: KfsDirectoryWatcherEvent, span) ->
-                continueSpan(tracer, span) { Path.of(event.targetDirectory, event.path).absolute() }
+                continueSpan(span) { Path.of(event.targetDirectory, event.path).absolute() }
             }
     }
 
@@ -198,10 +195,9 @@ internal class EventTriggerUploadScheduler(
 internal class PollingUploadScheduler(
     private val config: CdrClientConfig,
     private val schedulingValidationService: SchedulingValidationService,
-    private val tracer: Tracer,
     @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
-    @param:Value("\${management.tracing.sampling.probability:1.0}")
+    @param:Value($$"${management.tracing.sampling.probability:1.0}")
     private val samplerProbability: Double,
     retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
@@ -211,7 +207,6 @@ internal class PollingUploadScheduler(
     retryUploadFileHandling = retryUploadFileHandling,
     cdrUploadsDispatcher = cdrUploadsDispatcher,
     processingInProgressCache = processingInProgressCache,
-    tracer = tracer,
     fileBusyTester = fileBusyTester,
 ) {
 
@@ -257,7 +252,7 @@ internal class PollingUploadScheduler(
     }.fold(
         onSuccess = { },
         onFailure = { t: Throwable ->
-            tracer.withSpan(null)
+//            tracer.withSpan(null)
             when (t) {
                 is CancellationException -> logger.info { "Shutting down file polling task." }.also { throw t }
                 else -> {
@@ -274,19 +269,19 @@ internal class PollingUploadScheduler(
                 config.customer
                     .asSequence()
                     .map {
-                        startSpan(tracer, "poll directory ${it.sourceFolder}") {
+                        startSpan("poll directory ${it.sourceFolder}") {
                             logger.debug { "Polling source directory for files: ${it.sourceFolder}" }
                             it.getAllSourceDocTypeFolders().forEach { dir -> logger.debug { "Polling additional source directory for files: $dir" } }
                             it
                         }
                     }
-                    .flatMap { (connector, span) ->
+                    .flatMap { (connector, _) ->
                         val allSourceFolders: List<Path> = listOf(connector.sourceFolder) + connector.getAllSourceDocTypeFolders()
                         allSourceFolders.flatMap { dir ->
                             dir.listDirectoryEntries()
                                 .asSequence()
                                 .sortedBy { Files.readAttributes(it, BasicFileAttributes::class.java).lastModifiedTime() }
-                                .map { path -> path to tracer.nextSpan(span)!! }
+                                .map { path -> startSpan("handle file found in ${path.parent}") { path } }
                         }
                     }.forEach { (path, span) ->
                         emit(path.absolute() to span)
@@ -296,7 +291,8 @@ internal class PollingUploadScheduler(
             }
         }
             .onCompletion { error: Throwable? ->
-                tracer.withSpan(null)
+//                DefaultSpan.create(SpanContext.getInvalid())
+//                tracer.withSpan(null)
                 // `shareIn(..)` makes this a hot flow which never terminates unless an error occurs, or it is explicitly canceled
                 when (error) {
                     !is CancellationException -> logger.error {
@@ -321,7 +317,6 @@ internal abstract class BaseUploadScheduler(
     @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
     private val processingInProgressCache: ObjectKache<String, Path>,
-    private val tracer: Tracer,
     private val fileBusyTester: FileBusyTester
 ) {
 
@@ -329,7 +324,7 @@ internal abstract class BaseUploadScheduler(
     protected suspend fun uploadFiles(pathFlow: Flow<Pair<Path, Span>>): Unit = coroutineScope {
         pathFlow
             .filter { (fileOrDir: Path, span: Span) ->
-                continueSpan(tracer, span) {
+                continueSpan(span) {
                     logger.debug {
                         "new item '${fileOrDir.name}' in '['${fileOrDir.parent}']' ; file ${
                             if (fileOrDir.isRegularFile()) "is"
@@ -342,7 +337,7 @@ internal abstract class BaseUploadScheduler(
                 }.first
             }
             .filter { (file: Path, span: Span) ->
-                continueSpan(tracer, span) {
+                continueSpan(span) {
                     logger.debug {
                         "new file '${file.name}' in '${file.parent}' ; file ${
                             if (file.extension == EXTENSION_XML) "ends"
@@ -355,7 +350,7 @@ internal abstract class BaseUploadScheduler(
                 }.first
             }
             .filter { (file: Path, span: Span) ->
-                continueSpan(tracer, span) {
+                continueSpan(span) {
                     isNull(processingInProgressCache.put(file.absolutePathString(), file))
                         .also { isNotProcessing ->
                             if (!isNotProcessing) {
@@ -364,10 +359,10 @@ internal abstract class BaseUploadScheduler(
                         }
                 }.first
             }
-            .onEach { (file: Path, span) ->
-                continueSpan(tracer, span) {
+            .onEach { (file: Path, span: Span) ->
+                continueSpan(span) {
                     logger.info { "queuing '${file}' for upload" }
-                    launch(SpanContextElement(span, tracer)) {
+                    launch(span.asContextElement()) {
                         runCatching {
                             dispatchForUpload(file)
                         }.fold(
@@ -391,7 +386,7 @@ internal abstract class BaseUploadScheduler(
                 }
             }
             .onCompletion { error: Throwable? ->
-                tracer.withSpan(null)
+//                tracer.withSpan(null)
                 when (error) {
                     !is CancellationException -> logger.error {
                         "Upload flow subscription terminated${if (error != null) " with error: '${error::class}'; message: '${error.message}'" else "."}"

@@ -5,7 +5,7 @@ import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientSecret
 import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.micrometer.tracing.Tracer
+import io.opentelemetry.api.trace.Span
 import org.springframework.stereotype.Service
 import java.time.Instant
 
@@ -24,7 +24,6 @@ internal class ClientSecretRenewalService(
     private val config: CdrClientConfig,
     private val configurationWriter: ConfigurationWriter,
     private val cdrApiClient: CdrApiClient,
-    private val tracer: Tracer
 ) {
     sealed interface RenewClientSecretResult {
         object Success : RenewClientSecretResult
@@ -93,7 +92,7 @@ internal class ClientSecretRenewalService(
 
     private fun getNewSecret(): String =
         cdrApiClient.renewClientCredential(
-            traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
+            traceId = Span.current()?.spanContext?.traceId ?: EMPTY_STRING
         ).run {
             when (this) {
                 is CdrApiClient.RenewClientSecretResult.Success -> this.clientSecret

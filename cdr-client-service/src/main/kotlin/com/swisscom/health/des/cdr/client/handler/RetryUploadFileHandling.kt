@@ -6,7 +6,7 @@ import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.getConnectorForSourceFile
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentResult
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.micrometer.tracing.Tracer
+import io.opentelemetry.api.trace.Span
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.time.delay
@@ -36,7 +36,6 @@ private val logger = KotlinLogging.logger {}
 @Suppress("TooManyFunctions", "LongParameterList")
 internal class RetryUploadFileHandling(
     private val cdrClientConfig: CdrClientConfig,
-    private val tracer: Tracer,
     private val cdrApiClient: CdrApiClient,
 ) {
 
@@ -66,7 +65,7 @@ internal class RetryUploadFileHandling(
                     file = uploadFile,
                     connectorId = connector.connectorId.id,
                     mode = connector.mode,
-                    traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
+                    traceId = Span.current()?.spanContext?.traceId ?: EMPTY_STRING
                 )
 
                 retryNeeded = when (response) {

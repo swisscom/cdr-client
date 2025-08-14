@@ -1,11 +1,10 @@
 package com.swisscom.health.des.cdr.client.scheduling
 
+import com.swisscom.health.des.cdr.client.TraceSupport
 import com.swisscom.health.des.cdr.client.handler.ClientSecretRenewalService
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
-import com.swisscom.health.des.cdr.client.handler.withSpan
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.micrometer.tracing.Tracer
 import jakarta.annotation.PostConstruct
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
@@ -29,7 +28,6 @@ internal class ClientSecretRenewalScheduler(
     private val clientSecretRenewalService: ClientSecretRenewalService,
     private val schedulingValidationService: SchedulingValidationService,
     private val shutdownService: ShutdownService,
-    private val tracer: Tracer,
 ) {
 
     @PostConstruct
@@ -39,7 +37,7 @@ internal class ClientSecretRenewalScheduler(
         fixedDelayString = "#{ @'client-com.swisscom.health.des.cdr.client.config.CdrClientConfig'.getIdpCredentials().getMaxCredentialAge().toMillis() }",
         initialDelayString= "#{ @'client-com.swisscom.health.des.cdr.client.config.CdrClientConfig'.getIdpCredentials().getMillisUntilNextCredentialRenewal() }"
     )
-    fun renewClientSecret(): Unit = tracer.withSpan("Renew Client Secret") {
+    fun renewClientSecret(): Unit = TraceSupport.withSpan("Renew Client Secret") {
         if(schedulingValidationService.isSchedulingAllowed) {
             logger.info { "Renewing client secret..." }
             val result = clientSecretRenewalService.renewClientSecret()

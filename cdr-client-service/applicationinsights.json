@@ -1,0 +1,39 @@
+{
+  "connectionString": "InstrumentationKey=93ddaea3-c045-481c-a707-5fbf5467f9dc;IngestionEndpoint=https://switzerlandnorth-0.in.applicationinsights.azure.com/;LiveEndpoint=https://switzerlandnorth.livediagnostics.monitor.azure.com/",
+  "authentication": {
+    "enabled": true,
+    "type": "SAMI"
+  },
+  "role": {
+    "name": "cdr-client-prod-cl-pmediad-vm01"
+  },
+  "sampling": {
+    "percentage": 100
+  },
+  "instrumentation": {
+    "logging": {
+      "level": "INFO"
+    },
+    "micrometer": {
+      "enabled": false
+    },
+    "springScheduling": {
+      "enabled": false
+    }
+  },
+  "heartbeat": {
+    "intervalSeconds": 60
+  },
+  "preview": {
+    "diskPersistenceMaxSizeMb": 50
+  },
+  "selfDiagnostics": {
+    "destination": "file+console",
+    "level": "INFO",
+    "file": {
+      "path": "applicationinsights.log",
+      "maxSizeMb": 10,
+      "maxHistory": 10
+    }
+  }
+}
