@@ -9,6 +9,7 @@ import com.swisscom.health.des.cdr.client.xml.XmlUtil
 import com.swisscom.health.des.cdr.client.xml.toDom
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.opentelemetry.api.trace.Span
+import io.opentelemetry.api.trace.Tracer
 import org.springframework.stereotype.Component
 import java.nio.file.Files
 import java.nio.file.Path
@@ -28,7 +29,8 @@ internal const val PULL_RESULT_ID_HEADER = "cdr-document-uuid"
 @Suppress("TooManyFunctions")
 internal class PullFileHandling(
     private val cdrApiClient: CdrApiClient,
-    private val xmlParser: XmlUtil
+    private val xmlParser: XmlUtil,
+    private val tracer: Tracer,
 ) {
     /**
      * Downloads files for a specific customer.
@@ -36,7 +38,7 @@ internal class PullFileHandling(
      * @param connector the connector to synchronize
      */
     suspend fun pullSyncConnector(connector: Connector) {
-        TraceSupport.withSpan("Pull Sync Connector ${connector.connectorId}") {
+        TraceSupport.withSpan(tracer, "Pull Sync Connector ${connector.connectorId}") {
             logger.info { "Sync connector '${connector.connectorId}' (${connector.mode}) - pulling" }
             var counter = 0
             runCatching {

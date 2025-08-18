@@ -1,4 +1,4 @@
-//package com.swisscom.health.des.cdr.client
+package com.swisscom.health.des.cdr.client
 //
 //import com.fasterxml.jackson.databind.ObjectMapper
 //import com.microsoft.aad.msal4j.ClientCredentialParameters

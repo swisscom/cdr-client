@@ -59,18 +59,19 @@ gradle.taskGraph.whenReady(
     }
 )
 
+dependencyManagement {
+    imports {
+        mavenBom(libs.spring.boot.dependencies.get().toString())
+        mavenBom("io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom:2.18.1")
+    }
+}
+
 dependencies {
-    implementation(platform(libs.spring.boot.dependencies))
-    implementation(platform(libs.spring.cloud.dependencies))
     implementation(libs.kache)
     implementation(libs.msal4j)
     implementation(libs.okhttp)
     implementation(libs.kfswatch)
     implementation(libs.kotlin.logging)
-//    implementation(libs.micrometer.tracing)
-//    implementation(libs.micrometer.tracing.bridge.otel)
-    implementation("io.opentelemetry:opentelemetry-extension-kotlin:1.49.0")
-    implementation("io.opentelemetry.instrumentation:opentelemetry-logback-mdc-1.0:2.18.1-alpha")
     implementation(libs.logstash.encoder)
     implementation(libs.kotlin.reflect)
     implementation(libs.kotlin.stdlib)
@@ -82,6 +83,8 @@ dependencies {
     implementation(libs.jackson.dataformat.yaml)
     implementation(libs.jackson.module.kotlin)
     implementation(projects.cdrClientCommon)
+    implementation("io.opentelemetry:opentelemetry-extension-kotlin")
+    implementation("io.opentelemetry.instrumentation:opentelemetry-spring-boot-starter:2.18.1")
 
     // Note: At the time of writing the configuration processor seems to be broken; might be related to the upgrade to Kotlin 2.x
     // Enable annotation processing via menu File | Settings | Build, Execution, Deployment

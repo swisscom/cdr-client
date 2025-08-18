@@ -1,8 +1,8 @@
 package com.swisscom.health.des.cdr.client
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.trace.Span
+import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.Tracer
 import kotlin.contracts.ExperimentalContracts
 import kotlin.contracts.InvocationKind
@@ -16,31 +16,28 @@ val logger = KotlinLogging.logger {}
  */
 object TraceSupport {
 
-    @JvmStatic
-    val TRACER: Tracer = GlobalOpenTelemetry.get().getTracer("cdr-client-trace-support")
-
-    inline fun <A> withSpan(spanName: String, block: () -> A): A {
-        val span: Span = TRACER.spanBuilder(spanName).startSpan()
+    inline fun <A> withSpan(tracer: Tracer, spanName: String, block: () -> A): A {
+        val span: Span = tracer.spanBuilder(spanName).setSpanKind(SpanKind.INTERNAL).startSpan()
         return span.makeCurrent().use { _ ->
-            logger.info { "Starting span: '$span'" }
+            logger.trace { "Starting span: '$span'" }
             block().also {
-                logger.info { "Ending span: '$span'" }
+                logger.trace { "Ending span: '$span'" }
             }
         }
     }
 
     @OptIn(ExperimentalContracts::class)
-    inline fun <A> startSpan(spanName: String, block: () -> A): Pair<A, Span> {
+    inline fun <A> startSpan(tracer: Tracer, spanName: String, block: () -> A): Pair<A, Span> {
         contract {
             callsInPlace(block, InvocationKind.EXACTLY_ONCE)
         }
 
-        val span: Span = TRACER.spanBuilder(spanName).startSpan()
+        val span: Span = tracer.spanBuilder(spanName).setSpanKind(SpanKind.INTERNAL).startSpan()
 
         return span.makeCurrent().use { _ ->
-            logger.info { "Starting span: '$span'" }
+            logger.trace { "Starting span: '$span'" }
             block().also {
-                logger.info { "Ending span: '$span'" }
+                logger.trace { "Ending span: '$span'" }
             }
         } to span
     }
@@ -52,27 +49,11 @@ object TraceSupport {
         }
 
         return span.makeCurrent().use { _ ->
-            logger.info { "Continuing span: '$span'" }
+            logger.trace { "Continuing span: '$span'" }
             block().also {
-                logger.info { "Ending continuation of span: '$span'" }
+                logger.trace { "Ending continuation of span: '$span'" }
             }
         } to span
     }
 
 }
-
-//internal class SpanContextElement(private val span: Span) : ThreadContextElement<Scope> {
-//    override val key: CoroutineContext.Key<SpanContextElement>
-//        get() = Key
-//
-//    override fun updateThreadContext(context: CoroutineContext): Scope = span.makeCurrent()
-//
-//    override fun restoreThreadContext(context: CoroutineContext, oldState: Scope) = oldState.close()
-//
-//    override fun toString(): String = "$Key=$span"
-//
-//    companion object Key : CoroutineContext.Key<SpanContextElement> {
-//        override fun toString(): String = "SpanInScope"
-//    }
-//
-//}

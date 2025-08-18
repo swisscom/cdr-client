@@ -13,8 +13,8 @@ import io.github.irgaly.kfswatch.KfsDirectoryWatcherEvent
 import io.github.irgaly.kfswatch.KfsEvent
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.opentelemetry.api.trace.Span
+import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.extension.kotlin.asContextElement
-import jakarta.annotation.PostConstruct
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +36,6 @@ import kotlinx.coroutines.time.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
@@ -63,8 +62,7 @@ private val logger = KotlinLogging.logger {}
 internal class EventTriggerUploadScheduler(
     private val config: CdrClientConfig,
     private val schedulingValidationService: SchedulingValidationService,
-    @param:Value($$"${management.tracing.sampling.probability:0.0}")
-    private val samplerProbability: Double,
+    private val tracer: Tracer,
     @Qualifier("limitedParallelismCdrUploadsDispatcher")
     cdrUploadsDispatcher: CoroutineDispatcher,
     retryUploadFileHandling: RetryUploadFileHandling,
@@ -77,19 +75,6 @@ internal class EventTriggerUploadScheduler(
     processingInProgressCache = processingInProgressCache,
     fileBusyTester = fileBusyTester,
 ) {
-
-    @PostConstruct
-    @Suppress("UnusedPrivateMember")
-    private fun failIfTelemetrySamplingIsEnabled() {
-        if (samplerProbability > ZERO_SAMPLING_THRESHOLD) {
-            logger.error {
-                "Telemetry sampling is enabled (sampling probability is set to $samplerProbability). Currently we cannot support telemetry " +
-                        "sampling without introducing a memory leak due to the lack of framework integration of micrometer/open-telemetry with Kotlin " +
-                        "coroutines/asynchronous flows. You need to disable telemetry sampling."
-            }
-            error("Telemetry sampling is enabled. Please set the configuration property `management.tracing.sampling.probability` to 0.0")
-        }
-    }
 
     // NOTE: The scheduled tasks are racing the SpringBoot/integration tests; we need to give the tests enough time to update the client configuration
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
@@ -143,7 +128,7 @@ internal class EventTriggerUploadScheduler(
                 }
             }
             .map { event: KfsDirectoryWatcherEvent ->
-                startSpan("file system event") {
+                startSpan(tracer, "file system event") {
                     event
                 }
             }
@@ -197,8 +182,7 @@ internal class PollingUploadScheduler(
     private val schedulingValidationService: SchedulingValidationService,
     @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
-    @param:Value($$"${management.tracing.sampling.probability:1.0}")
-    private val samplerProbability: Double,
+    private val tracer: Tracer,
     retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
     fileBusyTester: FileBusyTester,
@@ -209,19 +193,6 @@ internal class PollingUploadScheduler(
     processingInProgressCache = processingInProgressCache,
     fileBusyTester = fileBusyTester,
 ) {
-
-    @PostConstruct
-    @Suppress("UnusedPrivateMember")
-    private fun failIfTelemetrySamplingIsEnabled() {
-        if (samplerProbability > ZERO_SAMPLING_THRESHOLD) {
-            logger.error {
-                "Telemetry sampling is enabled (sampling probability is set to $samplerProbability). Currently we cannot support telemetry " +
-                        "sampling without introducing a memory leak due to the lack of framework integration of micrometer/open-telemetry with Kotlin " +
-                        "coroutines/asynchronous flows. You need to disable telemetry sampling."
-            }
-            error("Telemetry sampling is enabled. Please set the configuration property `management.tracing.sampling.probability` to 0.0")
-        }
-    }
 
     // NOTE: The scheduled tasks are racing the SpringBoot/integration tests; we need to give the tests enough time to update the client configuration
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
@@ -269,7 +240,7 @@ internal class PollingUploadScheduler(
                 config.customer
                     .asSequence()
                     .map {
-                        startSpan("poll directory ${it.sourceFolder}") {
+                        startSpan(tracer, "poll directory ${it.sourceFolder}") {
                             logger.debug { "Polling source directory for files: ${it.sourceFolder}" }
                             it.getAllSourceDocTypeFolders().forEach { dir -> logger.debug { "Polling additional source directory for files: $dir" } }
                             it
@@ -281,7 +252,7 @@ internal class PollingUploadScheduler(
                             dir.listDirectoryEntries()
                                 .asSequence()
                                 .sortedBy { Files.readAttributes(it, BasicFileAttributes::class.java).lastModifiedTime() }
-                                .map { path -> startSpan("handle file found in ${path.parent}") { path } }
+                                .map { path -> startSpan(tracer, "handle file found in ${path.parent}") { path } }
                         }
                     }.forEach { (path, span) ->
                         emit(path.absolute() to span)
@@ -317,7 +288,7 @@ internal abstract class BaseUploadScheduler(
     @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
     private val processingInProgressCache: ObjectKache<String, Path>,
-    private val fileBusyTester: FileBusyTester
+    private val fileBusyTester: FileBusyTester,
 ) {
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
@@ -437,10 +408,6 @@ internal abstract class BaseUploadScheduler(
 
     companion object {
         const val EXTENSION_XML = "xml"
-
-        @JvmStatic
-        val ZERO_SAMPLING_THRESHOLD: Double = 0.0
-
         const val DEFAULT_INITIAL_DELAY_MILLIS = 2_000L
         const val DEFAULT_RESTART_DELAY_MILLIS = 15_000L
         const val DEFAULT_RESTART_DELAY_SECONDS = DEFAULT_RESTART_DELAY_MILLIS / 1_000L

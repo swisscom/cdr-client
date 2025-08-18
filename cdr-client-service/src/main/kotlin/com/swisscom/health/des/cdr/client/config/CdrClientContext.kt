@@ -9,6 +9,8 @@ import com.microsoft.aad.msal4j.ConfidentialClientApplication
 import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.opentelemetry.api.OpenTelemetry
+import io.opentelemetry.api.trace.Tracer
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -36,6 +38,9 @@ private val logger = KotlinLogging.logger {}
 @Suppress("TooManyFunctions")
 @Configuration
 internal class CdrClientContext {
+
+    @Bean
+    fun otelTracer(otel: OpenTelemetry): Tracer = otel.getTracer("cdr-client-trace-support")
 
     /**
      * Creates and returns an instance of the OkHttpClient.
