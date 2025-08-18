@@ -61,6 +61,8 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 private val logger = KotlinLogging.logger {}
+private const val PREFIX = "{{prefix}}"
+private const val SCOPE = "https://${PREFIX}identity.health.swisscom.ch/CdrApi/.default"
 
 @Composable
 @Preview
@@ -141,7 +143,16 @@ internal fun CdrConfigScreen(
                 label = { Text(text = stringResource(Res.string.label_cdr_api_host)) },
                 value = uiState.clientServiceConfig.cdrApi.host,
                 placeHolder = { Text(text = stringResource(Res.string.label_cdr_api_host_placeholder)) },
-                onValueChange = { if (canEdit) viewModel.setCdrApiHost(it) },
+                onValueChange = {
+                    if (canEdit) {
+                        viewModel.setCdrApiHost(it)
+                        if(it.startsWith("stg")) {
+                            viewModel.setIdpCredentialsScopes(SCOPE.replace(PREFIX, "tst."))
+                        } else {
+                            viewModel.setIdpCredentialsScopes(SCOPE.replace(PREFIX, ""))
+                        }
+                    }
+                },
                 enabled = canEdit,
             )
 

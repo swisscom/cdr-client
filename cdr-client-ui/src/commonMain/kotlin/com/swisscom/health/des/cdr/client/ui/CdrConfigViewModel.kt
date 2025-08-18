@@ -138,6 +138,19 @@ internal class CdrConfigViewModel(
         }
     }
 
+    fun setIdpCredentialsScopes(scope: String) {
+        logger.debug { "setIdpCredentialsScopes" }
+        _uiState.update {
+            it.copy(
+                clientServiceConfig = it.clientServiceConfig.copy(
+                    idpCredentials = it.clientServiceConfig.idpCredentials.copy(
+                        scopes = listOf(scope)
+                    )
+                )
+            )
+        }
+    }
+
     /**
      * Sets the temporary download directory in the client service configuration.
      *

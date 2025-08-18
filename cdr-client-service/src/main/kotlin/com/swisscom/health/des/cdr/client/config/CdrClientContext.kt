@@ -18,8 +18,10 @@ import okhttp3.Response
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.boot.context.properties.ConfigurationPropertiesBinding
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.convert.converter.Converter
 import org.springframework.retry.support.RetryTemplate
 import java.io.IOException
 import java.nio.file.Path
@@ -139,7 +141,7 @@ internal class CdrClientContext {
      */
     @Bean
     fun clientCredentialParams(config: CdrClientConfig): ClientCredentialParameters =
-        ClientCredentialParameters.builder(config.idpCredentials.scopes.toSet()).build()
+        ClientCredentialParameters.builder(setOf(config.idpCredentials.scopes.scopes[0].scope)).build()
 
     /**
      * Creates and returns a spring retry-template that retries on IOExceptions up to three times before bailing out.
@@ -183,6 +185,10 @@ internal class CdrClientContext {
     @ConditionalOnMissingBean(FileBusyTester::class)
     fun defaultBusyFileTester(): FileBusyTester =
         FileBusyTester.NeverBusy.also { logger.warn { "No file-busy-test strategy defined, defaulting to 'NEVER_BUSY'" } }
+
+    @Bean
+    @ConfigurationPropertiesBinding
+    fun stringToScopeConverter(): Converter<String, Scope> = Converter { Scope(it) }
 
 }
 

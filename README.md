@@ -13,13 +13,21 @@ On macOS, the client UI application starts the client service and shuts it down 
 
 ## Installation / Run the client
 
-> Improvements for the installation are work in progress. For now, the client is only available as a jar file with
-> manual
-> steps
-> required for the installation.
+### Installer
+
+Download the installer from the [download page](https://cdr.health.swisscom.ch/share/downloads/download.html) and follow the instructions.
+Using the download page will give you the latest version of the client.
+
+The installed client will automatically check for updates and install them if available. 
+If the UI is running during an update it needs to be restarted manually to reflect the changes.
+* **Windows**: Checks for updates every hour. The UI needs to be manually restarted to reflect the changes.
+* **Linux** (Debian): A custom apt repository is added to your system, and the software is installed from it. Updates can be managed through the standard package manager (apt update/upgrade commands).
+* **MacOS**: Auto updates in the background or during startup. The UI (and therefore the client service) need to be manually restarted to reflect the changes.
+
+### Manual Installation - Jar only, no auto update
+If you want to run the client service without the UI and without auto updates, you can download the jar file directly.
 
 Pre-Requirements:
-
 * Java 17 (or higher) installed
 
 Go to the [releases](https://github.com/swisscom/cdr-client/releases) github page and click on the maven assets for the newest release:
@@ -31,14 +39,14 @@ should contain the configuration for the client. An example can be found [here](
 
 Open a terminal and navigate to the directory where the jar file is located. Run the following command to start the
 client (check the jar name and replace it in the command or rename the jar itself):
-> The -D parameters need to be placed before the "-jar cdr-client.jar".<p>
+> The -D parameters need to be placed before the "-jar cdr-client-service.jar".<p>
 > The quotes are necessary for Windows, but not for Unix systems
 
 ```shell
-java "-Dspring.config.additional-location=./application-customer.yaml" -jar cdr-client.jar
+java "-Dspring.config.additional-location=./application-customer.yaml" -jar cdr-client-service.jar
 ```
 
-Check that no error messages are present in the terminal (or have a look at the "cdr-client.log" file that is created in
+Check that no error messages are present in the terminal (or have a look at the "cdr-client-service.log" file that is created in
 the same directory as you've placed the jar file) and that the client is running.
 
 Configure an OS appropriate service to run the client as a background service.
@@ -101,7 +109,7 @@ the upload failed with a response code of 4xx, the file will be appended with '.
 same name as the file sent, but with the extension '.log', will be created and the received response body will be saved
 to this file. If the upload failed with a response code of 5xx, the file will be retried indefinitely, assuming the root
 cause is an infrastructure issue that will ultimately be resolved (and uploading another file would fail too, for the
-same reason). See retry-delay in the [application-client.yaml](./src/main/resources/config/application-client.yaml)
+same reason). See retry-delay in the [application-client.yaml](./cdr-client-service/src/main/resources/config/application-client.yaml)
 file.
 
 ## Local development
@@ -115,7 +123,7 @@ docker compose down && docker compose up --build
 ```
 
 If you want to work with a deployed CDR API you need to change
-the [application-dev.yaml](./src/main/resources/config/application-dev.yaml)
+the [application-dev.yaml](./cdr-client-service/src/main/resources/config/application-dev.yaml)
 
 Set the following spring profile to active: dev
 
@@ -146,14 +154,14 @@ You can use [Hydraulic Conveyor](https://conveyor.hydraulic.dev) to build instal
 
 Run following to build the project and create and install the package on your DEBIAN system:
 ```
-./gradlew clean build -x test && conveyor -f conveyor-dev.conf make site && sudo dpkg -i output/debian/swisscom-schweiz-ag-cdr-client_1.0.0_amd64.deb
+./gradlew cleanAll buildAll -x test && conveyor -f conveyor-dev.conf make site && sudo dpkg -i output/debian/swisscom-schweiz-ag-cdr-client_1.0.0_amd64.deb
 ```
 
 ### Running the Fat-JAR
 
 If the built SpringBoot fat-jar should be run directly, the following command can be used:
-`java -jar cdr-client.jar`
-The jar can be found in build/libs.
+`java -jar cdr-client-service.jar`
+The jar can be found in cdr-client-service/build/libs.
 
 The following environment variables need to be present (and correctly configured) so that the application can start
 successfully:
@@ -209,8 +217,4 @@ client:
       mode: production
 ```
 
-Some information can also be set as environment variables.
-See [application-client.yaml](./src/main/resources/config/application-client.yaml) for variable names.
-
-If the host is not set to production, but to stg instead, then the CDR_CLIENT_SCOPE_PREFIX environment variable needs to
-be set to `tst.`.
+If the host is set to stage instead of production, then the scopes needs to be set to `https://tst.identity.health.swisscom.ch/CdrApi/.default`.

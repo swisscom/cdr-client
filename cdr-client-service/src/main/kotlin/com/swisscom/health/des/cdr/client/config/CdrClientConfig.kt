@@ -408,6 +408,33 @@ internal data class Customer(
     }
 }
 
+@Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
+internal data class Scopes(
+    val scopes: MutableList<Scope>
+) : PropertyNameAware, MutableList<Scope> by scopes {
+
+    // required by SpringBoot
+    @Suppress("unused")
+    constructor() : this(mutableListOf())
+
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    companion object {
+        const val PROPERTY_NAME = "scopes"
+    }
+}
+
+@JvmInline
+internal value class Scope(val scope: String) : PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    companion object {
+        const val PROPERTY_NAME = "scope"
+    }
+}
+
 @JvmInline
 internal value class FileBusyTestStrategyProperty(val strategy: CdrClientConfig.FileBusyTestStrategy) : PropertyNameAware {
     override val propertyName: String
@@ -459,7 +486,7 @@ internal data class IdpCredentials(
      * Access scopes to request from the OAuth identity provider. Currently only ```https://[stg.]identity.health.swisscom.ch/CdrApi/.default```
      * is supported.
      * */
-    val scopes: List<String>,
+    val scopes: Scopes,
 
     /**
      * Whether to attempt to automatically renew the client secret every [maxCredentialAge] days.
