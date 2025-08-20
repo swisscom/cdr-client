@@ -138,13 +138,13 @@ internal class CdrConfigViewModel(
         }
     }
 
-    fun setIdpCredentialsScopes(scope: String) {
-        logger.debug { "setIdpCredentialsScopes" }
+    fun setIdpCredentialsScope(scope: String) {
+        logger.debug { "setIdpCredentialsScope" }
         _uiState.update {
             it.copy(
                 clientServiceConfig = it.clientServiceConfig.copy(
                     idpCredentials = it.clientServiceConfig.idpCredentials.copy(
-                        scopes = listOf(scope)
+                        scope = scope
                     )
                 )
             )

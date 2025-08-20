@@ -187,8 +187,7 @@ client:
     tenant-id: swisscom-health-tenant-id # provided by Swisscom Health
     client-id: my-client-id # Self-service on CDR website
     client-secret: my-secret # Self-service on CDR website
-    scopes:
-      - https://identity.health.swisscom.ch/CdrApi/.default
+    scope: https://identity.health.swisscom.ch/CdrApi/.default
     renew-credential: true
     max-credential-age: 365d
     last-credential-renewal-time: 2025-06-05T14:01:42Z
@@ -217,4 +216,4 @@ client:
       mode: production
 ```
 
-If the host is set to stage instead of production, then the scopes needs to be set to `https://tst.identity.health.swisscom.ch/CdrApi/.default`.
+If the host is set to stage instead of production, then the scope needs to be set to `https://tst.identity.health.swisscom.ch/CdrApi/.default`.

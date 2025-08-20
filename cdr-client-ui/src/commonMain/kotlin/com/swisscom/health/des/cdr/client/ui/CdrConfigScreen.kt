@@ -147,9 +147,9 @@ internal fun CdrConfigScreen(
                     if (canEdit) {
                         viewModel.setCdrApiHost(it)
                         if(it.startsWith("stg")) {
-                            viewModel.setIdpCredentialsScopes(SCOPE.replace(PREFIX, "tst."))
+                            viewModel.setIdpCredentialsScope(SCOPE.replace(PREFIX, "tst."))
                         } else {
-                            viewModel.setIdpCredentialsScopes(SCOPE.replace(PREFIX, ""))
+                            viewModel.setIdpCredentialsScope(SCOPE.replace(PREFIX, ""))
                         }
                     }
                 },

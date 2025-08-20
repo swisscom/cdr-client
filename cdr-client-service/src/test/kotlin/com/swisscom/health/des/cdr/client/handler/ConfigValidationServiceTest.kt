@@ -17,7 +17,6 @@ import com.swisscom.health.des.cdr.client.config.IdpCredentials
 import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime.Companion.BEGINNING_OF_TIME
 import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.Scope
-import com.swisscom.health.des.cdr.client.config.Scopes
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.config.toDto
@@ -446,7 +445,7 @@ internal class ConfigValidationServiceTest {
                 tenantId = TenantId("fake-tenant-id"),
                 clientId = ClientId("fake-client-id"),
                 clientSecret = ClientSecret("fake-client-secret"),
-                scopes = Scopes(mutableListOf(Scope("CDR"))),
+                scope = Scope("CDR"),
                 renewCredential = RenewCredential(true),
                 lastCredentialRenewalTime = BEGINNING_OF_TIME,
             ),

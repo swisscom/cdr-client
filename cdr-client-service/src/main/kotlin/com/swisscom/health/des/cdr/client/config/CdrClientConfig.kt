@@ -394,7 +394,7 @@ internal data class CredentialApi(
 
 @Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
 internal data class Customer(
-    val customer: MutableList<Connector>
+    private val customer: MutableList<Connector>
 ) : PropertyNameAware, MutableList<Connector> by customer {
 
     // required by SpringBoot
@@ -405,23 +405,6 @@ internal data class Customer(
 
     companion object {
         const val PROPERTY_NAME = "customer"
-    }
-}
-
-@Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
-internal data class Scopes(
-    val scopes: MutableList<Scope>
-) : PropertyNameAware, MutableList<Scope> by scopes {
-
-    // required by SpringBoot
-    @Suppress("unused")
-    constructor() : this(mutableListOf())
-
-    override val propertyName: String
-        get() = PROPERTY_NAME
-
-    companion object {
-        const val PROPERTY_NAME = "scopes"
     }
 }
 
@@ -483,10 +466,10 @@ internal data class IdpCredentials(
     val clientSecret: ClientSecret,
 
     /**
-     * Access scopes to request from the OAuth identity provider. Currently only ```https://[stg.]identity.health.swisscom.ch/CdrApi/.default```
+     * Access scope to request from the OAuth identity provider. Currently only ```https://[stg.]identity.health.swisscom.ch/CdrApi/.default```
      * is supported.
      * */
-    val scopes: Scopes,
+    val scope: Scope,
 
     /**
      * Whether to attempt to automatically renew the client secret every [maxCredentialAge] days.

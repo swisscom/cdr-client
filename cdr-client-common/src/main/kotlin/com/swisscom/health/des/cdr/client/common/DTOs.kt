@@ -270,7 +270,7 @@ class DTOs {
             val tenantId: String,
             val clientId: String,
             val clientSecret: String,
-            val scopes: List<String>,
+            val scope: String,
             val renewCredential: Boolean,
             val maxCredentialAge: Duration,
             val lastCredentialRenewalTime: Instant,
@@ -281,7 +281,7 @@ class DTOs {
                     tenantId = EMPTY_STRING,
                     clientId = EMPTY_STRING,
                     clientSecret = EMPTY_STRING,
-                    scopes = emptyList(),
+                    scope = EMPTY_STRING,
                     renewCredential = false,
                     maxCredentialAge = Duration.ZERO,
                     lastCredentialRenewalTime = Instant.EPOCH
