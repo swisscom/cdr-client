@@ -19,6 +19,7 @@ import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
 import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import com.swisscom.health.des.cdr.client.config.RenewCredential
+import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
 import io.mockk.clearMocks
@@ -96,7 +97,7 @@ class ConfigurationWriterTest {
                 tenantId = TenantId("fake-tenant-id"),
                 clientId = ClientId("fake-client-id"),
                 clientSecret = ClientSecret("fake-client-secret"),
-                scopes = emptyList(),
+                scope = Scope("scope1"),
                 renewCredential = RenewCredential.ENABLED,
                 maxCredentialAge = Duration.ofDays(30),
                 lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
@@ -153,6 +154,7 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.scope") } returns propOrigin
         every { propSource.getOrigin("client.customer[0].connector-id") } returns propOrigin
         every { propSource.getOrigin("client.local-folder") } returns propOrigin
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
@@ -181,6 +183,7 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.scope") } returns propOrigin
         every { propSource.getOrigin("client.local-folder") } returns propOrigin
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
         every { propSource.getOrigin("client.customer[0].connector-id") } returns propOrigin
@@ -212,6 +215,7 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns propOrigin
+        every { propSource.getOrigin("client.idp-credentials.scope") } returns propOrigin
         every { propSource.getOrigin("client.customer[0].connector-id") } returns propOrigin
         every { propSource.getOrigin("client.local-folder") } returns propOrigin
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns propOrigin
@@ -273,6 +277,7 @@ class ConfigurationWriterTest {
         every { propSource.getOrigin("client.idp-credentials.tenant-id") } returns null
         every { propSource.getOrigin("client.idp-credentials.client-id") } returns null
         every { propSource.getOrigin("client.idp-credentials.last-credential-renewal-time") } returns null
+        every { propSource.getOrigin("client.idp-credentials.scope") } returns null
         every { propSource.getOrigin("client.customer[0].connector-id") } returns null
         every { propSource.getOrigin("client.local-folder") } returns null
         every { propSource.getOrigin("client.file-busy-test-strategy") } returns null

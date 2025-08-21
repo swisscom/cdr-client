@@ -139,7 +139,7 @@ internal class CdrClientContext {
      */
     @Bean
     fun clientCredentialParams(config: CdrClientConfig): ClientCredentialParameters =
-        ClientCredentialParameters.builder(config.idpCredentials.scopes.toSet()).build()
+        ClientCredentialParameters.builder(setOf(config.idpCredentials.scope.scope)).build()
 
     /**
      * Creates and returns a spring retry-template that retries on IOExceptions up to three times before bailing out.

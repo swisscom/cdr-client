@@ -5,8 +5,7 @@ client:
     tenant-id: value-required
     client-id: value-required
     client-secret: value-required
-    scopes:
-      - https://identity.health.swisscom.ch/CdrApi/.default
+    scope: https://identity.health.swisscom.ch/CdrApi/.default
     renew-credential: false
     last-credential-renewal-time: 1970-01-01T00:00:00Z
   file-busy-test-strategy: file_size_changed # valid values are `never_busy`, `file_size_changed`, `always_busy`
