@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
+    <!-- LOGS_DIRECTORY is set by systemD for Linux deployments base on the `LogsDirectory` directive -->
     <property name="LOG_DIR" value="${LOGS_DIRECTORY:-@@LOG_DIR@@}" />
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">

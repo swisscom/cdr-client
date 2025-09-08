@@ -2,6 +2,7 @@
     <!-- Labels -->
     <string name="app_name">CDR Client Manager</string>
     <string name="label_open_application_window">Open application window</string>
+    <string name="label_close_application_window">Close application window</string>
     <string name="label_exit">Exit</string>
     <string name="label_reset">Reset</string>
     <string name="label_close">Close</string>

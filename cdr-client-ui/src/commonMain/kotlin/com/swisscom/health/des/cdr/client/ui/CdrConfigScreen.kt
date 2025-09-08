@@ -39,7 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_RGB_Colour_icon
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_apply
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host_placeholder
@@ -57,6 +57,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.s
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_synchronizing
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_unknown
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CancellationException
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -146,7 +147,7 @@ internal fun CdrConfigScreen(
                 onValueChange = {
                     if (canEdit) {
                         viewModel.setCdrApiHost(it)
-                        if(it.startsWith("stg")) {
+                        if (it.startsWith("stg")) {
                             viewModel.setIdpCredentialsScope(SCOPE_TEST)
                         } else {
                             viewModel.setIdpCredentialsScope(SCOPE_DEFAULT)
@@ -203,7 +204,12 @@ internal fun CdrConfigScreen(
                 runCatching {
                     // we ignore the SnackbarResult; is that a good idea?
                     snackbarHostState.showSnackbar(message = errorMessage, actionLabel = closeActionLabel)
-                }.onFailure { logger.error { "Snackbar fail: '${it.toString()}'" } }
+                }.onFailure { t: Throwable ->
+                    when (t) {
+                        is CancellationException -> logger.debug { "Snackbar host encountered cancellation exception; are we being shut down?" }
+                        else -> logger.error { "Snackbar fail: '${t}'" }
+                    }
+                }
 
                 viewModel.clearErrorMessage()
             }
@@ -227,7 +233,7 @@ private fun statusStringResource(status: DTOs.StatusResponse.StatusCode): String
 @Composable
 private fun SwisscomLogo(modifier: Modifier) =
     Image(
-        painter = painterResource(resource = Res.drawable.Swisscom_Lifeform_Colour_RGB),
+        painter = painterResource(resource = Res.drawable.Swisscom_Lifeform_RGB_Colour_icon),
         contentDescription = null,
         modifier = modifier,
     ).also {

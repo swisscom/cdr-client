@@ -159,12 +159,12 @@ internal class RetryUploadFileHandling(
     /**
      * For an error case, renames the file to '.error' and creates a file with the response body.
      */
-    private fun renameFileToErrorAndCreateLogFile(file: Path, responseBdy: String): Unit = runCatching {
+    private fun renameFileToErrorAndCreateLogFile(file: Path, responseBody: String): Unit = runCatching {
         val uuidString = UUID.randomUUID().toString()
         val errorFile = file.resolveSibling("${file.nameWithoutExtension}_$uuidString.error")
         val logFile = file.resolveSibling("${file.nameWithoutExtension}_$uuidString.response")
         file.moveTo(errorFile)
-        Files.write(logFile, responseBdy.toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
+        Files.write(logFile, responseBody.toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
 
         cdrClientConfig.customer.getConnectorForSourceFile(file).let { connector ->
             if (connector.getEffectiveSourceErrorFolder(file) != file.parent) {

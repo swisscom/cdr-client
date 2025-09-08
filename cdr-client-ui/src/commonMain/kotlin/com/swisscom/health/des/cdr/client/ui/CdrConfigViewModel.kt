@@ -9,7 +9,9 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.e
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_client_validation
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -480,8 +482,8 @@ internal class CdrConfigViewModel(
     /**
      * Queries the CDR Client service status.
      */
-    fun queryClientServiceStatus(retryStrategy: CdrClientApiClient.RetryStrategy): Job =
-        viewModelScope.launch {
+    fun queryClientServiceStatus(retryStrategy: CdrClientApiClient.RetryStrategy): Deferred<DTOs.StatusResponse.StatusCode> =
+        viewModelScope.async {
             cdrClientApiClient.getClientServiceStatus(retryStrategy).let { status: DTOs.StatusResponse.StatusCode ->
                 if (status.isOnlineCategory && _uiState.value.clientServiceStatus.isOfflineCategory) {
                     // if we went from an offline state to an online state, we need to refresh the client service configuration
@@ -502,6 +504,7 @@ internal class CdrConfigViewModel(
                         clientServiceStatus = status
                     )
                 }
+                status
             }
         }
 

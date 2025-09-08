@@ -19,8 +19,10 @@ import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import mockwebserver3.junit5.StartStop
+import okhttp3.Headers
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -88,13 +90,11 @@ internal class PollingPushFileHandlingTest {
     private val sourceDirectory = "source"
     private val forumDatenaustauschMediaType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
 
-    private lateinit var cdrServiceMock: MockWebServer
+    @StartStop
+    private val cdrServiceMock = MockWebServer()
 
     @BeforeEach
     fun setup() {
-        cdrServiceMock = MockWebServer()
-        cdrServiceMock.start()
-
         val inflightDir = tmpDir.resolve(inflightDir).also { it.createDirectories() }
         val sourceDir0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
         val targetDir0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
@@ -139,8 +139,6 @@ internal class PollingPushFileHandlingTest {
 
     @AfterEach
     fun tearDown() {
-        cdrServiceMock.shutdown()
-
         runBlocking {
             fileCache.clear()
         }
@@ -148,10 +146,11 @@ internal class PollingPushFileHandlingTest {
 
     @Test
     fun `test successfully write two files to API - no archive`() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-            .setBody("{\"message\": \"Upload successful\"}")
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body("{\"message\": \"Upload successful\"}")
+            .build()
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
 
@@ -198,10 +197,11 @@ internal class PollingPushFileHandlingTest {
             )
         )
 
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-            .setBody("{\"message\": \"Upload successful\"}")
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body("{\"message\": \"Upload successful\"}")
+            .build()
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
 
@@ -252,10 +252,11 @@ internal class PollingPushFileHandlingTest {
             )
         )
 
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-            .setBody("{\"message\": \"Upload successful\"}")
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body("{\"message\": \"Upload successful\"}")
+            .build()
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
 
@@ -307,10 +308,11 @@ internal class PollingPushFileHandlingTest {
             )
         )
 
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-            .setBody("{\"message\": \"Upload successful\"}")
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body("{\"message\": \"Upload successful\"}")
+            .build()
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
 
@@ -365,16 +367,17 @@ internal class PollingPushFileHandlingTest {
 
     @Test
     fun `test successfully write two files to API fail with third - no separate error directory`() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-            .setBody("{\"message\": \"Upload successful\"}")
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body("{\"message\": \"Upload successful\"}")
+            .build()
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.BAD_REQUEST.value()).setBody("{\"message\": \"Exception\"}"))
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.BAD_REQUEST.value()).body("{\"message\": \"Exception\"}").build())
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
         val errorDir = sourceDir.resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE))
@@ -425,16 +428,17 @@ internal class PollingPushFileHandlingTest {
             )
         )
 
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-            .setBody("{\"message\": \"Upload successful\"}")
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body("{\"message\": \"Upload successful\"}")
+            .build()
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.BAD_REQUEST.value()).setBody("{\"message\": \"Exception\"}"))
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.BAD_REQUEST.value()).body("{\"message\": \"Exception\"}").build())
 
         val payload1 = sourceDir0.resolve("dummy.xml.tmp")
         payload1.outputStream().use { it.write("Hello".toByteArray()) }
@@ -486,16 +490,17 @@ internal class PollingPushFileHandlingTest {
             )
         )
 
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-            .setBody("{\"message\": \"Upload successful\"}")
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body("{\"message\": \"Upload successful\"}")
+            .build()
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.BAD_REQUEST.value()).setBody("{\"message\": \"Exception\"}"))
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.BAD_REQUEST.value()).body("{\"message\": \"Exception\"}").build())
 
         val payload1 = invoiceSourceDir.resolve("dummy.xml.tmp")
         payload1.outputStream().use { it.write("Hello".toByteArray()) }
@@ -548,16 +553,17 @@ internal class PollingPushFileHandlingTest {
             )
         )
 
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-            .setBody("{\"message\": \"Upload successful\"}")
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body("{\"message\": \"Upload successful\"}")
+            .build()
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()).setBody("{\"message\": \"Exception\"}"))
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.BAD_REQUEST.value()).setBody("{\"message\": \"Exception\"}"))
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.BAD_REQUEST.value()).body("{\"message\": \"Exception\"}").build())
 
         val payload1 = invoiceSourceDir.resolve("dummy.xml.tmp")
         payload1.outputStream().use { it.write("Hello".toByteArray()) }
@@ -592,13 +598,14 @@ internal class PollingPushFileHandlingTest {
 
     @Test
     fun `test successfully write two files to API fail with third do not retry - no separate error directory`() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
-            .setBody("{\"message\": \"Upload successful\"}")
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body("{\"message\": \"Upload successful\"}")
+            .build()
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.BAD_REQUEST.value()).setBody("{\"message\": \"Exception\"}"))
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.BAD_REQUEST.value()).body("{\"message\": \"Exception\"}").build())
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
         val errorDir = sourceDir.resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE))

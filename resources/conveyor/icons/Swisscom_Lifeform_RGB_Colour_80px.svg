@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="a26-digital" xmlns="http://www.w3.org/2000/svg" width="80" height="80" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 80 80">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: url(#Unbenannter_Verlauf_2);
+      }
+
+      .cls-2 {
+        fill: url(#Unbenannter_Verlauf_4);
+      }
+
+      .cls-3 {
+        fill: url(#Unbenannter_Verlauf_3);
+      }
+
+      .cls-4 {
+        fill: url(#Unbenannter_Verlauf_8);
+      }
+
+      .cls-5 {
+        fill: url(#Unbenannter_Verlauf_7);
+      }
+
+      .cls-6 {
+        fill: url(#Unbenannter_Verlauf_5);
+      }
+
+      .cls-7 {
+        fill: url(#Unbenannter_Verlauf_9);
+      }
+
+      .cls-8 {
+        fill: url(#Unbenannter_Verlauf_55-23);
+      }
+
+      .cls-9 {
+        fill: url(#Unbenannter_Verlauf_55-25);
+      }
+
+      .cls-10 {
+        fill: url(#Unbenannter_Verlauf_55-21);
+      }
+
+      .cls-11 {
+        fill: url(#Unbenannter_Verlauf_55-27);
+      }
+
+      .cls-12 {
+        fill: url(#Unbenannter_Verlauf_55-20);
+      }
+
+      .cls-13 {
+        fill: url(#Unbenannter_Verlauf_55-29);
+      }
+
+      .cls-14 {
+        fill: url(#Unbenannter_Verlauf_55-22);
+      }
+
+      .cls-15 {
+        fill: url(#Unbenannter_Verlauf_55-24);
+      }
+
+      .cls-16 {
+        fill: url(#Unbenannter_Verlauf_55-30);
+      }
+
+      .cls-17 {
+        fill: url(#Unbenannter_Verlauf_55-26);
+      }
+
+      .cls-18 {
+        fill: url(#Unbenannter_Verlauf_55-28);
+      }
+
+      .cls-19 {
+        fill: url(#Unbenannter_Verlauf_55-19);
+      }
+
+      .cls-20 {
+        fill: url(#Unbenannter_Verlauf_55-17);
+      }
+
+      .cls-21 {
+        fill: url(#Unbenannter_Verlauf_55-18);
+      }
+
+      .cls-22 {
+        fill: url(#Unbenannter_Verlauf_55-15);
+      }
+
+      .cls-23 {
+        fill: url(#Unbenannter_Verlauf_55-16);
+      }
+
+      .cls-24 {
+        fill: url(#Unbenannter_Verlauf_55-10);
+      }
+
+      .cls-25 {
+        fill: url(#Unbenannter_Verlauf_55-13);
+      }
+
+      .cls-26 {
+        fill: url(#Unbenannter_Verlauf_55-14);
+      }
+
+      .cls-27 {
+        fill: url(#Unbenannter_Verlauf_55-11);
+      }
+
+      .cls-28 {
+        fill: url(#Unbenannter_Verlauf_55-12);
+      }
+
+      .cls-29 {
+        fill: #fff;
+      }
+
+      .cls-30 {
+        fill: red;
+      }
+
+      .cls-31 {
+        fill: url(#Unbenannter_Verlauf_55-8);
+      }
+
+      .cls-32 {
+        fill: url(#Unbenannter_Verlauf_55-2);
+      }
+
+      .cls-33 {
+        fill: url(#Unbenannter_Verlauf_55-7);
+      }
+
+      .cls-34 {
+        fill: url(#Unbenannter_Verlauf_55-6);
+      }
+
+      .cls-35 {
+        fill: url(#Unbenannter_Verlauf_55-4);
+      }
+
+      .cls-36 {
+        fill: url(#Unbenannter_Verlauf_55-9);
+      }
+
+      .cls-37 {
+        fill: url(#Unbenannter_Verlauf_55-3);
+      }
+
+      .cls-38 {
+        fill: url(#Unbenannter_Verlauf_55-5);
+      }
+
+      .cls-39 {
+        fill: url(#Unbenannter_Verlauf_2-2);
+      }
+
+      .cls-40 {
+        fill: url(#Unbenannter_Verlauf_2-3);
+      }
+
+      .cls-41 {
+        fill: url(#Unbenannter_Verlauf_5-2);
+      }
+
+      .cls-42 {
+        fill: url(#Unbenannter_Verlauf_12);
+      }
+
+      .cls-43 {
+        fill: url(#Unbenannter_Verlauf_13);
+      }
+
+      .cls-44 {
+        fill: url(#Unbenannter_Verlauf_55);
+      }
+
+      .cls-45 {
+        fill: url(#Unbenannter_Verlauf_11);
+      }
+    </style>
+    <linearGradient id="Unbenannter_Verlauf_3" data-name="Unbenannter Verlauf 3" x1="23.53" y1="62.909" x2="33.05" y2="58.47" gradientUnits="userSpaceOnUse">
+      <stop offset=".189" stop-color="#38f"/>
+      <stop offset="1" stop-color="#004de1"/>
+    </linearGradient>
+    <linearGradient id="Unbenannter_Verlauf_2" data-name="Unbenannter Verlauf 2" x1="23.53" y1="62.909" x2="33.05" y2="58.47" gradientUnits="userSpaceOnUse">
+      <stop offset=".149" stop-color="#0030b3" stop-opacity="0"/>
+      <stop offset=".49" stop-color="#0030b3" stop-opacity=".01"/>
+      <stop offset=".612" stop-color="#0030b3" stop-opacity=".048"/>
+      <stop offset=".7" stop-color="#0030b3" stop-opacity=".114"/>
+      <stop offset=".77" stop-color="#0030b3" stop-opacity=".209"/>
+      <stop offset=".831" stop-color="#0030b3" stop-opacity=".332"/>
+      <stop offset=".884" stop-color="#0030b3" stop-opacity=".484"/>
+      <stop offset=".933" stop-color="#0030b3" stop-opacity=".665"/>
+      <stop offset=".976" stop-color="#0030b3" stop-opacity=".868"/>
+      <stop offset="1" stop-color="#0030b3"/>
+    </linearGradient>
+    <linearGradient id="Unbenannter_Verlauf_2-2" data-name="Unbenannter Verlauf 2" x1="24.719" y1="64.933" x2="34.151" y2="57.018" xlink:href="#Unbenannter_Verlauf_2"/>
+    <linearGradient id="Unbenannter_Verlauf_2-3" data-name="Unbenannter Verlauf 2" x1="22.916" y1="61.466" x2="34.561" y2="58.345" xlink:href="#Unbenannter_Verlauf_2"/>
+    <linearGradient id="Unbenannter_Verlauf_13" data-name="Unbenannter Verlauf 13" x1="25.774" y1="71.658" x2="25.774" y2="9.813" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ef0000"/>
+      <stop offset=".278" stop-color="red"/>
+      <stop offset=".772" stop-color="red"/>
+      <stop offset=".86" stop-color="#ef0000"/>
+    </linearGradient>
+    <linearGradient id="Unbenannter_Verlauf_12" data-name="Unbenannter Verlauf 12" x1="22.201" y1="48.213" x2="48.688" y2="32.298" gradientUnits="userSpaceOnUse">
+      <stop offset=".829" stop-color="#ad0000" stop-opacity="0"/>
+      <stop offset=".866" stop-color="#ad0000" stop-opacity=".228"/>
+      <stop offset=".997" stop-color="#ad0000"/>
+    </linearGradient>
+    <linearGradient id="Unbenannter_Verlauf_11" data-name="Unbenannter Verlauf 11" x1="19.786" y1="63.877" x2="42.548" y2="10.253" gradientUnits="userSpaceOnUse">
+      <stop offset=".752" stop-color="#ad0000" stop-opacity="0"/>
+      <stop offset=".783" stop-color="#ad0000" stop-opacity=".228"/>
+      <stop offset=".891" stop-color="#ad0000"/>
+    </linearGradient>
+    <radialGradient id="Unbenannter_Verlauf_55" data-name="Unbenannter Verlauf 55" cx="124.367" cy="223.774" fx="124.367" fy="223.774" r="7.687" gradientTransform="translate(-56.688 -125.709) scale(.676 .726)" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#300" stop-opacity=".75"/>
+      <stop offset=".048" stop-color="#300" stop-opacity=".697"/>
+      <stop offset=".581" stop-color="#300" stop-opacity=".189"/>
+      <stop offset=".9" stop-color="#300" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="Unbenannter_Verlauf_55-2" data-name="Unbenannter Verlauf 55" cx="126.19" cy="222.817" fx="126.19" fy="222.817" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-3" data-name="Unbenannter Verlauf 55" cx="125.473" cy="225.54" fx="125.473" fy="225.54" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-4" data-name="Unbenannter Verlauf 55" cx="126.43" cy="224.367" fx="126.43" fy="224.367" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-5" data-name="Unbenannter Verlauf 55" cx="128.251" cy="227.004" fx="128.251" fy="227.004" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-6" data-name="Unbenannter Verlauf 55" cx="129.513" cy="227.85" fx="129.513" fy="227.85" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-7" data-name="Unbenannter Verlauf 55" cx="131.582" cy="229.551" fx="131.582" fy="229.551" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-8" data-name="Unbenannter Verlauf 55" cx="133.788" cy="231.778" fx="133.788" fy="231.778" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-9" data-name="Unbenannter Verlauf 55" cx="135.504" cy="233.894" fx="135.504" fy="233.894" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-10" data-name="Unbenannter Verlauf 55" cx="137.078" cy="236.115" fx="137.078" fy="236.115" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-11" data-name="Unbenannter Verlauf 55" cx="138.061" cy="237.515" fx="138.061" fy="237.515" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-12" data-name="Unbenannter Verlauf 55" cx="138.379" cy="236.115" fx="138.379" fy="236.115" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-13" data-name="Unbenannter Verlauf 55" cx="138.947" cy="240.1" fx="138.947" fy="240.1" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-14" data-name="Unbenannter Verlauf 55" cx="139.794" cy="241.305" fx="139.794" fy="241.305" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-15" data-name="Unbenannter Verlauf 55" cx="139.671" cy="242.657" fx="139.671" fy="242.657" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-16" data-name="Unbenannter Verlauf 55" cx="140.165" cy="244.001" fx="140.165" fy="244.001" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-17" data-name="Unbenannter Verlauf 55" cx="140.71" cy="244.56" fx="140.71" fy="244.56" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-18" data-name="Unbenannter Verlauf 55" cx="141.741" cy="246.371" fx="141.741" fy="246.371" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-19" data-name="Unbenannter Verlauf 55" cx="129.857" cy="221.604" fx="129.857" fy="221.604" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-20" data-name="Unbenannter Verlauf 55" cx="132.082" cy="219.994" fx="132.082" fy="219.994" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-21" data-name="Unbenannter Verlauf 55" cx="128.241" cy="221.753" fx="128.241" fy="221.753" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-22" data-name="Unbenannter Verlauf 55" cx="134.521" cy="218.596" fx="134.521" fy="218.596" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-23" data-name="Unbenannter Verlauf 55" cx="135.79" cy="218.183" fx="135.79" fy="218.183" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-24" data-name="Unbenannter Verlauf 55" cx="137.41" cy="215.78" fx="137.41" fy="215.78" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-25" data-name="Unbenannter Verlauf 55" cx="138.036" cy="216.403" fx="138.036" fy="216.403" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-26" data-name="Unbenannter Verlauf 55" cx="139.332" cy="214.541" fx="139.332" fy="214.541" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-27" data-name="Unbenannter Verlauf 55" cx="138.617" cy="213" fx="138.617" fy="213" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-28" data-name="Unbenannter Verlauf 55" cx="140.359" cy="210.3" fx="140.359" fy="210.3" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-29" data-name="Unbenannter Verlauf 55" cx="141.282" cy="208.949" fx="141.282" fy="208.949" r="7.687" xlink:href="#Unbenannter_Verlauf_55"/>
+    <radialGradient id="Unbenannter_Verlauf_55-30" data-name="Unbenannter Verlauf 55" cx="143.654" cy="208.921" fx="143.654" fy="208.921" xlink:href="#Unbenannter_Verlauf_55"/>
+    <linearGradient id="Unbenannter_Verlauf_9" data-name="Unbenannter Verlauf 9" x1="50.874" y1="79.006" x2="50.874" y2="15.558" gradientUnits="userSpaceOnUse">
+      <stop offset=".178" stop-color="#0055f8"/>
+      <stop offset=".211" stop-color="#095cf8"/>
+      <stop offset=".331" stop-color="#2674fb"/>
+      <stop offset=".449" stop-color="#3b86fd"/>
+      <stop offset=".564" stop-color="#4890fe"/>
+      <stop offset=".673" stop-color="#4d94ff"/>
+    </linearGradient>
+    <linearGradient id="Unbenannter_Verlauf_8" data-name="Unbenannter Verlauf 8" x1="54.595" y1="76.211" x2="43.621" y2="13.977" gradientUnits="userSpaceOnUse">
+      <stop offset=".612" stop-color="#3387ff" stop-opacity="0"/>
+      <stop offset=".65" stop-color="#3387ff" stop-opacity=".173"/>
+      <stop offset=".701" stop-color="#3387ff" stop-opacity=".386"/>
+      <stop offset=".753" stop-color="#3387ff" stop-opacity=".57"/>
+      <stop offset=".805" stop-color="#3387ff" stop-opacity=".72"/>
+      <stop offset=".856" stop-color="#3387ff" stop-opacity=".837"/>
+      <stop offset=".906" stop-color="#3387ff" stop-opacity=".92"/>
+      <stop offset=".954" stop-color="#3387ff" stop-opacity=".97"/>
+      <stop offset="1" stop-color="#3387ff" stop-opacity=".987"/>
+    </linearGradient>
+    <linearGradient id="Unbenannter_Verlauf_7" data-name="Unbenannter Verlauf 7" x1="35.312" y1="77.982" x2="55.987" y2="21.179" gradientUnits="userSpaceOnUse">
+      <stop offset=".033" stop-color="#003cb0"/>
+      <stop offset=".096" stop-color="#003fb5" stop-opacity=".936"/>
+      <stop offset=".207" stop-color="#034ac2" stop-opacity=".766"/>
+      <stop offset=".354" stop-color="#075bd8" stop-opacity=".491"/>
+      <stop offset=".529" stop-color="#0c72f6" stop-opacity=".113"/>
+      <stop offset=".578" stop-color="#0e7aff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="Unbenannter_Verlauf_5" data-name="Unbenannter Verlauf 5" x1="46.287" y1="24.651" x2="55.585" y2="14.68" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d90000" stop-opacity=".8"/>
+      <stop offset=".35" stop-color="red" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="Unbenannter_Verlauf_5-2" data-name="Unbenannter Verlauf 5" x1="39.328" y1="23.823" x2="59.749" y2="20.222" xlink:href="#Unbenannter_Verlauf_5"/>
+    <linearGradient id="Unbenannter_Verlauf_4" data-name="Unbenannter Verlauf 4" x1="32.999" y1="15.147" x2="38.132" y2="1.045" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0445c8"/>
+      <stop offset=".614" stop-color="#006dff"/>
+      <stop offset="1" stop-color="#3d95fe"/>
+    </linearGradient>
+  </defs>
+  <path class="cls-3" d="M33.891,62.17c-1.578-6.801-4.199-11.135-8.749-15.57-.317.72-.536,1.249-.608,1.417-1.666,3.896-2.903,8.157-1.908,12.348,1.603,6.747,8.425,10.753,15.502,11.294-2.598-1.462-3.548-6.519-4.237-9.489Z"/>
+  <path class="cls-1" d="M33.891,62.17c-1.578-6.801-4.199-11.135-8.749-15.57-.317.72-.536,1.249-.608,1.417-1.666,3.896-2.903,8.157-1.908,12.348,1.603,6.747,8.425,10.753,15.502,11.294-2.598-1.462-3.548-6.519-4.237-9.489Z"/>
+  <path class="cls-39" d="M33.891,62.17c-1.578-6.801-4.199-11.135-8.749-15.57-.317.72-.536,1.249-.608,1.417-1.666,3.896-2.903,8.157-1.908,12.348,1.603,6.747,8.425,10.753,15.502,11.294-2.598-1.462-3.548-6.519-4.237-9.489Z"/>
+  <path class="cls-40" d="M33.891,62.17c-1.578-6.801-4.199-11.135-8.749-15.57-.317.72-.536,1.249-.608,1.417-1.666,3.896-2.903,8.157-1.908,12.348,1.603,6.747,8.425,10.753,15.502,11.294-2.598-1.462-3.548-6.519-4.237-9.489Z"/>
+  <path class="cls-43" d="M34.514,13.374c-1.006-1.09-2.022-2.27-2.747-3.562-8.814,3.914-19.667,12.824-18.204,22.443.806,4.914,4.833,8.437,8.53,11.589,6.476,5.52,9.887,10.134,11.788,18.325.689,2.97,1.639,8.027,4.236,9.489,0-15.152,0-48.59,0-50.155,0-2.267-.124-4.106-3.613-8.14.003.003.007.007.01.01Z"/>
+  <path class="cls-42" d="M34.514,13.374c-1.006-1.09-2.022-2.27-2.747-3.562-8.814,3.914-19.667,12.824-18.204,22.443.806,4.914,4.833,8.437,8.53,11.589,6.476,5.52,9.887,10.134,11.788,18.325.689,2.97,1.639,8.027,4.236,9.489,0-15.152,0-48.59,0-50.155,0-2.267-.124-4.106-3.613-8.14.003.003.007.007.01.01Z"/>
+  <path class="cls-45" d="M34.514,13.374c-1.006-1.09-2.022-2.27-2.747-3.562-8.814,3.914-19.667,12.824-18.204,22.443.806,4.914,4.833,8.437,8.53,11.589,6.476,5.52,9.887,10.134,11.788,18.325.689,2.97,1.639,8.027,4.236,9.489,0-15.152,0-48.59,0-50.155,0-2.267-.124-4.106-3.613-8.14.003.003.007.007.01.01Z"/>
+  <g>
+    <rect class="cls-44" x="22.046" y="31.341" width="10.759" height="10.759"/>
+    <rect class="cls-32" x="23.278" y="30.647" width="10.759" height="10.759"/>
+    <rect class="cls-37" x="22.794" y="32.623" width="10.759" height="10.759"/>
+    <rect class="cls-35" x="23.441" y="31.772" width="10.759" height="10.759"/>
+    <rect class="cls-38" x="24.672" y="33.686" width="10.759" height="10.759"/>
+    <rect class="cls-34" x="25.526" y="34.3" width="10.759" height="10.759"/>
+    <rect class="cls-33" x="26.925" y="35.535" width="10.759" height="10.759"/>
+    <rect class="cls-31" x="28.417" y="37.151" width="10.759" height="10.759"/>
+    <rect class="cls-36" x="29.578" y="38.687" width="10.759" height="10.759"/>
+    <rect class="cls-24" x="30.642" y="40.299" width="10.759" height="10.759"/>
+    <rect class="cls-27" x="31.308" y="41.315" width="10.759" height="10.759"/>
+    <rect class="cls-28" x="31.523" y="40.299" width="10.759" height="10.759"/>
+    <rect class="cls-25" x="31.906" y="43.192" width="10.759" height="10.759"/>
+    <rect class="cls-26" x="32.48" y="44.067" width="10.759" height="10.759"/>
+    <rect class="cls-22" x="32.397" y="45.048" width="10.759" height="10.759"/>
+    <rect class="cls-23" x="32.73" y="46.024" width="10.759" height="10.759"/>
+    <rect class="cls-20" x="33.099" y="46.43" width="10.759" height="10.759"/>
+    <rect class="cls-21" x="33.797" y="47.744" width="10.759" height="10.759"/>
+    <rect class="cls-19" x="25.759" y="29.766" width="10.759" height="10.759"/>
+    <rect class="cls-12" x="27.264" y="28.598" width="10.759" height="10.759"/>
+    <rect class="cls-10" x="24.666" y="29.875" width="10.759" height="10.759"/>
+    <rect class="cls-14" x="28.913" y="27.583" width="10.759" height="10.759"/>
+    <rect class="cls-8" x="29.771" y="27.283" width="10.759" height="10.759"/>
+    <rect class="cls-15" x="30.867" y="25.539" width="10.759" height="10.759"/>
+    <rect class="cls-9" x="31.291" y="25.991" width="10.759" height="10.759"/>
+    <rect class="cls-17" x="32.167" y="24.64" width="10.759" height="10.759"/>
+    <rect class="cls-11" x="31.684" y="23.521" width="10.759" height="10.759"/>
+    <rect class="cls-18" x="32.861" y="21.561" width="10.759" height="10.759"/>
+    <rect class="cls-13" x="33.486" y="20.58" width="10.759" height="10.759"/>
+    <rect class="cls-16" x="35.09" y="20.56" width="10.759" height="10.759"/>
+  </g>
+  <path class="cls-29" d="M38.127,21.525c-1.542.352-2.676,1.523-3.312,3.04-.587,1.401-.96,2.89-1.773,4.179-1.468,2.328-3.983,2.442-6.075,3.833-1.085.722-2.01,1.813-2.272,3.133-.242,1.221.112,2.51.748,3.564,1.249,2.071,3.341,3.214,5.106,4.716,1.494,1.271,2.707,2.802,3.202,4.787.396,1.588.548,3.245,1.084,4.787.566,1.625,1.661,3.091,3.291,3.586V21.525Z"/>
+  <path class="cls-29" d="M38.127,21.525c-1.542.352-2.676,1.523-3.312,3.04-.587,1.401-.96,2.89-1.773,4.179-1.468,2.328-3.983,2.442-6.075,3.833-1.085.722-2.01,1.813-2.272,3.133-.242,1.221.112,2.51.748,3.564,1.249,2.071,3.341,3.214,5.106,4.716,1.494,1.271,2.707,2.802,3.202,4.787.396,1.588.548,3.245,1.084,4.787.566,1.625,1.661,3.091,3.291,3.586V21.525Z"/>
+  <path class="cls-7" d="M34.514,13.364c1.626,1.742,5.084,5.242,10.552,9.958,2.387,2.059,4.591,4.088,6.916,6.162,7.609,6.787,13.48,13.421,14.86,20.054,1.056,5.076-.088,10.61-2.763,14.98-5.38,8.686-16.13,13.485-25.952,14.487,0,0,0-55.476,0-57.502,0-2.267-.124-4.106-3.613-8.14Z"/>
+  <path class="cls-4" d="M34.514,13.364c1.626,1.742,5.084,5.242,10.552,9.958,2.387,2.059,4.591,4.088,6.916,6.162,7.609,6.787,13.48,13.421,14.86,20.054,1.056,5.076-.088,10.61-2.763,14.98-5.38,8.686-16.13,13.485-25.952,14.487,0,0,0-55.476,0-57.502,0-2.267-.124-4.106-3.613-8.14Z"/>
+  <path class="cls-5" d="M34.514,13.364c1.626,1.742,5.084,5.242,10.552,9.958,2.387,2.059,4.591,4.088,6.916,6.162,7.609,6.787,13.48,13.421,14.86,20.054,1.056,5.076-.088,10.61-2.763,14.98-5.38,8.686-16.13,13.485-25.952,14.487,0,0,0-55.476,0-57.502,0-2.267-.124-4.106-3.613-8.14Z"/>
+  <path class="cls-30" d="M45.066,23.322c2.387,2.059,4.591,4.088,6.916,6.162,2.589,2.309,4.975,4.6,7.053,6.879,1.701-4.703,2.394-9.663.836-14.48-2.762-8.54-12.705-15.332-21.744-13.866v8.995c1.783,1.721,4.087,3.849,6.939,6.308Z"/>
+  <path class="cls-6" d="M45.066,23.322c2.387,2.059,4.591,4.088,6.916,6.162,2.589,2.309,4.975,4.6,7.053,6.879,1.701-4.703,2.394-9.663.836-14.48-2.762-8.54-12.705-15.332-21.744-13.866v8.995c1.783,1.721,4.087,3.849,6.939,6.308Z"/>
+  <path class="cls-41" d="M45.066,23.322c2.387,2.059,4.591,4.088,6.916,6.162,2.589,2.309,4.975,4.6,7.053,6.879,1.701-4.703,2.394-9.663.836-14.48-2.762-8.54-12.705-15.332-21.744-13.866v8.995c1.783,1.721,4.087,3.849,6.939,6.308Z"/>
+  <path class="cls-2" d="M38.127,17.014c0-1.571,0-15.97,0-15.97-.144-.05-.374-.037-.531-.034-2.706.144-6.105,1.309-6.777,4.273-.491,3.212,1.63,5.842,3.706,8.092.778.834,1.973,2.066,3.602,3.638Z"/>
+</svg>

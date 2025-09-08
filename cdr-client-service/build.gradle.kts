@@ -89,18 +89,19 @@ dependencies {
     testImplementation(libs.jacocoCore)
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.mock.webserver) {
-        // Unfortunately we cannot exclude JUnit 4 as MockWebServer implements interfaces from that version
-//        exclude(group = "junit", module = "junit")
-    }
-    testImplementation(libs.mockk) {
-        exclude(group = "junit", module = "junit")
-    }
+    testImplementation(libs.mock.webserver)
+    testImplementation(libs.mock.webserver.junit5)
+    testImplementation(libs.mockk)
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.micrometer.tracing.test)
     testImplementation(libs.spring.mockk)
     testImplementation(libs.awaitility)
 
+}
+
+configurations.all {
+    // exclude globally so I don't have to explicitly exclude it from mockk and all of its transitive dependencies
+    exclude(module = "junit", group = "junit")
 }
 
 kapt {
