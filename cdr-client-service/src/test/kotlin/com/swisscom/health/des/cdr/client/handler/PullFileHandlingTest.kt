@@ -19,10 +19,11 @@ import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
 import kotlinx.coroutines.runBlocking
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import mockwebserver3.junit5.StartStop
+import okhttp3.Headers
 import okhttp3.OkHttpClient
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -72,7 +73,8 @@ internal class PullFileHandlingTest {
     @TempDir
     private lateinit var tmpDir: Path
 
-    private lateinit var cdrServiceMock: MockWebServer
+    @StartStop
+    private val cdrServiceMock = MockWebServer()
 
     private lateinit var pullFileHandling: PullFileHandling
 
@@ -85,8 +87,6 @@ internal class PullFileHandlingTest {
 
     @BeforeEach
     fun setup() {
-        cdrServiceMock = MockWebServer()
-        cdrServiceMock.start()
         mockTracer()
 
         endpoint = CdrApi(
@@ -107,11 +107,6 @@ internal class PullFileHandlingTest {
 
         cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), clientCredentialParams, retryIoErrorsThrice, securedApp, ObjectMapper())
         pullFileHandling = PullFileHandling(tracer, cdrApiClient, XmlUtil())
-    }
-
-    @AfterEach
-    fun tearDown() {
-        cdrServiceMock.shutdown()
     }
 
     @Test
@@ -355,30 +350,32 @@ internal class PullFileHandlingTest {
 
     private fun enqueueFileResponse(fileName: String = "dummy.txt") {
         val pullRequestId = UUID.randomUUID().toString()
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(PULL_RESULT_ID_HEADER, pullRequestId)
-            .setBody(String(ClassPathResource("messages/$fileName").inputStream.readAllBytes(), StandardCharsets.UTF_8))
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(PULL_RESULT_ID_HEADER, pullRequestId).build())
+            .body(String(ClassPathResource("messages/$fileName").inputStream.readAllBytes(), StandardCharsets.UTF_8))
+            .build()
         cdrServiceMock.enqueue(mockResponse)
     }
 
     private fun enqueueFileResponseNoHeader() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setBody(String(ClassPathResource("messages/dummy.txt").inputStream.readAllBytes(), StandardCharsets.UTF_8))
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .body(String(ClassPathResource("messages/dummy.txt").inputStream.readAllBytes(), StandardCharsets.UTF_8))
+            .build()
         cdrServiceMock.enqueue(mockResponse)
     }
 
     private fun enqueueReportResponse() {
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.OK.value()))
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.OK.value()).build())
     }
 
     private fun enqueueEmptyResponse() {
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.NO_CONTENT.value()))
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.NO_CONTENT.value()).build())
     }
 
     private fun enqueueExceptionResponse() {
-        cdrServiceMock.enqueue(MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value()))
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).build())
     }
 
     private fun mockTracer() {

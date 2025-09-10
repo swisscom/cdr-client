@@ -49,5 +49,6 @@ client:
       doc-type-folders:
         invoice:
           target-folder: ${client.customer[0].target-folder}
-          source-folder: ${client.customer[0].source-folder}/i-will-fail-soon
+          # If you change this, then you need to change com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory as well
+          source-folder: ${client.customer[0].source-folder}/invoice-test-source
 

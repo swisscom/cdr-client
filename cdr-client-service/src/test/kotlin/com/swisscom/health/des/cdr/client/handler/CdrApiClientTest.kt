@@ -11,10 +11,11 @@ import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.AZURE_T
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CDR_PROCESSING_MODE_HEADER
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CONNECTOR_ID_HEADER
 import io.mockk.every
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
-import okhttp3.mockwebserver.RecordedRequest
-import org.junit.jupiter.api.AfterEach
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
+import mockwebserver3.junit5.StartStop
+import okhttp3.Headers
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
@@ -65,13 +66,11 @@ internal class CdrApiClientTest {
     @TempDir
     private lateinit var sourceDir: Path
 
-    private lateinit var apiServerMock: MockWebServer
+    @StartStop
+    private val apiServerMock = MockWebServer()
 
     @BeforeEach
     fun setup() {
-        apiServerMock = MockWebServer()
-        apiServerMock.start()
-
         every { config.credentialApi } returns CredentialApi(
             scheme = "http",
             host = Host(apiServerMock.hostName),
@@ -87,17 +86,13 @@ internal class CdrApiClientTest {
         )
     }
 
-    @AfterEach
-    fun tearDown() {
-        apiServerMock.shutdown()
-    }
-
     @Test
     fun `test client credential renewal - status code 200, valid response`() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .setBody(RENEW_SECRET_RESPONSE)
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body(RENEW_SECRET_RESPONSE)
+            .build()
         apiServerMock.enqueue(mockResponse)
 
         val result: CdrApiClient.RenewClientSecretResult = cdrApiClient.renewClientCredential(DEFAULT_TRACE_ID)
@@ -108,7 +103,7 @@ internal class CdrApiClientTest {
 
         val request: RecordedRequest = requireNotNull(apiServerMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
         assertEquals("PATCH", request.method)
-        assertEquals("/client-credentials/$TEST_CLIENT_ID", request.path)
+        assertEquals("/client-credentials/$TEST_CLIENT_ID", request.target)
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).startsWith("Bearer "))
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).removePrefix("Bearer ").isNotBlank())
         assertEquals(DEFAULT_TRACE_ID, request.headers[AZURE_TRACE_ID_HEADER])
@@ -118,10 +113,11 @@ internal class CdrApiClientTest {
 
     @Test
     fun `test client credential renewal - status code 200, invalid response type`() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_HTML)
-            .setBody(INVALID_RENEW_SECRET_RESPONSE)
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_HTML_VALUE).build())
+            .body(INVALID_RENEW_SECRET_RESPONSE)
+            .build()
         apiServerMock.enqueue(mockResponse)
 
         val result: CdrApiClient.RenewClientSecretResult = cdrApiClient.renewClientCredential(DEFAULT_TRACE_ID)
@@ -135,10 +131,11 @@ internal class CdrApiClientTest {
 
     @Test
     fun `test client credential renewal - status code 404`() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.NOT_FOUND.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
-            .setBody(NOT_FOUND_PROBLEM_JSON)
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.NOT_FOUND.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE).build())
+            .body(NOT_FOUND_PROBLEM_JSON)
+            .build()
         apiServerMock.enqueue(mockResponse)
 
         val result: CdrApiClient.RenewClientSecretResult = cdrApiClient.renewClientCredential(DEFAULT_TRACE_ID)
@@ -151,10 +148,11 @@ internal class CdrApiClientTest {
 
     @Test
     fun `test client credential renewal - status code 500`() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE)
-            .setBody(INTERNAL_SERVER_ERROR_PROBLEM_JSON)
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.INTERNAL_SERVER_ERROR.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE).build())
+            .body(INTERNAL_SERVER_ERROR_PROBLEM_JSON)
+            .build()
         apiServerMock.enqueue(mockResponse)
         apiServerMock.enqueue(mockResponse)
         apiServerMock.enqueue(mockResponse)
@@ -170,10 +168,11 @@ internal class CdrApiClientTest {
 
     @Test
     fun `test document upload - status 202`() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.ACCEPTED.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .setBody("""{"message": "Upload successful"}""")
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.ACCEPTED.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body("""{"message": "Upload successful"}""")
+            .build()
         apiServerMock.enqueue(mockResponse)
 
         val testFile: Path = sourceDir.resolve("test-file.txt").apply { writeText("test content") }
@@ -190,7 +189,7 @@ internal class CdrApiClientTest {
 
         val request: RecordedRequest = requireNotNull(apiServerMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
         assertEquals("POST", request.method)
-        assertEquals("/documents", request.path)
+        assertEquals("/documents", request.target)
         assertEquals("application/forumdatenaustausch+xml;charset=UTF-8", request.headers[HttpHeaders.CONTENT_TYPE])
         assertEquals("test-connector-id", request.headers[CONNECTOR_ID_HEADER])
         assertEquals(CdrClientConfig.Mode.TEST.value, request.headers[CDR_PROCESSING_MODE_HEADER])
@@ -203,11 +202,16 @@ internal class CdrApiClientTest {
 
     @Test
     fun `test document download - status 200`() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, "application/forumdatenaustausch+xml;charset=UTF-8")
-            .setHeader(PULL_RESULT_ID_HEADER, "test-pull-result-id")
-            .setBody("test content")
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(
+                Headers.Builder()
+                    .add(HttpHeaders.CONTENT_TYPE, "application/forumdatenaustausch+xml;charset=UTF-8")
+                    .add(PULL_RESULT_ID_HEADER, "test-pull-result-id")
+                    .build()
+            )
+            .body("test content")
+            .build()
         apiServerMock.enqueue(mockResponse)
 
         val result: CdrApiClient.DownloadDocumentResult = cdrApiClient.downloadDocument(
@@ -228,7 +232,7 @@ internal class CdrApiClientTest {
 
         val request: RecordedRequest = requireNotNull(apiServerMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
         assertEquals("GET", request.method)
-        assertEquals("/documents?limit=1", request.path)
+        assertEquals("/documents?limit=1", request.target)
         assertEquals("some-other-connector-id", request.headers[CONNECTOR_ID_HEADER])
         assertEquals(CdrClientConfig.Mode.PRODUCTION.value, request.headers[CDR_PROCESSING_MODE_HEADER])
         assertEquals(DEFAULT_TRACE_ID, request.headers[AZURE_TRACE_ID_HEADER])
@@ -240,8 +244,9 @@ internal class CdrApiClientTest {
 
     @Test
     fun `test document download - status 204`() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.NO_CONTENT.value())
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.NO_CONTENT.value())
+            .build()
         apiServerMock.enqueue(mockResponse)
 
         val result: CdrApiClient.DownloadDocumentResult = cdrApiClient.downloadDocument(
@@ -259,10 +264,11 @@ internal class CdrApiClientTest {
 
     @Test
     fun `test download acknowledgement - status 200`() {
-        val mockResponse = MockResponse()
-            .setResponseCode(HttpStatus.OK.value())
-            .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.ALL_VALUE)
-            .setBody(EMPTY_STRING)
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.ALL_VALUE).build())
+            .body(EMPTY_STRING)
+            .build()
         apiServerMock.enqueue(mockResponse)
 
         val result: CdrApiClient.DownloadDocumentResult = cdrApiClient.acknowledgeDocumentDownload(
@@ -278,7 +284,7 @@ internal class CdrApiClientTest {
 
         val request: RecordedRequest = requireNotNull(apiServerMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
         assertEquals("DELETE", request.method)
-        assertEquals("/documents/test-pull-result-id", request.path)
+        assertEquals("/documents/test-pull-result-id", request.target)
         assertEquals("some-other-connector-id", request.headers[CONNECTOR_ID_HEADER])
         assertEquals(CdrClientConfig.Mode.PRODUCTION.value, request.headers[CDR_PROCESSING_MODE_HEADER])
         assertEquals(DEFAULT_TRACE_ID, request.headers[AZURE_TRACE_ID_HEADER])

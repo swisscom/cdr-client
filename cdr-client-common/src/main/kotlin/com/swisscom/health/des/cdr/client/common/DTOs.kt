@@ -14,6 +14,7 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
+import java.net.URI
 import java.net.URL
 import java.time.Duration
 import java.time.Instant
@@ -33,7 +34,7 @@ object DurationSerializer : KSerializer<Duration> {
 object UrlSerializer : KSerializer<URL> {
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("java.net.URL", PrimitiveKind.STRING)
     override fun serialize(encoder: Encoder, value: URL) = encoder.encodeString(value.toString())
-    override fun deserialize(decoder: Decoder): URL = URL(decoder.decodeString())
+    override fun deserialize(decoder: Decoder): URL = URI(decoder.decodeString()).toURL()
 }
 
 class DTOs {
@@ -189,7 +190,7 @@ class DTOs {
                 cdrApi = Endpoint.EMPTY,
                 filesInProgressCacheSize = EMPTY_STRING,
                 idpCredentials = IdpCredentials.EMPTY,
-                idpEndpoint = URL("http://localhost:8080"),
+                idpEndpoint = URI("http://localhost:8080").toURL(),
                 localFolder = EMPTY_STRING,
                 pullThreadPoolSize = 0,
                 pushThreadPoolSize = 0,
