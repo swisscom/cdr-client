@@ -5,8 +5,7 @@ client:
   idp-credentials:
     tenant-id: ${CDR_B2C_TENANT_ID:test-tenant-client-id} # `test-tenant-client-id` is the required value if the MockOauth2Server is used; see its `config.json`
     client-id: ${CDR_CLIENT_ID:easy-system-test-user-id}
-    scopes:
-      - https://dev.identity.health.swisscom.ch/CdrApi/.default
+    scope: https://dev.identity.health.swisscom.ch/CdrApi/.default
     client-secret: ${CDR_CLIENT_SECRET:Placeholder_test-secret}
     renew-credential: true
     last-credential-renewal-time: 2030-01-01T00:00:00Z

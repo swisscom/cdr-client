@@ -7,8 +7,7 @@ client:
     client-id: easy-system-test-user-id
     client-secret: test-client-secret
     last-credential-renewal-time: 1970-01-01T00:00:00Z
-    scopes:
-      - https://dev.identity.health.swisscom.ch/CdrApi/.default
+    scope: https://dev.identity.health.swisscom.ch/CdrApi/.default
   # If you change this, then you need to change com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory as well
   local-folder: ${java.io.tmpdir}/cdr-client-test-source/cdr_download
   # if you change the idp-endpoint issuer host name, you also need to change add in caddy/Caddyfile and you need to add the new host to the `test_hosts` file;
@@ -50,5 +49,6 @@ client:
       doc-type-folders:
         invoice:
           target-folder: ${client.customer[0].target-folder}
-          source-folder: ${client.customer[0].source-folder}/i-will-fail-soon
+          # If you change this, then you need to change com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory as well
+          source-folder: ${client.customer[0].source-folder}/invoice-test-source
 

@@ -31,11 +31,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import mockwebserver3.Dispatcher
+import mockwebserver3.MockResponse
+import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
+import mockwebserver3.junit5.StartStop
+import okhttp3.Headers
 import okhttp3.OkHttpClient
-import okhttp3.mockwebserver.Dispatcher
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
-import okhttp3.mockwebserver.RecordedRequest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -96,7 +98,8 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
     @TempDir
     private lateinit var tmpDir: Path
 
-    private lateinit var cdrServiceMock: MockWebServer
+    @StartStop
+    private val cdrServiceMock = MockWebServer()
 
     private lateinit var documentDownloadScheduler: DocumentDownloadScheduler
     private lateinit var pullFileHandling: PullFileHandling
@@ -115,9 +118,6 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
     @BeforeEach
     fun setup() {
-        cdrServiceMock = MockWebServer()
-        cdrServiceMock.start()
-
         val endpoint = CdrApi(
             host = Host(cdrServiceMock.hostName),
             basePath = "documents",
@@ -176,7 +176,6 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
     @AfterEach
     fun tearDown() {
-        cdrServiceMock.shutdown()
         counterOne = 0
         counterTwo = 0
     }
@@ -197,23 +196,29 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
     }
 
     private fun handleDispatcher(request: RecordedRequest, practOneMaxCount: Int, practTwoMaxCount: Int): MockResponse {
-        return if (request.method == "GET" && request.headers[CONNECTOR_ID_HEADER] == connectorId1) {
-            mockResponseDependingOnPath(request) { handleConnectorOne(practOneMaxCount) }
-        } else if (request.method == "GET" && request.headers[CONNECTOR_ID_HEADER] == connectorId2) {
-            mockResponseDependingOnPath(request) { handleConnectorTwo(practTwoMaxCount) }
-        } else if (request.method == "DELETE") {
-            MockResponse().setResponseCode(HttpStatus.OK.value())
-        } else {
-            MockResponse().setResponseCode(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .setBody("I'm sorry. My responses are limited. You must ask the right questions.")
+        return when (request.method) {
+            "GET" if request.headers[CONNECTOR_ID_HEADER] == connectorId1 -> {
+                mockResponseDependingOnPath(request) { handleConnectorOne(practOneMaxCount) }
+            }
+            "GET" if request.headers[CONNECTOR_ID_HEADER] == connectorId2 -> {
+                mockResponseDependingOnPath(request) { handleConnectorTwo(practTwoMaxCount) }
+            }
+            "DELETE" -> {
+                MockResponse.Builder().code(HttpStatus.OK.value()).build()
+            }
+            else -> {
+                MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                    .body("I'm sorry. My responses are limited. You must ask the right questions.")
+                    .build()
+            }
         }
     }
 
     private fun mockResponseDependingOnPath(request: RecordedRequest, handleMethod: () -> MockResponse): MockResponse {
-        return with(request.path!!) {
+        return with(request.target) {
             when {
                 contains("limit=1") -> handleMethod()
-                else -> MockResponse().setResponseCode(HttpStatus.NOT_FOUND.value())
+                else -> MockResponse.Builder().code(HttpStatus.NOT_FOUND.value()).build()
             }
         }
     }
@@ -221,24 +226,26 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
     private fun handleConnectorOne(maxCount: Int): MockResponse {
         return if (counterOne < maxCount) {
             counterOne++
-            MockResponse()
-                .setResponseCode(HttpStatus.OK.value())
-                .setHeader(PULL_RESULT_ID_HEADER, UUID.randomUUID().toString())
-                .setBody(String(ClassPathResource("messages/dummy.txt").inputStream.readAllBytes(), StandardCharsets.UTF_8))
+            MockResponse.Builder()
+                .code(HttpStatus.OK.value())
+                .headers(Headers.Builder().add(PULL_RESULT_ID_HEADER, UUID.randomUUID().toString()).build())
+                .body(String(ClassPathResource("messages/dummy.txt").inputStream.readAllBytes(), StandardCharsets.UTF_8))
+                .build()
         } else {
-            MockResponse().setResponseCode(HttpStatus.NO_CONTENT.value())
+            MockResponse.Builder().code(HttpStatus.NO_CONTENT.value()).build()
         }
     }
 
     private fun handleConnectorTwo(maxCount: Int): MockResponse {
         return if (counterTwo < maxCount) {
             counterTwo++
-            MockResponse()
-                .setResponseCode(HttpStatus.OK.value())
-                .setHeader(PULL_RESULT_ID_HEADER, UUID.randomUUID().toString())
-                .setBody(String(ClassPathResource("messages/dummy.txt").inputStream.readAllBytes(), StandardCharsets.UTF_8))
+            MockResponse.Builder()
+                .code(HttpStatus.OK.value())
+                .headers(Headers.Builder().add(PULL_RESULT_ID_HEADER, UUID.randomUUID().toString()).build())
+                .body(String(ClassPathResource("messages/dummy.txt").inputStream.readAllBytes(), StandardCharsets.UTF_8))
+                .build()
         } else {
-            MockResponse().setResponseCode(HttpStatus.NO_CONTENT.value())
+            MockResponse.Builder().code(HttpStatus.NO_CONTENT.value()).build()
         }
     }
 

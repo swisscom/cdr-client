@@ -1,15 +1,12 @@
 package com.swisscom.health.des.cdr.client.ui
 
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ApplicationScope
@@ -20,19 +17,24 @@ import com.github.pgreze.process.ProcessResult
 import com.github.pgreze.process.Redirect
 import com.github.pgreze.process.process
 import com.kdroid.composetray.tray.api.Tray
+import com.kdroid.composetray.utils.isMenuBarInDarkMode
+import com.sun.jna.Platform
 import com.swisscom.health.des.cdr.client.common.Constants.CONFIG_CHANGE_EXIT_CODE
-import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
+import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.escalatingFind
 import com.swisscom.health.des.cdr.client.ui.CdrConfigViewModel.Companion.STATUS_CHECK_DELAY
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_Colour_RGB_icon
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_RGB_Colour_icon
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_RGB_Solid_Navy_icon
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_RGB_Solid_White_icon
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.app_name
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_status
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_close_application_window
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_exit
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_open_application_window
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_unknown
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
@@ -64,7 +66,7 @@ private const val LOGBACK_CONFIGURATION_FILE_PROPERTY = "logback.configurationFi
   kotlin-logging in this kotlin file, as it would initialize Logback before the external
   configuration file may be set.
 
-  So, DO NOT DEFINE A LOGGER LIKE THIS:
+  In short: DO NOT DEFINE A LOGGER LIKE THIS:
   `private val logger = KotlinLogging.logger {}`
  */
 
@@ -77,13 +79,21 @@ fun main() = application {
 
     // I have found no way to push this down into the CdrConfigScreen composable;
     // the client status query runs in a different coroutine scope, so it won't be canceled automatically when the main window is closed
-    var statusQueryJob: Job by remember { mutableStateOf(Job().apply { complete() }) }
-    LaunchedEffect(isWindowVisible) {
+    var statusQueryJob: Deferred<DTOs.StatusResponse.StatusCode> by remember { mutableStateOf(CompletableDeferred(DTOs.StatusResponse.StatusCode.UNKNOWN)) }
+    var clientServiceStatus: DTOs.StatusResponse.StatusCode by remember { mutableStateOf(DTOs.StatusResponse.StatusCode.UNKNOWN) }
+    LaunchedEffect(Unit) {
         statusQueryJob.cancelAndJoin()
-        while (isWindowVisible) {
+        while (true) {
             statusQueryJob = cdrConfigViewModel.queryClientServiceStatus(CdrClientApiClient.RetryStrategy.EXPONENTIAL)
-            statusQueryJob.join()
+            clientServiceStatus = statusQueryJob.await()
             delay(STATUS_CHECK_DELAY)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            println("UI application is shutting down, canceling status query job")
+            statusQueryJob.cancel()
         }
     }
 
@@ -94,7 +104,7 @@ fun main() = application {
         onCloseRequest = { isWindowVisible = false },
         visible = isWindowVisible,
         title = stringResource(Res.string.app_name),
-        icon = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon), // not rendered on Ubuntu
+        icon = painterResource(Res.drawable.Swisscom_Lifeform_RGB_Colour_icon), // not rendered on Ubuntu
     ) {
         CdrConfigScreen(
             viewModel = cdrConfigViewModel,
@@ -112,10 +122,17 @@ fun main() = application {
     // FIXME: client service status must be updated from model! But cannot figure out how to update the model on demand on opening the tray menu?
     //   We need on-demand update because status polling is suspended while the main window is closed.
     CdrSystemTray(
-        primaryAction = { isWindowVisible = true }
+        labelShowMainWindow = {
+            if (isWindowVisible)
+                stringResource(Res.string.label_close_application_window)
+            else
+                stringResource(Res.string.label_open_application_window)
+        },
+        showMainWindow = { isWindowVisible = !isWindowVisible },
+        serviceStatus = clientServiceStatus,
     )
 
-    // start cdr client service if the UI is configured to control the service
+// start cdr client service if the UI is configured to control the service
     if (uiIsServiceController()) {
         registerCdrClientServiceShutdownHook()
         LaunchCdrClientService()
@@ -123,8 +140,8 @@ fun main() = application {
 }
 
 private fun registerCdrClientServiceShutdownHook() =
-    // Needed for macOS only: If "Quit" is selected from the dock icon's context menu, the main
-    // process is killed, but not its children. I have no idea why and how. If the UI process
+// Needed for macOS only: If "Quit" is selected from the dock icon's context menu, the main
+// process is killed, but not its children. I have no idea why and how. If the UI process
     // receives a SIGTERM, then the child process gets terminated as well as expected.
     Runtime.getRuntime().addShutdownHook(
         Thread {
@@ -156,38 +173,51 @@ private fun LaunchCdrClientService() =
 
 @Composable
 private fun ApplicationScope.CdrSystemTray(
-    toolTip: String = stringResource(Res.string.app_name),
-    labelPrimaryAction: String = stringResource(Res.string.label_open_application_window),
-    labelStatusItem: String = "${stringResource(Res.string.label_client_status)}: ${stringResource(Res.string.status_unknown)}",
-    labelExit: String = stringResource(Res.string.label_exit),
-    primaryAction: (() -> Unit)? = null,
-) =
+    serviceStatus: DTOs.StatusResponse.StatusCode,
+    labelShowMainWindow: @Composable () -> String,
+    showMainWindow: (() -> Unit),
+) {
+    val toolTip = stringResource(Res.string.app_name)
+    val labelStatusItem = "${stringResource(Res.string.label_client_status)}:     $serviceStatus"
+    val labelExit = stringResource(Res.string.label_exit)
+
+    val isMenuBarDark: Boolean = isMenuBarInDarkMode()
+    val colorIcon = painterResource(Res.drawable.Swisscom_Lifeform_RGB_Colour_icon)
+    val monochromeIconLight = painterResource(Res.drawable.Swisscom_Lifeform_RGB_Solid_White_icon)
+    val monochromeIconDark = painterResource(Res.drawable.Swisscom_Lifeform_RGB_Solid_Navy_icon)
+
+    val icon =
+        when {
+            Platform.isMac() || Platform.isLinux() -> if (isMenuBarDark) monochromeIconLight else monochromeIconDark
+            else -> colorIcon
+        }
+
+    val labelShowMainWindow = labelShowMainWindow()
+
     Tray(
-        iconContent = {
-            Icon(
-                painter = painterResource(Res.drawable.Swisscom_Lifeform_Colour_RGB_icon),
-                contentDescription = EMPTY_STRING,
-                tint = Color.Unspecified,
-                modifier = Modifier.fillMaxSize()
-                    // neither of these options works (on linux, at least); intention was to update the client service status when the tray icon is clicked
-//                    .onClick(onClick = { logger.info { "updating client service status because tray icon was clicked" } })
-//                    .clickable(onClick = { logger.info { "updating client service status because tray icon was clicked" } })
-            )
-        },
+        icon = icon,
         tooltip = toolTip,
-        primaryAction = primaryAction,
-        primaryActionLabel = labelPrimaryAction
     ) {
         Item(
             label = labelStatusItem,
             isEnabled = false,
-            onClick = {}
         )
+
+        Divider()
+
+        Item(
+            label = labelShowMainWindow,
+            onClick = showMainWindow
+        )
+
         Item(
             label = labelExit,
-            onClick = ::exitApplication
-        )
+        ) {
+            dispose() // dispose system tray
+            exitApplication()
+        }
     }
+}
 
 /**
  * Checks whether the system property `logback.configurationFile` is set and if so, checks if the

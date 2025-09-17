@@ -125,7 +125,6 @@ private fun initLogbackConfig() =
             } else {
                 logbackConfigPath
             }
-
         }
         ?.absolute()
         ?.let { logbackConfigFile: Path ->
