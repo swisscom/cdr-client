@@ -41,7 +41,7 @@ import org.springframework.core.env.MutablePropertySources
 import org.springframework.core.io.FileSystemResource
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
-import java.net.URL
+import java.net.URI
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
@@ -102,7 +102,7 @@ class ConfigurationWriterTest {
                 maxCredentialAge = Duration.ofDays(30),
                 lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
             ),
-            idpEndpoint = URL("http://localhost:8080"),
+            idpEndpoint = URI.create("http://localhost:8080").toURL(),
             localFolder = TempDownloadDir(CURRENT_WORKING_DIR),
             pullThreadPoolSize = 1,
             pushThreadPoolSize = 1,

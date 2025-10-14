@@ -34,7 +34,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.springframework.core.env.Environment
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
-import java.net.URL
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
@@ -449,7 +449,7 @@ internal class ConfigValidationServiceTest {
                 renewCredential = RenewCredential(true),
                 lastCredentialRenewalTime = BEGINNING_OF_TIME,
             ),
-            idpEndpoint = URL("http://localhost"),
+            idpEndpoint = URI.create("http://localhost").toURL(),
             fileBusyTestStrategy = FileBusyTestStrategyProperty(CdrClientConfig.FileBusyTestStrategy.FILE_SIZE_CHANGED),
             fileBusyTestInterval = Duration.ofMillis(250),
             fileBusyTestTimeout = Duration.ofSeconds(1),

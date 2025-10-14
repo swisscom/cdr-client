@@ -1,14 +1,20 @@
 package com.swisscom.health.des.cdr.client.http
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.microsoft.aad.msal4j.ClientCredentialFactory
+import com.microsoft.aad.msal4j.ClientCredentialParameters
+import com.microsoft.aad.msal4j.ConfidentialClientApplication
+import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.swisscom.health.des.cdr.client.common.Constants.SHUTDOWN_DELAY
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.CREDENTIAL_VALIDATION_FAILED
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DIR_READ_WRITABLE
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DIR_SINGLE_USE
-import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MODE_VALUE
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MODE_OVERLAP
+import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MODE_VALUE
+import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toCdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
@@ -21,10 +27,14 @@ import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.INVALID_CRED
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.actuate.health.HealthEndpoint
 import org.springframework.boot.actuate.health.SystemHealth
 import org.springframework.http.ResponseEntity
+import org.springframework.retry.RetryContext
+import org.springframework.retry.support.RetryTemplate
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -40,6 +50,7 @@ private val logger = KotlinLogging.logger {}
  * HTTP API is the cdr-client-ui module.
  */
 @RestController
+@Suppress("LongParameterList")
 internal class WebOperations(
     private val healthEndpoint: HealthEndpoint,
     private val objectMapper: ObjectMapper,
@@ -47,6 +58,8 @@ internal class WebOperations(
     private val configWriter: ConfigurationWriter,
     private val config: CdrClientConfig,
     private val configValidationService: ConfigValidationService,
+    @param:Qualifier("retryIoAndServerErrors")
+    private val retryIOExceptionsAndServerErrors: RetryTemplate,
 ) {
     /*
      * BEGIN - (Configuration) Validation Endpoints
@@ -158,6 +171,63 @@ internal class WebOperations(
         }
     }
 
+    @PutMapping("api/validate-credentials")
+    internal suspend fun validateCredentials(
+        @RequestBody idpCredentials: DTOs.CdrClientConfig.IdpCredentials,
+    ): ResponseEntity<ValidationResult> = runCatching {
+        retryIOExceptionsAndServerErrors.execute<String, Exception> { retry: RetryContext ->
+            val idpEndpoint = config.idpEndpoint.toString()
+            val correctedIdpEndpoint = if (idpEndpoint.endsWith("${idpCredentials.tenantId}/"))
+                idpEndpoint
+            else
+                idpEndpoint.replace(Regex("https://login\\.microsoftonline\\.com/[^/]+/?"), "https://login.microsoftonline.com/${idpCredentials.tenantId}/")
+
+            if (retry.retryCount > 0) {
+                logger.debug {
+                    "Operation targeting '$correctedIdpEndpoint' has failed; exception: " +
+                            "'${retry.lastThrowable?.let { getRootestCause(it)::class.java }}'; message: '${retry.lastThrowable?.message}'"
+                }
+                logger.info {
+                    "Retry attempt '#${retry.retryCount}' of 'validate credentials' operation targeting " +
+                            "'$correctedIdpEndpoint'"
+                }
+            }
+            logger.trace { "validating credentials" }
+
+            val clientCredentialParams = ClientCredentialParameters.builder(setOf(config.idpCredentials.scope.scope)).build()
+            val secApp = ConfidentialClientApplication.builder(
+                idpCredentials.clientId,
+                ClientCredentialFactory.createFromSecret(idpCredentials.clientSecret)
+            ).authority(correctedIdpEndpoint)
+                .build()
+
+            val authResult: IAuthenticationResult =
+                secApp.acquireToken(clientCredentialParams).get()
+            authResult.accessToken()
+        }
+    }.fold(
+        onSuccess = { token: String ->
+            var validationResult: ValidationResult = ValidationResult.Success
+            if (token.isBlank()) {
+                validationResult += credentialValidationFailure
+            }
+            ResponseEntity.ok(validationResult)
+        },
+        onFailure = { e ->
+            logger.error { "Failed to validate credentials: $e" }
+            ResponseEntity.ok(credentialValidationFailure)
+        }
+    )
+
+    private val credentialValidationFailure = ValidationResult.Failure(
+        listOf(
+            DTOs.ValidationDetail.ConfigItemDetail(
+                configItem = DomainObjects.ConfigurationItem.UNKNOWN,
+                messageKey = CREDENTIAL_VALIDATION_FAILED
+            )
+        )
+    )
+
     //
     // END - (Configuration) Validation Endpoints
     //
@@ -221,10 +291,10 @@ internal class WebOperations(
         val healthStatus: SystemHealth = healthEndpoint.health() as SystemHealth
         logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
 
-
         val status = when (healthStatus.components[CONFIG_INDICATOR_NAME]?.status?.code) {
             CONFIG_BROKEN -> DTOs.StatusResponse.StatusCode.BROKEN
             CONFIG_ERROR -> DTOs.StatusResponse.StatusCode.ERROR
+            INVALID_CRED -> DTOs.StatusResponse.StatusCode.LOGIN_FAILED
             else -> when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
                 FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
                 FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED

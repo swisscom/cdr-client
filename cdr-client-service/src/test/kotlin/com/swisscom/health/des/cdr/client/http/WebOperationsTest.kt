@@ -1,6 +1,10 @@
 package com.swisscom.health.des.cdr.client.http
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.microsoft.aad.msal4j.ClientCredentialFactory
+import com.microsoft.aad.msal4j.ClientCredentialParameters
+import com.microsoft.aad.msal4j.ConfidentialClientApplication
+import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.config.CdrApi
@@ -34,6 +38,8 @@ import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -48,11 +54,13 @@ import org.springframework.boot.actuate.health.HealthEndpoint
 import org.springframework.boot.actuate.health.SystemHealth
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.retry.support.RetryTemplate
 import org.springframework.util.unit.DataSize
-import java.net.URL
+import java.net.URI
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
+import java.util.concurrent.CompletableFuture
 
 @ExtendWith(MockKExtension::class)
 internal class WebOperationsTest {
@@ -68,6 +76,9 @@ internal class WebOperationsTest {
 
     @MockK
     private lateinit var configValidationService: ConfigValidationService
+
+    @MockK
+    private lateinit var retryIOExceptionsAndServerErrors: RetryTemplate
 
     private var objectMapper: ObjectMapper = ObjectMapper()
 
@@ -86,6 +97,7 @@ internal class WebOperationsTest {
             objectMapper = objectMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
+            retryIOExceptionsAndServerErrors = retryIOExceptionsAndServerErrors
         )
     }
 
@@ -167,6 +179,7 @@ internal class WebOperationsTest {
         "DISABLED, DISABLED",
         "ERROR, ERROR",
         "BROKEN, BROKEN",
+        "INVALID_CREDENTIALS, LOGIN_FAILED",
         "FOO, UNKNOWN"
     )
     fun `test status endpoint`(healthStatusString: String, responseStatusString: String) = runTest {
@@ -185,6 +198,7 @@ internal class WebOperationsTest {
             "DISABLED" -> DTOs.StatusResponse.StatusCode.DISABLED
             "BROKEN" -> DTOs.StatusResponse.StatusCode.BROKEN
             "ERROR" -> DTOs.StatusResponse.StatusCode.ERROR
+            "LOGIN_FAILED" -> DTOs.StatusResponse.StatusCode.LOGIN_FAILED
             else -> DTOs.StatusResponse.StatusCode.UNKNOWN
         }
         val systemHealth = mockk<SystemHealth>()
@@ -207,6 +221,240 @@ internal class WebOperationsTest {
         val probDetail = webOperationsAdvice.handleError(exception)
 
         assertEquals("Failed to retrieve service status: java.lang.IllegalStateException: BANG!", probDetail.detail)
+    }
+
+    @Test
+    fun `test validateCredentials - success with valid access token`() = runTest {
+        // Create a real RetryTemplate instead of mocking it
+        val realRetryTemplate = RetryTemplate.builder()
+            .maxAttempts(3)
+            .build()
+
+        // Create WebOperations with real RetryTemplate
+        val webOperationsWithRealRetry = WebOperations(
+            shutdownService = shutdownService,
+            configWriter = configWriter,
+            healthEndpoint = healthEndpoint,
+            objectMapper = objectMapper,
+            config = DEFAULT_CDR_CONFIG,
+            configValidationService = configValidationService,
+            retryIOExceptionsAndServerErrors = realRetryTemplate
+        )
+
+        val idpCredentials = DTOs.CdrClientConfig.IdpCredentials(
+            tenantId = "test-tenant-id",
+            clientId = "test-client-id",
+            clientSecret = "test-client-secret",
+            scope = "scope",
+            renewCredential = true,
+            maxCredentialAge = Duration.ofDays(1L),
+            lastCredentialRenewalTime = Instant.now()
+        )
+
+        // Mock the MSAL4J static methods and objects
+        mockkStatic(ConfidentialClientApplication::class)
+        mockkStatic(ClientCredentialFactory::class)
+
+        val mockAuthResult = mockk<IAuthenticationResult>()
+        val mockConfidentialApp = mockk<ConfidentialClientApplication>()
+        val mockBuilder = mockk<ConfidentialClientApplication.Builder>()
+        val mockCompletableFuture = CompletableFuture.completedFuture(mockAuthResult)
+
+        every { mockAuthResult.accessToken() } returns "valid-access-token"
+        every { mockConfidentialApp.acquireToken(any<ClientCredentialParameters>()) } returns mockCompletableFuture
+        every { mockBuilder.authority(any()) } returns mockBuilder
+        every { mockBuilder.build() } returns mockConfidentialApp
+        every { ConfidentialClientApplication.builder(any<String>(), any()) } returns mockBuilder
+        every { ClientCredentialFactory.createFromSecret(any()) } returns mockk()
+
+        try {
+            val response = webOperationsWithRealRetry.validateCredentials(idpCredentials)
+
+            assertEquals(HttpStatus.OK, response.statusCode)
+            val validationResult = assertInstanceOf<DTOs.ValidationResult>(response.body)
+            assertEquals(DTOs.ValidationResult.Success, validationResult)
+        } finally {
+            unmockkStatic(ConfidentialClientApplication::class)
+            unmockkStatic(ClientCredentialFactory::class)
+        }
+    }
+
+    @Test
+    fun `test validateCredentials - failure with blank access token`() = runTest {
+        // Create a real RetryTemplate instead of mocking it
+        val realRetryTemplate = RetryTemplate.builder()
+            .maxAttempts(3)
+            .build()
+
+        // Create WebOperations with real RetryTemplate
+        val webOperationsWithRealRetry = WebOperations(
+            shutdownService = shutdownService,
+            configWriter = configWriter,
+            healthEndpoint = healthEndpoint,
+            objectMapper = objectMapper,
+            config = DEFAULT_CDR_CONFIG,
+            configValidationService = configValidationService,
+            retryIOExceptionsAndServerErrors = realRetryTemplate
+        )
+
+        val idpCredentials = DTOs.CdrClientConfig.IdpCredentials(
+            tenantId = "test-tenant-id",
+            clientId = "test-client-id",
+            clientSecret = "test-client-secret",
+            scope = "scope",
+            renewCredential = true,
+            maxCredentialAge = Duration.ofDays(1L),
+            lastCredentialRenewalTime = Instant.now()
+        )
+
+        // Mock the MSAL4J static methods and objects to return blank token
+        mockkStatic(ConfidentialClientApplication::class)
+        mockkStatic(ClientCredentialFactory::class)
+
+        val mockAuthResult = mockk<IAuthenticationResult>()
+        val mockConfidentialApp = mockk<ConfidentialClientApplication>()
+        val mockBuilder = mockk<ConfidentialClientApplication.Builder>()
+        val mockCompletableFuture = CompletableFuture.completedFuture(mockAuthResult)
+
+        every { mockAuthResult.accessToken() } returns ""  // Blank token
+        every { mockConfidentialApp.acquireToken(any<ClientCredentialParameters>()) } returns mockCompletableFuture
+        every { mockBuilder.authority(any()) } returns mockBuilder
+        every { mockBuilder.build() } returns mockConfidentialApp
+        every { ConfidentialClientApplication.builder(any<String>(), any()) } returns mockBuilder
+        every { ClientCredentialFactory.createFromSecret(any()) } returns mockk()
+
+        try {
+            val response = webOperationsWithRealRetry.validateCredentials(idpCredentials)
+
+            assertEquals(HttpStatus.OK, response.statusCode)
+            val validationResult = assertInstanceOf<DTOs.ValidationResult.Failure>(response.body)
+            assertEquals(1, validationResult.validationDetails.size)
+            assertEquals(DTOs.ValidationMessageKey.CREDENTIAL_VALIDATION_FAILED, validationResult.validationDetails[0].messageKey)
+        } finally {
+            unmockkStatic(ConfidentialClientApplication::class)
+            unmockkStatic(ClientCredentialFactory::class)
+        }
+    }
+
+    @Test
+    fun `test validateCredentials - failure with MSAL exception`() = runTest {
+        // Create a real RetryTemplate instead of mocking it
+        val realRetryTemplate = RetryTemplate.builder()
+            .maxAttempts(2)
+            .build()
+
+        // Create WebOperations with real RetryTemplate
+        val webOperationsWithRealRetry = WebOperations(
+            shutdownService = shutdownService,
+            configWriter = configWriter,
+            healthEndpoint = healthEndpoint,
+            objectMapper = objectMapper,
+            config = DEFAULT_CDR_CONFIG,
+            configValidationService = configValidationService,
+            retryIOExceptionsAndServerErrors = realRetryTemplate
+        )
+
+        val idpCredentials = DTOs.CdrClientConfig.IdpCredentials(
+            tenantId = "test-tenant-id",
+            clientId = "test-client-id",
+            clientSecret = "test-client-secret",
+            scope = "scope",
+            renewCredential = true,
+            maxCredentialAge = Duration.ofDays(1L),
+            lastCredentialRenewalTime = Instant.now()
+        )
+
+        // Mock the MSAL4J static methods to throw exception
+        mockkStatic(ConfidentialClientApplication::class)
+        mockkStatic(ClientCredentialFactory::class)
+
+        val mockConfidentialApp = mockk<ConfidentialClientApplication>()
+        val mockBuilder = mockk<ConfidentialClientApplication.Builder>()
+
+        every { mockBuilder.authority(any()) } returns mockBuilder
+        every { mockBuilder.build() } returns mockConfidentialApp
+        every { ConfidentialClientApplication.builder(any<String>(), any()) } returns mockBuilder
+        every { ClientCredentialFactory.createFromSecret(any()) } returns mockk()
+        every { mockConfidentialApp.acquireToken(any<ClientCredentialParameters>()) } throws RuntimeException("Authentication failed")
+
+        try {
+            val response = webOperationsWithRealRetry.validateCredentials(idpCredentials)
+
+            assertEquals(HttpStatus.OK, response.statusCode)
+            val validationResult = assertInstanceOf<DTOs.ValidationResult.Failure>(response.body)
+            assertEquals(1, validationResult.validationDetails.size)
+            assertEquals(DTOs.ValidationMessageKey.CREDENTIAL_VALIDATION_FAILED, validationResult.validationDetails[0].messageKey)
+        } finally {
+            unmockkStatic(ConfidentialClientApplication::class)
+            unmockkStatic(ClientCredentialFactory::class)
+        }
+    }
+
+    @Test
+    fun `test validateCredentials - verifies correct endpoint correction logic`() = runTest {
+        // Create a real RetryTemplate instead of mocking it
+        val realRetryTemplate = RetryTemplate.builder()
+            .maxAttempts(3)
+            .build()
+
+        // Create a config with the original endpoint that needs correction
+        val configWithOriginalEndpoint = DEFAULT_CDR_CONFIG.copy(
+            idpEndpoint = URI.create("https://login.microsoftonline.com/original-tenant-id/").toURL()
+        )
+
+        // Create WebOperations with real RetryTemplate and corrected config
+        val webOperationsWithRealRetry = WebOperations(
+            shutdownService = shutdownService,
+            configWriter = configWriter,
+            healthEndpoint = healthEndpoint,
+            objectMapper = objectMapper,
+            config = configWithOriginalEndpoint,
+            configValidationService = configValidationService,
+            retryIOExceptionsAndServerErrors = realRetryTemplate
+        )
+
+        val idpCredentials = DTOs.CdrClientConfig.IdpCredentials(
+            tenantId = "different-tenant-id",
+            clientId = "test-client-id",
+            clientSecret = "test-client-secret",
+            scope = "scope",
+            renewCredential = true,
+            maxCredentialAge = Duration.ofDays(1L),
+            lastCredentialRenewalTime = Instant.now()
+        )
+
+        // Mock the MSAL4J static methods and objects
+        mockkStatic(ConfidentialClientApplication::class)
+        mockkStatic(ClientCredentialFactory::class)
+
+        val mockAuthResult = mockk<IAuthenticationResult>()
+        val mockConfidentialApp = mockk<ConfidentialClientApplication>()
+        val mockBuilder = mockk<ConfidentialClientApplication.Builder>()
+        val mockCompletableFuture = CompletableFuture.completedFuture(mockAuthResult)
+
+        every { mockAuthResult.accessToken() } returns "valid-access-token"
+        every { mockConfidentialApp.acquireToken(any<ClientCredentialParameters>()) } returns mockCompletableFuture
+        // Mock the corrected endpoint that should be generated
+        every { mockBuilder.authority("https://login.microsoftonline.com/different-tenant-id/") } returns mockBuilder
+        every { mockBuilder.build() } returns mockConfidentialApp
+        every { ConfidentialClientApplication.builder(any<String>(), any()) } returns mockBuilder
+        every { ClientCredentialFactory.createFromSecret(any()) } returns mockk()
+
+        try {
+            val response = webOperationsWithRealRetry.validateCredentials(idpCredentials)
+
+            assertEquals(HttpStatus.OK, response.statusCode)
+            val validationResult = assertInstanceOf<DTOs.ValidationResult>(response.body)
+            assertEquals(DTOs.ValidationResult.Success, validationResult)
+
+            // Verify that the correct tenant-specific endpoint was used
+            io.mockk.verify {
+                mockBuilder.authority("https://login.microsoftonline.com/different-tenant-id/")
+            }
+        } finally {
+            unmockkStatic(ConfidentialClientApplication::class)
+            unmockkStatic(ClientCredentialFactory::class)
+        }
     }
 
     companion object {
@@ -247,7 +495,7 @@ internal class WebOperationsTest {
                 maxCredentialAge = Duration.ofDays(30),
                 lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
             ),
-            idpEndpoint = URL("http://localhost:8080"),
+            idpEndpoint = URI.create("http://localhost:8080").toURL(),
             localFolder = TempDownloadDir(CURRENT_WORKING_DIR),
             pullThreadPoolSize = 1,
             pushThreadPoolSize = 1,

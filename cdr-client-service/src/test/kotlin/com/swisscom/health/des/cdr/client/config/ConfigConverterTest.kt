@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
-import java.net.URL
+import java.net.URI
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
@@ -49,7 +49,7 @@ class ConfigConverterTest {
             maxCredentialAge = Duration.ofDays(30),
             lastCredentialRenewalTime = LastCredentialRenewalTime(LAST_UPDATED_AT),
         ),
-        idpEndpoint = URL("http://localhost:8080"),
+        idpEndpoint = URI.create("http://localhost:8080").toURL(),
         localFolder = TempDownloadDir(RELATIVE_PATH),
         pullThreadPoolSize = 1,
         pushThreadPoolSize = 1,
@@ -107,7 +107,7 @@ class ConfigConverterTest {
             maxCredentialAge = Duration.ofDays(30),
             lastCredentialRenewalTime = LastCredentialRenewalTime(LAST_UPDATED_AT),
         ),
-        idpEndpoint = URL("http://localhost:8080"),
+        idpEndpoint = URI.create("http://localhost:8080").toURL(),
         localFolder = TempDownloadDir(ABSOLUTE_PATH),
         pullThreadPoolSize = 1,
         pushThreadPoolSize = 1,

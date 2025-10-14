@@ -466,7 +466,7 @@ internal data class IdpCredentials(
     val clientSecret: ClientSecret,
 
     /**
-     * Access scope to request from the OAuth identity provider. Currently only ```https://[stg.]identity.health.swisscom.ch/CdrApi/.default```
+     * Access scope to request from the OAuth identity provider. Currently only ```https://[tst.]identity.health.swisscom.ch/CdrApi/.default```
      * is supported.
      * */
     val scope: Scope,

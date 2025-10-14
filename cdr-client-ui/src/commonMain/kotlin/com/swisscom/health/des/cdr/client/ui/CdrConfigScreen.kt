@@ -51,6 +51,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service_subtitle
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_reset
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_broken
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_credentials
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_disabled
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_error
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_offline
@@ -227,6 +228,7 @@ private fun statusStringResource(status: DTOs.StatusResponse.StatusCode): String
         DTOs.StatusResponse.StatusCode.ERROR -> stringResource(Res.string.status_error)
         DTOs.StatusResponse.StatusCode.OFFLINE -> stringResource(Res.string.status_offline)
         DTOs.StatusResponse.StatusCode.BROKEN -> stringResource(Res.string.status_broken)
+        DTOs.StatusResponse.StatusCode.LOGIN_FAILED -> stringResource(Res.string.status_credentials)
         DTOs.StatusResponse.StatusCode.UNKNOWN -> stringResource(Res.string.status_unknown)
     }
 

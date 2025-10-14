@@ -7,6 +7,7 @@
     <string name="label_reset">Reset</string>
     <string name="label_close">Close</string>
     <string name="label_apply">Apply</string>
+    <string name="label_validate">Test</string>
     <string name="label_client_status">Client status</string>
     <string name="label_cdr_api_host">CDR host</string>
     <string name="label_cdr_api_host_placeholder">Fully qualified domain name of the CDR host, e.g. 'cdr.health.swisscom.ch'</string>
@@ -57,11 +58,13 @@
     <string name="status_synchronizing">synchronizing</string>
     <string name="status_disabled">disabled</string>
     <string name="status_error">error</string>
+    <string name="status_credentials">credentials invalid</string>
     <string name="status_offline">offline</string>
     <string name="status_unknown">unknown</string>
 
     <!-- Messages -->
     <string name="message_loading_initial_config">Loading initial configuration...</string>
+    <string name="message_credentials_valid">Credentials are ok</string>
 
     <!-- Tooltips -->
 
@@ -83,4 +86,5 @@
     <string name="error_test_timeout_too_long">Timeout cannot be longer than test interval</string>
     <string name="error_no_connector">Connector configuration is missing</string>
     <string name="error_is_placeholder">Placeholder value, needs to be replaced</string>
+    <string name="error_is_credentials">Credential check failed. Either the given values are wrong or connection couldn't be established.</string>
 </resources>

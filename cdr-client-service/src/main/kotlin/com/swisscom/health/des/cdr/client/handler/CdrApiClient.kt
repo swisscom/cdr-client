@@ -45,6 +45,8 @@ internal class CdrApiClient(
     private val objectMapper: ObjectMapper
 ) {
 
+    var onCredentialValidation: ((Boolean) -> Unit)? = null
+
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     fun renewClientCredential(traceId: String): RenewClientSecretResult = runCatching {
         logger.debug { "Renewing client secret" }
@@ -433,8 +435,12 @@ internal class CdrApiClient(
             authResult.accessToken()
         }
     }.fold(
-        onSuccess = { token: String -> token },
+        onSuccess = { token: String ->
+            onCredentialValidation?.invoke(token.isNotBlank())
+            token
+        },
         onFailure = { e ->
+            onCredentialValidation?.invoke(false)
             logger.error { "Failed to get access token: $e" }
             EMPTY_STRING
         }

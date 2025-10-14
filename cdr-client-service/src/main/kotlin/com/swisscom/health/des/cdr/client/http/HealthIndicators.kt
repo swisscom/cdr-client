@@ -35,6 +35,9 @@ internal class HealthIndicators(
                 !schedulingValidationService.isConfigSourceUnambiguous -> Health.Builder(Status(CONFIG_BROKEN))
                     .withDetail("configStatus", "ambiguous config source")
 
+                !schedulingValidationService.areCredentialsValid -> Health.Builder(Status(INVALID_CRED))
+                    .withDetail("configStatus", "invalid credentials")
+
                 !configValidationService.isConfigValid -> Health.Builder(Status(CONFIG_ERROR))
                     .withDetail("configStatus", "invalid config")
 
@@ -49,6 +52,7 @@ internal class HealthIndicators(
         const val CONFIG_INDICATOR_NAME = "config"
         const val CONFIG_BROKEN = "BROKEN"
         const val CONFIG_ERROR = "ERROR"
+        const val INVALID_CRED = "INVALID_CREDENTIALS"
         const val CONFIG_OK = "OK"
     }
 }

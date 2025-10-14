@@ -121,7 +121,8 @@ class DTOs {
         VALUE_IS_BLANK,
         FILE_BUSY_TEST_TIMEOUT_TOO_LONG,
         NO_CONNECTOR_CONFIGURED,
-        VALUE_IS_PLACEHOLDER
+        VALUE_IS_PLACEHOLDER,
+        CREDENTIAL_VALIDATION_FAILED
     }
 
 
@@ -136,6 +137,7 @@ class DTOs {
             SYNCHRONIZING(true),
             DISABLED(true),
             ERROR(true),
+            LOGIN_FAILED(true),
             BROKEN(true),
             OFFLINE(false);
 

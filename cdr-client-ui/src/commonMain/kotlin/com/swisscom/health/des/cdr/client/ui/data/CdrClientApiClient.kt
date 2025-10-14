@@ -1,6 +1,5 @@
 package com.swisscom.health.des.cdr.client.ui.data
 
-import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.data.HttpClient.MEDIA_TYPE_APPLICATION_JSON
@@ -120,6 +119,10 @@ internal class CdrClientApiClient {
     suspend fun updateClientServiceConfiguration(config: DTOs.CdrClientConfig): Result<DTOs.CdrClientConfig> =
         putAnything<DTOs.CdrClientConfig, DTOs.CdrClientConfig>(CDR_CLIENT_CONFIG_URL, config, "Update client service configuration")
 
+    suspend fun checkCredentials(idpCredentials: DTOs.CdrClientConfig.IdpCredentials): Result<DTOs.ValidationResult> =
+        putAnything<DTOs.CdrClientConfig.IdpCredentials, DTOs.ValidationResult>(
+            VALIDATE_CREDENTIALS_URL, idpCredentials, "Check credential values")
+
     /**
      * Sends a command to the CDR client service to shut itself down. (The platform's service control
      * process is responsible for restarting the service.)
@@ -152,7 +155,7 @@ internal class CdrClientApiClient {
                     .use { response: Response ->
                         val responseString: String = response.body
                             .use { body ->
-                                body?.string() ?: EMPTY_STRING
+                                body.string()
                             }.also {
                                 logger.trace { "Response body: '$it'" }
                             }
@@ -198,7 +201,7 @@ internal class CdrClientApiClient {
                 .use { response: Response ->
                     val responseString: String = response.body
                         .use { body ->
-                            body?.string() ?: EMPTY_STRING
+                            body.string()
                         }.also {
                             logger.trace { "raw response body: '$it'" }
                         }
@@ -245,7 +248,7 @@ internal class CdrClientApiClient {
                 .use { response: Response ->
                     val responseString: String = response.body
                         .use { body ->
-                            body?.string() ?: EMPTY_STRING
+                            body.string()
                         }.also {
                             logger.trace { "Response body: '$it'" }
                         }
@@ -336,6 +339,9 @@ internal class CdrClientApiClient {
 
         @JvmStatic
         private val STATUS_URL = "$CDR_CLIENT_BASE_URL/status".toHttpUrl()
+
+        @JvmStatic
+        private val VALIDATE_CREDENTIALS_URL = "$CDR_CLIENT_BASE_URL/validate-credentials".toHttpUrl()
 
         @JvmStatic
         private val CDR_CLIENT_CONFIG_URL = "$CDR_CLIENT_BASE_URL/service-configuration".toHttpUrl()
