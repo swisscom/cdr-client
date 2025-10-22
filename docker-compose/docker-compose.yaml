@@ -11,8 +11,6 @@ services:
       retries: 5
       start_period: 5s
       timeout: 10s
-    ports:
-        - "9090:8080"
     environment:
       - TZ=Europe/Zurich
     command: ["--verbose", "--global-response-templating"]
@@ -39,11 +37,10 @@ services:
     build: ./caddy
     mem_limit: 256m
     ports:
-      - "443:8443"
-      - "80:8080"
+      - "80:80"
     healthcheck:
       # checks the mock-oauth2-server's health endpoint to prove that both caddy and the mock-oauth2-server are up and running
-      test: curl --fail http://localhost:8080/isalive || exit 1
+      test: curl --fail http://localhost/isalive || exit 1
       interval: 5s
       retries: 5
       start_period: 120s

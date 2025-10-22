@@ -1,10 +1,6 @@
 package com.swisscom.health.des.cdr.client
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.microsoft.aad.msal4j.ClientCredentialParameters
-import com.microsoft.aad.msal4j.IAuthenticationResult
-import com.microsoft.aad.msal4j.IConfidentialClientApplication
-import com.microsoft.aad.msal4j.TokenSource
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
@@ -26,7 +22,6 @@ import io.micrometer.tracing.Tracer
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
-import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -54,7 +49,6 @@ import org.springframework.retry.support.RetryTemplate
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.UUID
-import java.util.concurrent.CompletableFuture
 import kotlin.io.path.createDirectories
 import kotlin.io.path.extension
 import kotlin.io.path.listDirectoryEntries
@@ -83,14 +77,9 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
     @MockK
     private lateinit var traceContext: TraceContext
 
-    @MockK
-    private lateinit var clientCredentialParams: ClientCredentialParameters
 
     @MockK
     private lateinit var retryIoErrorsThrice: RetryTemplate
-
-    @MockK
-    private lateinit var securedApp: IConfidentialClientApplication
 
     @MockK
     private lateinit var xmlParser: XmlUtil
@@ -154,16 +143,9 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } answers { "Mocked Result" }
 
-        val resultMock: CompletableFuture<IAuthenticationResult> = mockk()
-        val authMock: IAuthenticationResult = mockk()
-        every { resultMock.get() } returns authMock
-        every { authMock.metadata().tokenSource() } returns TokenSource.CACHE
-        every { authMock.accessToken() } returns "123"
-        every { securedApp.acquireToken(any<ClientCredentialParameters>()) } returns resultMock
-
         mockTracer()
 
-        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), clientCredentialParams, retryIoErrorsThrice, securedApp, ObjectMapper())
+        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), retryIoErrorsThrice, ObjectMapper())
         pullFileHandling = PullFileHandling(tracer, cdrApiClient, xmlParser)
         documentDownloadScheduler = DocumentDownloadScheduler(
             config,

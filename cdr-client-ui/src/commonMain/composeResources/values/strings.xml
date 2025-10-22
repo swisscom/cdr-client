@@ -58,6 +58,8 @@
     <string name="status_disabled">disabled</string>
     <string name="status_error">error</string>
     <string name="status_offline">offline</string>
+    <string name="status_authn_error">login error</string>
+    <string name="status_authn_denied">login denied</string>
     <string name="status_unknown">unknown</string>
 
     <!-- Messages -->

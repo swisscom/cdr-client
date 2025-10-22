@@ -1,35 +1,35 @@
 [versions]
 jdk="21"
-kotlin-lang = "2.2.10"
-compose-multiplatform = "1.8.2"
-compose-native-tray = "0.9.0"
+kotlin-lang = "2.2.20"
+compose-multiplatform = "1.9.1"
+compose-native-tray = "1.0.4"
 kotlin-logging = "7.0.13"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization="1.9.0"
 detekt = "1.23.8"
 awaitility="4.3.0"
-jacoco="0.8.13"
+jacoco="0.8.14"
 kache="2.1.1"
-kfs-watch="1.3.1"
+kfs-watch="1.4.0"
 logstash-encoder="8.1"
-mockk="1.14.5"
+mockk="1.14.6"
 spring-mockk="4.0.2"
-msal4j="1.23.0"
-okHttp="5.1.0"
+nimbusOauth2SdkVersion="11.29.2"
+okHttp="5.2.1"
 spring-cloud="2025.0.0"
-spring-boot="3.5.5"
+spring-boot="3.5.6"
 spring-dependency-management="1.1.7"
-docker-compose="0.17.12"
+docker-compose="0.17.12" # all versions above this one require Gradle 9; blocked by the conveyor-plugin which is not Gradle 9 compatible yet
 conveyor-plugin = "1.12"
-androidx-lifecycle = "2.9.3"
+androidx-lifecycle = "2.9.5"
 conveyor-control-api = "1.1"
-jna = "5.17.0"
+jna = "5.18.1"
 ui-tiles = "2.13.0"
 pgreze-kotlin-process = "1.5.1"
 
 [libraries]
 kache = { group = "com.mayakapps.kache", name = "kache", version.ref = "kache" }
-msal4j = { group = "com.microsoft.azure", name = "msal4j", version.ref = "msal4j" }
+nimbusOAuth2Sdk = { group = "com.nimbusds", name = "oauth2-oidc-sdk", version.ref = "nimbusOauth2SdkVersion" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okHttp" }
 kfswatch = { group = "io.github.irgaly.kfswatch", name = "kfswatch", version.ref = "kfs-watch" }
 kotlin-logging = { group = "io.github.oshai", name = "kotlin-logging-jvm", version.ref = "kotlin-logging" }

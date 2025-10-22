@@ -1,8 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.microsoft.aad.msal4j.ClientCredentialParameters
-import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
@@ -62,13 +60,7 @@ internal class PullFileHandlingTest {
     private lateinit var traceContext: TraceContext
 
     @MockK
-    private lateinit var clientCredentialParams: ClientCredentialParameters
-
-    @MockK
     private lateinit var retryIoErrorsThrice: RetryTemplate
-
-    @MockK
-    private lateinit var securedApp: IConfidentialClientApplication
 
     @TempDir
     private lateinit var tmpDir: Path
@@ -105,7 +97,7 @@ internal class PullFileHandlingTest {
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } returns "Mocked Result"
 
-        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), clientCredentialParams, retryIoErrorsThrice, securedApp, ObjectMapper())
+        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), retryIoErrorsThrice, ObjectMapper())
         pullFileHandling = PullFileHandling(tracer, cdrApiClient, XmlUtil())
     }
 

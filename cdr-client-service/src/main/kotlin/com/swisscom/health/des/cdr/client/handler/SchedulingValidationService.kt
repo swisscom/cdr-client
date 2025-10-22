@@ -17,8 +17,9 @@ internal class SchedulingValidationService(
     val isSchedulingAllowed: Boolean by lazy { isConfigSourceUnambiguous && configValidationService.isConfigValid }
     val isConfigSourceUnambiguous: Boolean by lazy { isConfigFromOneSource() }
 
+    @Suppress("unused")
     @PostConstruct
-    fun isConfigFromOneSource(): Boolean {
+    private fun isConfigFromOneSource(): Boolean {
         val activeProfiles = environment.activeProfiles.toList()
         return if (!activeProfiles.contains("test")) {
             isWriteableConfigurationUnambiguous()

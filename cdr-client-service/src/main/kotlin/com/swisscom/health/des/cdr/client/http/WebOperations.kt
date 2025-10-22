@@ -15,9 +15,16 @@ import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_AUTHENTICATED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_DENIED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_FAILED_PERMANENT
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_FAILED_RETRY
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNAUTHENTICATED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_BROKEN
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_OK
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
@@ -216,24 +223,38 @@ internal class WebOperations(
      * @return a [DTOs.StatusResponse] containing the status code of the client service
      * @see [HealthIndicators]
      */
+    @Suppress("CyclomaticComplexMethod")
     @GetMapping("api/status")
     internal suspend fun status(): ResponseEntity<DTOs.StatusResponse> = runCatching {
         val healthStatus: SystemHealth = healthEndpoint.health() as SystemHealth
         logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
 
+        val configStatus: String? = healthStatus.components[CONFIG_INDICATOR_NAME]?.status?.code
+        val syncStatus: String? = healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code
+        val authNStatus: String? = healthStatus.components[AUTHN_INDICATOR_NAME]?.status?.code
 
-        val status = when (healthStatus.components[CONFIG_INDICATOR_NAME]?.status?.code) {
-            CONFIG_BROKEN -> DTOs.StatusResponse.StatusCode.BROKEN
-            CONFIG_ERROR -> DTOs.StatusResponse.StatusCode.ERROR
-            else -> when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
-                FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
-                FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED
-                else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+        val status =
+            if (!configStatus.isNullOrBlank() && configStatus != CONFIG_OK) {
+                when (configStatus) {
+                    CONFIG_BROKEN -> DTOs.StatusResponse.StatusCode.BROKEN
+                    CONFIG_ERROR -> DTOs.StatusResponse.StatusCode.ERROR
+                    else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+                }
+            } else if (!authNStatus.isNullOrBlank() && !(authNStatus == AUTHN_AUTHENTICATED || authNStatus == AUTHN_UNAUTHENTICATED)) {
+                when (authNStatus) {
+                    AUTHN_DENIED -> DTOs.StatusResponse.StatusCode.AUTHN_DENIED
+                    AUTHN_FAILED_RETRY, AUTHN_FAILED_PERMANENT -> DTOs.StatusResponse.StatusCode.AUTHN_ERROR
+                    else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+                }
+            } else if (!syncStatus.isNullOrBlank()) {
+                when (syncStatus) {
+                    FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
+                    FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED
+                    else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+                }
+            } else {
+                DTOs.StatusResponse.StatusCode.UNKNOWN
             }
-            // TODO: add checks for error scenarios: configuration errors, CDR API not reachable, IdP not reachable, etc.
-            //   all other error scenarios would probably prevent the client service from starting altogether;
-            //   remember result of last attempt to reach remote endpoints instead of pinging them?
-        }
 
         return ResponseEntity.ok(
             DTOs.StatusResponse(

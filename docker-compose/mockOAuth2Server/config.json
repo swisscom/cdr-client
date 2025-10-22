@@ -1,8 +1,6 @@
 {
   "interactiveLogin": false,
-  "httpServer": {
-    "type": "NettyWrapper"
-  },
+  "httpServer": "NettyWrapper",
   "tokenProvider" : {
     "keyProvider" : {
       "algorithm" : "ES256"
