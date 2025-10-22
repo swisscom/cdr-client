@@ -99,7 +99,7 @@ dependencies {
 
 }
 
-configurations.all {
+configurations.configureEach {
     // exclude globally so I don't have to explicitly exclude it from mockk and all of its transitive dependencies
     exclude(module = "junit", group = "junit")
 }
