@@ -55,8 +55,8 @@ internal class HealthIndicators(
                 UNAUTHENTICATED -> Health.status(AUTHN_UNAUTHENTICATED).withDetail("authNState", "no login attempted").build()
                 AUTHENTICATED -> Health.status(AUTHN_AUTHENTICATED).withDetail("authNState", "JWT obtained").build()
                 DENIED -> Health.status(AUTHN_DENIED).withDetail("authNState", "wrong credentials or IdP coordinates").build()
-                RETRYABLE_FAILURE -> Health.status(AUTHN_FAILED_RETRY).withDetail("authNState", "io error (recoverable)").build()
-                FAILED -> Health.status(AUTHN_FAILED_PERMANENT).withDetail("authNState", "unrecoverable error").build()
+                RETRYABLE_FAILURE -> Health.status(AUTHN_COMMUNICATION_ERROR).withDetail("authNState", "io error (recoverable)").build()
+                FAILED -> Health.status(AUTHN_UNKNOWN_ERROR).withDetail("authNState", "unrecoverable error").build()
             }
         }
 
@@ -72,7 +72,7 @@ internal class HealthIndicators(
         const val AUTHN_AUTHENTICATED = "AUTHENTICATED"
         const val AUTHN_UNAUTHENTICATED = "UNAUTHENTICATED"
         const val AUTHN_DENIED = "DENIED"
-        const val AUTHN_FAILED_RETRY = "FAILED_RETRY"
-        const val AUTHN_FAILED_PERMANENT = "FAILED_PERMANENT"
+        const val AUTHN_COMMUNICATION_ERROR = "COMMUNICATION_ERROR"
+        const val AUTHN_UNKNOWN_ERROR = "UNKNOWN_ERROR"
     }
 }

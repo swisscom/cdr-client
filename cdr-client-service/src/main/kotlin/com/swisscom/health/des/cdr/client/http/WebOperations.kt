@@ -16,11 +16,11 @@ import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_AUTHENTICATED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_COMMUNICATION_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_DENIED
-import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_FAILED_PERMANENT
-import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_FAILED_RETRY
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNAUTHENTICATED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNKNOWN_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_BROKEN
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_INDICATOR_NAME
@@ -243,7 +243,8 @@ internal class WebOperations(
             } else if (!authNStatus.isNullOrBlank() && !(authNStatus == AUTHN_AUTHENTICATED || authNStatus == AUTHN_UNAUTHENTICATED)) {
                 when (authNStatus) {
                     AUTHN_DENIED -> DTOs.StatusResponse.StatusCode.AUTHN_DENIED
-                    AUTHN_FAILED_RETRY, AUTHN_FAILED_PERMANENT -> DTOs.StatusResponse.StatusCode.AUTHN_ERROR
+                    AUTHN_COMMUNICATION_ERROR -> DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR
+                    AUTHN_UNKNOWN_ERROR -> DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR
                     else -> DTOs.StatusResponse.StatusCode.UNKNOWN
                 }
             } else if (!syncStatus.isNullOrBlank()) {

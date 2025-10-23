@@ -92,8 +92,6 @@ internal class OAuth2AuthNService @OptIn(ExperimentalTime::class) constructor(
         // `ClientSecretBasic` is another option; it works in production, but our mock IdP is not set up to get the client id from the Basic Auth header,
         // instead we use the form parameter `client_id`
         val clientAuth: ClientAuthentication = ClientSecretPost(clientID, clientSecret)
-
-        @Suppress("SpreadOperator")
         val scope = Scope(idpCredentials.scope.scope)
         val tokenEndpoint: URI = idpEndpoint.toURI()
         val request = TokenRequest(tokenEndpoint, clientAuth, clientGrant, scope)

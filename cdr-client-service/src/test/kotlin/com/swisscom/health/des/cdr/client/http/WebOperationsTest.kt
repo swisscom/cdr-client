@@ -25,12 +25,13 @@ import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_AUTHENTICATED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_COMMUNICATION_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_DENIED
-import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_FAILED_RETRY
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNKNOWN_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_BROKEN
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_INDICATOR_NAME
-import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_OK
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
@@ -191,8 +192,8 @@ internal class WebOperationsTest {
         }
         val authNStatus = when (healthStatusString) {
             "DENIED" -> AUTHN_DENIED
-            "AUTHN_FAILED_RETRY" -> AUTHN_FAILED_RETRY
-            "AUTHN_FAILED_PERMANENT" -> AUTHN_FAILED_RETRY
+            "AUTHN_COMMUNICATION_ERROR" -> AUTHN_COMMUNICATION_ERROR
+            "AUTHN_UNKNOWN_ERROR" -> AUTHN_UNKNOWN_ERROR
             else -> AUTHN_AUTHENTICATED
         }
         val responseStatus = when (responseStatusString) {
@@ -200,7 +201,8 @@ internal class WebOperationsTest {
             "DISABLED" -> DTOs.StatusResponse.StatusCode.DISABLED
             "BROKEN" -> DTOs.StatusResponse.StatusCode.BROKEN
             "ERROR" -> DTOs.StatusResponse.StatusCode.ERROR
-            "AUTHN_ERROR" -> DTOs.StatusResponse.StatusCode.AUTHN_ERROR
+            "AUTHN_COMMUNICATION_ERROR" -> DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR
+            "AUTHN_UNKNOWN_ERROR" -> DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR
             "AUTHN_DENIED" -> DTOs.StatusResponse.StatusCode.AUTHN_DENIED
             else -> DTOs.StatusResponse.StatusCode.UNKNOWN
         }

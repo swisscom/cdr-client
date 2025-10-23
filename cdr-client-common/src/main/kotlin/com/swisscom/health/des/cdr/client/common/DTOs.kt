@@ -137,8 +137,9 @@ class DTOs {
             DISABLED(true),
             ERROR(true),
             BROKEN(true),
-            AUTHN_ERROR(true),
             AUTHN_DENIED(true),
+            AUTHN_COMMUNICATION_ERROR(true),
+            AUTHN_UNKNOWN_ERROR(true),
             OFFLINE(false);
 
             val isOfflineCategory: Boolean
