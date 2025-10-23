@@ -239,7 +239,7 @@ class OAuth2AuthNServiceTest {
         assertEquals(MAX_ATTEMPTS * 2, idpMock.requestCount)
         assertInstanceOf<AuthNResponse.RetryableFailure>(authNResponse)
         val wrappedException: IOException = assertInstanceOf<IOException>(authNResponse.error)
-        assertEquals("Error writing to server", wrappedException.message)
+        assertEquals("Unexpected end of file from server", wrappedException.message)
 
         assertEquals(OAuth2AuthNService.AuthNState.RETRYABLE_FAILURE, authNService.currentAuthNState())
     }
