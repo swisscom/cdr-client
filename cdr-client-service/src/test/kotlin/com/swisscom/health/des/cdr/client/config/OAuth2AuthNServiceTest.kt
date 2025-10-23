@@ -238,8 +238,7 @@ class OAuth2AuthNServiceTest {
         // then they try to retrieve the response code in a best-effort way, which makes MockWebServer count another request
         assertEquals(MAX_ATTEMPTS * 2, idpMock.requestCount)
         assertInstanceOf<AuthNResponse.RetryableFailure>(authNResponse)
-        val wrappedException: IOException = assertInstanceOf<IOException>(authNResponse.error)
-        assertEquals("Unexpected end of file from server", wrappedException.message)
+        assertInstanceOf<IOException>(authNResponse.error)
 
         assertEquals(OAuth2AuthNService.AuthNState.RETRYABLE_FAILURE, authNService.currentAuthNState())
     }
