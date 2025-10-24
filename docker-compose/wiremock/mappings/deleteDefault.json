@@ -5,6 +5,9 @@
     "headers": {
       "cdr-connector-id": {
         "doesNotMatch": "(1|5|666|1234|2345)"
+      },
+      "Authorization": {
+        "matches": "Bearer .*"
       }
     }
   },

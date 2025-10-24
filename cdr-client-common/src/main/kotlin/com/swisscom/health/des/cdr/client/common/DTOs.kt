@@ -137,6 +137,9 @@ class DTOs {
             DISABLED(true),
             ERROR(true),
             BROKEN(true),
+            AUTHN_DENIED(true),
+            AUTHN_COMMUNICATION_ERROR(true),
+            AUTHN_UNKNOWN_ERROR(true),
             OFFLINE(false);
 
             val isOfflineCategory: Boolean
@@ -190,7 +193,7 @@ class DTOs {
                 cdrApi = Endpoint.EMPTY,
                 filesInProgressCacheSize = EMPTY_STRING,
                 idpCredentials = IdpCredentials.EMPTY,
-                idpEndpoint = URI("http://localhost:8080").toURL(),
+                idpEndpoint = URI("http://localhost").toURL(),
                 localFolder = EMPTY_STRING,
                 pullThreadPoolSize = 0,
                 pushThreadPoolSize = 0,

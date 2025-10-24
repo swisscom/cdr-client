@@ -16,6 +16,9 @@
         "headers": {
           "cdr-connector-id": {
             "equalTo": "666"
+          },
+          "Authorization": {
+            "matches": "Bearer .*"
           }
         }
       },

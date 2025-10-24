@@ -1,26 +1,29 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.mayakapps.kache.ObjectKache
-import com.microsoft.aad.msal4j.ClientCredentialParameters
-import com.microsoft.aad.msal4j.IAuthenticationResult
-import com.microsoft.aad.msal4j.IConfidentialClientApplication
-import com.microsoft.aad.msal4j.TokenSource
-import com.ninjasquad.springmockk.MockkBean
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.ClientId
+import com.swisscom.health.des.cdr.client.config.ClientSecret
 import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.Host
+import com.swisscom.health.des.cdr.client.config.IdpCredentials
+import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
+import com.swisscom.health.des.cdr.client.config.RenewCredential
+import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
+import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.mockk.every
-import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
+import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import mockwebserver3.RecordedRequest
 import mockwebserver3.junit5.StartStop
 import okhttp3.Headers
 import org.awaitility.Awaitility.await
@@ -42,11 +45,13 @@ import org.springframework.scheduling.config.TaskExecutionOutcome.Status.STARTED
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.createDirectories
@@ -62,7 +67,7 @@ import kotlin.io.path.walk
     properties = [
         "spring.main.lazy-initialization=true",
         "spring.jmx.enabled=false",
-        "client.idp-credentials.renew-credential=false",
+        "client.idp-credentials.renew-credential=false", //DO NOT REMOVE! Or your spy(k)ed config won't take effect; see code about race condition below
     ]
 )
 // only test polling, not filesystem event handling
@@ -72,9 +77,6 @@ internal class PollingPushFileHandlingTest {
 
     @SpykBean
     private lateinit var config: CdrClientConfig
-
-    @MockkBean
-    private lateinit var securedApp: IConfidentialClientApplication
 
     @Autowired
     private lateinit var fileCache: ObjectKache<String, Path>
@@ -93,6 +95,9 @@ internal class PollingPushFileHandlingTest {
     @StartStop
     private val cdrServiceMock = MockWebServer()
 
+    @StartStop
+    private val idpMock = MockWebServer()
+
     @BeforeEach
     fun setup() {
         val inflightDir = tmpDir.resolve(inflightDir).also { it.createDirectories() }
@@ -106,6 +111,16 @@ internal class PollingPushFileHandlingTest {
             scheme = "http",
             port = cdrServiceMock.port,
         )
+        every { config.idpCredentials } returns IdpCredentials(
+            tenantId = TenantId("fake-tenant-id"),
+            clientId = ClientId("test-client-id"),
+            clientSecret = ClientSecret("test-client-secret"),
+            scope = Scope("https://dev.identity.health.swisscom.ch/CdrApi/.default"),
+            renewCredential = RenewCredential(false),
+            maxCredentialAge = Duration.ofDays(365),
+            lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
+        )
+        every { config.idpEndpoint } returns URI("http://${idpMock.hostName}:${idpMock.port}/oauth2/v2.0/token").toURL()
         every { config.customer } returns Customer(
             mutableListOf(
                 Connector(
@@ -118,18 +133,29 @@ internal class PollingPushFileHandlingTest {
             )
         )
 
-        val resultMock: CompletableFuture<IAuthenticationResult> = mockk()
-        val authMock: IAuthenticationResult = mockk()
-        every { resultMock.get() } returns authMock
-        every { authMock.metadata().tokenSource() } returns TokenSource.CACHE
-        every { authMock.accessToken() } returns "123"
-        every { securedApp.acquireToken(any<ClientCredentialParameters>()) } returns resultMock
+        idpMock.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse =
+                MockResponse.Builder()
+                    .code(HttpStatus.OK.value())
+                    .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+                    .body(
+                        """
+                        {
+                          "token_type" : "Bearer",
+                          "access_token" : "eyJraWQiOiJ0ZXN0LXRlbmFudC1pZC9vYXV0aDIvdjIuMCIsInR5cCI6IkpXVCIsImFsZyI6IkVTMjU2In0.eyJzdWIiOiJ0ZXN0LWNsaWVudC1pZCIsIm5iZiI6MTc2MDU0NjA0Nywicm9sZXMiOlsiQ2RyQXBwbGljYXRpb25NYW5hZ2VyLlJlYWRXcml0ZS5BbGwiXSwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdC90ZXN0LXRlbmFudC1pZC9vYXV0aDIvdjIuMCIsImV4cCI6MTc2MDU0NjQwNywiaWF0IjoxNzYwNTQ2MDQ3LCJqdGkiOiI4MDEzNzc2YS1jMWMyLTRhZGYtODE3Yi1hOWZiMDIxMTc3NmQifQ.RiL2mqiU7e40hmXzPzMIJQJUTa1gjgusFbav1TcXLjnuehaC944AVCWIvg1QQW4dTm89d_YoRTqo6SlIR8qySQ",
+                          "expires_in" : 359,
+                          "scope" : "https://dev.identity.health.swisscom.ch/CdrApi/.default"
+                        }
+                        """
+                    )
+                    .build()
+        }
 
         if (isFirstTest.compareAndSet(true, false)) {
             val filePoller = scheduledTaskHolder.scheduledTasks.filter { it.task.toString().endsWith("launchFilePoller") }
             assertEquals(1, filePoller.size)
             assertEquals(NONE, filePoller.first().task.lastExecutionOutcome.status) {
-                "we cannot be sure whether we won or lost the race against the event watcher task; so let's bail out to err on the safe side"
+                "we cannot be sure whether we won or lost the race against the file poller task; so let's bail out to err on the safe side"
             }
             await().until { filePoller.first().task.lastExecutionOutcome.status == STARTED }
             // give the file polling task some time to start up

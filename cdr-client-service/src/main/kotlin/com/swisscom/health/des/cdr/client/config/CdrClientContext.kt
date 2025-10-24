@@ -3,11 +3,7 @@ package com.swisscom.health.des.cdr.client.config
 import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy
 import com.mayakapps.kache.ObjectKache
-import com.microsoft.aad.msal4j.ClientCredentialFactory
-import com.microsoft.aad.msal4j.ClientCredentialParameters
-import com.microsoft.aad.msal4j.ConfidentialClientApplication
-import com.microsoft.aad.msal4j.IConfidentialClientApplication
-import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -46,11 +42,35 @@ internal class CdrClientContext {
     @Bean
     fun okHttpClient(
         builder: OkHttpClient.Builder,
+        oAuth2AuthNService: OAuth2AuthNService,
         @Value($$"${client.connection-timeout-ms}") timeout: Long,
         @Value($$"${client.read-timeout-ms}") readTimeout: Long
     ): OkHttpClient =
         builder
             .connectTimeout(timeout, TimeUnit.MILLISECONDS).readTimeout(readTimeout, TimeUnit.MILLISECONDS)
+            .addInterceptor { chain ->
+                oAuth2AuthNService.getAccessToken()
+                    .let { authNResponse ->
+                        when (authNResponse) {
+                            is AuthNResponse.Success -> {
+                                chain
+                                    .request()
+                                    .newBuilder()
+                                    .run {
+                                        header("Authorization", "Bearer ${authNResponse.response.tokens.accessToken.value}")
+                                        build()
+                                    }.let { authenticatedRequest ->
+                                        chain.proceed(authenticatedRequest)
+                                    }
+                            }
+
+                            else -> chain.proceed(chain.request()) // unauthenticated call; will probably fail with 401/403
+                                .also { _ ->
+                                    logger.warn { "Authentication failed, proceeding unauthenticated; authentication response: '$authNResponse'" }
+                                }
+                        }
+                    }
+            }
             .addInterceptor { chain ->
                 val response: Response = chain.proceed(chain.request())
 
@@ -59,7 +79,7 @@ internal class CdrClientContext {
                     throw HttpServerErrorException(
                         message = "Received error status code '${response.code}'.",
                         statusCode = response.code,
-                        responseBody = response.body?.string() ?: EMPTY_STRING
+                        responseBody = response.body.string()
                     )
                 }
 
@@ -122,26 +142,6 @@ internal class CdrClientContext {
         }
 
     /**
-     * Creates and returns an instance of the MSAL4J client object through which we can obtain an OAuth2 token.
-     */
-    @Bean
-    fun confidentialClientApp(config: CdrClientConfig): IConfidentialClientApplication =
-        ConfidentialClientApplication.builder(
-            config.idpCredentials.clientId.id,
-            ClientCredentialFactory.createFromSecret(config.idpCredentials.clientSecret.value)
-        ).authority(config.idpEndpoint.toString())
-            // TODO: Implement application level retry of all remote calls and then comment in the line below
-            // .disableInternalRetries()
-            .build()
-
-    /**
-     * Creates and returns an instance of credentials to be used with the MSAL4J client to obtain an OAuth2 token.
-     */
-    @Bean
-    fun clientCredentialParams(config: CdrClientConfig): ClientCredentialParameters =
-        ClientCredentialParameters.builder(setOf(config.idpCredentials.scope.scope)).build()
-
-    /**
      * Creates and returns a spring retry-template that retries on IOExceptions up to three times before bailing out.
      */
     @Bean(name = ["retryIoAndServerErrors"])
@@ -186,7 +186,13 @@ internal class CdrClientContext {
 
 }
 
-internal class HttpServerErrorException(message: String, val statusCode: Int, val responseBody: String) : RuntimeException(message)
+internal class HttpServerErrorException(message: String, val statusCode: Int, val responseBody: String) : RuntimeException(message, null, false, false) {
+    override fun toString(): String {
+        return "HttpServerErrorException(statusCode='$statusCode', responseBody='$responseBody', message='${message}')"
+    }
+}
+
+internal class WrongCredentialsException(message: String) : RuntimeException(message, null, false, false)
 
 sealed interface FileBusyTester {
     suspend fun isBusy(file: Path): Boolean

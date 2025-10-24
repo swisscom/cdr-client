@@ -21,12 +21,18 @@ import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.config.toDto
+import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
-import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_AUTHENTICATED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_COMMUNICATION_ERROR
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_DENIED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNKNOWN_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_BROKEN
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_OK
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
@@ -49,7 +55,7 @@ import org.springframework.boot.actuate.health.SystemHealth
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
-import java.net.URL
+import java.net.URI
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
@@ -161,12 +167,16 @@ internal class WebOperationsTest {
         assertEquals("Failed to update service configuration: java.lang.IllegalStateException: BANG!", probDetail.detail)
     }
 
+    @Suppress("CyclomaticComplexMethod")
     @ParameterizedTest
     @CsvSource(
         "ENABLED, SYNCHRONIZING",
         "DISABLED, DISABLED",
         "ERROR, ERROR",
         "BROKEN, BROKEN",
+        "DENIED, AUTHN_DENIED",
+        "AUTHN_FAILED_RETRY, AUTHN_ERROR",
+        "AUTHN_FAILED_PERMANENT, AUTHN_ERROR",
         "FOO, UNKNOWN"
     )
     fun `test status endpoint`(healthStatusString: String, responseStatusString: String) = runTest {
@@ -178,13 +188,22 @@ internal class WebOperationsTest {
         val configStatus = when (healthStatusString) {
             "BROKEN" -> CONFIG_BROKEN
             "ERROR" -> CONFIG_ERROR
-            else -> healthStatusString
+            else -> CONFIG_OK
+        }
+        val authNStatus = when (healthStatusString) {
+            "DENIED" -> AUTHN_DENIED
+            "AUTHN_COMMUNICATION_ERROR" -> AUTHN_COMMUNICATION_ERROR
+            "AUTHN_UNKNOWN_ERROR" -> AUTHN_UNKNOWN_ERROR
+            else -> AUTHN_AUTHENTICATED
         }
         val responseStatus = when (responseStatusString) {
             "SYNCHRONIZING" -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
             "DISABLED" -> DTOs.StatusResponse.StatusCode.DISABLED
             "BROKEN" -> DTOs.StatusResponse.StatusCode.BROKEN
             "ERROR" -> DTOs.StatusResponse.StatusCode.ERROR
+            "AUTHN_COMMUNICATION_ERROR" -> DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR
+            "AUTHN_UNKNOWN_ERROR" -> DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR
+            "AUTHN_DENIED" -> DTOs.StatusResponse.StatusCode.AUTHN_DENIED
             else -> DTOs.StatusResponse.StatusCode.UNKNOWN
         }
         val systemHealth = mockk<SystemHealth>()
@@ -192,6 +211,7 @@ internal class WebOperationsTest {
         every { systemHealth.toString() } returns "fake health status"
         every { systemHealth.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code } returns fileSyncStatus
         every { systemHealth.components[CONFIG_INDICATOR_NAME]?.status?.code } returns configStatus
+        every { systemHealth.components[AUTHN_INDICATOR_NAME]?.status?.code } returns authNStatus
 
         val response = webOperations.status()
         assertEquals(HttpStatus.OK, response.statusCode)
@@ -232,9 +252,9 @@ internal class WebOperationsTest {
                 )
             ),
             cdrApi = CdrApi(
-                scheme = "https",
+                scheme = "http",
                 host = Host("localhost"),
-                port = 8080,
+                port = 80,
                 basePath = "/"
             ),
             filesInProgressCacheSize = DataSize.ofMegabytes(1L),
@@ -247,16 +267,16 @@ internal class WebOperationsTest {
                 maxCredentialAge = Duration.ofDays(30),
                 lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
             ),
-            idpEndpoint = URL("http://localhost:8080"),
+            idpEndpoint = URI("http://localhost").toURL(),
             localFolder = TempDownloadDir(CURRENT_WORKING_DIR),
             pullThreadPoolSize = 1,
             pushThreadPoolSize = 1,
             retryDelay = emptyList(),
             scheduleDelay = Duration.ofSeconds(1L),
             credentialApi = CredentialApi(
-                scheme = "https",
+                scheme = "http",
                 host = Host("localhost"),
-                port = 8080,
+                port = 80,
                 basePath = "/"
             ),
             retryTemplate = CdrClientConfig.RetryTemplateConfig(

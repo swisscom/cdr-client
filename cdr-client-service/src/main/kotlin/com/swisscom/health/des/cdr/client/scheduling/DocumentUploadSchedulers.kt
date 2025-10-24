@@ -82,7 +82,7 @@ internal class EventTriggerUploadScheduler(
 ) {
 
     @PostConstruct
-    @Suppress("UnusedPrivateMember")
+    @Suppress("unused")
     private fun failIfTelemetrySamplingIsEnabled() {
         if (samplerProbability > ZERO_SAMPLING_THRESHOLD) {
             logger.error {
@@ -216,7 +216,7 @@ internal class PollingUploadScheduler(
 ) {
 
     @PostConstruct
-    @Suppress("UnusedPrivateMember")
+    @Suppress("unused")
     private fun failIfTelemetrySamplingIsEnabled() {
         if (samplerProbability > ZERO_SAMPLING_THRESHOLD) {
             logger.error {

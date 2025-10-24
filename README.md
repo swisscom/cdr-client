@@ -140,13 +140,7 @@ The following environment variables can be set (to override their `dev` profile 
 
 The application JRE has to be started with the following system properties:
 
-* `-Djdk.net.hosts.file=cdr-client-service/src/test/resources/msal4j_hosts`
-* `-Djavax.net.ssl.trustStore=cdr-client-service/src/test/resources/caddy_truststore.p12`
-* `-Djavax.net.ssl.trustStorePassword=changeit`
-
-The first property sets a custom hosts file to resolve external servers that MSAL4J has hardcoded as valid IdPs and
-redirect them to `localhost`. The other properties are used to make the JRE trust the SSL certificate presented by the  
-[caddy proxy](https://caddyserver.com/) server that we use to impersonate those servers.
+* currently none
 
 ### Hydraulic Conveyor
 
