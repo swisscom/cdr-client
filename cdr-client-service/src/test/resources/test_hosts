@@ -1,4 +1,0 @@
-127.0.0.1 localhost
-# MSAL4J has those hosts hard-coded, which makes it complicated for testing; see com.microsoft.aad.msal4j.AadInstanceDiscoveryProvider.DEFAULT_TRUSTED_HOST
-127.0.0.1 login.microsoftonline.com
-# END MSAL4J

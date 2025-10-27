@@ -25,8 +25,9 @@ internal class SchedulingValidationService(
         cdrApiClient.onCredentialValidation = { valid -> areCredentialsValid = valid }
     }
 
+    @Suppress("unused")
     @PostConstruct
-    fun isConfigFromOneSource(): Boolean {
+    private fun isConfigFromOneSource(): Boolean {
         val activeProfiles = environment.activeProfiles.toList()
         return if (!activeProfiles.contains("test")) {
             isWriteableConfigurationUnambiguous()

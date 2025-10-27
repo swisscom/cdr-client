@@ -87,9 +87,9 @@ class ConfigurationWriterTest {
                 )
             ),
             cdrApi = CdrApi(
-                scheme = "https",
+                scheme = "http",
                 host = Host("localhost"),
-                port = 8080,
+                port = 80,
                 basePath = "/"
             ),
             filesInProgressCacheSize = DataSize.ofMegabytes(1L),
@@ -102,16 +102,16 @@ class ConfigurationWriterTest {
                 maxCredentialAge = Duration.ofDays(30),
                 lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
             ),
-            idpEndpoint = URI.create("http://localhost:8080").toURL(),
+            idpEndpoint = URI("http://localhost").toURL(),
             localFolder = TempDownloadDir(CURRENT_WORKING_DIR),
             pullThreadPoolSize = 1,
             pushThreadPoolSize = 1,
             retryDelay = emptyList(),
             scheduleDelay = Duration.ofSeconds(1L),
             credentialApi = CredentialApi(
-                scheme = "https",
+                scheme = "http",
                 host = Host("localhost"),
-                port = 8080,
+                port = 80,
                 basePath = "/"
             ),
             retryTemplate = CdrClientConfig.RetryTemplateConfig(

@@ -40,6 +40,8 @@ management:
     address: localhost
     port: 8193
   endpoints:
+    access:
+      default: none
     web:
       exposure:
         include: "info,health"
@@ -52,6 +54,9 @@ management:
     health:
       show-details: always
       show-components: always
+      access: read_only
+    info:
+      access: read_only
   tracing:
     sampling:
       # sampling has to be disabled; if enabled we create a memory leak as there is no way to guarantee a sampled span gets closed and releases its resources

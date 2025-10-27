@@ -37,10 +37,10 @@ private val logger = KotlinLogging.logger {}
  */
 internal class CdrClientApiClient {
 
-    sealed interface Result<U> {
+    sealed interface Result<out U> {
         data class Success<T>(val response: T) : Result<T>
-        data class IOError<Nothing>(val errors: Map<String, Any>) : Result<Nothing>
-        data class ServiceError<Nothing>(val errors: Map<String, Any>) : Result<Nothing>
+        data class IOError(val errors: Map<String, Any>) : Result<Nothing>
+        data class ServiceError(val errors: Map<String, Any>) : Result<Nothing>
     }
 
     suspend fun validateConnectorMode(

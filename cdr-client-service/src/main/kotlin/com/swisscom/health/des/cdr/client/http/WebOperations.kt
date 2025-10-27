@@ -1,10 +1,6 @@
 package com.swisscom.health.des.cdr.client.http
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.microsoft.aad.msal4j.ClientCredentialFactory
-import com.microsoft.aad.msal4j.ClientCredentialParameters
-import com.microsoft.aad.msal4j.ConfidentialClientApplication
-import com.microsoft.aad.msal4j.IAuthenticationResult
 import com.swisscom.health.des.cdr.client.common.Constants.SHUTDOWN_DELAY
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.CREDENTIAL_VALIDATION_FAILED
@@ -16,18 +12,25 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MO
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MODE_VALUE
 import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
 import com.swisscom.health.des.cdr.client.config.toCdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_AUTHENTICATED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_COMMUNICATION_ERROR
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_DENIED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNAUTHENTICATED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNKNOWN_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_BROKEN
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_OK
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
-import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.INVALID_CRED
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.actuate.health.HealthEndpoint
@@ -40,6 +43,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.net.URI
 import java.nio.file.Path
 import java.time.Instant
 
@@ -60,6 +64,7 @@ internal class WebOperations(
     private val configValidationService: ConfigValidationService,
     @param:Qualifier("retryIoAndServerErrors")
     private val retryIOExceptionsAndServerErrors: RetryTemplate,
+    private val authService: OAuth2AuthNService,
 ) {
     /*
      * BEGIN - (Configuration) Validation Endpoints
@@ -175,12 +180,12 @@ internal class WebOperations(
     internal suspend fun validateCredentials(
         @RequestBody idpCredentials: DTOs.CdrClientConfig.IdpCredentials,
     ): ResponseEntity<ValidationResult> = runCatching {
-        retryIOExceptionsAndServerErrors.execute<String, Exception> { retry: RetryContext ->
+        retryIOExceptionsAndServerErrors.execute<OAuth2AuthNService.AuthNResponse, Exception> { retry: RetryContext ->
             val idpEndpoint = config.idpEndpoint.toString()
-            val correctedIdpEndpoint = if (idpEndpoint.endsWith("${idpCredentials.tenantId}/"))
+            val correctedIdpEndpoint = if (config.idpCredentials.tenantId.id == idpCredentials.tenantId)
                 idpEndpoint
-            else
-                idpEndpoint.replace(Regex("https://login\\.microsoftonline\\.com/[^/]+/?"), "https://login.microsoftonline.com/${idpCredentials.tenantId}/")
+            else // only replace the first path segment after the host with the tenant id from the provided credentials
+                idpEndpoint.replace(Regex("(http[s]?://[^/]+/)[^/]+"), "$1${idpCredentials.tenantId}")
 
             if (retry.retryCount > 0) {
                 logger.debug {
@@ -194,22 +199,19 @@ internal class WebOperations(
             }
             logger.trace { "validating credentials" }
 
-            val clientCredentialParams = ClientCredentialParameters.builder(setOf(config.idpCredentials.scope.scope)).build()
-            val secApp = ConfidentialClientApplication.builder(
-                idpCredentials.clientId,
-                ClientCredentialFactory.createFromSecret(idpCredentials.clientSecret)
-            ).authority(correctedIdpEndpoint)
-                .build()
-
-            val authResult: IAuthenticationResult =
-                secApp.acquireToken(clientCredentialParams).get()
-            authResult.accessToken()
+            authService.getNewAccessToken(idpCredentials.toCdrClientConfig(), URI(correctedIdpEndpoint).toURL())
         }
     }.fold(
-        onSuccess = { token: String ->
+        onSuccess = { authNResponse: OAuth2AuthNService.AuthNResponse ->
             var validationResult: ValidationResult = ValidationResult.Success
-            if (token.isBlank()) {
-                validationResult += credentialValidationFailure
+            when (authNResponse) {
+                is OAuth2AuthNService.AuthNResponse.Success -> {
+
+                }
+
+                else -> {
+                    validationResult += credentialValidationFailure
+                }
             }
             ResponseEntity.ok(validationResult)
         },
@@ -286,24 +288,39 @@ internal class WebOperations(
      * @return a [DTOs.StatusResponse] containing the status code of the client service
      * @see [HealthIndicators]
      */
+    @Suppress("CyclomaticComplexMethod")
     @GetMapping("api/status")
     internal suspend fun status(): ResponseEntity<DTOs.StatusResponse> = runCatching {
         val healthStatus: SystemHealth = healthEndpoint.health() as SystemHealth
         logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
 
-        val status = when (healthStatus.components[CONFIG_INDICATOR_NAME]?.status?.code) {
-            CONFIG_BROKEN -> DTOs.StatusResponse.StatusCode.BROKEN
-            CONFIG_ERROR -> DTOs.StatusResponse.StatusCode.ERROR
-            INVALID_CRED -> DTOs.StatusResponse.StatusCode.LOGIN_FAILED
-            else -> when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
-                FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
-                FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED
-                else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+        val configStatus: String? = healthStatus.components[CONFIG_INDICATOR_NAME]?.status?.code
+        val syncStatus: String? = healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code
+        val authNStatus: String? = healthStatus.components[AUTHN_INDICATOR_NAME]?.status?.code
+
+        val status =
+            if (!configStatus.isNullOrBlank() && configStatus != CONFIG_OK) {
+                when (configStatus) {
+                    CONFIG_BROKEN -> DTOs.StatusResponse.StatusCode.BROKEN
+                    CONFIG_ERROR -> DTOs.StatusResponse.StatusCode.ERROR
+                    else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+                }
+            } else if (!authNStatus.isNullOrBlank() && !(authNStatus == AUTHN_AUTHENTICATED || authNStatus == AUTHN_UNAUTHENTICATED)) {
+                when (authNStatus) {
+                    AUTHN_DENIED -> DTOs.StatusResponse.StatusCode.AUTHN_DENIED
+                    AUTHN_COMMUNICATION_ERROR -> DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR
+                    AUTHN_UNKNOWN_ERROR -> DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR
+                    else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+                }
+            } else if (!syncStatus.isNullOrBlank()) {
+                when (syncStatus) {
+                    FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
+                    FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED
+                    else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+                }
+            } else {
+                DTOs.StatusResponse.StatusCode.UNKNOWN
             }
-            // TODO: add checks for error scenarios: configuration errors, CDR API not reachable, IdP not reachable, etc.
-            //   all other error scenarios would probably prevent the client service from starting altogether;
-            //   remember result of last attempt to reach remote endpoints instead of pinging them?
-        }
 
         return ResponseEntity.ok(
             DTOs.StatusResponse(

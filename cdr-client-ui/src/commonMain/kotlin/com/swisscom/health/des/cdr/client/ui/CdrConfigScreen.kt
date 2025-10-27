@@ -50,6 +50,9 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service_subtitle
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_reset
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_communication_error
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_denied
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_unknown_error
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_broken
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_credentials
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_disabled
@@ -228,6 +231,9 @@ private fun statusStringResource(status: DTOs.StatusResponse.StatusCode): String
         DTOs.StatusResponse.StatusCode.ERROR -> stringResource(Res.string.status_error)
         DTOs.StatusResponse.StatusCode.OFFLINE -> stringResource(Res.string.status_offline)
         DTOs.StatusResponse.StatusCode.BROKEN -> stringResource(Res.string.status_broken)
+        DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR -> stringResource(Res.string.status_authn_communication_error)
+        DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR -> stringResource(Res.string.status_authn_unknown_error)
+        DTOs.StatusResponse.StatusCode.AUTHN_DENIED -> stringResource(Res.string.status_authn_denied)
         DTOs.StatusResponse.StatusCode.LOGIN_FAILED -> stringResource(Res.string.status_credentials)
         DTOs.StatusResponse.StatusCode.UNKNOWN -> stringResource(Res.string.status_unknown)
     }
@@ -302,7 +308,7 @@ private fun ResetButton(enabled: Boolean, onClick: () -> Unit) =
 //        toolTip = "Reset form values to currently active configuration",
         onClick = onClick,
         enabled = enabled,
-    ).also { logger.trace { "CancelButton has been (re-)composed." } }
+    ).also { logger.trace { "ResetButton has been (re-)composed." } }
 
 @Composable
 private fun ApplyButton(enabled: Boolean, onClick: () -> Unit) =

@@ -5,7 +5,7 @@ client:
     # as the internal yaml file cannot be updated and the property also cannot be overridden in an external file as that would lead to two secret
     # locations, which currently also fails the update
     max-credential-age: 365d
-  idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/
+  idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/oauth2/v2.0/token
   schedule-delay: PT10M
   files-in-progress-cache-size: 10MB
   connection-timeout-ms: 5000
