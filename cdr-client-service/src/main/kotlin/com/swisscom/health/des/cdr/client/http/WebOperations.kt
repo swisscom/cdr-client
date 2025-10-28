@@ -180,6 +180,7 @@ internal class WebOperations(
     internal suspend fun validateCredentials(
         @RequestBody idpCredentials: DTOs.CdrClientConfig.IdpCredentials,
     ): ResponseEntity<ValidationResult> = runCatching {
+        logger.debug { "validating credentials for tenant id: '${idpCredentials.tenantId}'" }
         retryIOExceptionsAndServerErrors.execute<OAuth2AuthNService.AuthNResponse, Exception> { retry: RetryContext ->
             val idpEndpoint = config.idpEndpoint.toString()
             val correctedIdpEndpoint = if (config.idpCredentials.tenantId.id == idpCredentials.tenantId)
@@ -199,7 +200,7 @@ internal class WebOperations(
             }
             logger.trace { "validating credentials" }
 
-            authService.getNewAccessToken(idpCredentials.toCdrClientConfig(), URI(correctedIdpEndpoint).toURL())
+            authService.getNewAccessToken(idpCredentials.toCdrClientConfig(), URI(correctedIdpEndpoint).toURL(), false)
         }
     }.fold(
         onSuccess = { authNResponse: OAuth2AuthNService.AuthNResponse ->
@@ -213,6 +214,7 @@ internal class WebOperations(
                     validationResult += credentialValidationFailure
                 }
             }
+            logger.debug { "Credentials validation completed with result: '$validationResult'" }
             ResponseEntity.ok(validationResult)
         },
         onFailure = { e ->

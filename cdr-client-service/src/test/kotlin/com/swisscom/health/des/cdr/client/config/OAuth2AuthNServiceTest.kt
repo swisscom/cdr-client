@@ -80,7 +80,7 @@ class OAuth2AuthNServiceTest {
             .build()
         idpMock.enqueue(mockResponse)
 
-        assertEquals(OAuth2AuthNService.AuthNState.UNAUTHENTICATED, authNService.currentAuthNState())
+        assertEquals(OAuth2AuthNService.AuthNState.UNKNOWN, authNService.currentAuthNStateNonBlocking())
 
         val authNResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
         val serverSideRequest: RecordedRequest = requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
@@ -92,7 +92,7 @@ class OAuth2AuthNServiceTest {
         assertTrue(accessTokenResponse.indicatesSuccess())
         assertEquals(ACCESS_TOKEN, accessTokenResponse.tokens.accessToken.value)
 
-        assertEquals(OAuth2AuthNService.AuthNState.AUTHENTICATED, authNService.currentAuthNState())
+        assertEquals(OAuth2AuthNService.AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
     }
 
     @OptIn(ExperimentalTime::class)
@@ -126,7 +126,7 @@ class OAuth2AuthNServiceTest {
         val constantTimeClock = mockk<Clock>()
         every { constantTimeClock.now().epochSeconds } returns 1760437304L // IdP response `expires_on` - 1
 
-        assertEquals(OAuth2AuthNService.AuthNState.UNAUTHENTICATED, authNService.currentAuthNState())
+        assertEquals(OAuth2AuthNService.AuthNState.UNKNOWN, authNService.currentAuthNStateNonBlocking())
 
         authNService = OAuth2AuthNService(config = config, clock = constantTimeClock, retryIoErrors = retryIoExceptionsTwice)
 
@@ -142,7 +142,7 @@ class OAuth2AuthNServiceTest {
         assertTrue(accessTokenResponse.indicatesSuccess())
         assertEquals(ACCESS_TOKEN, accessTokenResponse.tokens.accessToken.value)
 
-        assertEquals(OAuth2AuthNService.AuthNState.AUTHENTICATED, authNService.currentAuthNState())
+        assertEquals(OAuth2AuthNService.AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
     }
 
     @OptIn(ExperimentalTime::class)
@@ -165,7 +165,7 @@ class OAuth2AuthNServiceTest {
         val constantTimeClock = mockk<Clock>()
         every { constantTimeClock.now().epochSeconds } returns 1760437306L // IdP response `expires_on` + 1
 
-        assertEquals(OAuth2AuthNService.AuthNState.UNAUTHENTICATED, authNService.currentAuthNState())
+        assertEquals(OAuth2AuthNService.AuthNState.UNKNOWN, authNService.currentAuthNStateNonBlocking())
 
         authNService = OAuth2AuthNService(config = config, clock = constantTimeClock, retryIoErrors = retryIoExceptionsTwice)
 
@@ -181,7 +181,7 @@ class OAuth2AuthNServiceTest {
         assertTrue(accessTokenResponse.indicatesSuccess())
         assertEquals(ACCESS_TOKEN, accessTokenResponse.tokens.accessToken.value)
 
-        assertEquals(OAuth2AuthNService.AuthNState.AUTHENTICATED, authNService.currentAuthNState())
+        assertEquals(OAuth2AuthNService.AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
     }
 
     @Test
@@ -197,7 +197,7 @@ class OAuth2AuthNServiceTest {
             .build()
         idpMock.enqueue(mockResponse)
 
-        assertEquals(OAuth2AuthNService.AuthNState.UNAUTHENTICATED, authNService.currentAuthNState())
+        assertEquals(OAuth2AuthNService.AuthNState.UNKNOWN, authNService.currentAuthNStateNonBlocking())
 
         val authNResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
         val serverSideRequest: RecordedRequest = requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
@@ -208,7 +208,7 @@ class OAuth2AuthNServiceTest {
         val wrappedException: WrongCredentialsException = authNResponse.error
         assertTrue(wrappedException.message!!.startsWith("Failed to login; client id: 'ClientId(id=fake-client-id)'"))
 
-        assertEquals(OAuth2AuthNService.AuthNState.DENIED, authNService.currentAuthNState())
+        assertEquals(OAuth2AuthNService.AuthNState.DENIED, authNService.currentAuthNStateNonBlocking())
     }
 
     @Test
@@ -230,7 +230,7 @@ class OAuth2AuthNServiceTest {
         idpMock.enqueue(mockResponse)
         idpMock.enqueue(mockResponse)
 
-        assertEquals(OAuth2AuthNService.AuthNState.UNAUTHENTICATED, authNService.currentAuthNState())
+        assertEquals(OAuth2AuthNService.AuthNState.UNKNOWN, authNService.currentAuthNStateNonBlocking())
 
         val authNResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
 
@@ -240,7 +240,7 @@ class OAuth2AuthNServiceTest {
         assertInstanceOf<AuthNResponse.RetryableFailure>(authNResponse)
         assertInstanceOf<IOException>(authNResponse.error)
 
-        assertEquals(OAuth2AuthNService.AuthNState.RETRYABLE_FAILURE, authNService.currentAuthNState())
+        assertEquals(OAuth2AuthNService.AuthNState.RETRYABLE_FAILURE, authNService.currentAuthNStateNonBlocking())
     }
 
     private companion object {

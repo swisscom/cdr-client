@@ -270,7 +270,7 @@ internal class WebOperationsTest {
         )
 
 
-        every { authNService.getNewAccessToken(any(), any()) } returns OAuth2AuthNService.AuthNResponse.Success(mockk())
+        every { authNService.getNewAccessToken(any(), any(), false) } returns OAuth2AuthNService.AuthNResponse.Success(mockk())
 
         val response = webOperationsWithRealRetry.validateCredentials(idpCredentials)
 
@@ -308,7 +308,7 @@ internal class WebOperationsTest {
             lastCredentialRenewalTime = Instant.now()
         )
 
-        every { authNService.getNewAccessToken(any(), any()) } returns OAuth2AuthNService.AuthNResponse.Failed(mockk())
+        every { authNService.getNewAccessToken(any(), any(), false) } returns OAuth2AuthNService.AuthNResponse.Failed(mockk())
 
         val response = webOperationsWithRealRetry.validateCredentials(idpCredentials)
 
@@ -353,7 +353,7 @@ internal class WebOperationsTest {
         )
 
         val idpEndpointSlot = slot<URL>()
-        every { authNService.getNewAccessToken(any(), capture(idpEndpointSlot)) } returns OAuth2AuthNService.AuthNResponse.Success(mockk())
+        every { authNService.getNewAccessToken(any(), capture(idpEndpointSlot), false) } returns OAuth2AuthNService.AuthNResponse.Success(mockk())
 
         val response = webOperationsWithRealRetry.validateCredentials(idpCredentials)
 
