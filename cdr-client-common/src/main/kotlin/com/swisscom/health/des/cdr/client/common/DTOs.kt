@@ -137,7 +137,6 @@ class DTOs {
             SYNCHRONIZING(true),
             DISABLED(true),
             ERROR(true),
-            LOGIN_FAILED(true),
             BROKEN(true),
             AUTHN_DENIED(true),
             AUTHN_COMMUNICATION_ERROR(true),

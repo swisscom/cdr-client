@@ -40,8 +40,6 @@ internal class CdrApiClient(
     private val objectMapper: ObjectMapper
 ) {
 
-    var onCredentialValidation: ((Boolean) -> Unit)? = null
-
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     fun renewClientCredential(traceId: String): RenewClientSecretResult = runCatching {
         logger.debug { "Renewing client secret" }

@@ -54,7 +54,6 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.s
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_denied
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_unknown_error
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_broken
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_credentials
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_disabled
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_error
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_offline
@@ -234,7 +233,6 @@ private fun statusStringResource(status: DTOs.StatusResponse.StatusCode): String
         DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR -> stringResource(Res.string.status_authn_communication_error)
         DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR -> stringResource(Res.string.status_authn_unknown_error)
         DTOs.StatusResponse.StatusCode.AUTHN_DENIED -> stringResource(Res.string.status_authn_denied)
-        DTOs.StatusResponse.StatusCode.LOGIN_FAILED -> stringResource(Res.string.status_credentials)
         DTOs.StatusResponse.StatusCode.UNKNOWN -> stringResource(Res.string.status_unknown)
     }
 

@@ -58,7 +58,6 @@
     <string name="status_synchronizing">synchronizing</string>
     <string name="status_disabled">disabled</string>
     <string name="status_error">error</string>
-    <string name="status_credentials">credentials invalid</string>
     <string name="status_offline">offline</string>
     <string name="status_authn_communication_error">login communication error</string>
     <string name="status_authn_unknown_error">login unknown error</string>
