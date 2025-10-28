@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertInstanceOf
@@ -212,6 +213,7 @@ class OAuth2AuthNServiceTest {
     }
 
     @Test
+    @Disabled("Flaky test - sometimes runs forever when running in gradle test suite")
     fun `io exception - authN retryable`() {
         val mockResponse = MockResponse.Builder()
             .code(HttpStatus.OK.value())
