@@ -7,6 +7,7 @@ import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.D
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.FAILED
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.RETRYABLE_FAILURE
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.UNAUTHENTICATED
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.UNKNOWN
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import org.springframework.boot.actuate.health.Health
@@ -51,12 +52,13 @@ internal class HealthIndicators(
     @Bean
     fun authNHealthIndicator(): HealthIndicator =
         HealthIndicator {
-            when (authNService.currentAuthNState()) {
+            when (authNService.currentAuthNStateNonBlocking()) {
                 UNAUTHENTICATED -> Health.status(AUTHN_UNAUTHENTICATED).withDetail("authNState", "no login attempted").build()
                 AUTHENTICATED -> Health.status(AUTHN_AUTHENTICATED).withDetail("authNState", "JWT obtained").build()
                 DENIED -> Health.status(AUTHN_DENIED).withDetail("authNState", "wrong credentials or IdP coordinates").build()
                 RETRYABLE_FAILURE -> Health.status(AUTHN_COMMUNICATION_ERROR).withDetail("authNState", "io error (recoverable)").build()
                 FAILED -> Health.status(AUTHN_UNKNOWN_ERROR).withDetail("authNState", "unrecoverable error").build()
+                UNKNOWN -> Health.status(AUTHN_UNKNOWN_ERROR).withDetail("authNState", "connection or other issue").build()
             }
         }
 

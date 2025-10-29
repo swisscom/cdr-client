@@ -156,7 +156,14 @@ val jacocoTestReport = tasks.named<JacocoReport>("jacocoTestReport") {
 
 tasks.withType<Test> {
     // show log output produced by tests in console
-    testLogging.showStandardStreams = false
+    testLogging {
+        events("passed", "skipped", "failed", "started")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+        showStandardStreams = false
+    }
 
     useJUnitPlatform {
         includeEngines("junit-jupiter")

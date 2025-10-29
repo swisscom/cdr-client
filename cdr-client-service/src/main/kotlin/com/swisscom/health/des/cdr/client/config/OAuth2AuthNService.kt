@@ -15,29 +15,41 @@ import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.A
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.DENIED
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.RETRYABLE_FAILURE
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.UNAUTHENTICATED
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Service
 import java.io.IOException
 import java.net.URI
 import java.net.URL
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+
+private val logger = KotlinLogging.logger {}
 
 @Service
 internal class OAuth2AuthNService @OptIn(ExperimentalTime::class) constructor(
     private val config: CdrClientConfig,
     private val retryIoErrors: RetryTemplate,
+    @Suppress("SpringJavaInjectionPointsAutowiringInspection")
     private val clock: Clock = Clock.System,
 ) {
 
     private var accessTokenAuthNResponse: AuthNResponse = AuthNResponse.NotAuthenticated
+    private val tokenLock = ReentrantReadWriteLock()
+
+    @Volatile
+    private var cachedAuthNState: AuthNState = AuthNState.UNKNOWN
 
     internal enum class AuthNState {
         AUTHENTICATED,
         UNAUTHENTICATED,
         RETRYABLE_FAILURE,
         FAILED,
-        DENIED;
+        DENIED,
+        UNKNOWN;
     }
 
     internal sealed interface AuthNResponse {
@@ -48,44 +60,47 @@ internal class OAuth2AuthNService @OptIn(ExperimentalTime::class) constructor(
         object NotAuthenticated : AuthNResponse
     }
 
-    @Synchronized
-    internal fun currentAuthNState(): AuthNState =
-        when (accessTokenAuthNResponse) {
-            is AuthNResponse.Success -> AUTHENTICATED
-            is AuthNResponse.RetryableFailure -> RETRYABLE_FAILURE
-            is AuthNResponse.Failed -> AuthNState.FAILED
-            is AuthNResponse.Deny -> DENIED
-            is AuthNResponse.NotAuthenticated -> UNAUTHENTICATED
-        }
+    internal fun currentAuthNStateNonBlocking(): AuthNState = cachedAuthNState
 
     @OptIn(ExperimentalTime::class)
-    // could be improved with more fine-grained locking to avoid blocking all threads while a valid token is available and no renewal is required;
-    // but we have only five threads for uploads, one for downloads (all of which are mostly waiting for IO), and one for the service status check,
-    // so lock contention should be minimal
-    @Synchronized
-    internal fun getAccessToken(): AuthNResponse =
-        when (val currentTokenResponse = accessTokenAuthNResponse) {
-            is AuthNResponse.NotAuthenticated, is AuthNResponse.RetryableFailure -> {
-                getNewAccessToken(config.idpCredentials, config.idpEndpoint)
-            }
-
-            is AuthNResponse.Deny, is AuthNResponse.Failed -> {
-                currentTokenResponse
-            }
-
-            is AuthNResponse.Success -> {
+    internal fun getAccessToken(): AuthNResponse {
+        tokenLock.read {
+            val currentTokenResponse = accessTokenAuthNResponse
+            if (currentTokenResponse is AuthNResponse.Success) {
                 val expiresOn = currentTokenResponse.response.customParameters["expires_on"] as Long?
-                if (expiresOn == null || clock.now().epochSeconds > expiresOn) {
-                    getNewAccessToken(config.idpCredentials, config.idpEndpoint)
-                } else {
-                    currentTokenResponse
+                if (expiresOn != null && clock.now().epochSeconds <= expiresOn) {
+                    return currentTokenResponse
                 }
             }
-        }.also {
-            accessTokenAuthNResponse = it
         }
 
-    private fun getNewAccessToken(idpCredentials: IdpCredentials, idpEndpoint: URL): AuthNResponse {
+        return tokenLock.write {
+            val currentTokenResponse = accessTokenAuthNResponse
+            if (currentTokenResponse is AuthNResponse.Success) {
+                val expiresOn = currentTokenResponse.response.customParameters["expires_on"] as Long?
+                if (expiresOn != null && clock.now().epochSeconds <= expiresOn) {
+                    return@write currentTokenResponse
+                }
+            }
+
+            val newResponse = when (currentTokenResponse) {
+                is AuthNResponse.Deny, is AuthNResponse.Failed -> currentTokenResponse
+                else -> getNewAccessToken(config.idpCredentials, config.idpEndpoint)
+            }
+
+            accessTokenAuthNResponse = newResponse
+            cachedAuthNState = when (newResponse) {
+                is AuthNResponse.Success -> AUTHENTICATED
+                is AuthNResponse.RetryableFailure -> RETRYABLE_FAILURE
+                is AuthNResponse.Failed -> AuthNState.FAILED
+                is AuthNResponse.Deny -> DENIED
+                is AuthNResponse.NotAuthenticated -> UNAUTHENTICATED
+            }
+            newResponse
+        }
+    }
+
+    internal fun getNewAccessToken(idpCredentials: IdpCredentials, idpEndpoint: URL, shouldRetry: Boolean = true): AuthNResponse {
         val clientGrant: AuthorizationGrant = ClientCredentialsGrant()
         val clientID = ClientID(idpCredentials.clientId.id)
         val clientSecret = Secret(idpCredentials.clientSecret.value)
@@ -98,9 +113,13 @@ internal class OAuth2AuthNService @OptIn(ExperimentalTime::class) constructor(
 
         val authNResponse: AuthNResponse =
             runCatching {
-                retryIoErrors.execute<HTTPResponse, Throwable> { _ ->
-                    request.toHTTPRequest().send()
-                }.run { TokenResponse.parse(this) }
+                if (shouldRetry) {
+                    retryIoErrors.execute<HTTPResponse, Throwable> { _ ->
+                        request.toHTTPRequest().send()
+                    }.run { TokenResponse.parse(this) }
+                } else {
+                    request.toHTTPRequest().send().run { TokenResponse.parse(this) }
+                }
             }.fold(
                 onSuccess = { httpResponse: TokenResponse ->
                     if (httpResponse.indicatesSuccess()) {
@@ -116,6 +135,7 @@ internal class OAuth2AuthNService @OptIn(ExperimentalTime::class) constructor(
                     }
                 },
                 onFailure = { t ->
+                    logger.debug { "Error while trying to get access token from IdP at '$idpEndpoint' for client id '${idpCredentials.clientId}': $t" }
                     when (t) {
                         is IOException -> AuthNResponse.RetryableFailure(t)
                         else -> AuthNResponse.Failed(

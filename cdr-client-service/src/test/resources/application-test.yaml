@@ -24,6 +24,13 @@ client:
     - 100ms
     - 100ms
     - 100ms
+  retry-template:
+    retries: 2
+    initial-delay: 50ms
+    multiplier: 2.0
+    max-delay: 500ms
+  file-busy-test-interval: 50ms
+  file-busy-test-timeout: 500ms
   file-busy-test-strategy: file_size_changed # valid values are `never_busy`, `file_size_changed`, `always_busy`
   cdr-api:
     scheme: http
