@@ -32,8 +32,9 @@ internal class ClientSecretRenewalScheduler(
     private val tracer: Tracer,
 ) {
 
+    @Suppress("unused")
     @PostConstruct
-    fun reportIn() = logger.info { "Automatic client secret renewal is active!" }
+    private fun reportIn() = logger.info { "Automatic client secret renewal is active!" }
 
     @Scheduled(
         fixedDelayString = "#{ @'client-com.swisscom.health.des.cdr.client.config.CdrClientConfig'.getIdpCredentials().getMaxCredentialAge().toMillis() }",

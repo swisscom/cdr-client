@@ -16,15 +16,16 @@ import androidx.compose.material.Icon
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
@@ -38,7 +39,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.alorma.compose.settings.ui.SettingsMenuLink
 import com.alorma.compose.settings.ui.base.internal.SettingsTileColors
@@ -52,6 +52,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.a
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_directory_not_found
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_duplicate_mode
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_illegal_mode
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_is_credentials
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_is_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_no_connector
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_not_a_directory
@@ -103,6 +104,7 @@ internal val DTOs.ValidationMessageKey.stringResource: StringResource
             DTOs.ValidationMessageKey.NO_CONNECTOR_CONFIGURED -> Res.string.error_no_connector
             DTOs.ValidationMessageKey.VALUE_IS_PLACEHOLDER -> Res.string.error_is_placeholder
             DTOs.ValidationMessageKey.ILLEGAL_MODE -> Res.string.error_illegal_mode
+            DTOs.ValidationMessageKey.CREDENTIAL_VALIDATION_FAILED -> Res.string.error_is_credentials
         }
 
 @Composable
@@ -218,7 +220,7 @@ internal fun DropDownList(
 
         OutlinedTextField(
             readOnly = true,
-            modifier = modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
+            modifier = modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true),
             enabled = enabled,
             value = value,
             onValueChange = { },
@@ -361,10 +363,9 @@ internal fun ButtonWithToolTip(
 ) =
     if (toolTip.isNotBlank()) {
         TooltipBox(
-            positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
             tooltip = {
                 PlainTooltip(
-                    caretSize = DpSize(16.dp, 8.dp),
                     shadowElevation = 16.dp,
                     shape = MaterialTheme.shapes.extraSmall,
 

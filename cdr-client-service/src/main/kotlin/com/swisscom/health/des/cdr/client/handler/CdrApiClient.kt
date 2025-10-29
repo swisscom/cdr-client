@@ -1,9 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.microsoft.aad.msal4j.ClientCredentialParameters
-import com.microsoft.aad.msal4j.IAuthenticationResult
-import com.microsoft.aad.msal4j.IConfidentialClientApplication
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -38,17 +35,14 @@ private val logger = KotlinLogging.logger {}
 internal class CdrApiClient(
     private val cdrClientConfig: CdrClientConfig,
     private val httpClient: OkHttpClient,
-    private val clientCredentialParams: ClientCredentialParameters,
     @param:Qualifier("retryIoAndServerErrors")
     private val retryIOExceptionsAndServerErrors: RetryTemplate,
-    private val securedApp: IConfidentialClientApplication,
     private val objectMapper: ObjectMapper
 ) {
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     fun renewClientCredential(traceId: String): RenewClientSecretResult = runCatching {
         logger.debug { "Renewing client secret" }
-        val accessToken = getAccessToken()
         retryIOExceptionsAndServerErrors.execute<Response, Exception> { retry: RetryContext ->
             if (retry.retryCount > 0) {
                 logger.debug {
@@ -66,9 +60,6 @@ internal class CdrApiClient(
                     .headers(
                         Headers.Builder().run {
                             this[AZURE_TRACE_ID_HEADER] = traceId
-                            if (accessToken.isNotBlank()) {
-                                this[HttpHeaders.AUTHORIZATION] = "Bearer $accessToken"
-                            }
                             this.build()
                         }
                     )
@@ -99,9 +90,7 @@ internal class CdrApiClient(
                         }
                     }
 
-                    val appRegistration = response.body?.let { body ->
-                        objectMapper.readValue(body.byteStream(), CdrClientAppRegistrationDto::class.java)
-                    } ?: CdrClientAppRegistrationDto.EMPTY
+                    val appRegistration = objectMapper.readValue(response.body.byteStream(), CdrClientAppRegistrationDto::class.java)
 
                     appRegistration.warnings.forEach { warning ->
                         logger.warn { "Client secret renewal server-side warning: '$warning'" }
@@ -124,7 +113,7 @@ internal class CdrApiClient(
                 else ->
                     RenewClientSecretResult.RenewHttpErrorResponse(
                         code = response.code,
-                        responseBody = response.body?.string() ?: "no response body"
+                        responseBody = response.body.string()
                     ).also { result ->
                         logger.warn { "Renewing client secret encountered client error; status code: '${result.code}'" }
                         logger.trace { "Response body: '${result.responseBody}'" }
@@ -185,14 +174,14 @@ internal class CdrApiClient(
 
                         response.code in 400..499 -> UploadDocumentResult.UploadClientErrorResponse(
                             code = response.code,
-                            responseBody = response.body?.string() ?: "no response body"
+                            responseBody = response.body.string()
                         ).also { result ->
                             logger.info { "Upload '$file' encountered client error: '$result'" }
                         }
 
                         else -> UploadDocumentResult.UploadServerErrorResponse(
                             code = response.code,
-                            responseBody = response.body?.string() ?: "no response body"
+                            responseBody = response.body.string()
                         ).also { result ->
                             logger.info { "Upload '$file' encountered server error: '$result'" }
                         }
@@ -237,12 +226,12 @@ internal class CdrApiClient(
                         logger.debug { "Request file done - no document pending" }
                     }
 
-                    response.isSuccessWithContent() -> {
+                    response.isSuccessful -> {
                         val pullResultId: String = requireNotNull(response.header(PULL_RESULT_ID_HEADER)) { error("No pull result id found in response") }
                         val tmpFile: Path = cdrClientConfig.localFolder.path.resolve("$pullResultId.tmp")
                             .apply {
                                 outputStream().use { os ->
-                                    response.body!!.byteStream().use { iss -> iss.copyTo(os) }
+                                    response.body.byteStream().use { iss -> iss.copyTo(os) }
                                 }
                             }
 
@@ -256,7 +245,7 @@ internal class CdrApiClient(
 
                     else -> DownloadDocumentResult.Error(
                         code = response.code,
-                        message = response.body?.string() ?: "no response body"
+                        message = response.body.string()
                     ).also { result ->
                         logger.warn { "Request file encountered error: '$result'" }
                     }
@@ -292,7 +281,7 @@ internal class CdrApiClient(
                 )
             ).execute().use { response: Response ->
                 when {
-                    response.isSuccessWithContent() -> DownloadDocumentResult.AcknowledgeSuccess(
+                    response.isSuccessful -> DownloadDocumentResult.AcknowledgeSuccess(
                         pullResultId = downloadId
                     ).also { _ ->
                         logger.debug { "Pulled file with id '$downloadId' acknowledged" }
@@ -300,7 +289,7 @@ internal class CdrApiClient(
 
                     else -> DownloadDocumentResult.Error(
                         code = response.code,
-                        message = response.body?.string() ?: "no response body"
+                        message = response.body.string()
                     ).also { result ->
                         logger.info { "Acknowledging pulled file with id '$downloadId' encountered a http error: '$result'" }
                     }
@@ -349,27 +338,15 @@ internal class CdrApiClient(
      * Build headers with connector-id, access token, processing mode and trace id.
      */
     private fun buildBaseHeaders(connectorId: String, mode: CdrClientConfig.Mode, traceId: String): Headers {
-        val accessToken = getAccessToken()
-
         return Headers.Builder().run {
             this[CONNECTOR_ID_HEADER] = connectorId
             this[CDR_PROCESSING_MODE_HEADER] = mode.value
             this[AZURE_TRACE_ID_HEADER] = traceId
             this[CLIENT_TYPE_HEADER] = clientType ?: "cdr-client"
             this[CLIENT_VERSION_HEADER] = clientVersion ?: "unknown"
-            if (accessToken.isNotBlank()) {
-                this[HttpHeaders.AUTHORIZATION] = "Bearer $accessToken"
-            }
             this.build()
         }
     }
-
-    /**
-     * Checks if an HTTP response is successful.
-     *
-     * @return whether the response is a success or not
-     */
-    private fun Response.isSuccessWithContent(): Boolean = this.isSuccessful && this.body != null
 
     /**
      * Checks if the HTTP response is of status code 204 (NO_CONTENT).
@@ -411,35 +388,6 @@ internal class CdrApiClient(
             .build()
     }
 
-    /**
-     * Retrieves the JWT token required to call the CDR API function; MSAL4J caches
-     * tokens for as long as they are valid.
-     */
-    @Synchronized
-    private fun getAccessToken(): String = runCatching {
-        retryIOExceptionsAndServerErrors.execute<String, Exception> { retry: RetryContext ->
-            if (retry.retryCount > 0) {
-                logger.debug {
-                    "Operation targeting '${cdrClientConfig.idpEndpoint}' has failed; exception: " +
-                            "'${retry.lastThrowable?.let { getRootestCause(it)::class.java }}'; message: '${retry.lastThrowable?.message}'"
-                }
-                logger.info {
-                    "Retry attempt '#${retry.retryCount}' of 'get access token' operation targeting " +
-                            "'${cdrClientConfig.idpEndpoint}'"
-                }
-            }
-            val authResult: IAuthenticationResult = securedApp.acquireToken(clientCredentialParams).get()
-            logger.debug { "Token taken from ${authResult.metadata().tokenSource()}" }
-            authResult.accessToken()
-        }
-    }.fold(
-        onSuccess = { token: String -> token },
-        onFailure = { e ->
-            logger.error { "Failed to get access token: $e" }
-            EMPTY_STRING
-        }
-    )
-
     companion object {
         const val CONNECTOR_ID_HEADER = "cdr-connector-id"
         const val CDR_PROCESSING_MODE_HEADER = "cdr-processing-mode"
@@ -480,11 +428,6 @@ internal class CdrApiClient(
         val notOnOrAfter: String = EMPTY_STRING,
         val orgId: String = EMPTY_STRING, // org id of the UI user who creates/updates/deletes the app registration
         val warnings: List<String> = emptyList(),
-    ) {
-        companion object {
-            @JvmStatic
-            val EMPTY = CdrClientAppRegistrationDto(EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, EMPTY_STRING, emptyList())
-        }
-    }
+    )
 
 }

@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.ui
 
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Divider
@@ -25,6 +26,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_client_secret_renewal_timestamp
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_tenant_id
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_tenant_id_placeholder
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_validate
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.message_loading_initial_config
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.compose.resources.stringResource
@@ -53,17 +55,6 @@ internal fun IdpSettingsGroup(
             Text(text = stringResource(Res.string.message_loading_initial_config))
             Divider(modifier = modifier.padding(bottom = 8.dp))
         } else {
-            // Client secret renewal
-            OnOffSwitch(
-                name = DomainObjects.ConfigurationItem.IDP_CLIENT_SECRET_RENWAL,
-                modifier = modifier.padding(bottom = 16.dp),
-                title = stringResource(Res.string.label_client_idp_settings_client_secret_renewal),
-                subtitle = stringResource(Res.string.label_client_idp_settings_client_secret_renewal_subtitle),
-                checked = uiState.clientServiceConfig.idpCredentials.renewCredential,
-                onValueChange = { if (canEdit) viewModel.setIdpRenewClientSecret(it) },
-                enabled = canEdit,
-            )
-
             // Tenant ID
             var tenantIdValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
             LaunchedEffect(uiState.clientServiceConfig.idpCredentials.tenantId) {
@@ -118,6 +109,21 @@ internal fun IdpSettingsGroup(
                 enabled = canEdit,
             )
 
+            // Validate IdP settings
+            CheckButton(enabled = canEdit, onClick = viewModel::checkIdpCredentials)
+            Spacer(modifier.padding(bottom = 16.dp))
+
+            // Client secret renewal
+            OnOffSwitch(
+                name = DomainObjects.ConfigurationItem.IDP_CLIENT_SECRET_RENWAL,
+                modifier = modifier.padding(bottom = 16.dp),
+                title = stringResource(Res.string.label_client_idp_settings_client_secret_renewal),
+                subtitle = stringResource(Res.string.label_client_idp_settings_client_secret_renewal_subtitle),
+                checked = uiState.clientServiceConfig.idpCredentials.renewCredential,
+                onValueChange = { if (canEdit) viewModel.setIdpRenewClientSecret(it) },
+                enabled = canEdit,
+            )
+
             // Last credential renewal time
             DisabledTextField(
                 name = DomainObjects.ConfigurationItem.IDP_CLIENT_SECRET_RENWAL_TIME,
@@ -130,3 +136,11 @@ internal fun IdpSettingsGroup(
         }
     }
 }
+
+@Composable
+private fun CheckButton(enabled: Boolean, onClick: () -> Unit) =
+    ButtonWithToolTip(
+        label = stringResource(Res.string.label_validate),
+        onClick = onClick,
+        enabled = enabled,
+    ).also { logger.trace { "CheckButton has been (re-)composed." } }

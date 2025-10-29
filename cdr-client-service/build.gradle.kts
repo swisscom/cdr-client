@@ -29,16 +29,6 @@ idea {
     }
 }
 
-tasks.bootRun {
-    environment["JDK_JAVA_OPTIONS"] =
-        listOfNotNull(
-            environment["JDK_JAVA_OPTIONS"],
-            "-Djavax.net.ssl.trustStore=src/test/resources/caddy_truststore.p12",
-            "-Djavax.net.ssl.trustStorePassword=changeit",
-            "-Djdk.net.hosts.file=src/test/resources/msal4j_hosts"
-        ).joinToString(" ")
-}
-
 application {
     mainClass = "com.swisscom.health.des.cdr.client.CdrClientApplicationKt"
 }
@@ -63,7 +53,7 @@ dependencies {
     implementation(platform(libs.spring.boot.dependencies))
     implementation(platform(libs.spring.cloud.dependencies))
     implementation(libs.kache)
-    implementation(libs.msal4j)
+    implementation(libs.nimbusOAuth2Sdk)
     implementation(libs.okhttp)
     implementation(libs.kfswatch)
     implementation(libs.kotlin.logging)
@@ -99,9 +89,8 @@ dependencies {
 
 }
 
-configurations.all {
-    // exclude globally so I don't have to explicitly exclude it from mockk and all of its transitive dependencies
-    exclude(module = "junit", group = "junit")
+configurations.configureEach {
+    exclude(group = "junit", module = "junit")
 }
 
 kapt {
@@ -167,17 +156,19 @@ val jacocoTestReport = tasks.named<JacocoReport>("jacocoTestReport") {
 
 tasks.withType<Test> {
     // show log output produced by tests in console
-    testLogging.showStandardStreams = false
+    testLogging {
+        events("passed", "skipped", "failed", "started")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+        showStandardStreams = false
+    }
 
     useJUnitPlatform {
         includeEngines("junit-jupiter")
     }
     finalizedBy(jacocoTestReport)
-
-    jvmArgs(
-        // tests_hosts is used to redirect msal4j, which insists on talking to the Mothership, to our docker compose setup
-        "-Djdk.net.hosts.file=${layout.projectDirectory.file("src/test/resources/test_hosts").asFile.absolutePath}"
-    )
 }
 
 jacoco {
@@ -252,13 +243,6 @@ tasks.register<Test>("integrationTest") {
     useJUnitPlatform {
         includeTags(Constants.INTEGRATION_TEST_TAG)
     }
-    environment["JDK_JAVA_OPTIONS"] =
-        listOfNotNull(
-            environment["JDK_JAVA_OPTIONS"],
-            "-Djavax.net.ssl.trustStore=src/test/resources/caddy_truststore.p12",
-            "-Djavax.net.ssl.trustStorePassword=changeit",
-            "-Djdk.net.hosts.file=src/test/resources/msal4j_hosts"
-        ).joinToString(" ")
     shouldRunAfter(tasks.test)
     // Ensure latest images get pulled
     dependsOn(tasks.composePull)

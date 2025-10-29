@@ -3,33 +3,47 @@ package com.swisscom.health.des.cdr.client.http
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.Constants.SHUTDOWN_DELAY
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.CREDENTIAL_VALIDATION_FAILED
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DIR_READ_WRITABLE
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DIR_SINGLE_USE
-import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MODE_VALUE
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MODE_OVERLAP
+import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MODE_VALUE
+import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
 import com.swisscom.health.des.cdr.client.config.toCdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_AUTHENTICATED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_COMMUNICATION_ERROR
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_DENIED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNAUTHENTICATED
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNKNOWN_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_BROKEN
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_OK
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.actuate.health.HealthEndpoint
 import org.springframework.boot.actuate.health.SystemHealth
 import org.springframework.http.ResponseEntity
+import org.springframework.retry.RetryContext
+import org.springframework.retry.support.RetryTemplate
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.net.URI
 import java.nio.file.Path
 import java.time.Instant
 
@@ -40,6 +54,7 @@ private val logger = KotlinLogging.logger {}
  * HTTP API is the cdr-client-ui module.
  */
 @RestController
+@Suppress("LongParameterList")
 internal class WebOperations(
     private val healthEndpoint: HealthEndpoint,
     private val objectMapper: ObjectMapper,
@@ -47,6 +62,9 @@ internal class WebOperations(
     private val configWriter: ConfigurationWriter,
     private val config: CdrClientConfig,
     private val configValidationService: ConfigValidationService,
+    @param:Qualifier("retryIoAndServerErrors")
+    private val retryIOExceptionsAndServerErrors: RetryTemplate,
+    private val authService: OAuth2AuthNService,
 ) {
     /*
      * BEGIN - (Configuration) Validation Endpoints
@@ -158,6 +176,62 @@ internal class WebOperations(
         }
     }
 
+    @PutMapping("api/validate-credentials")
+    internal suspend fun validateCredentials(
+        @RequestBody idpCredentials: DTOs.CdrClientConfig.IdpCredentials,
+    ): ResponseEntity<ValidationResult> = runCatching {
+        logger.debug { "validating credentials for tenant id: '${idpCredentials.tenantId}'" }
+        retryIOExceptionsAndServerErrors.execute<OAuth2AuthNService.AuthNResponse, Exception> { retry: RetryContext ->
+            val idpEndpoint = config.idpEndpoint.toString()
+            val correctedIdpEndpoint = if (config.idpCredentials.tenantId.id == idpCredentials.tenantId)
+                idpEndpoint
+            else // only replace the first path segment after the host with the tenant id from the provided credentials
+                idpEndpoint.replace(Regex("(http[s]?://[^/]+/)[^/]+"), "$1${idpCredentials.tenantId}")
+
+            if (retry.retryCount > 0) {
+                logger.debug {
+                    "Operation targeting '$correctedIdpEndpoint' has failed; exception: " +
+                            "'${retry.lastThrowable?.let { getRootestCause(it)::class.java }}'; message: '${retry.lastThrowable?.message}'"
+                }
+                logger.info {
+                    "Retry attempt '#${retry.retryCount}' of 'validate credentials' operation targeting " +
+                            "'$correctedIdpEndpoint'"
+                }
+            }
+            logger.trace { "validating credentials" }
+
+            authService.getNewAccessToken(idpCredentials.toCdrClientConfig(), URI(correctedIdpEndpoint).toURL(), false)
+        }
+    }.fold(
+        onSuccess = { authNResponse: OAuth2AuthNService.AuthNResponse ->
+            var validationResult: ValidationResult = ValidationResult.Success
+            when (authNResponse) {
+                is OAuth2AuthNService.AuthNResponse.Success -> {
+
+                }
+
+                else -> {
+                    validationResult += credentialValidationFailure
+                }
+            }
+            logger.debug { "Credentials validation completed with result: '$validationResult'" }
+            ResponseEntity.ok(validationResult)
+        },
+        onFailure = { e ->
+            logger.error { "Failed to validate credentials: $e" }
+            ResponseEntity.ok(credentialValidationFailure)
+        }
+    )
+
+    private val credentialValidationFailure = ValidationResult.Failure(
+        listOf(
+            DTOs.ValidationDetail.ConfigItemDetail(
+                configItem = DomainObjects.ConfigurationItem.UNKNOWN,
+                messageKey = CREDENTIAL_VALIDATION_FAILED
+            )
+        )
+    )
+
     //
     // END - (Configuration) Validation Endpoints
     //
@@ -216,24 +290,39 @@ internal class WebOperations(
      * @return a [DTOs.StatusResponse] containing the status code of the client service
      * @see [HealthIndicators]
      */
+    @Suppress("CyclomaticComplexMethod")
     @GetMapping("api/status")
     internal suspend fun status(): ResponseEntity<DTOs.StatusResponse> = runCatching {
         val healthStatus: SystemHealth = healthEndpoint.health() as SystemHealth
         logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
 
+        val configStatus: String? = healthStatus.components[CONFIG_INDICATOR_NAME]?.status?.code
+        val syncStatus: String? = healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code
+        val authNStatus: String? = healthStatus.components[AUTHN_INDICATOR_NAME]?.status?.code
 
-        val status = when (healthStatus.components[CONFIG_INDICATOR_NAME]?.status?.code) {
-            CONFIG_BROKEN -> DTOs.StatusResponse.StatusCode.BROKEN
-            CONFIG_ERROR -> DTOs.StatusResponse.StatusCode.ERROR
-            else -> when (healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code) {
-                FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
-                FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED
-                else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+        val status =
+            if (!configStatus.isNullOrBlank() && configStatus != CONFIG_OK) {
+                when (configStatus) {
+                    CONFIG_BROKEN -> DTOs.StatusResponse.StatusCode.BROKEN
+                    CONFIG_ERROR -> DTOs.StatusResponse.StatusCode.ERROR
+                    else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+                }
+            } else if (!authNStatus.isNullOrBlank() && !(authNStatus == AUTHN_AUTHENTICATED || authNStatus == AUTHN_UNAUTHENTICATED)) {
+                when (authNStatus) {
+                    AUTHN_DENIED -> DTOs.StatusResponse.StatusCode.AUTHN_DENIED
+                    AUTHN_COMMUNICATION_ERROR -> DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR
+                    AUTHN_UNKNOWN_ERROR -> DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR
+                    else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+                }
+            } else if (!syncStatus.isNullOrBlank()) {
+                when (syncStatus) {
+                    FILE_SYNCHRONIZATION_STATUS_ENABLED -> DTOs.StatusResponse.StatusCode.SYNCHRONIZING
+                    FILE_SYNCHRONIZATION_STATUS_DISABLED -> DTOs.StatusResponse.StatusCode.DISABLED
+                    else -> DTOs.StatusResponse.StatusCode.UNKNOWN
+                }
+            } else {
+                DTOs.StatusResponse.StatusCode.UNKNOWN
             }
-            // TODO: add checks for error scenarios: configuration errors, CDR API not reachable, IdP not reachable, etc.
-            //   all other error scenarios would probably prevent the client service from starting altogether;
-            //   remember result of last attempt to reach remote endpoints instead of pinging them?
-        }
 
         return ResponseEntity.ok(
             DTOs.StatusResponse(

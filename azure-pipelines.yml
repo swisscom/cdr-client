@@ -19,7 +19,7 @@ pool:
 
 steps:
   - task: AzureCLI@2
-    displayName: 'Download JDK 17'
+    displayName: 'Download JDK 21'
     inputs:
       azureSubscription: 'azdo-des-sp-CDR'
       scriptType: 'bash'
@@ -30,13 +30,13 @@ steps:
         --blob-url https://$(storageName)/build-agent-files/microsoft-jdk-21.0.8-linux-x64.tar.gz
 
   - task: JavaToolInstaller@0
-    displayName: 'Install JDK 17'
+    displayName: 'Install JDK 21'
     inputs:
-      versionSpec: "17"
+      versionSpec: "21"
       jdkArchitectureOption: x64
       jdkSourceOption: LocalDirectory
       jdkFile: "$(Agent.BuildDirectory)/microsoft-jdk-21.0.8-linux-x64.tar.gz"
-      jdkDestinationDirectory: "$(agent.toolsDirectory)/jdk17"
+      jdkDestinationDirectory: "$(agent.toolsDirectory)/jdk21"
       cleanDestinationDirectory: true
   - script: |
       which java

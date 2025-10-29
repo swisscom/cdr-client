@@ -41,7 +41,7 @@ import org.springframework.core.env.MutablePropertySources
 import org.springframework.core.io.FileSystemResource
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
-import java.net.URL
+import java.net.URI
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
@@ -87,9 +87,9 @@ class ConfigurationWriterTest {
                 )
             ),
             cdrApi = CdrApi(
-                scheme = "https",
+                scheme = "http",
                 host = Host("localhost"),
-                port = 8080,
+                port = 80,
                 basePath = "/"
             ),
             filesInProgressCacheSize = DataSize.ofMegabytes(1L),
@@ -102,16 +102,16 @@ class ConfigurationWriterTest {
                 maxCredentialAge = Duration.ofDays(30),
                 lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
             ),
-            idpEndpoint = URL("http://localhost:8080"),
+            idpEndpoint = URI("http://localhost").toURL(),
             localFolder = TempDownloadDir(CURRENT_WORKING_DIR),
             pullThreadPoolSize = 1,
             pushThreadPoolSize = 1,
             retryDelay = emptyList(),
             scheduleDelay = Duration.ofSeconds(1L),
             credentialApi = CredentialApi(
-                scheme = "https",
+                scheme = "http",
                 host = Host("localhost"),
-                port = 8080,
+                port = 80,
                 basePath = "/"
             ),
             retryTemplate = CdrClientConfig.RetryTemplateConfig(

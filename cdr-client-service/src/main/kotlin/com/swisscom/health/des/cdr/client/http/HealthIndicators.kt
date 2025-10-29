@@ -1,11 +1,17 @@
 package com.swisscom.health.des.cdr.client.http
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.AUTHENTICATED
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.DENIED
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.FAILED
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.RETRYABLE_FAILURE
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.UNAUTHENTICATED
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.UNKNOWN
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import org.springframework.boot.actuate.health.Health
 import org.springframework.boot.actuate.health.HealthIndicator
-import org.springframework.boot.actuate.health.Status
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -13,7 +19,8 @@ import org.springframework.context.annotation.Configuration
 internal class HealthIndicators(
     private val config: CdrClientConfig,
     private val configValidationService: ConfigValidationService,
-    private val schedulingValidationService: SchedulingValidationService
+    private val schedulingValidationService: SchedulingValidationService,
+    private val authNService: OAuth2AuthNService,
 ) {
 
     /**
@@ -23,8 +30,8 @@ internal class HealthIndicators(
     fun fileSynchronizationHealthIndicator(): HealthIndicator =
         HealthIndicator {
             when (config.fileSynchronizationEnabled.value) {
-                true -> Health.Builder(Status(FILE_SYNCHRONIZATION_STATUS_ENABLED)).withDetail("fileSynchronizationEnabled", true)
-                false -> Health.Builder(Status(FILE_SYNCHRONIZATION_STATUS_DISABLED)).withDetail("fileSynchronizationEnabled", false)
+                true -> Health.status(FILE_SYNCHRONIZATION_STATUS_ENABLED)
+                false -> Health.status(FILE_SYNCHRONIZATION_STATUS_DISABLED)
             }.build()
         }
 
@@ -32,14 +39,27 @@ internal class HealthIndicators(
     fun configHealthIndicator(): HealthIndicator =
         HealthIndicator {
             when {
-                !schedulingValidationService.isConfigSourceUnambiguous -> Health.Builder(Status(CONFIG_BROKEN))
+                !schedulingValidationService.isConfigSourceUnambiguous -> Health.status(CONFIG_BROKEN)
                     .withDetail("configStatus", "ambiguous config source")
 
-                !configValidationService.isConfigValid -> Health.Builder(Status(CONFIG_ERROR))
+                !configValidationService.isConfigValid -> Health.status(CONFIG_ERROR)
                     .withDetail("configStatus", "invalid config")
 
-                else -> Health.Builder(Status(CONFIG_OK)).withDetail("configStatus", "ok")
+                else -> Health.status(CONFIG_OK).withDetail("configStatus", "valid config")
             }.build()
+        }
+
+    @Bean
+    fun authNHealthIndicator(): HealthIndicator =
+        HealthIndicator {
+            when (authNService.currentAuthNStateNonBlocking()) {
+                UNAUTHENTICATED -> Health.status(AUTHN_UNAUTHENTICATED).withDetail("authNState", "no login attempted").build()
+                AUTHENTICATED -> Health.status(AUTHN_AUTHENTICATED).withDetail("authNState", "JWT obtained").build()
+                DENIED -> Health.status(AUTHN_DENIED).withDetail("authNState", "wrong credentials or IdP coordinates").build()
+                RETRYABLE_FAILURE -> Health.status(AUTHN_COMMUNICATION_ERROR).withDetail("authNState", "io error (recoverable)").build()
+                FAILED -> Health.status(AUTHN_UNKNOWN_ERROR).withDetail("authNState", "unrecoverable error").build()
+                UNKNOWN -> Health.status(AUTHN_UNKNOWN_ERROR).withDetail("authNState", "connection or other issue").build()
+            }
         }
 
     companion object {
@@ -50,5 +70,11 @@ internal class HealthIndicators(
         const val CONFIG_BROKEN = "BROKEN"
         const val CONFIG_ERROR = "ERROR"
         const val CONFIG_OK = "OK"
+        const val AUTHN_INDICATOR_NAME = "authN"
+        const val AUTHN_AUTHENTICATED = "AUTHENTICATED"
+        const val AUTHN_UNAUTHENTICATED = "UNAUTHENTICATED"
+        const val AUTHN_DENIED = "DENIED"
+        const val AUTHN_COMMUNICATION_ERROR = "COMMUNICATION_ERROR"
+        const val AUTHN_UNKNOWN_ERROR = "UNKNOWN_ERROR"
     }
 }

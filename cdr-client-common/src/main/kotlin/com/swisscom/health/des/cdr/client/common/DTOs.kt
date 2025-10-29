@@ -121,7 +121,8 @@ class DTOs {
         VALUE_IS_BLANK,
         FILE_BUSY_TEST_TIMEOUT_TOO_LONG,
         NO_CONNECTOR_CONFIGURED,
-        VALUE_IS_PLACEHOLDER
+        VALUE_IS_PLACEHOLDER,
+        CREDENTIAL_VALIDATION_FAILED
     }
 
 
@@ -137,6 +138,9 @@ class DTOs {
             DISABLED(true),
             ERROR(true),
             BROKEN(true),
+            AUTHN_DENIED(true),
+            AUTHN_COMMUNICATION_ERROR(true),
+            AUTHN_UNKNOWN_ERROR(true),
             OFFLINE(false);
 
             val isOfflineCategory: Boolean
@@ -190,7 +194,7 @@ class DTOs {
                 cdrApi = Endpoint.EMPTY,
                 filesInProgressCacheSize = EMPTY_STRING,
                 idpCredentials = IdpCredentials.EMPTY,
-                idpEndpoint = URI("http://localhost:8080").toURL(),
+                idpEndpoint = URI("http://localhost").toURL(),
                 localFolder = EMPTY_STRING,
                 pullThreadPoolSize = 0,
                 pushThreadPoolSize = 0,

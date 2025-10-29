@@ -12,6 +12,9 @@
             "not": {
               "equalTo": "test"
             }
+          },
+          "Authorization": {
+            "matches": "Bearer .*"
           }
         }
       },

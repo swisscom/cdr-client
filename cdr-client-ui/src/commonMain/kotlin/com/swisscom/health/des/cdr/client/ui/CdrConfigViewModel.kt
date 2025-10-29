@@ -7,6 +7,8 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.R
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_client_communication
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_client_configuration
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_client_validation
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_is_credentials
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.message_credentials_valid
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Deferred
@@ -69,6 +71,34 @@ internal class CdrConfigViewModel(
                 }
                 asyncClientServiceRestart().join()
             }
+        }
+
+    fun checkIdpCredentials(): Job =
+        viewModelScope.launch {
+            cdrClientApiClient.checkCredentials(_uiState.value.clientServiceConfig.idpCredentials).handle(
+                onSuccess = { validationResult ->
+                    logger.info { "IDP credentials check succeeded" }
+                    if (validationResult == DTOs.ValidationResult.Success)
+                        _uiState.update {
+                            it.copy(
+                                errorMessageKey = StringResourceWithArgs(
+                                    resourceId = Res.string.message_credentials_valid,
+                                    DTOs.CdrClientConfig.DocumentType.UNDEFINED
+                                )
+                            )
+                        }
+                    else {
+                        _uiState.update {
+                            it.copy(
+                                errorMessageKey = StringResourceWithArgs(
+                                    resourceId = Res.string.error_is_credentials,
+                                    DTOs.CdrClientConfig.DocumentType.UNDEFINED
+                                )
+                            )
+                        }
+                    }
+                }
+            )
         }
 
     /**
