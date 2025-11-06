@@ -315,7 +315,7 @@ internal class CdrClientApiClient {
                 if (result != FAILED_STATUS_CODE) {
                     return result
                 } else {
-                    logger.debug { "CDR client service is '${FAILED_STATUS_CODE}', retrying after '$currentDelay'" }
+                    logger.debug { "curaLINE client service is '${FAILED_STATUS_CODE}', retrying after '$currentDelay'" }
                 }
                 delay(currentDelay)
                 currentDelay = (currentDelay * factor).coerceAtMost(maxDelay)
