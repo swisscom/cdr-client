@@ -1,9 +1,9 @@
-# CDR Client
+# curaLINE Client
 
 The Swisscom Health curaLINE Data Routing (CDR) Client.
 
 The project is split into two parts:
-1. the client service, which is the actual client that connects to the CDR API and
+1. the client service, which is the actual client that connects to the curaLINE API and
 2. the client UI, which can be used to configure the client service and monitor its status
 
 On a Linux system, the service part runs as a systemd unit. On a Windows system it runs as a Windows service 

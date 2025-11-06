@@ -1,6 +1,6 @@
 <resources>
     <!-- Labels -->
-    <string name="app_name">CDR Client Manager</string>
+    <string name="app_name">curaLINE Client Manager</string>
     <string name="label_open_application_window">Open application window</string>
     <string name="label_close_application_window">Close application window</string>
     <string name="label_exit">Exit</string>
@@ -9,32 +9,32 @@
     <string name="label_apply">Apply</string>
     <string name="label_validate">Test</string>
     <string name="label_client_status">Client status</string>
-    <string name="label_cdr_api_host">CDR host</string>
-    <string name="label_cdr_api_host_placeholder">Fully qualified domain name of the CDR host, e.g. 'cdr.health.swisscom.ch'</string>
+    <string name="label_cdr_api_host">curaLINE host</string>
+    <string name="label_cdr_api_host_placeholder">Fully qualified domain name of the curaLINE host, e.g. 'cdr.health.swisscom.ch'</string>
     <string name="label_enable_client_service">Client Service</string>
     <string name="label_enable_client_service_subtitle">Start synchronizing your documents</string>
     <string name="label_enable_document_archive">Document Archive</string>
     <string name="label_enable_document_archive_subtitle">Keep an archive of successfully uploaded documents</string>
-    <string name="label_client_service_status">CDR client service status:</string>
-    <string name="label_client_idp_settings">CDR Login Details</string>
+    <string name="label_client_service_status">curaLINE client service status:</string>
+    <string name="label_client_idp_settings">curaLINE Login Details</string>
     <string name="label_client_idp_settings_tenant_id">IdP tenant ID</string>
     <string name="label_client_idp_settings_tenant_id_placeholder">The environment (test/production) specific Identity Provider ID</string>
     <string name="label_client_idp_settings_client_id">Client ID</string>
-    <string name="label_client_idp_settings_client_id_placeholder">ID generated on CDR website</string>
+    <string name="label_client_idp_settings_client_id_placeholder">ID generated on curaLINE website</string>
     <string name="label_client_idp_settings_client_secret">Client password</string>
-    <string name="label_client_idp_settings_client_secret_placeholder">Password generated on CDR website</string>
+    <string name="label_client_idp_settings_client_secret_placeholder">Password generated on curaLINE website</string>
     <string name="label_client_idp_settings_client_secret_renewal">Automatic Secret Renewal</string>
     <string name="label_client_idp_settings_client_secret_renewal_subtitle">If enabled automatically renews the client secret every 365 days</string>
     <string name="label_client_idp_settings_client_secret_renewal_timestamp">Last client secret renewal occurred at</string>
     <string name="label_client_local_folder">Temporary download directory</string>
-    <string name="label_client_local_folder_placeholder">CDR client temporary download directory</string>
+    <string name="label_client_local_folder_placeholder">curaLINE client temporary download directory</string>
     <string name="label_client_file_busy_strategy">File busy test strategy</string>
     <string name="label_client_file_busy_strategy_placeholder">Strategy to test whether a file is still written to</string>
     <string name="label_client_connector_settings">Connector Definition</string>
     <string name="label_client_connector_id">Connector ID</string>
-    <string name="label_client_connector_id_placeholder">Connector ID as provided on the CDR web application</string>
+    <string name="label_client_connector_id_placeholder">Connector ID as provided on the curaLINE web application</string>
     <string name="label_client_connector_mode">Connector mode</string>
-    <string name="label_client_connector_mode_placeholder">Signals the CDR API the intended connector purpose</string>
+    <string name="label_client_connector_mode_placeholder">Signals the curaLINE API the intended connector purpose</string>
     <string name="label_client_connector_upload_dirs">Upload Directories</string>
     <string name="label_client_connector_download_dirs">Download Directories</string>
     <string name="label_client_connector_error_dir">Error directory</string>
@@ -73,7 +73,7 @@
     <!-- Error messages -->
     <string name="error_client_communication">Failed to communicate with the client service. Details:\n%1$s</string>
     <string name="error_client_configuration">There is an error in your config. Check the UI for remarks</string>
-    <string name="error_client_validation">CDR client reported an error. Details:\n%1$s</string>
+    <string name="error_client_validation">curaLINE client reported an error. Details:\n%1$s</string>
     <string name="error_value_is_mandatory">A value is required</string>
     <string name="error_directory_not_found">This directory does not exist</string>
     <string name="error_not_a_directory">Not a directory</string>
