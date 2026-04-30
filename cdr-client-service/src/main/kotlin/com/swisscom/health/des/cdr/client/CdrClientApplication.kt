@@ -9,6 +9,7 @@ import org.springframework.boot.runApplication
 import org.springframework.scheduling.annotation.EnableScheduling
 import java.nio.file.LinkOption
 import java.nio.file.Path
+import kotlin.io.path.absolute
 import kotlin.io.path.appendText
 import kotlin.io.path.createFile
 import kotlin.io.path.createParentDirectories
@@ -107,11 +108,11 @@ private fun upgradeConfig() {
         ?.let { configLocation: Path -> configLocation.takeIf { it.isRegularFile() } }
         ?.let { configLocation: Path ->
             when (val upgradeResult = ConfigUpgrade.applyPendingUpgradeSteps(configLocation)) {
-                is UpgradeResult.AlreadyAtLatestVersion -> logMsg { "Configuration was already at the latest version, no upgrade was performed" }
-                is UpgradeResult.Success -> logMsg { "Configuration successfully upgraded to version '${upgradeResult.version}'" }
+                is UpgradeResult.AlreadyAtLatestVersion -> logMsg { "Configuration at '${configLocation.absolute()}' was already at the latest version, no upgrade was performed" }
+                is UpgradeResult.Success -> logMsg { "Configuration at '${configLocation.absolute()}' successfully upgraded to version '${upgradeResult.version}'" }
                 is UpgradeResult.Failure -> {
-                    logMsg { "Failed to upgrade to version '${upgradeResult.version}'" }
-                    error("Failed to upgrade to version '${upgradeResult.version}'") // causes the JVM to exit
+                    logMsg { "Failed to upgrade configuration at '${configLocation.absolute()}' to version '${upgradeResult.version}'" }
+                    error("Failed to upgrade configuration at '${configLocation.absolute()}' to version '${upgradeResult.version}'") // causes the JVM to exit
                 }
             }
         }
