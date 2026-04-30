@@ -17,7 +17,10 @@ import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 
 private const val SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY = "spring.config.additional-location"
+private const val SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV1 = "SPRING_CONFIG_ADDITIONALLOCATION" // correct
+private const val SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV2 = "SPRING_CONFIG_ADDITIONAL_LOCATION" // technically not correct, but supported by SpringBoot
 private const val SPRING_BOOT_LOGBACK_CONFIG_LOCATION_PROPERTY = "logging.config"
+private const val SPRING_BOOT_LOGBACK_CONFIG_LOCATION_ENV = "LOGGING_CONFIG"
 private const val LOGBACK_CONFIGURATION_FILE_PROPERTY = "logback.configurationFile"
 
 /**
@@ -46,7 +49,12 @@ fun main(args: Array<String>): Unit = runCatching {
  * has been deleted, for whatever reason).
  */
 private fun initConfig() {
-    System.getProperty(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY)
+    val serviceConfigLocation: String? =
+        // env variables have higher precedence for SpringBoot configuration than system properties
+        System.getenv(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV1).takeUnless { it.isNullOrBlank() }
+            ?: System.getenv(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV2).takeUnless { it.isNullOrBlank() }
+            ?: System.getProperty(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY).takeUnless { it.isNullOrBlank() }
+    serviceConfigLocation
         ?.takeIf { it.isNotBlank() }
         ?.let { configLocation: String -> Path.of(configLocation) }
         ?.let { configPath -> ConfigInit.initSpringBootConfig(configPath) }
@@ -56,11 +64,17 @@ private fun initConfig() {
             Unit
         }
         ?: logMsg {
-            "No SpringBoot configuration file location configured via system property '$SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY', " +
-                    "skipping initialization of SpringBoot configuration"
+            "No SpringBoot configuration file location configured via environment variable '$SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV1' " +
+                    "or '$SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV2', or system property '$SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY', " +
+                    "skipping initialization of SpringBoot configuration."
         }
 
-    System.getProperty(SPRING_BOOT_LOGBACK_CONFIG_LOCATION_PROPERTY)
+
+    val logbackConfigLocation: String? =
+        // env variables have higher precedence for SpringBoot configuration than system properties
+        System.getProperty(SPRING_BOOT_LOGBACK_CONFIG_LOCATION_PROPERTY).takeUnless { it.isNullOrBlank() }
+            ?: System.getenv(SPRING_BOOT_LOGBACK_CONFIG_LOCATION_ENV).takeUnless { it.isNullOrBlank() }
+    logbackConfigLocation
         ?.takeIf { it.isNotBlank() }
         ?.let { configLocation: String -> Path.of(configLocation) }
         ?.let { configPath -> ConfigInit.initLogbackConfig(configPath) }
@@ -72,8 +86,8 @@ private fun initConfig() {
             Unit
         }
         ?: logMsg {
-            "No Logback configuration file location configured via system property '$SPRING_BOOT_LOGBACK_CONFIG_LOCATION_PROPERTY', " +
-                    "skipping initialization of Logback configuration"
+            "No Logback configuration file location configured via environment variable '$SPRING_BOOT_LOGBACK_CONFIG_LOCATION_ENV' or " +
+                    "system property '$SPRING_BOOT_LOGBACK_CONFIG_LOCATION_PROPERTY', skipping initialization of Logback configuration."
         }
 }
 
@@ -81,8 +95,13 @@ private fun initConfig() {
  * Upgrades existing configuration files to the latest version, adding new configuration items with
  * default values where necessary.
  */
-private fun upgradeConfig() =
-    System.getProperty(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY)
+private fun upgradeConfig() {
+    val serviceConfigLocation: String? =
+        // env variables have higher precedence for SpringBoot configuration than system properties
+        System.getenv(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV1).takeUnless { it.isNullOrBlank() }
+            ?: System.getenv(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV2).takeUnless { it.isNullOrBlank() }
+            ?: System.getProperty(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY).takeUnless { it.isNullOrBlank() }
+    serviceConfigLocation
         ?.let { configLocation: String -> configLocation.takeIf { it.isNotBlank() } }
         ?.let { configLocation: String -> Path.of(configLocation) }
         ?.let { configLocation: Path -> configLocation.takeIf { it.isRegularFile() } }
@@ -97,15 +116,17 @@ private fun upgradeConfig() =
             }
         }
         ?: logMsg {
-            "No SpringBoot configuration file location configured via system property '$SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY' " +
+            "No SpringBoot configuration file location configured via environment variable '$SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV1' or " +
+                    "'$SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV2', or system property '$SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY' " +
                     "or no file exists at configured location, skipping upgrade of SpringBoot configuration"
         }
+}
 
 private val tmpLogFile: Path? by lazy {
     val fileOrDirStr: String? = System.getProperty(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY)
         .takeUnless { it.isNullOrBlank() }
         ?: System.getProperty("java.io.tmpdir")
-            // ms windows services running as `SYSTEM` don't know where the tmp dir is, nor do they have a user.home
+            // MS Windows services running as `SYSTEM` don't know where the tmp dir is, nor do they have a user.home
             .takeUnless { it.isNullOrBlank() }
         ?: "C:\\ProgramData"
             // we assume that all Linux/macOS scenarios yield a value for `java.io.tmpdir`
@@ -146,7 +167,7 @@ fun logMsg(msgProducer: () -> String) {
     }
 
     when {
-        // on windows we run as a service; stdout is not captured anywhere, so have to write to a file
+        // on Windows, we run as a service; stdout is not captured anywhere, so have to write to a file
         // to be able to identify issues during initialization
         Platform.isWindows() -> printlnF(msgProducer())
         // every other OS (we care about) is sane
