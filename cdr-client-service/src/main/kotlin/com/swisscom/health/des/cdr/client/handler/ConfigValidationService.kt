@@ -55,6 +55,7 @@ internal class ConfigValidationService(
     fun validateAllConfigurationItems(config: DTOs.CdrClientConfig): ValidationResult {
         val validations = mutableListOf<ValidationResult>()
 
+        validations.add(validateCdrApiEndpoint(config.cdrApi))
         validations.add(validateDirectoriesAreAbsolute(config))
         validations.add(validateDirectoryIsReadWritable(config.localFolder))
         validations.add(validateDirectoryOverlap(config))
@@ -77,6 +78,7 @@ internal class ConfigValidationService(
             if (it is ValidationResult.Failure) {
                 logger.warn {
                     """
+                    |
                     |#############################################################################################
                     |#############################################################################################
                     |No file upload/download will be possible due to configuration validation failure.
@@ -92,6 +94,21 @@ internal class ConfigValidationService(
     fun validateAvailableDiskspace(connectors: List<DTOs.CdrClientConfig.Connector>): ValidationResult {
         logger.trace { "Validating available disk space for connectors: $connectors" }
         TODO()
+    }
+
+    fun validateCdrApiEndpoint(cdrApiEndpoint: DomainObjects.ApiEndpoint): ValidationResult {
+        return if (cdrApiEndpoint == DomainObjects.ApiEndpoint.UNKNOWN) {
+            ValidationResult.Failure(
+                listOf(
+                    ValidationDetail.ConfigItemDetail(
+                        configItem = DomainObjects.ConfigurationItem.CDR_API_HOST,
+                        messageKey = ILLEGAL_VALUE
+                    )
+                )
+            )
+        } else {
+            ValidationResult.Success
+        }
     }
 
     fun validateDirectoriesAreAbsolute(config: DTOs.CdrClientConfig): ValidationResult {

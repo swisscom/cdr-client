@@ -231,8 +231,13 @@ object Constants {
     const val INTEGRATION_TEST_TAG = "integration-test"
 }
 
+val test by testing.suites.existing(JvmTestSuite::class)
+
 tasks.register<Test>("integrationTest") {
+    description = "Runs the integration tests."
     group = Constants.TASK_GROUP_VERIFICATION
+    testClassesDirs = files(test.map { it.sources.output.classesDirs })
+    classpath = files(test.map { it.sources.runtimeClasspath })
     useJUnitPlatform {
         includeTags(Constants.INTEGRATION_TEST_TAG)
     }
@@ -257,11 +262,14 @@ dockerCompose {
 val packagePrepare = "jpackage-prepare"
 
 tasks.register<Delete>("clearPackagePrepare") {
+    description = "Deletes the output of the jpackage prepare step to ensure a clean state for the next run."
     delete(file("${outputDir.get().asFile.absolutePath}/$packagePrepare"))
 }
 
 tasks.register<Exec>("jpackageAppPrepareDebian") {
     dependsOn("clearPackagePrepare")
+    description = "Prepares the application image for Debian-based Linux distributions using jpackage. " +
+            "The resulting image will be used as input for the jpackageAppFinishDebian task to create a .deb package."
     executable = "jpackage"
     args(
         "--type", "app-image",
@@ -287,6 +295,7 @@ tasks.register<Exec>("jpackageAppPrepareDebian") {
 
 tasks.register<Exec>("jpackageAppFinishDebian") {
     dependsOn("jpackageAppPrepareDebian")
+    description = "Finishes the packaging of the application for Debian-based Linux distributions by creating a .deb package using jpackage."
     executable = "jpackage"
     args(
         "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",
@@ -300,6 +309,8 @@ tasks.register<Exec>("jpackageAppFinishDebian") {
 
 tasks.register<Exec>("jpackageAppPrepareWindows") {
     dependsOn("clearPackagePrepare")
+    description = "Prepares the application image for Windows using jpackage. " +
+            "The resulting image will be used as input for the jpackageAppFinishWindows task to create an installer."
     executable = "jpackage"
     args(
         "--type", "app-image",
@@ -332,6 +343,7 @@ tasks.register<Exec>("jpackageAppPrepareWindows") {
 
 tasks.register<Exec>("jpackageAppFinishWindows") {
     dependsOn("jpackageAppPrepareWindows")
+    description = "Finishes the packaging of the application for Windows by creating an installer using jpackage."
     executable = "jpackage"
     args(
         "--app-image", "${outputDir.get().asFile.absolutePath}/$packagePrepare/${project.name}",

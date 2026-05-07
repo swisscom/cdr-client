@@ -37,4 +37,28 @@ class DomainObjects {
         MODE_VALUE,
     }
 
+    enum class ApiEndpoint(val protocol: String, val port: Int, val host: String) {
+        PRODUCTION("https", WELL_KNOWN_HTTPS_PORT, "cdr.health.swisscom.ch"),
+        PROD_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-prod-fn.azurewebsites.net"),
+        STAGING("https", WELL_KNOWN_HTTPS_PORT, "stg.cdr.health.swisscom.ch"),
+        STAGING_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-stg-fn.azurewebsites.net"),
+        INT_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-int-fn.azurewebsites.net"),
+        LOCALHOST("http", WELL_KNOWN_HTTP_PORT, "localhost"),
+        UNKNOWN("",0,"");
+
+        companion object {
+            fun fromEndpointParts(protocol: String, port: Int, host: String): ApiEndpoint =
+                entries.firstOrNull {
+                    it.protocol == protocol && it.host == host && it.port == port
+                } ?: UNKNOWN
+
+        }
+
+    }
+
+    private companion object {
+        private const val WELL_KNOWN_HTTPS_PORT = 443
+        private const val WELL_KNOWN_HTTP_PORT = 80
+    }
+
 }

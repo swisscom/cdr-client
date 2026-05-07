@@ -45,7 +45,7 @@ client:
     scheme: ${client.cdr-api.scheme}
     port: ${client.cdr-api.port}
     host: ${client.cdr-api.host}
-    base-path: api/client-credentials
+    base-path: client-credentials
   customer:
     - connector-id: 1
       content-type: application/forumdatenaustausch+xml;charset=UTF-8
