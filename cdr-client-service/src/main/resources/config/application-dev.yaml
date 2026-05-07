@@ -10,7 +10,7 @@ client:
     client-secret: ${CDR_CLIENT_SECRET:Placeholder_test-secret}
     renew-credential: true
     last-credential-renewal-time: 2030-01-01T00:00:00Z
-  idp-endpoint: http://localhost/${client.idp-credentials.tenant-id}/oauth2/v2.0/token
+  idp-endpoint: http://localhost:80/${client.idp-credentials.tenant-id}/oauth2/v2.0/token
   proxy-config:
     url: ${CDR_CLIENT_PROXY_URL:}
     username: ${CDR_CLIENT_PROXY_USERNAME:}
@@ -18,7 +18,7 @@ client:
   file-busy-test-strategy: file_size_changed # valid values are `never_busy`, `file_size_changed`, `always_busy`
   cdr-api:
     scheme: http
-    port: 80
+    port: 87
     host: localhost
     base-path: documents
   credential-api:

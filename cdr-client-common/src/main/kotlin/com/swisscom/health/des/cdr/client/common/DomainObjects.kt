@@ -43,7 +43,11 @@ class DomainObjects {
         STAGING("https", WELL_KNOWN_HTTPS_PORT, "stg.cdr.health.swisscom.ch"),
         STAGING_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-stg-fn.azurewebsites.net"),
         INT_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-int-fn.azurewebsites.net"),
-        LOCALHOST("http", WELL_KNOWN_HTTP_PORT, "localhost"),
+        // apparently, on MS Windows, it is possible for non-admin users to run processes that listen on port 80;
+        // as non-admin users may call the cdr-client-service API and set the CDR API endpoint to `LOCALHOST` we
+        // cannot allow a local endpoint that the same non-admin user may be able to control
+        // https://stackoverflow.com/questions/169904/can-i-listen-on-a-port-using-httplistener-or-other-net-code-on-vista-without/6663823#6663823
+        LOCALHOST("http", PLAINTEXT_API_PORT, "localhost"),
         UNKNOWN("",0,"");
 
         companion object {
@@ -58,7 +62,7 @@ class DomainObjects {
 
     private companion object {
         private const val WELL_KNOWN_HTTPS_PORT = 443
-        private const val WELL_KNOWN_HTTP_PORT = 80
+        private const val PLAINTEXT_API_PORT = 87
     }
 
 }

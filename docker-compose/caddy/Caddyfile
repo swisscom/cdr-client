@@ -1,7 +1,6 @@
 {
 	http_port 80
 	auto_https disable_redirects
-
 }
 
 localhost:80 {
@@ -28,4 +27,3 @@ localhost:80 {
         file_server browse
     }
 }
-

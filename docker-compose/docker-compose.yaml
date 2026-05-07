@@ -38,6 +38,7 @@ services:
     mem_limit: 256m
     ports:
       - "80:80"
+      - "87:80"
       - "3000:3000"
     volumes:
       - ${PWD}/../output:/srv/install:ro
