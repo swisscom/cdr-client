@@ -37,4 +37,32 @@ class DomainObjects {
         MODE_VALUE,
     }
 
+    enum class ApiEndpoint(val protocol: String, val port: Int, val host: String) {
+        PRODUCTION("https", WELL_KNOWN_HTTPS_PORT, "cdr.health.swisscom.ch"),
+        PROD_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-prod-fn.azurewebsites.net"),
+        STAGING("https", WELL_KNOWN_HTTPS_PORT, "stg.cdr.health.swisscom.ch"),
+        STAGING_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-stg-fn.azurewebsites.net"),
+        INT_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-int-fn.azurewebsites.net"),
+        // apparently, on MS Windows, it is possible for non-admin users to run processes that listen on port 80;
+        // as non-admin users may call the cdr-client-service API and set the CDR API endpoint to `LOCALHOST` we
+        // cannot allow a local endpoint that the same non-admin user may be able to control
+        // https://stackoverflow.com/questions/169904/can-i-listen-on-a-port-using-httplistener-or-other-net-code-on-vista-without/6663823#6663823
+        LOCALHOST("http", PLAINTEXT_API_PORT, "localhost"),
+        UNKNOWN("",0,"");
+
+        companion object {
+            fun fromEndpointParts(protocol: String, port: Int, host: String): ApiEndpoint =
+                entries.firstOrNull {
+                    it.protocol == protocol && it.host == host && it.port == port
+                } ?: UNKNOWN
+
+        }
+
+    }
+
+    private companion object {
+        private const val WELL_KNOWN_HTTPS_PORT = 443
+        private const val PLAINTEXT_API_PORT = 87
+    }
+
 }

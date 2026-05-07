@@ -106,7 +106,13 @@ internal class PollingPushFileHandlingTest {
         val targetDir0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
 
         every { config.localFolder } returns TempDownloadDir(inflightDir)
+        // 1st call is made by validator, which expects the port to be set to 87; subsequent calls need to know the actual port
         every { config.cdrApi } returns CdrApi(
+            host = Host(cdrServiceMock.hostName),
+            basePath = "documents",
+            scheme = "http",
+            port = 87,
+        ) andThen CdrApi(
             host = Host(cdrServiceMock.hostName),
             basePath = "documents",
             scheme = "http",

@@ -193,7 +193,7 @@ class DTOs {
     data class CdrClientConfig(
         val fileSynchronizationEnabled: Boolean,
         val customer: List<Connector>,
-        val cdrApi: Endpoint,
+        val cdrApi: DomainObjects.ApiEndpoint,
         val filesInProgressCacheSize: String,
         val idpCredentials: IdpCredentials,
         val idpEndpoint: URL,
@@ -202,7 +202,6 @@ class DTOs {
         val pushThreadPoolSize: Int,
         val retryDelay: List<Duration>,
         val scheduleDelay: Duration,
-        val credentialApi: Endpoint,
         val retryTemplate: RetryTemplateConfig,
         val fileBusyTestInterval: Duration,
         val fileBusyTestTimeout: Duration,
@@ -217,7 +216,7 @@ class DTOs {
             val EMPTY = CdrClientConfig(
                 fileSynchronizationEnabled = false,
                 customer = emptyList(),
-                cdrApi = Endpoint.EMPTY,
+                cdrApi = DomainObjects.ApiEndpoint.PRODUCTION,
                 filesInProgressCacheSize = EMPTY_STRING,
                 idpCredentials = IdpCredentials.EMPTY,
                 idpEndpoint = URI("http://localhost").toURL(),
@@ -226,7 +225,6 @@ class DTOs {
                 pushThreadPoolSize = 0,
                 retryDelay = emptyList(),
                 scheduleDelay = Duration.ZERO,
-                credentialApi = Endpoint.EMPTY,
                 fileBusyTestInterval = Duration.ZERO,
                 fileBusyTestTimeout = Duration.ZERO,
                 fileBusyTestStrategy = FileBusyTestStrategy.NEVER_BUSY,
@@ -295,24 +293,6 @@ class DTOs {
                 )
             }
 
-        }
-
-        @Serializable
-        data class Endpoint(
-            val scheme: String,
-            val host: String,
-            val port: Int,
-            val basePath: String,
-        ) {
-            companion object {
-                @JvmStatic
-                val EMPTY = Endpoint(
-                    scheme = EMPTY_STRING,
-                    host = EMPTY_STRING,
-                    port = 0,
-                    basePath = EMPTY_STRING
-                )
-            }
         }
 
         @Serializable

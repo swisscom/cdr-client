@@ -62,15 +62,15 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 private val logger = KotlinLogging.logger {}
-private const val SCOPE_TEST = "https://tst.identity.health.swisscom.ch/CdrApi/.default"
-private const val SCOPE_DEFAULT = "https://identity.health.swisscom.ch/CdrApi/.default"
+private const val SCOPE_STAGING = "https://tst.identity.health.swisscom.ch/CdrApi/.default"
+private const val SCOPE_PRODUCTION = "https://identity.health.swisscom.ch/CdrApi/.default"
 
 @Composable
 internal fun CdrConfigScreen(
     modifier: Modifier = Modifier,
     viewModel: CdrConfigViewModel,
     remoteViewValidations: CdrConfigViewRemoteValidations,
-    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val uiState: CdrConfigUiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
 
@@ -91,13 +91,18 @@ internal fun CdrConfigScreen(
     ) { paddingValues: PaddingValues ->
         val scrollState: ScrollState = rememberScrollState()
 
+
+        val horizontalPaddingModifier = modifier.fillMaxWidth().padding(horizontal = 8.dp)
+        val verticalPaddingModifier = modifier.padding(vertical = 16.dp)
+        val topPaddingModifier = modifier.padding(top = 16.dp)
+
+        val columnModifier = modifier.verticalScroll(scrollState)
+            .padding(paddingValues) // contains calculated padding to account for top and bottom bars
+            .padding(16.dp) // additional padding for the content
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
-            modifier = modifier
-                .verticalScroll(scrollState)
-                .padding(paddingValues) // contains calculated padding to account for top and bottom bars
-                .padding(16.dp), // additional padding for the content
+            modifier = columnModifier
         ) {
             SwisscomLogo(modifier.size(86.dp).padding(16.dp))
 
@@ -118,17 +123,17 @@ internal fun CdrConfigScreen(
             // File monitoring status warnings
             if (uiState.fileMonitoringStatus.errorFileCount > 0 || uiState.fileMonitoringStatus.oldTempFileCount > 0) {
                 FileMonitoringWarningBanner(
-                    modifier = modifier.fillMaxWidth().padding(8.dp),
+                    modifier = horizontalPaddingModifier,
                     fileMonitoringStatus = uiState.fileMonitoringStatus
                 )
             }
 
-            Divider(modifier = modifier)
+            Divider(modifier = verticalPaddingModifier)
 
             // client service enabled/disabled option
             OnOffSwitch(
                 name = DomainObjects.ConfigurationItem.SYNC_SWITCH,
-                modifier = modifier.padding(all = 8.dp).padding(bottom = 16.dp),
+                modifier = horizontalPaddingModifier,
                 title = stringResource(Res.string.label_enable_client_service),
                 subtitle = stringResource(Res.string.label_enable_client_service_subtitle),
                 checked = uiState.clientServiceConfig.fileSynchronizationEnabled,
@@ -136,35 +141,44 @@ internal fun CdrConfigScreen(
                 enabled = canEdit,
             )
 
-            Divider(modifier = modifier)
+            Divider(modifier = verticalPaddingModifier)
 
             // CDR API Host
             var cdrHostValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-            LaunchedEffect(uiState.clientServiceConfig.cdrApi.host) {
+            LaunchedEffect(uiState.clientServiceConfig.cdrApi) {
                 cdrHostValidationResult =
+                    // if the service configuration has an endpoint with a host set, that is not in the list of known hosts, then
+                    // the factory method returns UNKNOWN, which has a blank host attribute value
                     remoteViewValidations.validateNotBlank(uiState.clientServiceConfig.cdrApi.host, DomainObjects.ConfigurationItem.CDR_API_HOST)
             }
-            ValidatedTextField(
+            DropDownList(
                 name = DomainObjects.ConfigurationItem.CDR_API_HOST,
-                modifier = modifier.padding(8.dp).fillMaxWidth(),
-                validatable = { cdrHostValidationResult },
+                modifier = horizontalPaddingModifier,
+                initiallyExpanded = false,
+                options = { DomainObjects.ApiEndpoint.entries.filter { it == DomainObjects.ApiEndpoint.PRODUCTION || it == DomainObjects.ApiEndpoint.STAGING } },
                 label = { Text(text = stringResource(Res.string.label_cdr_api_host)) },
-                value = uiState.clientServiceConfig.cdrApi.host,
                 placeHolder = { Text(text = stringResource(Res.string.label_cdr_api_host_placeholder)) },
+                value = uiState.clientServiceConfig.cdrApi.name,
                 onValueChange = {
                     if (canEdit) {
-                        viewModel.setCdrApiHost(it)
-                        if (it.startsWith("stg")) {
-                            viewModel.setIdpCredentialsScope(SCOPE_TEST)
-                        } else {
-                            viewModel.setIdpCredentialsScope(SCOPE_DEFAULT)
+                        DomainObjects.ApiEndpoint.valueOf(it).also { apiEndpoint ->
+                            viewModel.setCdrApiEndpoint(apiEndpoint)
+                            if (apiEndpoint == DomainObjects.ApiEndpoint.STAGING) {
+                                viewModel.setIdpCredentialsScope(SCOPE_STAGING)
+                            } else {
+                                viewModel.setIdpCredentialsScope(SCOPE_PRODUCTION)
+                            }
                         }
                     }
                 },
+                validatable = { cdrHostValidationResult },
                 enabled = canEdit,
             )
 
-            Divider(modifier = modifier)
+            Divider(modifier = topPaddingModifier)
+
+            // FIXME: The ConnectorList, IdpSettingsGroup, and AdvancedSettingsGroup composables set their own padding -> DON'T!
+            //  Only manage internal padding, but not the padding of the container itself.
 
             ConnectorList(
                 modifier = modifier,
@@ -177,7 +191,6 @@ internal fun CdrConfigScreen(
 
             Divider(modifier = modifier)
 
-            // IdP settings
             IdpSettingsGroup(
                 modifier = modifier,
                 viewModel = viewModel,
@@ -189,7 +202,6 @@ internal fun CdrConfigScreen(
 
             Divider(modifier = modifier)
 
-            // Advanced settings
             AdvancedSettingsGroup(
                 modifier = modifier,
                 viewModel = viewModel,
@@ -248,7 +260,7 @@ private fun SwisscomLogo(modifier: Modifier) =
 @Composable
 private fun StatusTopBar(
     modifier: Modifier = Modifier,
-    uiState: CdrConfigUiState
+    uiState: CdrConfigUiState,
 ) {
     TopAppBar(
         modifier = modifier,
@@ -267,7 +279,7 @@ private fun StatusTopBar(
 private fun ButtonsBottomAppBar(
     modifier: Modifier,
     viewModel: CdrConfigViewModel,
-    enabled: Boolean
+    enabled: Boolean,
 ) {
     BottomAppBar(
         modifier = modifier,

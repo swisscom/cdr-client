@@ -37,7 +37,7 @@ class ConfigConverterTest {
         cdrApi = CdrApi(
             scheme = "http",
             host = Host("localhost"),
-            port = 80,
+            port = 87,
             basePath = "/"
         ),
         filesInProgressCacheSize = DataSize.ofMegabytes(1L),
@@ -59,7 +59,7 @@ class ConfigConverterTest {
         credentialApi = CredentialApi(
             scheme = "http",
             host = Host("localhost"),
-            port = 80,
+            port = 87,
             basePath = "/"
         ),
         retryTemplate = CdrClientConfig.RetryTemplateConfig(
@@ -99,8 +99,8 @@ class ConfigConverterTest {
         cdrApi = CdrApi(
             scheme = "http",
             host = Host("localhost"),
-            port = 80,
-            basePath = "/"
+            port = 87,
+            basePath = "api/documents"
         ),
         filesInProgressCacheSize = DataSize.ofMegabytes(1L),
         idpCredentials = IdpCredentials(
@@ -121,8 +121,8 @@ class ConfigConverterTest {
         credentialApi = CredentialApi(
             scheme = "http",
             host = Host("localhost"),
-            port = 80,
-            basePath = "/"
+            port = 87,
+            basePath = "api/client-credentials",
         ),
         retryTemplate = CdrClientConfig.RetryTemplateConfig(
             retries = 1,

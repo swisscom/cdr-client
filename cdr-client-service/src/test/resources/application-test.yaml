@@ -8,7 +8,7 @@ client:
     client-secret: test-client-secret
     last-credential-renewal-time: 1970-01-01T00:00:00Z
     scope: https://dev.identity.health.swisscom.ch/CdrApi/.default
-  idp-endpoint: http://localhost/${client.idp-credentials.tenant-id}/oauth2/v2.0/token
+  idp-endpoint: http://localhost:80/${client.idp-credentials.tenant-id}/oauth2/v2.0/token
   proxy-config:
     url:
     username:
@@ -38,14 +38,14 @@ client:
   file-busy-test-strategy: file_size_changed # valid values are `never_busy`, `file_size_changed`, `always_busy`
   cdr-api:
     scheme: http
-    port: 80
+    port: 87
     host: localhost
     base-path: documents
   credential-api:
     scheme: ${client.cdr-api.scheme}
     port: ${client.cdr-api.port}
     host: ${client.cdr-api.host}
-    base-path: api/client-credentials
+    base-path: client-credentials
   customer:
     - connector-id: 1
       content-type: application/forumdatenaustausch+xml;charset=UTF-8

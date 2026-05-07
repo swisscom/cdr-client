@@ -213,13 +213,14 @@ internal fun DropDownList(
     var isExpanded: Boolean by remember { mutableStateOf(initiallyExpanded) }
     ExposedDropdownMenuBox(
         expanded = isExpanded,
-        onExpandedChange = { isExpanded = it }
+        onExpandedChange = { isExpanded = it },
+        modifier = modifier
     ) {
         val validationResult = validatable.validate()
 
         OutlinedTextField(
             readOnly = true,
-            modifier = modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true),
+            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled).fillMaxWidth(),
             enabled = enabled,
             value = value,
             onValueChange = { },
@@ -227,21 +228,23 @@ internal fun DropDownList(
             isError = validationResult.isError(),
             singleLine = true,
             placeholder = placeHolder,
-//            colors = ExposedDropdownMenuDefaults.textFieldColors(),
             trailingIcon = {
                 ExposedDropdownMenuDefaults.TrailingIcon(
                     expanded = isExpanded,
                     modifier = Modifier.border(width = 1.dp, color = MaterialTheme.colorScheme.outline, shape = OutlinedTextFieldDefaults.shape),
                 )
             },
-            supportingText = validationResult.message,
+            // the text field reserves space for the supporting message, even if there is no text to render (composable is an empty lambda);
+            // this causes the dropdown list to not be attached directly to the text box; instead, it floats below it with a gap between the two
+//            supportingText = validationResult.message,
         ).also {
             logger.trace { "drop-down selection has been (re-)composed - field '$name'" }
         }
 
         ExposedDropdownMenu(
             expanded = isExpanded,
-            onDismissRequest = { isExpanded = false }
+            onDismissRequest = { isExpanded = false },
+            matchAnchorWidth = true,
         ) {
             options()
                 .map { it.toString() }
@@ -253,7 +256,6 @@ internal fun DropDownList(
                             isExpanded = false
                         },
                         contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding,
-//                        colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
                     )
                 }
         }

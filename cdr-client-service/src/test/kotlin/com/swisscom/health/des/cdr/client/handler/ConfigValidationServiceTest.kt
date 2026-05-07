@@ -617,13 +617,13 @@ internal class ConfigValidationServiceTest {
             cdrApi = CdrApi(
                 scheme = "http",
                 host = Host("localhost"),
-                port = 80,
+                port = 87,
                 basePath = "api",
             ),
             credentialApi = CredentialApi(
                 scheme = "http",
                 host = Host("localhost"),
-                port = 80,
+                port = 87,
                 basePath = "client-credentials",
             ),
             customer = Customer(customers.toMutableList()),
