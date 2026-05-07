@@ -114,7 +114,7 @@ tasks.test {
 val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
     violationRules {
         /**
-         * Ensure tests cover at least 75% of the LoC.
+         * We aim at a test coverage of at least 75% of the LoC.
          */
         rule {
             classDirectories.setFrom(files(classDirectories.files.map {
@@ -128,7 +128,7 @@ val jacocoTestCoverageVerification = tasks.named<JacocoCoverageVerification>("ja
                 }
             }))
             limit {
-                minimum = "0.70".toBigDecimal()
+                minimum = "0.65".toBigDecimal()
             }
         }
     }

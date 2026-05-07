@@ -65,8 +65,10 @@ object ConfigUpgrade {
                     } else {
                         acc + configUpgradeStep.upgrade(
                             configRoot = if (acc.isEmpty()) {
+                                // read original configuration file from disk
                                 YAML_MAPPER.readTree(configLocation.inputStream(StandardOpenOption.READ)) as ObjectNode
                             } else {
+                                // use version of the configuration containing changes from previous migration steps
                                 acc.last().configRoot
                             }
                         )
