@@ -55,6 +55,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.e
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_folder_overlaps_non_error
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_illegal_mode
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_illegal_value
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_illegal_value_combination
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_is_credentials
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_is_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_no_connector
@@ -116,6 +117,7 @@ internal val DTOs.ValidationMessageKey.stringResource: StringResource
             DTOs.ValidationMessageKey.PROXY_URL_MUST_START_WITH_HTTP_OR_HTTPS -> Res.string.error_proxy_url_must_start_with_http_or_https
             DTOs.ValidationMessageKey.PROXY_URL_INVALID_FORMAT -> Res.string.error_proxy_url_invalid_format
             DTOs.ValidationMessageKey.ILLEGAL_VALUE -> Res.string.error_illegal_value
+            DTOs.ValidationMessageKey.ILLEGAL_VALUE_COMBINATION -> Res.string.error_illegal_value_combination
         }
 
 @Composable

@@ -7,7 +7,7 @@ client:
     client-id: easy-system-test-user-id
     client-secret: test-client-secret
     last-credential-renewal-time: 1970-01-01T00:00:00Z
-    scope: https://dev.identity.health.swisscom.ch/CdrApi/.default
+    scope: https://localhost/CdrApi/.default
   idp-endpoint: http://localhost:80/${client.idp-credentials.tenant-id}/oauth2/v2.0/token
   proxy-config:
     url:

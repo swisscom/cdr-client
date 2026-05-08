@@ -18,7 +18,6 @@ class DomainObjects {
         ARCHIVE_DIRECTORY,
         IDP_CLIENT_PASSWORD,
         IDP_CLIENT_ID,
-        IDP_TENANT_ID,
         IDP_CLIENT_SECRET_RENWAL_TIME,
         IDP_CLIENT_SECRET_RENWAL,
         FILE_BUSY_TEST_TIMEOUT,
@@ -39,10 +38,10 @@ class DomainObjects {
 
     enum class ApiEndpoint(val protocol: String, val port: Int, val host: String) {
         PRODUCTION("https", WELL_KNOWN_HTTPS_PORT, "cdr.health.swisscom.ch"),
-        PROD_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-prod-fn.azurewebsites.net"),
+        PRODUCTION_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-prod-fn.azurewebsites.net"),
         STAGING("https", WELL_KNOWN_HTTPS_PORT, "stg.cdr.health.swisscom.ch"),
         STAGING_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-stg-fn.azurewebsites.net"),
-        INT_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-int-fn.azurewebsites.net"),
+        INTEGRATION_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-int-fn.azurewebsites.net"),
         // apparently, on MS Windows, it is possible for non-admin users to run processes that listen on port 80;
         // as non-admin users may call the cdr-client-service API and set the CDR API endpoint to `LOCALHOST` we
         // cannot allow a local endpoint that the same non-admin user may be able to control
@@ -55,9 +54,33 @@ class DomainObjects {
                 entries.firstOrNull {
                     it.protocol == protocol && it.host == host && it.port == port
                 } ?: UNKNOWN
-
         }
+    }
 
+    enum class TenantId(val tenantId: String) {
+        PRODUCTION("70b434db-eccb-4280-95dc-1e59220aca55"),
+        STAGING("dc5f3d15-71a0-47ad-a792-f708c9b4d123"),
+        INTEGRATION("f5a99f8d-dca6-413c-ba36-9e23b4720930"),
+        LOCALHOST("test-tenant-client-id"),
+        UNKNOWN("");
+
+        companion object {
+            fun fromTenantId(tenantId: String): TenantId =
+                entries.firstOrNull { it.tenantId == tenantId } ?: UNKNOWN
+        }
+    }
+
+    enum class OAuthScope(val scope: String) {
+        PRODUCTION("https://identity.health.swisscom.ch/CdrApi/.default"),
+        STAGING("https://tst.identity.health.swisscom.ch/CdrApi/.default"),
+        INTEGRATION("https://dev.identity.health.swisscom.ch/CdrApi/.default"),
+        LOCALHOST("https://localhost/CdrApi/.default"),
+        UNKNOWN("");
+
+        companion object {
+            fun fromScope(scope: String): OAuthScope =
+                entries.firstOrNull { it.scope == scope } ?: UNKNOWN
+        }
     }
 
     private companion object {

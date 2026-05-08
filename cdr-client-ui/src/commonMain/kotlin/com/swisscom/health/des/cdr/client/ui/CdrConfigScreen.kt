@@ -39,6 +39,7 @@ import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_RGB_Colour_icon
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_client_internal_error
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_apply
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_cdr_api_host_placeholder
@@ -62,8 +63,6 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 private val logger = KotlinLogging.logger {}
-private const val SCOPE_STAGING = "https://tst.identity.health.swisscom.ch/CdrApi/.default"
-private const val SCOPE_PRODUCTION = "https://identity.health.swisscom.ch/CdrApi/.default"
 
 @Composable
 internal fun CdrConfigScreen(
@@ -163,10 +162,20 @@ internal fun CdrConfigScreen(
                     if (canEdit) {
                         DomainObjects.ApiEndpoint.valueOf(it).also { apiEndpoint ->
                             viewModel.setCdrApiEndpoint(apiEndpoint)
-                            if (apiEndpoint == DomainObjects.ApiEndpoint.STAGING) {
-                                viewModel.setIdpCredentialsScope(SCOPE_STAGING)
-                            } else {
-                                viewModel.setIdpCredentialsScope(SCOPE_PRODUCTION)
+                            when (apiEndpoint) {
+                                DomainObjects.ApiEndpoint.PRODUCTION -> {
+                                    viewModel.setIdpCredentialsScope(DomainObjects.OAuthScope.PRODUCTION)
+                                    viewModel.setIdpTenantId(DomainObjects.TenantId.PRODUCTION)
+                                }
+
+                                DomainObjects.ApiEndpoint.STAGING -> {
+                                    viewModel.setIdpCredentialsScope(DomainObjects.OAuthScope.STAGING)
+                                    viewModel.setIdpTenantId(DomainObjects.TenantId.STAGING)
+                                }
+
+                                else -> {
+                                    viewModel.reportError(Res.string.error_client_internal_error, "Unknown API endpoint '$apiEndpoint'")
+                                }
                             }
                         }
                     }

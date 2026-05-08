@@ -12,6 +12,7 @@ import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.ERROR
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.FILE_BUSY_TEST_TIMEOUT_TOO_LONG
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.ILLEGAL_MODE
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.ILLEGAL_VALUE
+import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.ILLEGAL_VALUE_COMBINATION
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.LOCAL_DIR_OVERLAPS_WITH_SOURCE_DIRS
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.LOCAL_DIR_OVERLAPS_WITH_TARGET_DIRS
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.NOT_A_DIRECTORY
@@ -47,7 +48,7 @@ private val logger = KotlinLogging.logger {}
 @Service
 @Suppress("TooManyFunctions", "LargeClass")
 internal class ConfigValidationService(
-    private val config: CdrClientConfig
+    private val config: CdrClientConfig,
 ) {
 
     val isConfigValid: Boolean by lazy { validateAllConfigurationItems(config.toDto()) is ValidationResult.Success }
@@ -55,7 +56,7 @@ internal class ConfigValidationService(
     fun validateAllConfigurationItems(config: DTOs.CdrClientConfig): ValidationResult {
         val validations = mutableListOf<ValidationResult>()
 
-        validations.add(validateCdrApiEndpoint(config.cdrApi))
+        validations.add(validateCdrApiEndpoint(config.cdrApi, config.idpCredentials))
         validations.add(validateDirectoriesAreAbsolute(config))
         validations.add(validateDirectoryIsReadWritable(config.localFolder))
         validations.add(validateDirectoryOverlap(config))
@@ -96,16 +97,51 @@ internal class ConfigValidationService(
         TODO()
     }
 
-    fun validateCdrApiEndpoint(cdrApiEndpoint: DomainObjects.ApiEndpoint): ValidationResult {
-        return if (cdrApiEndpoint == DomainObjects.ApiEndpoint.UNKNOWN) {
-            ValidationResult.Failure(
-                listOf(
-                    ValidationDetail.ConfigItemDetail(
-                        configItem = DomainObjects.ConfigurationItem.CDR_API_HOST,
-                        messageKey = ILLEGAL_VALUE
-                    )
+    @Suppress("CyclomaticComplexMethod")
+    fun validateCdrApiEndpoint(cdrApiEndpoint: DomainObjects.ApiEndpoint, idpCredentials: DTOs.CdrClientConfig.IdpCredentials): ValidationResult {
+        fun failure(messageKey: DTOs.ValidationMessageKey) = ValidationResult.Failure(
+            listOf(
+                ValidationDetail.ConfigItemDetail(
+                    configItem = DomainObjects.ConfigurationItem.CDR_API_HOST,
+                    messageKey = messageKey
                 )
             )
+        )
+
+        val illegalValueFailure: ValidationResult.Failure by lazy(LazyThreadSafetyMode.NONE) {
+            failure(ILLEGAL_VALUE)
+        }
+
+        val illegalValueCombinationFailure: ValidationResult.Failure by lazy(LazyThreadSafetyMode.NONE) {
+            failure(ILLEGAL_VALUE_COMBINATION)
+        }
+
+        return if (cdrApiEndpoint == DomainObjects.ApiEndpoint.UNKNOWN) {
+            illegalValueFailure
+        } else if (cdrApiEndpoint == DomainObjects.ApiEndpoint.PRODUCTION || cdrApiEndpoint == DomainObjects.ApiEndpoint.PRODUCTION_INTERNAL) {
+            if (idpCredentials.tenantId != DomainObjects.TenantId.PRODUCTION || idpCredentials.scope != DomainObjects.OAuthScope.PRODUCTION) {
+                illegalValueCombinationFailure
+            } else {
+                ValidationResult.Success
+            }
+        } else if (cdrApiEndpoint == DomainObjects.ApiEndpoint.STAGING || cdrApiEndpoint == DomainObjects.ApiEndpoint.STAGING_INTERNAL) {
+            if (idpCredentials.tenantId != DomainObjects.TenantId.STAGING || idpCredentials.scope != DomainObjects.OAuthScope.STAGING) {
+                illegalValueCombinationFailure
+            } else {
+                ValidationResult.Success
+            }
+        } else if (cdrApiEndpoint == DomainObjects.ApiEndpoint.INTEGRATION_INTERNAL) {
+            if (idpCredentials.tenantId != DomainObjects.TenantId.INTEGRATION || idpCredentials.scope != DomainObjects.OAuthScope.INTEGRATION) {
+                illegalValueCombinationFailure
+            } else {
+                ValidationResult.Success
+            }
+        } else if (cdrApiEndpoint == DomainObjects.ApiEndpoint.LOCALHOST) {
+            if (idpCredentials.tenantId != DomainObjects.TenantId.LOCALHOST || idpCredentials.scope != DomainObjects.OAuthScope.LOCALHOST) {
+                illegalValueCombinationFailure
+            } else {
+                ValidationResult.Success
+            }
         } else {
             ValidationResult.Success
         }
@@ -703,10 +739,6 @@ internal class ConfigValidationService(
         validateIsNotBlankOrPlaceholder(
             value = credentials.clientSecret,
             configItem = DomainObjects.ConfigurationItem.IDP_CLIENT_PASSWORD
-        ).let { validations.add(it) }
-        validateIsNotBlankOrPlaceholder(
-            value = credentials.tenantId,
-            configItem = DomainObjects.ConfigurationItem.IDP_TENANT_ID
         ).let { validations.add(it) }
 
         return validations.fold(

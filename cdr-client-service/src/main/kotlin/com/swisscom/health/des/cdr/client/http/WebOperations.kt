@@ -188,10 +188,10 @@ internal class WebOperations(
         logger.debug { "validating credentials for tenant id: '${idpCredentials.tenantId}'" }
         retryIOExceptionsAndServerErrors.execute<OAuth2AuthNService.AuthNResponse, Exception> { retry: RetryContext ->
             val idpEndpoint = config.idpEndpoint.toString()
-            val correctedIdpEndpoint = if (config.idpCredentials.tenantId.id == idpCredentials.tenantId)
+            val correctedIdpEndpoint = if (config.idpCredentials.tenantId.id == idpCredentials.tenantId.tenantId)
                 idpEndpoint
             else // only replace the first path segment after the host with the tenant id from the provided credentials
-                idpEndpoint.replace(Regex("(http[s]?://[^/]+/)[^/]+"), "$1${idpCredentials.tenantId}")
+                idpEndpoint.replace(Regex("(http[s]?://[^/]+/)[^/]+"), "$1${idpCredentials.tenantId.tenantId}")
 
             if (retry.retryCount > 0) {
                 logger.debug {

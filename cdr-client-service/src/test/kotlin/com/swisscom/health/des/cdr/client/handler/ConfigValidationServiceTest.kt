@@ -36,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.extension.ExtendWith
+import org.junit.jupiter.api.fail
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.core.env.Environment
 import org.springframework.http.MediaType
@@ -609,6 +610,16 @@ internal class ConfigValidationServiceTest {
         assertEquals(DTOs.ValidationMessageKey.NOT_A_DIRECTORY, configItemDetail.messageKey)
     }
 
+    @Test
+    fun `test validation error if cdr-api is illegal host`() {
+        fail("todo")
+    }
+
+    @Test
+    fun `test validation error if cdr-api host and-or scope and-or tenant are from different environments`() {
+        fail("todo")
+    }
+
     private fun createCdrClientConfig(customers: List<Connector>, defaultLocalFolder: Path = localFolder0): CdrClientConfig =
         CdrClientConfig(
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
@@ -632,10 +643,10 @@ internal class ConfigValidationServiceTest {
             retryDelay = listOf(Duration.ofSeconds(1)),
             filesInProgressCacheSize = DataSize.ofMegabytes(1),
             idpCredentials = IdpCredentials(
-                tenantId = TenantId("fake-tenant-id"),
+                tenantId = TenantId(DomainObjects.TenantId.LOCALHOST.tenantId),
                 clientId = ClientId("fake-client-id"),
                 clientSecret = ClientSecret("fake-client-secret"),
-                scope = Scope("CDR"),
+                scope = Scope(DomainObjects.OAuthScope.LOCALHOST.scope),
                 renewCredential = RenewCredential(true),
                 lastCredentialRenewalTime = BEGINNING_OF_TIME,
             ),
