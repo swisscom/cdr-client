@@ -116,34 +116,41 @@ internal class ConfigValidationService(
             failure(ILLEGAL_VALUE_COMBINATION)
         }
 
-        return if (cdrApiEndpoint == DomainObjects.ApiEndpoint.UNKNOWN) {
-            illegalValueFailure
-        } else if (cdrApiEndpoint == DomainObjects.ApiEndpoint.PRODUCTION || cdrApiEndpoint == DomainObjects.ApiEndpoint.PRODUCTION_INTERNAL) {
-            if (idpCredentials.tenantId != DomainObjects.TenantId.PRODUCTION || idpCredentials.scope != DomainObjects.OAuthScope.PRODUCTION) {
-                illegalValueCombinationFailure
-            } else {
-                ValidationResult.Success
+
+        return when (cdrApiEndpoint) {
+            DomainObjects.ApiEndpoint.PRODUCTION, DomainObjects.ApiEndpoint.PRODUCTION_INTERNAL -> {
+                if (idpCredentials.tenantId != DomainObjects.TenantId.PRODUCTION || idpCredentials.scope != DomainObjects.OAuthScope.PRODUCTION) {
+                    illegalValueCombinationFailure
+                } else {
+                    ValidationResult.Success
+                }
             }
-        } else if (cdrApiEndpoint == DomainObjects.ApiEndpoint.STAGING || cdrApiEndpoint == DomainObjects.ApiEndpoint.STAGING_INTERNAL) {
-            if (idpCredentials.tenantId != DomainObjects.TenantId.STAGING || idpCredentials.scope != DomainObjects.OAuthScope.STAGING) {
-                illegalValueCombinationFailure
-            } else {
-                ValidationResult.Success
+
+            DomainObjects.ApiEndpoint.STAGING, DomainObjects.ApiEndpoint.STAGING_INTERNAL -> {
+                if (idpCredentials.tenantId != DomainObjects.TenantId.STAGING || idpCredentials.scope != DomainObjects.OAuthScope.STAGING) {
+                    illegalValueCombinationFailure
+                } else {
+                    ValidationResult.Success
+                }
             }
-        } else if (cdrApiEndpoint == DomainObjects.ApiEndpoint.INTEGRATION_INTERNAL) {
-            if (idpCredentials.tenantId != DomainObjects.TenantId.INTEGRATION || idpCredentials.scope != DomainObjects.OAuthScope.INTEGRATION) {
-                illegalValueCombinationFailure
-            } else {
-                ValidationResult.Success
+
+            DomainObjects.ApiEndpoint.INTEGRATION_INTERNAL -> {
+                if (idpCredentials.tenantId != DomainObjects.TenantId.INTEGRATION || idpCredentials.scope != DomainObjects.OAuthScope.INTEGRATION) {
+                    illegalValueCombinationFailure
+                } else {
+                    ValidationResult.Success
+                }
             }
-        } else if (cdrApiEndpoint == DomainObjects.ApiEndpoint.LOCALHOST) {
-            if (idpCredentials.tenantId != DomainObjects.TenantId.LOCALHOST || idpCredentials.scope != DomainObjects.OAuthScope.LOCALHOST) {
-                illegalValueCombinationFailure
-            } else {
-                ValidationResult.Success
+
+            DomainObjects.ApiEndpoint.LOCALHOST -> {
+                if (idpCredentials.tenantId != DomainObjects.TenantId.LOCALHOST || idpCredentials.scope != DomainObjects.OAuthScope.LOCALHOST) {
+                    illegalValueCombinationFailure
+                } else {
+                    ValidationResult.Success
+                }
             }
-        } else {
-            ValidationResult.Success
+
+            DomainObjects.ApiEndpoint.UNKNOWN -> illegalValueFailure
         }
     }
 
