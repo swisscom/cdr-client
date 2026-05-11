@@ -4,6 +4,7 @@ import com.mayakapps.kache.ObjectKache
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
+import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
@@ -108,7 +109,7 @@ internal class PollingPushFileHandlingTest {
         every { config.localFolder } returns TempDownloadDir(inflightDir)
         // 1st call is made by validator, which expects the port to be set to 87; subsequent calls need to know the actual port
         every { config.cdrApi } returns CdrApi(
-            host = Host(cdrServiceMock.hostName),
+            host = Host("localhost"),
             basePath = "documents",
             scheme = "http",
             port = 87,
@@ -119,10 +120,10 @@ internal class PollingPushFileHandlingTest {
             port = cdrServiceMock.port,
         )
         every { config.idpCredentials } returns IdpCredentials(
-            tenantId = TenantId("fake-tenant-id"),
+            tenantId = TenantId(DomainObjects.TenantId.LOCALHOST.tenantId),
             clientId = ClientId("test-client-id"),
             clientSecret = ClientSecret("test-client-secret"),
-            scope = Scope("https://dev.identity.health.swisscom.ch/CdrApi/.default"),
+            scope = Scope(DomainObjects.OAuthScope.LOCALHOST.scope),
             renewCredential = RenewCredential(false),
             maxCredentialAge = Duration.ofDays(365),
             lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),

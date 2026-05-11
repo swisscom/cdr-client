@@ -3,6 +3,7 @@ package com.swisscom.health.des.cdr.client.http
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
@@ -279,10 +280,10 @@ internal class WebOperationsTest {
         )
 
         val idpCredentials = DTOs.CdrClientConfig.IdpCredentials(
-            tenantId = "test-tenant-id",
+            tenantId = DomainObjects.TenantId.LOCALHOST,
             clientId = "test-client-id",
             clientSecret = "test-client-secret",
-            scope = "scope",
+            scope = DomainObjects.OAuthScope.LOCALHOST,
             renewCredential = true,
             maxCredentialAge = Duration.ofDays(1L),
             lastCredentialRenewalTime = Instant.now()
@@ -319,10 +320,10 @@ internal class WebOperationsTest {
         )
 
         val idpCredentials = DTOs.CdrClientConfig.IdpCredentials(
-            tenantId = "test-tenant-id",
+            tenantId = DomainObjects.TenantId.LOCALHOST,
             clientId = "test-client-id",
             clientSecret = "test-client-secret",
-            scope = "scope",
+            scope = DomainObjects.OAuthScope.LOCALHOST,
             renewCredential = true,
             maxCredentialAge = Duration.ofDays(1L),
             lastCredentialRenewalTime = Instant.now()
@@ -354,10 +355,10 @@ internal class WebOperationsTest {
         )
 
         val idpCredentialsWithMaskedSecret = DTOs.CdrClientConfig.IdpCredentials(
-            tenantId = DEFAULT_CDR_CONFIG.idpCredentials.tenantId.id,
+            tenantId = DomainObjects.TenantId.fromTenantId(DEFAULT_CDR_CONFIG.idpCredentials.tenantId.id),
             clientId = DEFAULT_CDR_CONFIG.idpCredentials.clientId.id,
             clientSecret = ClientSecret.MASKED_SECRET.value,
-            scope = DEFAULT_CDR_CONFIG.idpCredentials.scope.scope,
+            scope = DomainObjects.OAuthScope.fromScope(DEFAULT_CDR_CONFIG.idpCredentials.scope.scope),
             renewCredential = true,
             maxCredentialAge = Duration.ofDays(1L),
             lastCredentialRenewalTime = Instant.now()
@@ -387,10 +388,10 @@ internal class WebOperationsTest {
         )
 
         val idpCredentialsWithAnyMaskedSecret = DTOs.CdrClientConfig.IdpCredentials(
-            tenantId = DEFAULT_CDR_CONFIG.idpCredentials.tenantId.id,
+            tenantId = DomainObjects.TenantId.fromTenantId(DEFAULT_CDR_CONFIG.idpCredentials.tenantId.id),
             clientId = DEFAULT_CDR_CONFIG.idpCredentials.clientId.id,
             clientSecret = "**", // only 2 asterisks — still all-asterisk
-            scope = DEFAULT_CDR_CONFIG.idpCredentials.scope.scope,
+            scope = DomainObjects.OAuthScope.fromScope(DEFAULT_CDR_CONFIG.idpCredentials.scope.scope),
             renewCredential = true,
             maxCredentialAge = Duration.ofDays(1L),
             lastCredentialRenewalTime = Instant.now()
@@ -421,10 +422,10 @@ internal class WebOperationsTest {
 
         val newSecret = "brand-new-secret-entered-by-user"
         val idpCredentialsWithRealSecret = DTOs.CdrClientConfig.IdpCredentials(
-            tenantId = DEFAULT_CDR_CONFIG.idpCredentials.tenantId.id,
+            tenantId = DomainObjects.TenantId.fromTenantId(DEFAULT_CDR_CONFIG.idpCredentials.tenantId.id),
             clientId = DEFAULT_CDR_CONFIG.idpCredentials.clientId.id,
             clientSecret = newSecret,
-            scope = DEFAULT_CDR_CONFIG.idpCredentials.scope.scope,
+            scope = DomainObjects.OAuthScope.fromScope(DEFAULT_CDR_CONFIG.idpCredentials.scope.scope),
             renewCredential = true,
             maxCredentialAge = Duration.ofDays(1L),
             lastCredentialRenewalTime = Instant.now()
@@ -464,10 +465,10 @@ internal class WebOperationsTest {
         )
 
         val idpCredentials = DTOs.CdrClientConfig.IdpCredentials(
-            tenantId = "different-tenant-id",
+            tenantId = DomainObjects.TenantId.STAGING,
             clientId = "test-client-id",
             clientSecret = "test-client-secret",
-            scope = "scope",
+            scope = DomainObjects.OAuthScope.STAGING,
             renewCredential = true,
             maxCredentialAge = Duration.ofDays(1L),
             lastCredentialRenewalTime = Instant.now()
@@ -481,7 +482,7 @@ internal class WebOperationsTest {
         assertEquals(HttpStatus.OK, response.statusCode)
         val validationResult = assertInstanceOf<DTOs.ValidationResult>(response.body)
         assertEquals(DTOs.ValidationResult.Success, validationResult)
-        assertEquals(configWithOriginalEndpoint.idpEndpoint.path.replace("original-tenant-id", idpCredentials.tenantId), idpEndpointSlot.captured.path)
+        assertEquals(configWithOriginalEndpoint.idpEndpoint.path.replace("original-tenant-id", idpCredentials.tenantId.tenantId), idpEndpointSlot.captured.path)
     }
 
     companion object {
@@ -514,10 +515,10 @@ internal class WebOperationsTest {
             ),
             filesInProgressCacheSize = DataSize.ofMegabytes(1L),
             idpCredentials = IdpCredentials(
-                tenantId = TenantId("fake-tenant-id"),
+                tenantId = TenantId(DomainObjects.TenantId.LOCALHOST.tenantId),
                 clientId = ClientId("fake-client-id"),
                 clientSecret = ClientSecret("fake-client-secret"),
-                scope = Scope("scope1"),
+                scope = Scope(DomainObjects.OAuthScope.LOCALHOST.scope),
                 renewCredential = RenewCredential.ENABLED,
                 maxCredentialAge = Duration.ofDays(30),
                 lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),

@@ -4,6 +4,7 @@ package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DomainObjects
+import com.swisscom.health.des.cdr.client.common.DomainObjects.ApiEndpoint
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
@@ -559,7 +560,7 @@ internal class ConfigValidationServiceTest {
             val service = ConfigValidationService(config)
             val result = service.validateAllConfigurationItems(config.toDto())
             assertInstanceOf<DTOs.ValidationResult.Failure>(result)
-            val details = result.validationDetails.mapNotNull { it as? DTOs.ValidationDetail.PathDetail }
+            val details = result.validationDetails.filterIsInstance<DTOs.ValidationDetail.PathDetail>()
             val failedPaths = details.map { it.path }
             assertTrue(failedPaths.contains("relative/source"))
             assertTrue(failedPaths.contains("relative/target"))
@@ -609,6 +610,52 @@ internal class ConfigValidationServiceTest {
         assertEquals(DTOs.ValidationMessageKey.NOT_A_DIRECTORY, configItemDetail.messageKey)
     }
 
+    @Test
+    fun `test validation error if cdr-api is illegal host`() {
+        val config = createCdrClientConfig(blueSkyConnectors()).run {
+            copy(
+                cdrApi = cdrApi.copy(
+                    host = Host("illegal host!")
+                )
+            )
+        }
+        val service = ConfigValidationService(config)
+        val result = service.validateAllConfigurationItems(config.toDto())
+
+        assertInstanceOf<DTOs.ValidationResult.Failure>(result)
+        assertEquals(1, result.validationDetails.size)
+
+        val validationDetail = result.validationDetails.first()
+        assertInstanceOf<DTOs.ValidationDetail.ConfigItemDetail>(validationDetail)
+        assertEquals(DomainObjects.ConfigurationItem.CDR_API_HOST, validationDetail.configItem)
+        assertEquals(DTOs.ValidationMessageKey.ILLEGAL_VALUE, validationDetail.messageKey)
+
+    }
+
+    @Test
+    fun `test validation error if cdr-api host and-or scope and-or tenant are from different environments`() {
+        val config = createCdrClientConfig(blueSkyConnectors()).run {
+            copy(
+                cdrApi = cdrApi.copy(
+                    // tenant id and scope are for localhost -> mismatch with cdr api endpoint
+                    host = Host(ApiEndpoint.PRODUCTION.host),
+                    port = ApiEndpoint.PRODUCTION.port,
+                    scheme = ApiEndpoint.PRODUCTION.protocol
+                )
+            )
+        }
+        val service = ConfigValidationService(config)
+        val result = service.validateAllConfigurationItems(config.toDto())
+
+        assertInstanceOf<DTOs.ValidationResult.Failure>(result)
+        assertEquals(1, result.validationDetails.size)
+
+        val validationDetail = result.validationDetails.first()
+        assertInstanceOf<DTOs.ValidationDetail.ConfigItemDetail>(validationDetail)
+        assertEquals(DomainObjects.ConfigurationItem.CDR_API_HOST, validationDetail.configItem)
+        assertEquals(DTOs.ValidationMessageKey.ILLEGAL_VALUE_COMBINATION, validationDetail.messageKey)
+    }
+
     private fun createCdrClientConfig(customers: List<Connector>, defaultLocalFolder: Path = localFolder0): CdrClientConfig =
         CdrClientConfig(
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
@@ -632,10 +679,10 @@ internal class ConfigValidationServiceTest {
             retryDelay = listOf(Duration.ofSeconds(1)),
             filesInProgressCacheSize = DataSize.ofMegabytes(1),
             idpCredentials = IdpCredentials(
-                tenantId = TenantId("fake-tenant-id"),
+                tenantId = TenantId(DomainObjects.TenantId.LOCALHOST.tenantId),
                 clientId = ClientId("fake-client-id"),
                 clientSecret = ClientSecret("fake-client-secret"),
-                scope = Scope("CDR"),
+                scope = Scope(DomainObjects.OAuthScope.LOCALHOST.scope),
                 renewCredential = RenewCredential(true),
                 lastCredentialRenewalTime = BEGINNING_OF_TIME,
             ),

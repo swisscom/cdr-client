@@ -228,7 +228,7 @@ internal class CdrConfigViewModel(
         }
     }
 
-    fun setIdpCredentialsScope(scope: String) {
+    fun setIdpCredentialsScope(scope: DomainObjects.OAuthScope) {
         logger.debug { "setIdpCredentialsScope" }
         _uiState.update {
             it.copy(
@@ -262,7 +262,7 @@ internal class CdrConfigViewModel(
      *
      * @param id The IDP tenant ID to use.
      */
-    fun setIdpTenantId(id: String) {
+    fun setIdpTenantId(id: DomainObjects.TenantId) {
         logger.debug { "setTenantId: '$id'" }
         _uiState.update {
             it.copy(

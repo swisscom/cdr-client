@@ -1,6 +1,7 @@
 package com.swisscom.health.des.cdr.client.config
 
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.xml.DocumentType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -42,10 +43,10 @@ class ConfigConverterTest {
         ),
         filesInProgressCacheSize = DataSize.ofMegabytes(1L),
         idpCredentials = IdpCredentials(
-            tenantId = TenantId("fake-tenant-id"),
+            tenantId = TenantId(DomainObjects.TenantId.LOCALHOST.tenantId),
             clientId = ClientId("fake-client-id"),
             clientSecret = ClientSecret("fake-client-secret"),
-            scope = Scope("scope1"),
+            scope = Scope(DomainObjects.OAuthScope.LOCALHOST.scope),
             renewCredential = RenewCredential.ENABLED,
             maxCredentialAge = Duration.ofDays(30),
             lastCredentialRenewalTime = LastCredentialRenewalTime(LAST_UPDATED_AT),
@@ -104,10 +105,10 @@ class ConfigConverterTest {
         ),
         filesInProgressCacheSize = DataSize.ofMegabytes(1L),
         idpCredentials = IdpCredentials(
-            tenantId = TenantId("fake-tenant-id"),
+            tenantId = TenantId(DomainObjects.TenantId.LOCALHOST.tenantId),
             clientId = ClientId("fake-client-id"),
             clientSecret = ClientSecret("fake-client-secret"),
-            scope = Scope("scope1"),
+            scope = Scope(DomainObjects.OAuthScope.LOCALHOST.scope),
             renewCredential = RenewCredential.ENABLED,
             maxCredentialAge = Duration.ofDays(30),
             lastCredentialRenewalTime = LastCredentialRenewalTime(LAST_UPDATED_AT),

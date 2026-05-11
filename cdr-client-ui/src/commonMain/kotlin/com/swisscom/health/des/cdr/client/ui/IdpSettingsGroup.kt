@@ -21,8 +21,6 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_client_id_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_client_secret
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_client_secret_placeholder
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_tenant_id
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_tenant_id_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_validate
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_validate_idp_credentials_info
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.message_loading_initial_config
@@ -53,23 +51,6 @@ internal fun IdpSettingsGroup(
             Text(text = stringResource(Res.string.message_loading_initial_config))
             Divider(modifier = modifier.padding(bottom = 8.dp))
         } else {
-            // Tenant ID
-            var tenantIdValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-            LaunchedEffect(uiState.clientServiceConfig.idpCredentials.tenantId) {
-                tenantIdValidationResult =
-                    remoteViewValidations.validateNotBlank(uiState.clientServiceConfig.idpCredentials.tenantId, DomainObjects.ConfigurationItem.IDP_TENANT_ID)
-            }
-            ValidatedTextField(
-                name = DomainObjects.ConfigurationItem.IDP_TENANT_ID,
-                modifier = modifier.fillMaxWidth(),
-                validatable = { tenantIdValidationResult },
-                label = { Text(text = stringResource(Res.string.label_client_idp_settings_tenant_id)) },
-                placeHolder = { Text(text = stringResource(Res.string.label_client_idp_settings_tenant_id_placeholder)) },
-                value = uiState.clientServiceConfig.idpCredentials.tenantId,
-                onValueChange = { if (canEdit) viewModel.setIdpTenantId(it) },
-                enabled = canEdit,
-            )
-
             // Client ID
             var clientIdValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
             LaunchedEffect(uiState.clientServiceConfig.idpCredentials.clientId) {

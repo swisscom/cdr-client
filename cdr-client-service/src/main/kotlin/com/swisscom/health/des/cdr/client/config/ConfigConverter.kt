@@ -78,10 +78,10 @@ internal fun Endpoint.toDto(): DomainObjects.ApiEndpoint =
 
 internal fun IdpCredentials.toDto(): DTOs.CdrClientConfig.IdpCredentials =
     DTOs.CdrClientConfig.IdpCredentials(
-        tenantId = tenantId.id,
+        tenantId = DomainObjects.TenantId.fromTenantId(tenantId.id),
         clientId = clientId.id,
         clientSecret = if (clientSecret == ClientSecret.NO_SECRET) clientSecret.value else ClientSecret.MASKED_SECRET.value,
-        scope = scope.scope,
+        scope = DomainObjects.OAuthScope.fromScope(scope.scope),
         renewCredential = renewCredential.value,
         maxCredentialAge = maxCredentialAge,
         lastCredentialRenewalTime = lastCredentialRenewalTime.instant,
@@ -190,10 +190,10 @@ internal inline fun <reified T : Endpoint> DomainObjects.ApiEndpoint.toCdrClient
 
 internal fun DTOs.CdrClientConfig.IdpCredentials.toCdrClientConfig(): IdpCredentials =
     IdpCredentials(
-        tenantId = TenantId(tenantId),
+        tenantId = TenantId(tenantId.tenantId),
         clientId = ClientId(clientId),
         clientSecret = ClientSecret(clientSecret),
-        scope = Scope(scope),
+        scope = Scope(scope.scope),
         renewCredential = RenewCredential(renewCredential),
         maxCredentialAge = maxCredentialAge,
         lastCredentialRenewalTime = LastCredentialRenewalTime(lastCredentialRenewalTime),
