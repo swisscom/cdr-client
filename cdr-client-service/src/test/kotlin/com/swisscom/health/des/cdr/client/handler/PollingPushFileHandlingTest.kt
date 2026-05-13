@@ -444,7 +444,7 @@ internal class PollingPushFileHandlingTest {
     }
 
     @Test
-    fun `test successfully write two files to API fail with third CONFLICT - no separate error directory, rename file`() {
+    fun `test successfully write two files to API fail with third TEAPOT - no separate error directory, rename file`() {
         val mockResponse = MockResponse.Builder()
             .code(HttpStatus.OK.value())
             .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
@@ -455,7 +455,7 @@ internal class PollingPushFileHandlingTest {
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.CONFLICT.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.I_AM_A_TEAPOT.value()).body("{\"message\": \"Exception\"}").build())
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
 

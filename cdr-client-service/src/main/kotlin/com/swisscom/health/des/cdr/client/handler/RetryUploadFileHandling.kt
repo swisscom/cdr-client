@@ -79,7 +79,7 @@ internal class RetryUploadFileHandling(
 
                     is UploadDocumentResult.UploadClientRetryableErrorResponse -> {
                         logger.error {
-                            "File synchronization failed for '${uploadFile.fileName}'. Received a 4xx client error (response code: '${response.code}'). " +
+                            "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
                                     "Retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}'"
                         }
                         true
@@ -87,7 +87,7 @@ internal class RetryUploadFileHandling(
 
                     is UploadDocumentResult.UploadClientConfigNonRetryableErrorResponse -> {
                         logger.error {
-                            "File synchronization failed for '${uploadFile.fileName}'. Received a 4xx client error (response code: '${response.code}'). " +
+                            "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
                                     "The file extension will be modified and it will be retried after the next restart."
                         }
                         renameFileToFail(uploadFile)
@@ -96,7 +96,7 @@ internal class RetryUploadFileHandling(
 
                     is UploadDocumentResult.UploadClientErrorResponse -> {
                         logger.error {
-                            "File synchronization failed for '${uploadFile.fileName}'. Received a 4xx client error (response code: '${response.code}'). " +
+                            "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
                                     "No retry will be attempted and the file will be moved to the error directory due to client-side issue."
                         }
                         renameFileToErrorAndCreateLogFile(uploadFile, response.responseBody)
@@ -105,16 +105,16 @@ internal class RetryUploadFileHandling(
 
                     is UploadDocumentResult.UploadServerErrorResponse -> {
                         logger.error {
-                            "Failed to sync file '${uploadFile.fileName}', retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}' - " +
-                                    "server response: '${response.responseBody}'"
+                            "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
+                                    "Retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}' - server response:\n'${response.responseBody}'"
                         }
                         true
                     }
 
                     is UploadDocumentResult.UploadError -> {
                         logger.error {
-                            "Failed to sync file '${uploadFile.fileName}', retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}' - " +
-                                    "exception message: '${response.t?.message}'"
+                            "File synchronization failed for '${uploadFile.fileName}'. No server response is available. " +
+                                    "Retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}' - exception message: '${response.t?.message}'"
                         }
                         true
                     }

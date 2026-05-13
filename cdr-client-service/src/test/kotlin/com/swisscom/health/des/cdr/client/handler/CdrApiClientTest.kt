@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
@@ -25,11 +26,14 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import org.springframework.http.ProblemDetail
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
@@ -63,6 +67,9 @@ internal class CdrApiClientTest {
 
     @Autowired
     private lateinit var cdrApiClient: CdrApiClient
+
+    @Autowired
+    private lateinit var objectMapper: ObjectMapper
 
     @TempDir
     private lateinit var sourceDir: Path
@@ -167,10 +174,15 @@ internal class CdrApiClientTest {
         assertEquals(4, apiServerMock.requestCount)
     }
 
-    @Test
-    fun `test document upload - status 202`() {
+    @ParameterizedTest
+    @CsvSource(
+        "200",
+        "201",
+        "202",
+    )
+    fun `test document upload - status 2xx`(successStatus: Int) {
         val mockResponse = MockResponse.Builder()
-            .code(HttpStatus.ACCEPTED.value())
+            .code(successStatus)
             .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
             .body("""{"message": "Upload successful"}""")
             .build()
@@ -198,6 +210,36 @@ internal class CdrApiClientTest {
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).startsWith("Bearer "))
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).removePrefix("Bearer ").isNotBlank())
 
+        assertEquals(1, apiServerMock.requestCount)
+    }
+
+    @Test
+    fun `test document upload - status 409`() {
+        val problemJsonStr = objectMapper.writeValueAsString(
+            ProblemDetail.forStatus(HttpStatus.CONFLICT.value())
+                .run {
+                    title = HttpStatus.CONFLICT.reasonPhrase
+                }
+        )
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.CONFLICT.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_PROBLEM_JSON_VALUE).build())
+            .body(problemJsonStr)
+            .build()
+        apiServerMock.enqueue(mockResponse)
+
+        val testFile: Path = sourceDir.resolve("test-file.txt").apply { writeText("test content") }
+
+        val result: CdrApiClient.UploadDocumentResult = cdrApiClient.uploadDocument(
+            contentType = "application/forumdatenaustausch+xml;charset=UTF-8",
+            file = testFile,
+            connectorId = "test-connector-id",
+            mode = CdrClientConfig.Mode.TEST,
+            traceId = DEFAULT_TRACE_ID
+        )
+
+        // 409 is a "derived success" as the status code implies that the document has successfully been uploaded in a previous attempt
+        assertInstanceOf<CdrApiClient.UploadDocumentResult.Success>(result) { "CdrApiClient.UploadDocumentResult.Success expected but got $result" }
         assertEquals(1, apiServerMock.requestCount)
     }
 
