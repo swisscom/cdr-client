@@ -3,7 +3,7 @@ import org.gradle.kotlin.dsl.withType
 import org.gradle.api.GradleException
 
 allprojects {
-    version = "5.3.0"
+    version = "5.3.1-SNAPSHOT"
 }
 
 plugins {
