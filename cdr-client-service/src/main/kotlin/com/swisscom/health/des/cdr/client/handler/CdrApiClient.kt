@@ -38,7 +38,7 @@ internal class CdrApiClient(
     @param:Qualifier("retryIoAndServerErrors")
     private val retryIOExceptionsAndServerErrors: RetryTemplate,
     private val objectMapper: ObjectMapper,
-    private val osInformation: String
+    private val osInformation: String,
 ) {
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
@@ -154,7 +154,7 @@ internal class CdrApiClient(
      * @param traceId the trace id to propagate upstream for log correlation
      * @return the result of the HTTP post translated into a [UploadDocumentResult]
      */
-    @Suppress("MagicNumber")
+    @Suppress("MagicNumber", "CyclomaticComplexMethod")
     fun uploadDocument(contentType: String, file: Path, connectorId: String, mode: CdrClientConfig.Mode, traceId: String): UploadDocumentResult =
         runCatching {
             logger.debug { "Upload '$file' start" }
@@ -171,6 +171,13 @@ internal class CdrApiClient(
                     when {
                         response.isSuccessful -> UploadDocumentResult.Success.also { _ ->
                             logger.debug { "Upload '$file' done" }
+                        }
+
+                        response.code == HttpStatus.CONFLICT.value() -> UploadDocumentResult.Success.also { _ ->
+                            logger.info {
+                                "Upload of '$file' failed with status code '${HttpStatus.CONFLICT}'; " +
+                                        "upload will be treated as a success, as a another copy of the document has already been uploaded."
+                            }
                         }
 
                         response.code == HttpStatus.BAD_REQUEST.value() -> UploadDocumentResult.UploadClientErrorResponse(

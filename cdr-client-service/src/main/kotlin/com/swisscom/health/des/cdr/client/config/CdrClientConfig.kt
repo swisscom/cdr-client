@@ -537,7 +537,7 @@ internal value class ClientId(val id: String) : PropertyNameAware {
 }
 
 @JvmInline
-internal value class ClientSecret private constructor (val value: String) : PropertyNameAware {
+internal value class ClientSecret private constructor(val value: String) : PropertyNameAware {
     override val propertyName: String
         get() = PROPERTY_NAME
 

@@ -84,6 +84,7 @@
     <!-- Tooltips -->
 
     <!-- Error messages -->
+    <string name="error_client_internal_error">An internal error occurred in the client. Details:\n%1$s</string>
     <string name="error_client_communication">Failed to communicate with the client service. Details:\n%1$s</string>
     <string name="error_client_configuration">There is an error in your config. Check the UI for remarks</string>
     <string name="error_client_validation">curaLINE client reported an error. Details:\n%1$s</string>
@@ -108,4 +109,5 @@
     <string name="error_proxy_url_must_start_with_http_or_https">Proxy URL must start with http:// or https://</string>
     <string name="error_proxy_url_invalid_format">Invalid proxy URL format</string>
     <string name="error_illegal_value">Value is not valid/can't be used here</string>
+    <string name="error_illegal_value_combination">The combination of values is not valid</string>
 </resources>

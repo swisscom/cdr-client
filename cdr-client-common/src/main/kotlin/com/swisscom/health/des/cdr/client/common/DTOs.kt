@@ -114,6 +114,7 @@ class DTOs {
         NOT_A_DIRECTORY,
         DIRECTORY_NOT_FOUND,
         ILLEGAL_VALUE,
+        ILLEGAL_VALUE_COMBINATION,
         NOT_READ_WRITABLE,
         LOCAL_DIR_OVERLAPS_WITH_SOURCE_DIRS,
         LOCAL_DIR_OVERLAPS_WITH_TARGET_DIRS,
@@ -193,7 +194,7 @@ class DTOs {
     data class CdrClientConfig(
         val fileSynchronizationEnabled: Boolean,
         val customer: List<Connector>,
-        val cdrApi: Endpoint,
+        val cdrApi: DomainObjects.ApiEndpoint,
         val filesInProgressCacheSize: String,
         val idpCredentials: IdpCredentials,
         val idpEndpoint: URL,
@@ -202,7 +203,6 @@ class DTOs {
         val pushThreadPoolSize: Int,
         val retryDelay: List<Duration>,
         val scheduleDelay: Duration,
-        val credentialApi: Endpoint,
         val retryTemplate: RetryTemplateConfig,
         val fileBusyTestInterval: Duration,
         val fileBusyTestTimeout: Duration,
@@ -217,7 +217,7 @@ class DTOs {
             val EMPTY = CdrClientConfig(
                 fileSynchronizationEnabled = false,
                 customer = emptyList(),
-                cdrApi = Endpoint.EMPTY,
+                cdrApi = DomainObjects.ApiEndpoint.PRODUCTION,
                 filesInProgressCacheSize = EMPTY_STRING,
                 idpCredentials = IdpCredentials.EMPTY,
                 idpEndpoint = URI("http://localhost").toURL(),
@@ -226,7 +226,6 @@ class DTOs {
                 pushThreadPoolSize = 0,
                 retryDelay = emptyList(),
                 scheduleDelay = Duration.ZERO,
-                credentialApi = Endpoint.EMPTY,
                 fileBusyTestInterval = Duration.ZERO,
                 fileBusyTestTimeout = Duration.ZERO,
                 fileBusyTestStrategy = FileBusyTestStrategy.NEVER_BUSY,
@@ -298,29 +297,11 @@ class DTOs {
         }
 
         @Serializable
-        data class Endpoint(
-            val scheme: String,
-            val host: String,
-            val port: Int,
-            val basePath: String,
-        ) {
-            companion object {
-                @JvmStatic
-                val EMPTY = Endpoint(
-                    scheme = EMPTY_STRING,
-                    host = EMPTY_STRING,
-                    port = 0,
-                    basePath = EMPTY_STRING
-                )
-            }
-        }
-
-        @Serializable
         data class IdpCredentials(
-            val tenantId: String,
+            val tenantId: DomainObjects.TenantId,
             val clientId: String,
             val clientSecret: String,
-            val scope: String,
+            val scope: DomainObjects.OAuthScope,
             val renewCredential: Boolean,
             val maxCredentialAge: Duration,
             val lastCredentialRenewalTime: Instant,
@@ -328,10 +309,10 @@ class DTOs {
             companion object {
                 @JvmStatic
                 val EMPTY = IdpCredentials(
-                    tenantId = EMPTY_STRING,
+                    tenantId = DomainObjects.TenantId.PRODUCTION,
                     clientId = EMPTY_STRING,
                     clientSecret = EMPTY_STRING,
-                    scope = EMPTY_STRING,
+                    scope = DomainObjects.OAuthScope.PRODUCTION,
                     renewCredential = false,
                     maxCredentialAge = Duration.ZERO,
                     lastCredentialRenewalTime = Instant.EPOCH

@@ -4,6 +4,7 @@ import com.mayakapps.kache.ObjectKache
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
+import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
@@ -106,17 +107,23 @@ internal class PollingPushFileHandlingTest {
         val targetDir0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
 
         every { config.localFolder } returns TempDownloadDir(inflightDir)
+        // 1st call is made by validator, which expects the port to be set to 87; subsequent calls need to know the actual port
         every { config.cdrApi } returns CdrApi(
+            host = Host("localhost"),
+            basePath = "documents",
+            scheme = "http",
+            port = 87,
+        ) andThen CdrApi(
             host = Host(cdrServiceMock.hostName),
             basePath = "documents",
             scheme = "http",
             port = cdrServiceMock.port,
         )
         every { config.idpCredentials } returns IdpCredentials(
-            tenantId = TenantId("fake-tenant-id"),
+            tenantId = TenantId(DomainObjects.TenantId.LOCALHOST.tenantId),
             clientId = ClientId("test-client-id"),
             clientSecret = ClientSecret("test-client-secret"),
-            scope = Scope("https://dev.identity.health.swisscom.ch/CdrApi/.default"),
+            scope = Scope(DomainObjects.OAuthScope.LOCALHOST.scope),
             renewCredential = RenewCredential(false),
             maxCredentialAge = Duration.ofDays(365),
             lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
@@ -437,7 +444,7 @@ internal class PollingPushFileHandlingTest {
     }
 
     @Test
-    fun `test successfully write two files to API fail with third CONFLICT - no separate error directory, rename file`() {
+    fun `test successfully write two files to API fail with third TEAPOT - no separate error directory, rename file`() {
         val mockResponse = MockResponse.Builder()
             .code(HttpStatus.OK.value())
             .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
@@ -448,7 +455,7 @@ internal class PollingPushFileHandlingTest {
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.CONFLICT.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.I_AM_A_TEAPOT.value()).body("{\"message\": \"Exception\"}").build())
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
 

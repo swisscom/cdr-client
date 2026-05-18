@@ -4,6 +4,7 @@ package com.swisscom.health.des.cdr.client.config
 
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.RetryTemplateConfig
 import com.swisscom.health.des.cdr.client.xml.DocumentType
 import org.springframework.util.unit.DataSize
@@ -31,7 +32,6 @@ internal fun CdrClientConfig.toDto(): DTOs.CdrClientConfig {
         pushThreadPoolSize = pushThreadPoolSize,
         retryDelay = retryDelay,
         scheduleDelay = scheduleDelay,
-        credentialApi = credentialApi.toDto(),
         retryTemplate = retryTemplate.toDto(),
         fileBusyTestInterval = fileBusyTestInterval,
         fileBusyTestTimeout = fileBusyTestTimeout,
@@ -73,20 +73,15 @@ internal fun Connector.toDto(): DTOs.CdrClientConfig.Connector {
     )
 }
 
-internal fun Endpoint.toDto(): DTOs.CdrClientConfig.Endpoint =
-    DTOs.CdrClientConfig.Endpoint(
-        scheme = scheme,
-        host = host.fqdn,
-        port = port,
-        basePath = basePath
-    )
+internal fun Endpoint.toDto(): DomainObjects.ApiEndpoint =
+    DomainObjects.ApiEndpoint.fromEndpointParts(protocol = scheme, port = port, host = host.fqdn)
 
 internal fun IdpCredentials.toDto(): DTOs.CdrClientConfig.IdpCredentials =
     DTOs.CdrClientConfig.IdpCredentials(
-        tenantId = tenantId.id,
+        tenantId = DomainObjects.TenantId.fromTenantId(tenantId.id),
         clientId = clientId.id,
         clientSecret = if (clientSecret == ClientSecret.NO_SECRET) clientSecret.value else ClientSecret.MASKED_SECRET.value,
-        scope = scope.scope,
+        scope = DomainObjects.OAuthScope.fromScope(scope.scope),
         renewCredential = renewCredential.value,
         maxCredentialAge = maxCredentialAge,
         lastCredentialRenewalTime = lastCredentialRenewalTime.instant,
@@ -122,7 +117,8 @@ internal fun DTOs.CdrClientConfig.toCdrClientConfig(): CdrClientConfig {
         pushThreadPoolSize = pushThreadPoolSize,
         retryDelay = retryDelay,
         scheduleDelay = scheduleDelay,
-        credentialApi = credentialApi.toCdrClientConfig(CredentialApi::class),
+        // the credential-api endpoint is always the same as the cdr-api endpoint, only the path differs
+        credentialApi = cdrApi.toCdrClientConfig(CredentialApi::class),
         retryTemplate = retryTemplate.toCdrClientConfig(),
         fileBusyTestInterval = fileBusyTestInterval,
         fileBusyTestTimeout = fileBusyTestTimeout,
@@ -172,20 +168,20 @@ internal fun DTOs.CdrClientConfig.Connector.toCdrClientConfig(): Connector {
     )
 }
 
-internal inline fun <reified T : Endpoint> DTOs.CdrClientConfig.Endpoint.toCdrClientConfig(type: KClass<T>): T =
+internal inline fun <reified T : Endpoint> DomainObjects.ApiEndpoint.toCdrClientConfig(type: KClass<T>): T =
     when (type) {
         CdrApi::class -> CdrApi(
-            scheme = scheme,
+            scheme = protocol,
             host = Host(host),
             port = port,
-            basePath = basePath
+            basePath = "api/documents"
         )
 
         CredentialApi::class -> CredentialApi(
-            scheme = scheme,
+            scheme = protocol,
             host = Host(host),
             port = port,
-            basePath = basePath
+            basePath = "api/client-credentials"
         )
 
         else -> error("Unrecognized endpoint: $type")
@@ -194,10 +190,10 @@ internal inline fun <reified T : Endpoint> DTOs.CdrClientConfig.Endpoint.toCdrCl
 
 internal fun DTOs.CdrClientConfig.IdpCredentials.toCdrClientConfig(): IdpCredentials =
     IdpCredentials(
-        tenantId = TenantId(tenantId),
+        tenantId = TenantId(tenantId.tenantId),
         clientId = ClientId(clientId),
         clientSecret = ClientSecret(clientSecret),
-        scope = Scope(scope),
+        scope = Scope(scope.scope),
         renewCredential = RenewCredential(renewCredential),
         maxCredentialAge = maxCredentialAge,
         lastCredentialRenewalTime = LastCredentialRenewalTime(lastCredentialRenewalTime),

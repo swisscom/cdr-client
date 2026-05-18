@@ -3,6 +3,7 @@ package com.swisscom.health.des.cdr.client.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_client_communication
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_client_configuration
@@ -158,18 +159,16 @@ internal class CdrConfigViewModel(
     }
 
     /**
-     * Sets the CDR API host in the client service configuration.
+     * Sets the CDR API endpoint in the client service configuration.
      *
-     * @param host The (fully qualified) host name of the CDR API.
+     * @param apiEndpoint Enum representing one of the accepted API endpoints.
      */
-    fun setCdrApiHost(host: String) {
-        logger.debug { "setCdrApiHost: '$host'" }
+    fun setCdrApiEndpoint(apiEndpoint: DomainObjects.ApiEndpoint) {
+        logger.debug { "setCdrApiHost: '$apiEndpoint'" }
         _uiState.update {
             it.copy(
                 clientServiceConfig = it.clientServiceConfig.copy(
-                    cdrApi = it.clientServiceConfig.cdrApi.copy(
-                        host = host
-                    )
+                    cdrApi = apiEndpoint
                 )
             )
         }
@@ -229,7 +228,7 @@ internal class CdrConfigViewModel(
         }
     }
 
-    fun setIdpCredentialsScope(scope: String) {
+    fun setIdpCredentialsScope(scope: DomainObjects.OAuthScope) {
         logger.debug { "setIdpCredentialsScope" }
         _uiState.update {
             it.copy(
@@ -263,7 +262,7 @@ internal class CdrConfigViewModel(
      *
      * @param id The IDP tenant ID to use.
      */
-    fun setIdpTenantId(id: String) {
+    fun setIdpTenantId(id: DomainObjects.TenantId) {
         logger.debug { "setTenantId: '$id'" }
         _uiState.update {
             it.copy(
@@ -452,7 +451,7 @@ internal class CdrConfigViewModel(
     private fun updateDocTypeDirs(
         connector: DTOs.CdrClientConfig.Connector,
         docTypeDirs: DTOs.CdrClientConfig.Connector.DocTypeFolders,
-        docType: DTOs.CdrClientConfig.DocumentType
+        docType: DTOs.CdrClientConfig.DocumentType,
     ): DTOs.CdrClientConfig.Connector {
         logger.debug { "updateDocTypeDirs: '$docTypeDirs'" }
         val updatedConnector: DTOs.CdrClientConfig.Connector =
