@@ -46,7 +46,7 @@ internal fun ProxyConfig.toDto(): DTOs.CdrClientConfig.ProxyConfig =
     DTOs.CdrClientConfig.ProxyConfig(
         url = url.value,
         username = username.value,
-        password = password.value,
+        password = if (password == ProxyPassword.NO_PASSWORD) password.value else ProxyPassword.MASKED_PASSWORD.value,
     )
 
 internal fun Connector.toDto(): DTOs.CdrClientConfig.Connector {
