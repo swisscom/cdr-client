@@ -14,6 +14,7 @@ import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientSecret
 import com.swisscom.health.des.cdr.client.config.PropertyNameAware
+import com.swisscom.health.des.cdr.client.config.ProxyPassword
 import com.swisscom.health.des.cdr.client.config.toDto
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.origin.Origin
@@ -128,8 +129,9 @@ internal class ConfigurationWriter(
                     .filter { updatableConfigItem ->
                         updatableConfigItem.newValue != updatableConfigItem.currentValue &&
                                 // ignore masked values; the mask must not be written back to the configuration;
-                                // right now the only masked value is the OAuth client secret
-                                updatableConfigItem.newValue != ClientSecret.MASKED_SECRET
+                                // right now the only masked values are the OAuth client secret and the proxy password
+                                updatableConfigItem.newValue != ClientSecret.MASKED_SECRET &&
+                                updatableConfigItem.newValue != ProxyPassword.MASKED_PASSWORD
                     }.filter { changedConfigItem ->
                         (changedConfigItem is UpdatableConfigurationItem.WritableSource)
                             .also { isWritable ->

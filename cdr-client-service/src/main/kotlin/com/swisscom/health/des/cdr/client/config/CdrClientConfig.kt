@@ -546,10 +546,6 @@ internal value class ClientSecret private constructor(val value: String) : Prope
     companion object {
         private const val PROPERTY_NAME = "client-secret"
 
-        private const val MASKED_VALUE = "*********"
-
-        private const val MASK_CHAR = '*'
-
         @JvmStatic
         val NO_SECRET = ClientSecret(value = EMPTY_STRING)
 
@@ -562,8 +558,6 @@ internal value class ClientSecret private constructor(val value: String) : Prope
                 value.isAllAsterisks() -> MASKED_SECRET
                 else -> ClientSecret(value)
             }
-
-        private fun String.isAllAsterisks(): Boolean = isNotEmpty() && all { it == MASK_CHAR }
     }
 }
 
@@ -627,14 +621,27 @@ internal value class ProxyUsername(val value: String) : PropertyNameAware {
 }
 
 @JvmInline
-internal value class ProxyPassword(val value: String) : PropertyNameAware {
+internal value class ProxyPassword private constructor(val value: String) : PropertyNameAware {
     override val propertyName: String
         get() = PROPERTY_NAME
 
-    override fun toString(): String = "********"
+    override fun toString(): String = MASKED_VALUE
 
     companion object {
         private const val PROPERTY_NAME = "password"
+
+        @JvmStatic
+        val NO_PASSWORD = ProxyPassword(value = EMPTY_STRING)
+
+        @JvmStatic
+        val MASKED_PASSWORD = ProxyPassword(value = MASKED_VALUE)
+
+        operator fun invoke(value: String): ProxyPassword =
+            when {
+                value.isBlank() -> NO_PASSWORD
+                value.isAllAsterisks() -> MASKED_PASSWORD
+                else -> ProxyPassword(value)
+            }
     }
 }
 
@@ -642,6 +649,10 @@ internal value class ProxyPassword(val value: String) : PropertyNameAware {
 // END - Value classes for ProxyConfig properties
 //
 
+private const val MASKED_VALUE = "*********"
+private const val MASK_CHAR = '*'
+
+private fun String.isAllAsterisks(): Boolean = isNotEmpty() && all { it == MASK_CHAR }
 
 internal fun List<Connector>.getConnectorForSourceFile(file: Path): Connector =
     this.first { it.sourceFolder == file.parent || it.getAllSourceDocTypeFolders().contains(file.parent) }
