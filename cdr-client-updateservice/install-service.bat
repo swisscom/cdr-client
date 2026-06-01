@@ -1,34 +1,14 @@
 @echo off
 setlocal enabledelayedexpansion
-REM Install curaLINEClientWatchdog Service
-REM Run this script as Administrator
+REM Installation script for curaLINE Client Update Service
+REM Run this script as Administrator after installing the main curaLINE Client
 
 REM Configuration - change this to customize the service name
-set SERVICE_NAME=CDRClientWatchdog
-set DISPLAY_NAME=curaLINE Client Service
-set DESCRIPTION=Monitors and restarts curaLINE Client service when it fails
+set SERVICE_NAME=curaLINEClientUpdateService
+set DISPLAY_NAME=curaLINE Client Update Service
+set DESCRIPTION=Automatically manages updates for curaLINE Client on Windows Server
 
 echo Installing !DISPLAY_NAME!...
-
-REM Determine the correct path to CdrClientWatchdog.exe
-REM Check if it's in the current directory (manual installation)
-if exist "%~dp0CdrClientWatchdog.exe" (
-    set "WATCHDOG_PATH=%~dp0CdrClientWatchdog.exe"
-    echo Detected manual installation: using !WATCHDOG_PATH!
-) else if exist "%~dp0watchdog\CdrClientWatchdog.exe" (
-    REM Check if it's in the watchdog subdirectory (Conveyor installation)
-    set "WATCHDOG_PATH=%~dp0watchdog\CdrClientWatchdog.exe"
-    echo Detected Conveyor installation: using !WATCHDOG_PATH!
-) else (
-    echo ERROR: CdrClientWatchdog.exe not found!
-    echo Looked in:
-    echo   - %~dp0CdrClientWatchdog.exe
-    echo   - %~dp0watchdog\CdrClientWatchdog.exe
-    echo.
-    echo Please ensure CdrClientWatchdog.exe is in the correct location.
-    pause
-    exit /b 1
-)
 
 REM Stop service if it exists
 sc stop "!SERVICE_NAME!" >nul 2>&1
@@ -38,18 +18,20 @@ sc delete "!SERVICE_NAME!" >nul 2>&1
 
 REM Create the service
 sc create "!SERVICE_NAME!" ^
-    binPath= "\"!WATCHDOG_PATH!\" --service-name !SERVICE_NAME!" ^
+    binPath= "\"%~dp0CuraLineClientUpdateService.exe\" --service-name !SERVICE_NAME!" ^
     start= auto ^
     DisplayName= "!DISPLAY_NAME!"
 
 set "WAIT_SECONDS=7"
 
-if %ERRORLEVEL% == 0 (
+echo Wait set %ERRORLEVEL%
+
+if !ERRORLEVEL! == 0 (
     echo Service installed successfully.
 
     echo Add description to service...
-    sc description !SERVICE_NAME! !DESCRIPTION!
-    
+    sc description !SERVICE_NAME! "!DESCRIPTION!"
+
     REM Start the service
     echo Starting service...
     sc start !SERVICE_NAME! >nul 2>&1

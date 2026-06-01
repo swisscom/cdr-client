@@ -24,6 +24,14 @@ If the UI is running during an update it needs to be restarted manually to refle
 * **Linux** (Debian): A custom apt repository is added to your system, and the software is installed from it. Updates can be managed through the standard package manager (apt update/upgrade commands).
 * **MacOS**: Auto updates in the background or during startup. The UI (and therefore the client service) need to be manually restarted to reflect the changes.
 
+#### Windows Server Advanced Installation
+For Windows Server environments (especially 2019 version that don't support MSIX), a dedicated **Update Service** handles automatic updates:
+   * Downloads JAR artifacts from GitHub releases (default: every 2 hours, configurable)
+   * Manages service lifecycle (watchdog + CDR service)
+   * Fully automated - zero manual intervention for monthly updates
+   * See [Advanced Installation Guide](installation/WINDOWS_SERVER_ADVANCED_INSTALLATION_GUIDE.md) for setup instructions
+   * **Note**: Windows Server 2022 and newer should use the default MSIX installer instead
+
 ### Manual Installation - Jar only, no auto update
 If you want to run the client service without the UI and without auto updates, you can download the jar file directly.
 

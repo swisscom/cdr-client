@@ -1,6 +1,10 @@
 # CDR Client Watchdog Service
 
-This is a Windows service that monitors the CDR Client service (`cdr-client-service.exe`) and automatically restarts it when it exits with a non-zero exit code.
+This is a Windows service that monitors the CDR Client service and automatically restarts it when it exits with a non-zero exit code.
+
+The watchdog supports two execution modes:
+- **Executable Mode**: Monitors and runs `cdr-client-service.exe` (Windows 10/11 via Conveyor/MSIX)
+- **JAR Mode**: Monitors and runs the service as a Java JAR file (Windows Server (2019) advanced installation)
 
 ## Features
 
@@ -12,11 +16,41 @@ This is a Windows service that monitors the CDR Client service (`cdr-client-serv
 
 ## Configuration
 
-Edit `appsettings.json` to configure the watchdog behavior:
+Edit `appsettings.json` to configure the watchdog behavior.
 
+### Configuration Files
+
+- **`appsettings.json`**: Used for Conveyor/MSIX packaging (includes Conveyor-specific paths)
+- **`appsettings.release.json`**: Used for manual installation/GitHub releases (generic paths)
+
+When building with `./gradlew buildWatchdogRelease`, the release version is automatically copied to the output.
+
+### JAR Mode Configuration
+
+When running in JAR mode (Windows Server advanced installation), the CDR Client service requires:
+- Application configuration file (`application-customer.yaml`)
+- Logging configuration file (`logback-service.xml`)
+
+These paths must be configured in the `JavaArguments` setting. See [CONFIG_EXAMPLES.md](CONFIG_EXAMPLES.md) for details.
+
+**Example JAR Mode Configuration:**
 ```json
 {
-  "ServiceExecutablePath": "C:\\Program Files\\CDR Client\\cdr-client-service.exe",
+  "ServiceExecutionMode": "Jar",
+  "ServiceJarPath": "..\\..\\lib\\cdr-client-service.jar",
+  "JavaExecutablePath": "..\\..\\jre\\bin\\java.exe",
+  "JavaArguments": "-Xmx512m -Dspring.config.additional-location=C:/ProgramData/CDRClient/application-customer.yaml -Dlogging.config=C:/ProgramData/CDRClient/logback-service.xml -Dcdr.client.log.directory=C:/ProgramData/CDRClient/logs",
+  "RestartDelaySeconds": 5,
+  "HealthCheckIntervalSeconds": 30,
+  "MaxConsecutiveFailures": 5
+}
+```
+
+**Example Executable Mode Configuration:**
+```json
+{
+  "ServiceExecutionMode": "Executable",
+  "ServiceExecutablePath": "cdr-client-service.exe",
   "RestartDelaySeconds": 2,
   "HealthCheckIntervalSeconds": 30,
   "MaxConsecutiveFailures": 5
@@ -25,15 +59,25 @@ Edit `appsettings.json` to configure the watchdog behavior:
 
 ### Configuration Options
 
-- **ServiceExecutablePath**: Full path to the `cdr-client-service.exe` file
+**Common Settings:**
 - **RestartDelaySeconds**: Delay before restarting after a failure (default: 2 seconds)
 - **HealthCheckIntervalSeconds**: How often to check if the service is running (default: 30 seconds)
 - **MaxConsecutiveFailures**: Maximum number of consecutive failures before stopping the watchdog (default: 5)
 
+**For Executable Mode:**
+- **ServiceExecutionMode**: Set to `"Executable"` (default)
+- **ServiceExecutablePath**: Full path to the `cdr-client-service.exe` file
+
+**For JAR Mode:**
+- **ServiceExecutionMode**: Set to `"Jar"`
+- **ServiceJarPath**: Path to the service JAR file (e.g., `..\\..\\lib\\cdr-client-service.jar`)
+- **JavaExecutablePath**: Path to the Java executable (e.g., `..\\..\\jre\\bin\\java.exe`)
+- **JavaArguments**: Java command-line arguments, including Spring Boot configuration paths
+
 ## Installation
 
 ### Prerequisites
-- .NET 8.0 Runtime (Windows)
+- .NET 10 Runtime (Windows) - **Required** (this service is framework-dependent)
 - Administrator privileges
 
 ### Steps
@@ -42,6 +86,9 @@ Edit `appsettings.json` to configure the watchdog behavior:
    ```cmd
    build.bat
    ```
+   
+   Note: By default, builds as framework-dependent (requires .NET 10 runtime on target system).
+   For self-contained build (includes runtime): `build.bat true`
 
 2. **Deploy the files**:
    - Copy all files from the `publish` folder to your installation directory (e.g., `C:\Program Files\CDR Client\Watchdog\`)
@@ -86,11 +133,11 @@ Or use the Windows Services Manager (`services.msc`).
 
 ## How It Works
 
-1. The watchdog service starts and immediately launches the CDR Client service
-2. It monitors the CDR Client process every 30 seconds (configurable)
+1. The watchdog service starts and immediately launches the CDR Client service (either as executable or JAR)
+2. It monitors the CDR Client process at the configured health check interval (default: 30 seconds)
 3. If the CDR Client exits with code 0 (clean exit), the watchdog respects this and doesn't restart
-4. If the CDR Client exits with a non-zero code (error), the watchdog waits 5 seconds and restarts it
-5. If there are too many consecutive failures (5 by default), the watchdog stops to prevent endless loops
+4. If the CDR Client exits with a non-zero code (error), the watchdog waits for the configured restart delay and restarts it
+5. If there are too many consecutive failures (default: 5), the watchdog stops to prevent endless loops
 6. When the watchdog service is stopped, it gracefully shuts down the CDR Client service
 
 ## Integration with Conveyor
