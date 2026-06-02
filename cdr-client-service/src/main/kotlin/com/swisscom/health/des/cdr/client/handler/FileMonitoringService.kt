@@ -4,15 +4,15 @@ import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.TEMP_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.scheduling.BaseUploadScheduler.Companion.EXTENSION_XML
+import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.springframework.stereotype.Service
 import java.nio.file.Files
+import java.nio.file.Path
 import java.time.Instant
+import kotlin.concurrent.Volatile
 import kotlin.io.path.exists
 import kotlin.io.path.extension
 import kotlin.io.path.isDirectory
@@ -31,13 +31,15 @@ internal class FileMonitoringService(
     private val config: CdrClientConfig,
 ) {
     private val mutex = Mutex()
-    private val _monitoringStatus = MutableStateFlow(
-        DTOs.FileMonitoringStatusResponse(
-            errorFileCount = 0,
-            oldTempFileCount = 0
-        )
+
+    @Volatile
+    private var _monitoringStatus = DTOs.FileMonitoringStatusResponse(
+        errorFileCount = 0,
+        oldTempFileCount = 0
     )
-    val monitoringStatus: StateFlow<DTOs.FileMonitoringStatusResponse> = _monitoringStatus.asStateFlow()
+
+    val monitoringStatus: DTOs.FileMonitoringStatusResponse
+        get() = _monitoringStatus
 
     /**
      * Checks all error directories and the temporary directory for problematic files.
@@ -56,7 +58,7 @@ internal class FileMonitoringService(
                 oldTempFileCount = oldTempFileCount
             )
 
-            _monitoringStatus.value = newStatus
+            _monitoringStatus = newStatus
             logger.debug { "File monitoring check completed: $newStatus" }
         }
     }
@@ -67,18 +69,14 @@ internal class FileMonitoringService(
     private fun countErrorFiles(): Int =
         config.customer.map { connector ->
             runCatching {
-                val errorFolder = connector.getEffectiveSourceErrorFolder()
-                if (errorFolder.exists() && errorFolder.isDirectory()) {
-                    val count = Files.walk(errorFolder)
-                        .asSequence()
-                        .count { it.isRegularFile() && it.extension.lowercase() == EXTENSION_XML }
-                    if (count > 0) {
-                        logger.debug { "Found $count error file(s) in '${errorFolder}' for connector '${connector.connectorId}'" }
-                    }
-                    count
-                } else {
-                    0
-                }
+                DocumentType.entries
+                    .asSequence()
+                    .map { docType: DocumentType -> connector.getEffectiveSourceErrorFolder(docType) }
+                    .filter { errorFolder: Path -> errorFolder.exists() && errorFolder.isDirectory() }
+                    .flatMap { errorFolder: Path -> Files.walk(errorFolder).asSequence() }
+                    .distinct() // required because multiple document types might point to the same (default) error directory
+                    .count { file: Path -> file.isRegularFile() && file.extension.lowercase() == EXTENSION_XML }
+                    .also { errorCount -> logger.debug { "Found '$errorCount' error file(s) for connector '${connector.connectorId}'" } }
             }.getOrElse { t: Throwable ->
                 logger.warn { "Failed to check error folder for connector '${connector.connectorId}': ${t.message}" }
                 0
@@ -114,5 +112,3 @@ internal class FileMonitoringService(
         }
     }
 }
-
-

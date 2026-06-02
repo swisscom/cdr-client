@@ -119,7 +119,7 @@ internal class WebOperations(
         @RequestParam(name = "value") value: String?,
     ): ResponseEntity<List<DTOs.ValidationMessageKey>> = runCatching {
         logger.trace { "validating string value: '$value'" }
-        val validationResult: ValidationResult = configValidationService.validateIsNotBlankOrPlaceholder(value, DomainObjects.ConfigurationItem.UNKNOWN)
+        val validationResult: ValidationResult = configValidationService.validateIsNeitherBlankNorPlaceholder(value, DomainObjects.ConfigurationItem.UNKNOWN)
         ResponseEntity
             .ok(
                 if (validationResult is ValidationResult.Failure)
@@ -284,36 +284,39 @@ internal class WebOperations(
      * This endpoint updates the current CDR Client service configuration with the provided
      * [DTOs.CdrClientConfig] object.
      *
-     * @param config the new configuration to apply
+     * @param configDto the new configuration to apply
      * @return the configuration as it was received in the request body if the update was successful,
      * or a [WebOperationsAdvice.BadRequest] if the configuration is invalid
      */
     @PutMapping("api/service-configuration")
     internal suspend fun updateServiceConfiguration(
-        @RequestBody config: DTOs.CdrClientConfig
-    ): ResponseEntity<DTOs.CdrClientConfig> = runCatching {
-        logger.trace { "received DTOs.CdrClientConfig: '$config'" }
-        configWriter.updateClientServiceConfiguration(config.toCdrClientConfig()).let { result ->
-            when (result) {
-                is ConfigurationWriter.UpdateResult.Success -> {
-                    ResponseEntity
-                        .ok(config)
-                }
+        @RequestBody configDto: DTOs.CdrClientConfig,
+    ): ResponseEntity<DTOs.CdrClientConfig> =
+        runCatching {
+            logger.trace { "received DTOs.CdrClientConfig: '$configDto'" }
+            configDto.toCdrClientConfig()
+        }.mapCatching { config: CdrClientConfig ->
+            configWriter.updateClientServiceConfiguration(config).let { result ->
+                when (result) {
+                    is ConfigurationWriter.UpdateResult.Success -> {
+                        ResponseEntity
+                            .ok(configDto)
+                    }
 
-                is ConfigurationWriter.UpdateResult.Failure -> {
-                    throw WebOperationsAdvice.BadRequest(
-                        message = "Invalid configuration",
-                        props = result.errors
-                    )
+                    is ConfigurationWriter.UpdateResult.Failure -> {
+                        throw WebOperationsAdvice.BadRequest(
+                            message = "Invalid configuration",
+                            props = result.errors
+                        )
+                    }
                 }
             }
+        }.getOrElse { error: Throwable ->
+            when (error) {
+                is WebOperationsAdvice.ServerError, is WebOperationsAdvice.BadRequest -> throw error
+                else -> throw WebOperationsAdvice.ServerError("Failed to update service configuration: $error", error)
+            }
         }
-    }.getOrElse { error: Throwable ->
-        when (error) {
-            is WebOperationsAdvice.ServerError, is WebOperationsAdvice.BadRequest -> throw error
-            else -> throw WebOperationsAdvice.ServerError("Failed to update service configuration: $error", error)
-        }
-    }
 
     /**
      * This endpoint returns the status of the client service. It uses the health endpoint and
@@ -361,7 +364,7 @@ internal class WebOperations(
         return ResponseEntity.ok(
             DTOs.StatusResponse(
                 statusCode = status,
-                fileMonitoringStatus = fileMonitoringService.monitoringStatus.value
+                fileMonitoringStatus = fileMonitoringService.monitoringStatus
             )
         )
     }.getOrElse { error: Throwable ->
@@ -382,7 +385,7 @@ internal class WebOperations(
      */
     @GetMapping("/api/shutdown")
     internal suspend fun shutdown(
-        @RequestParam(name = "reason") reason: String?
+        @RequestParam(name = "reason") reason: String?,
     ): ResponseEntity<DTOs.ShutdownResponse> = runCatching {
         val shutdownTrigger = if (reason.isNullOrBlank()) ShutdownService.ShutdownTrigger.UNKNOWN else ShutdownService.ShutdownTrigger.fromReason(reason)
 

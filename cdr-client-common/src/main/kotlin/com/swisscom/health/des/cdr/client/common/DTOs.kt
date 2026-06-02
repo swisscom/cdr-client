@@ -268,6 +268,8 @@ class DTOs {
             @Serializable
             data class DocTypeFolders(
                 val sourceFolder: String? = null,
+                val archiveFolder: String? = null,
+                val errorFolder: String? = null,
                 val targetFolder: String? = null,
             ) {
                 companion object {

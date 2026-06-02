@@ -3,16 +3,13 @@ package com.swisscom.health.des.cdr.client.handler
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.DownloadDocumentResult
-import com.swisscom.health.des.cdr.client.xml.DocumentType
-import com.swisscom.health.des.cdr.client.xml.XmlUtil
-import com.swisscom.health.des.cdr.client.xml.toDom
+import com.swisscom.health.des.cdr.client.xml.extractDocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import org.springframework.stereotype.Component
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import kotlin.io.path.inputStream
 import kotlin.io.path.name
 import kotlin.io.path.nameWithoutExtension
 
@@ -27,7 +24,6 @@ private val logger = KotlinLogging.logger {}
 internal class PullFileHandling(
     private val tracer: Tracer,
     private val cdrApiClient: CdrApiClient,
-    private val xmlParser: XmlUtil
 ) {
     /**
      * Downloads files for a specific customer.
@@ -103,23 +99,7 @@ internal class PullFileHandling(
      */
     private fun moveFileToClientDirectory(connector: Connector, file: Path) {
         logger.debug { "Move file to target directory start" }
-        val targetDir =
-            if (connector.effectiveDocTypeFolders.isEmpty()) {
-                connector.targetFolder
-            } else {
-                val documentType: DocumentType =
-                    runCatching {
-                        xmlParser.findSchemaDefinition(file.inputStream().use { it.toDom() })
-                    }.fold(
-                        onSuccess = { it },
-                        onFailure = { e ->
-                            logger.error { "Failed to determine document type of file '$file': ${e.message}" }
-                            DocumentType.UNDEFINED
-                        }
-                    )
-                connector.effectiveDocTypeFolders[documentType]?.let { docTypeFolder -> connector.effectiveTargetFolder(docTypeFolder) }
-                    ?: connector.targetFolder.also { logger.debug { "No specific target directory defined for files of type '${documentType}'" } }
-            }
+        val targetDir = connector.getEffectiveTargetFolder(file.extractDocumentType())
         val targetTmpFile = targetDir.resolve(file.name)
         val targetFinal: Path by lazy(LazyThreadSafetyMode.NONE) { targetTmpFile.resolveSibling("${targetTmpFile.nameWithoutExtension}.xml") }
 

@@ -4,9 +4,10 @@ import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
-import com.swisscom.health.des.cdr.client.config.getConnectorForSourceFile
+import com.swisscom.health.des.cdr.client.config.getConnectorBySourceFolder
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentResult
 import com.swisscom.health.des.cdr.client.scheduling.BaseUploadScheduler.Companion.EXTENSION_XML
+import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import kotlinx.coroutines.CancellationException
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Component
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
-import java.util.*
+import java.util.UUID
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.moveTo
@@ -47,7 +48,7 @@ internal class RetryUploadFileHandling(
      * Retries the upload of a file until it is successful or a 4xx error occurred.
      */
     @Suppress("NestedBlockDepth", "LongMethod", "CyclomaticComplexMethod")
-    suspend fun uploadRetrying(file: Path, connector: Connector) {
+    suspend fun uploadRetrying(file: Path, docType: DocumentType, connector: Connector) {
         logger.debug { "Uploading file '$file'" }
         var retryCount = 0
         var retryNeeded: Boolean
@@ -73,7 +74,7 @@ internal class RetryUploadFileHandling(
                 retryNeeded = when (response) {
                     is UploadDocumentResult.Success -> {
                         logger.debug { "File '${uploadFile.fileName}' successfully synchronized." }
-                        deleteOrArchiveFile(uploadFile)
+                        deleteOrArchiveFile(uploadFile, docType)
                         false
                     }
 
@@ -99,7 +100,7 @@ internal class RetryUploadFileHandling(
                             "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
                                     "No retry will be attempted and the file will be moved to the error directory due to client-side issue."
                         }
-                        renameFileToErrorAndCreateLogFile(uploadFile, response.responseBody)
+                        renameFileToErrorAndCreateLogFile(uploadFile, docType, response.responseBody)
                         false
                     }
 
@@ -157,9 +158,9 @@ internal class RetryUploadFileHandling(
         )
     }
 
-    private fun deleteOrArchiveFile(file: Path): Unit = runCatching {
-        cdrClientConfig.customer.getConnectorForSourceFile(file).let { connector ->
-            connector.getEffectiveSourceArchiveFolder()?.let { archiveDir ->
+    private fun deleteOrArchiveFile(file: Path, docType: DocumentType): Unit = runCatching {
+        cdrClientConfig.customer.getConnectorBySourceFolder(file, docType).let { connector ->
+            connector.getEffectiveSourceArchiveFolder(docType)?.let { archiveDir ->
                 file.moveTo(
                     archiveDir.resolve("${file.nameWithoutExtension}_${UUID.randomUUID()}.$EXTENSION_XML")
                 )
@@ -186,9 +187,9 @@ internal class RetryUploadFileHandling(
      * For an error case, adds a UUID to the filename and creates a file with the response body with file extension '.response'.
      * If the filename already contains at least two UUIDs, replaces all but the first UUID with a new one to prevent excessively long filenames.
      */
-    private fun renameFileToErrorAndCreateLogFile(file: Path, responseBody: String): Unit = runCatching {
+    private fun renameFileToErrorAndCreateLogFile(file: Path, docType: DocumentType, responseBody: String): Unit = runCatching {
         val newBaseName = getBaseNameWithSingleOrNewUuid(file.nameWithoutExtension)
-        val errorFolder = cdrClientConfig.customer.getConnectorForSourceFile(file).getEffectiveSourceErrorFolder()
+        val errorFolder = cdrClientConfig.customer.getConnectorBySourceFolder(file, docType).getEffectiveSourceErrorFolder(docType)
         val errorFile = errorFolder.resolve("$newBaseName.$EXTENSION_XML")
         val logFile = errorFolder.resolve("$newBaseName.response")
         file.moveTo(errorFile)

@@ -3,6 +3,8 @@ package com.swisscom.health.des.cdr.client.handler
 import com.mayakapps.kache.ObjectKache
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
+import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
+import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
@@ -31,10 +33,8 @@ import okhttp3.Headers
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.beans.factory.annotation.Autowired
@@ -53,6 +53,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.createDirectories
@@ -91,7 +93,6 @@ internal class PollingPushFileHandlingTest {
     private val inflightDir = "inflight"
     private val targetDirectory = "customer"
     private val sourceDirectory = "source"
-    private val errorDirectory = "error"
     private val forumDatenaustauschMediaType = MediaType.parseMediaType("application/forumdatenaustausch+xml;charset=UTF-8")
 
     @StartStop
@@ -103,7 +104,9 @@ internal class PollingPushFileHandlingTest {
     @BeforeEach
     fun setup() {
         val inflightDir = tmpDir.resolve(inflightDir).also { it.createDirectories() }
-        val sourceDir0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
+        val sourceDir0 = tmpDir.resolve(sourceDirectory)
+            .also { it.resolve(ERROR_DIR_NAME).createDirectories() }
+            .also { it.resolve(ARCHIVE_DIR_NAME).resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)).createDirectories() }
         val targetDir0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
 
         every { config.localFolder } returns TempDownloadDir(inflightDir)
@@ -195,12 +198,12 @@ internal class PollingPushFileHandlingTest {
         val payload2 = sourceDir.resolve("dummy-2.xml.tmp")
         payload2.outputStream().use { it.write("Hello 2".toByteArray()) }
 
-        assertEquals(2, sourceDir.listDirectoryEntries().size)
+        assertEquals(2, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
 
-        await().during(1000L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.isEmpty() }
+        await().during(1000L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { paths -> paths.none { path -> path.isRegularFile() } }
 
         await().during(100L, TimeUnit.MILLISECONDS).until({
             tmpDir.walk().filter { it.isRegularFile() }.toList()
@@ -216,6 +219,7 @@ internal class PollingPushFileHandlingTest {
     fun `test successfully write two files to API - with archive`() {
         val sourceDir0 = tmpDir.resolve(sourceDirectory)
         val targetDir0 = tmpDir.resolve(targetDirectory)
+        val relativeArchiveDir = Path.of(ARCHIVE_DIR_NAME)
         every { config.customer } returns Customer(
             mutableListOf(
                 Connector(
@@ -225,7 +229,7 @@ internal class PollingPushFileHandlingTest {
                     contentType = forumDatenaustauschMediaType.toString(),
                     mode = CdrClientConfig.Mode.TEST,
                     sourceArchiveEnabled = true,
-                    sourceArchiveFolder = sourceDir0.resolve("archive"),
+                    sourceArchiveFolder = relativeArchiveDir,
                 )
             )
         )
@@ -249,28 +253,38 @@ internal class PollingPushFileHandlingTest {
         Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
 
-        val archiveDir = config.customer.first().getEffectiveSourceArchiveFolder()!!
+        val archiveDir = config.customer.first().getEffectiveSourceArchiveFolder(DocumentType.UNDEFINED)!!
 
-        await().during(1000L, TimeUnit.MILLISECONDS).until(sourceDir0::listDirectoryEntries) { it.none { it.isRegularFile() } }
+        await().during(1000L, TimeUnit.MILLISECONDS)
+            .until({ sourceDir0.listDirectoryEntries().also { println("XXXXX : $it") } }) { paths -> paths.none { path -> path.isRegularFile() } }
         await().during(100L, TimeUnit.MILLISECONDS)
-            .until(archiveDir::walk) { it.filter { it.isRegularFile() }.toList().run { size == 2 && all { it.extension == "xml" } } }
+            .until({
+                archiveDir.walk().filter { path -> path.isRegularFile() }.toList()
+            }) { paths -> paths.size == 2 && paths.all { path -> path.extension == "xml" } }
 
         // make sure no error files have been written or temporary files have been left
-        await().during(100L, TimeUnit.MILLISECONDS).until({ tmpDir.walk().filter { it.isRegularFile() && it.parent != archiveDir } }) { it.none() }
+        await().during(100L, TimeUnit.MILLISECONDS).until(
+            { tmpDir.walk().filter { it.isRegularFile() && it.parent != archiveDir } })
+        { it.none() }
 
         assertEquals(2, cdrServiceMock.requestCount)
 
         // processed files should be removed from cache
-        await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
+        await().until(
+            { runBlocking { fileCache.getKeys() } })
+        { it.isEmpty() }
     }
 
     @Test
-    @Disabled("requires support for archive directory for specific type, as relative path isn't allowed anymore")
-    fun `test successfully write two files to API - with relative archive for specific type`() {
+    @Suppress("LongMethod")
+    fun `test successfully write two files to API - with archive for specific type`() {
         val sourceDir0 = tmpDir.resolve(sourceDirectory)
         val targetDir0 = tmpDir.resolve(targetDirectory)
-        val relativeArchiveDir = sourceDir0.resolve("archive")
-        val invoiceSourceDir = sourceDir0.resolve("invoice").also { it.createDirectories() }
+        val archiveDir0 = sourceDir0.resolve(ARCHIVE_DIR_NAME)
+            .also { it.resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)).createDirectories() }
+        val relativeInvoiceSourceDir = Path.of("invoice")
+        val relativeInvoiceArchiveDir = Path.of(ARCHIVE_DIR_NAME)
+
         every { config.customer } returns Customer(
             mutableListOf(
                 Connector(
@@ -280,11 +294,21 @@ internal class PollingPushFileHandlingTest {
                     contentType = forumDatenaustauschMediaType.toString(),
                     mode = CdrClientConfig.Mode.TEST,
                     sourceArchiveEnabled = true,
-                    sourceArchiveFolder = relativeArchiveDir,
-                    docTypeFolders = mapOf(DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = invoiceSourceDir)),
+                    sourceArchiveFolder = archiveDir0,
+                    docTypeFolders = mapOf(
+                        DocumentType.INVOICE to Connector.DocTypeFolders(
+                            sourceFolder = relativeInvoiceSourceDir,
+                            archiveFolder = relativeInvoiceArchiveDir
+                        )
+                    ),
                 )
             )
         )
+
+        config.customer.first().getEffectiveSourceArchiveFolder(DocumentType.INVOICE)!!
+            .resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)).createDirectories()
+        config.customer.first().getEffectiveSourceArchiveFolder(DocumentType.NOTIFICATION)!!
+            .resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)).createDirectories()
 
         val mockResponse = MockResponse.Builder()
             .code(HttpStatus.OK.value())
@@ -293,85 +317,73 @@ internal class PollingPushFileHandlingTest {
             .build()
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
+        cdrServiceMock.enqueue(mockResponse)
+
+        val invoiceSourceDir = config.customer.first().getEffectiveSourceFolder(DocumentType.INVOICE)
+        assertTrue(invoiceSourceDir.contains(Path.of("invoice")))
+        assertTrue(invoiceSourceDir.startsWith(sourceDir0))
+
+        val notificationSourceDir = config.customer.first().getEffectiveSourceFolder(DocumentType.NOTIFICATION)
+        assertEquals(sourceDir0, notificationSourceDir)
 
         val payload1 = invoiceSourceDir.resolve("dummy.xml.tmp")
-        payload1.outputStream().use { it.write("Hello".toByteArray()) }
-        val payload2 = invoiceSourceDir.resolve("dummy-2.xml.tmp")
-        payload2.outputStream().use { it.write("Hello 2".toByteArray()) }
-
-        // 2 files and a subdirectory for the archive
-        assertEquals(2, invoiceSourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
-
-        Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
-        Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
-
-        val archiveDir = config.customer.first().getEffectiveSourceArchiveFolder()!!
-
-        await().during(1000L, TimeUnit.MILLISECONDS).until(invoiceSourceDir::listDirectoryEntries) { it.none { it.isRegularFile() } }
-        await().during(100L, TimeUnit.MILLISECONDS)
-            .until(archiveDir::walk) { it.filter { it.isRegularFile() }.toList().run { size == 2 && all { it.extension == "xml" } } }
-
-        // make sure no error files have been written or temporary files have been left
-        await().during(100L, TimeUnit.MILLISECONDS).until({ tmpDir.walk().filter { it.isRegularFile() && it.parent != archiveDir } }) { it.none() }
-
-        assertTrue(archiveDir.startsWith(invoiceSourceDir))
-        assertEquals(2, cdrServiceMock.requestCount)
-
-        // processed files should be removed from cache
-        await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
-    }
-
-    @Test
-    fun `test successfully write two files to API - with absolute archive for specific type`() {
-        val absoluteArchiveDir = tmpDir.resolve("archive")
-        val sourceDir0 = tmpDir.resolve(sourceDirectory)
-        val targetDir0 = tmpDir.resolve(targetDirectory)
-        val invoiceSourceDir = sourceDir0.resolve("invoice").also { it.createDirectories() }
-        every { config.customer } returns Customer(
-            mutableListOf(
-                Connector(
-                    connectorId = ConnectorId("2345"),
-                    targetFolder = targetDir0,
-                    sourceFolder = sourceDir0,
-                    contentType = forumDatenaustauschMediaType.toString(),
-                    mode = CdrClientConfig.Mode.TEST,
-                    sourceArchiveEnabled = true,
-                    sourceArchiveFolder = absoluteArchiveDir,
-                    docTypeFolders = mapOf(DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = invoiceSourceDir)),
-                )
+        payload1.outputStream().use {
+            it.write(
+                """
+                <invoice:request xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:invoice="http://www.forum-datenaustausch.ch/invoice" 
+                xsi:schemaLocation="http://www.forum-datenaustausch.ch/invoice generalInvoiceRequest_450.xsd" />
+                """.trimIndent().toByteArray()
             )
-        )
-
-        val mockResponse = MockResponse.Builder()
-            .code(HttpStatus.OK.value())
-            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
-            .body("{\"message\": \"Upload successful\"}")
-            .build()
-        cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(mockResponse)
-
-        val payload1 = invoiceSourceDir.resolve("dummy.xml.tmp")
-        payload1.outputStream().use { it.write("Hello".toByteArray()) }
+        }
         val payload2 = invoiceSourceDir.resolve("dummy-2.xml.tmp")
-        payload2.outputStream().use { it.write("Hello 2".toByteArray()) }
+        payload2.outputStream().use {
+            it.write(
+                """
+                <invoice:request xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:invoice="http://www.forum-datenaustausch.ch/invoice" 
+                xsi:schemaLocation="http://www.forum-datenaustausch.ch/invoice generalInvoiceRequest_450.xsd" />
+                """.trimIndent().toByteArray()
+            )
+        }
+        val payload3 = notificationSourceDir.resolve("dummy-3.xml.tmp")
+        payload3.outputStream().use {
+            it.write(
+                """
+                <notification:notification xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+                xmlns:notification="http://www.forum-datenaustausch.ch/notification" 
+                xsi:schemaLocation="http://www.forum-datenaustausch.ch/notification generalNotification_450.xsd" />
+                    """.trimIndent().toByteArray()
+            )
+        }
 
-        // 2 files and a subdirectory for the archive
         assertEquals(2, invoiceSourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
+        assertEquals(1, notificationSourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
+        Files.move(payload3, payload3.resolveSibling(payload3.nameWithoutExtension))
 
-        val archiveDir = config.customer.first().getEffectiveSourceArchiveFolder()!!
+        val invoiceArchiveDir = config.customer.first().getEffectiveSourceArchiveFolder(DocumentType.INVOICE)!!
+        val notificationArchiveDir = config.customer.first().getEffectiveSourceArchiveFolder(DocumentType.NOTIFICATION)!!
 
-        await().during(1000L, TimeUnit.MILLISECONDS).until(invoiceSourceDir::listDirectoryEntries) { it.none { it.isRegularFile() } }
+        assertEquals(invoiceSourceDir, invoiceArchiveDir.parent)
+
+        await().during(1000L, TimeUnit.MILLISECONDS)
+            .until(invoiceSourceDir::listDirectoryEntries) { paths -> paths.none { path -> path.isRegularFile() } }
+        // the two invoices should be archived under the document type specific archive directory
         await().during(100L, TimeUnit.MILLISECONDS)
-            .until(archiveDir::walk) { it.filter { it.isRegularFile() }.toList().run { size == 2 && all { it.extension == "xml" } } }
+            .until(invoiceArchiveDir::walk) { paths -> paths.toList().run { size == 2 && all { path -> path.extension == "xml" } } }
+        // the notification should be archived under the global archive directory as no document type specific archive directory has been defined
+        await().during(100L, TimeUnit.MILLISECONDS)
+            .until(notificationArchiveDir::walk) { paths -> paths.toList().run { size == 1 && all { path -> path.extension == "xml" } } }
 
         // make sure no error files have been written or temporary files have been left
-        await().during(100L, TimeUnit.MILLISECONDS).until({ tmpDir.walk().filter { it.isRegularFile() && it.parent != archiveDir } }) { it.none() }
+        await().during(100L, TimeUnit.MILLISECONDS)
+            .until(tmpDir::walk) { paths ->
+                paths.filter { !it.parent.startsWith(invoiceArchiveDir) }.filter { !it.parent.startsWith(notificationArchiveDir) }
+                    .none { path -> path.isRegularFile() }
+            }
 
-        assertEquals(absoluteArchiveDir, archiveDir.parent)
-        assertEquals(2, cdrServiceMock.requestCount)
+        assertEquals(3, cdrServiceMock.requestCount)
 
         // processed files should be removed from cache
         await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
@@ -388,10 +400,10 @@ internal class PollingPushFileHandlingTest {
         val payload3 = sourceDir.resolve("dummy-3.log")
         payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
 
-        assertEquals(3, sourceDir.listDirectoryEntries().size)
+        assertEquals(3, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         // the polling process must leave non-xml files where they are
-        await().during(1000L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.size == 3 }
+        await().during(1000L, TimeUnit.MILLISECONDS).until { sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size == 3 }
 
         assertEquals(0, cdrServiceMock.requestCount)
 
@@ -400,7 +412,7 @@ internal class PollingPushFileHandlingTest {
     }
 
     @Test
-    fun `test successfully write two files to API fail with third BAD_REQUEST - don't move file`() {
+    fun `test successfully write two files to API fail with third BAD_REQUEST - move file to source-error directory`() {
         val mockResponse = MockResponse.Builder()
             .code(HttpStatus.OK.value())
             .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
@@ -414,7 +426,7 @@ internal class PollingPushFileHandlingTest {
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.BAD_REQUEST.value()).body("{\"message\": \"Exception\"}").build())
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
-        val errorDir = sourceDir.resolve(errorDirectory)
+        val errorDir = sourceDir.resolve(ERROR_DIR_NAME)
 
         val payload1 = sourceDir.resolve("dummy.xml.tmp")
         payload1.outputStream().use { it.write("Hello".toByteArray()) }
@@ -423,7 +435,7 @@ internal class PollingPushFileHandlingTest {
         val payload3 = sourceDir.resolve("dummy-3.xml.tmp")
         payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
 
-        assertEquals(3, sourceDir.listDirectoryEntries().size)
+        assertEquals(3, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
@@ -431,6 +443,9 @@ internal class PollingPushFileHandlingTest {
 
         await().during(1, TimeUnit.SECONDS).until(cdrServiceMock::requestCount) { it == 6 }
 
+        // above we give the client service 1 second to move the upload file to the error directory and to create the `.response`
+        // file alongside it by means of checking that during 1 second the request count stays stable at 6 requests; nonetheless,
+        // there is a race condition in the assertions for files below (a race that, at the time of writing, we always win).
         assertEquals(0, sourceDir.listDirectoryEntries("*xml").size)
         assertEquals(1, errorDir.listDirectoryEntries("*xml").size)
         assertEquals(1, errorDir.listDirectoryEntries("*response").size)
@@ -466,7 +481,7 @@ internal class PollingPushFileHandlingTest {
         val payload3 = sourceDir.resolve("dummy-3.xml.tmp")
         payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
 
-        assertEquals(3, sourceDir.listDirectoryEntries().size)
+        assertEquals(3, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
@@ -498,7 +513,11 @@ internal class PollingPushFileHandlingTest {
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
+        // 404s simulate a known Azure Function App hiccup where the function runtime returns intermittent 404s for all function endpoints for whatever reason
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.NOT_FOUND.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.NOT_FOUND.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.NOT_FOUND.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(mockResponse)
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
 
@@ -509,7 +528,7 @@ internal class PollingPushFileHandlingTest {
         val payload3 = sourceDir.resolve("dummy-3.xml.tmp")
         payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
 
-        assertEquals(3, sourceDir.listDirectoryEntries().size)
+        assertEquals(3, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
@@ -517,143 +536,17 @@ internal class PollingPushFileHandlingTest {
 
         val expectedMinRequests = 6
         await().atMost(5, TimeUnit.SECONDS).until { cdrServiceMock.requestCount == expectedMinRequests }
-        assertEquals(1, sourceDir.listDirectoryEntries("*upload").size)
-
-        // Wait for more requests to be made due to retries (should increase above 6)
-        await().atMost(5, TimeUnit.SECONDS).until { cdrServiceMock.requestCount > expectedMinRequests }
-
-        // the file should remain in the cache and be retried
-        await().until({ runBlocking { fileCache.getKeys() } }) { it.isNotEmpty() }
-    }
-
-    @Test
-    fun `test successfully write two files to API fail with third - with separate error directory`() {
-        val sourceDir0 = tmpDir.resolve(sourceDirectory)
-        val targetDir0 = tmpDir.resolve(targetDirectory)
-        every { config.customer } returns Customer(
-            mutableListOf(
-                Connector(
-                    connectorId = ConnectorId("2345"),
-                    targetFolder = targetDir0,
-                    sourceFolder = sourceDir0,
-                    contentType = forumDatenaustauschMediaType.toString(),
-                    mode = CdrClientConfig.Mode.TEST,
-                    sourceErrorFolder = sourceDir0.resolve("error"),
-                )
-            )
-        )
-
-        val mockResponse = MockResponse.Builder()
-            .code(HttpStatus.OK.value())
-            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
-            .body("{\"message\": \"Upload successful\"}")
-            .build()
-        cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.BAD_REQUEST.value()).body("{\"message\": \"Exception\"}").build())
-
-        val payload1 = sourceDir0.resolve("dummy.xml.tmp")
-        payload1.outputStream().use { it.write("Hello".toByteArray()) }
-        val payload2 = sourceDir0.resolve("dummy-2.xml.tmp")
-        payload2.outputStream().use { it.write("Hello 2".toByteArray()) }
-        val payload3 = sourceDir0.resolve("dummy-3.xml.tmp")
-        payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
-
-        assertEquals(3, sourceDir0.listDirectoryEntries().filter { it.isRegularFile() }.size)
-
-        Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
-        Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
-        Files.move(payload3, payload3.resolveSibling(payload3.nameWithoutExtension))
-        val errorDir = config.customer.first().getEffectiveSourceErrorFolder()
-
-        await().during(1, TimeUnit.SECONDS).until(cdrServiceMock::requestCount) { it == 6 }
-        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir0::listDirectoryEntries) { it.none { it.isRegularFile() } }
-        await().during(100L, TimeUnit.MILLISECONDS).until { errorDir.listDirectoryEntries("*response").size == 1 }
-
-        assertEquals(1, errorDir.listDirectoryEntries("*xml").size)
-        assertEquals(1, errorDir.listDirectoryEntries("*response").size)
-
-        // but no additional requests for the error and response file should have been made, i.e. the request count
-        // should still be 6 (2 successful and four failed requests)
-        await().during(100, TimeUnit.MILLISECONDS).until(cdrServiceMock::requestCount) { it == 6 }
-
-        // ignored files like the error and response file don't get processed and thus are not supposed to be in the processing cache
+        // eventually the upload succeeds and the state gets cleared
         await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
     }
 
     @Test
-    fun `test successfully write two files to API fail with third - with absolute error directory`() {
-        val absoluteErrorDir = tmpDir.resolve("error/absolute")
+    @Suppress("LongMethod")
+    fun `test successfully write two files to API fail with third - with error folder for specific type`() {
+        val relativeErrorDir = Path.of(ERROR_DIR_NAME) // will be assumed to be a subdirectory of the source directory
         val sourceDir0 = tmpDir.resolve(sourceDirectory)
         val targetDir0 = tmpDir.resolve(targetDirectory)
-        val invoiceSourceDir = sourceDir0.resolve("invoice").also { it.createDirectories() }
-
-        every { config.customer } returns Customer(
-            mutableListOf(
-                Connector(
-                    connectorId = ConnectorId("2345"),
-                    targetFolder = targetDir0,
-                    sourceFolder = sourceDir0,
-                    contentType = forumDatenaustauschMediaType.toString(),
-                    mode = CdrClientConfig.Mode.TEST,
-                    sourceErrorFolder = absoluteErrorDir,
-                    docTypeFolders = mapOf(DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = invoiceSourceDir)),
-                )
-            )
-        )
-
-        val mockResponse = MockResponse.Builder()
-            .code(HttpStatus.OK.value())
-            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
-            .body("{\"message\": \"Upload successful\"}")
-            .build()
-        cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.BAD_REQUEST.value()).body("{\"message\": \"Exception\"}").build())
-
-        val payload1 = invoiceSourceDir.resolve("dummy.xml.tmp")
-        payload1.outputStream().use { it.write("Hello".toByteArray()) }
-        val payload2 = invoiceSourceDir.resolve("dummy-2.xml.tmp")
-        payload2.outputStream().use { it.write("Hello 2".toByteArray()) }
-        val payload3 = invoiceSourceDir.resolve("dummy-3.xml.tmp")
-        payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
-
-        assertEquals(3, invoiceSourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
-
-        Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
-        Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
-        Files.move(payload3, payload3.resolveSibling(payload3.nameWithoutExtension))
-        val errorDir = config.customer.first().getEffectiveSourceErrorFolder()
-
-        await().during(1, TimeUnit.SECONDS).until(cdrServiceMock::requestCount) { it == 6 }
-        await().during(100L, TimeUnit.MILLISECONDS).until(invoiceSourceDir::listDirectoryEntries) { it.none { it.isRegularFile() } }
-        await().during(100L, TimeUnit.MILLISECONDS).until { errorDir.listDirectoryEntries("*response").size == 1 }
-
-        assertEquals(absoluteErrorDir.parent, errorDir.parent)
-        assertEquals(1, errorDir.listDirectoryEntries("*xml").size)
-        assertEquals(1, errorDir.listDirectoryEntries("*response").size)
-
-        // but no additional requests for the error and response file should have been made, i.e. the request count
-        // should still be 6 (2 successful and four failed requests)
-        await().during(100, TimeUnit.MILLISECONDS).until(cdrServiceMock::requestCount) { it == 6 }
-
-        // ignored files like the error and response file don't get processed and thus are not supposed to be in the processing cache
-        await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
-    }
-
-    @Test
-    @Disabled("requires support for error directory for specific type, as relative path isn't allowed anymore")
-    fun `test successfully write two files to API fail with third - with separate error directory for defined type`() {
-        val relativeErrorDir = Path.of("error")
-        val sourceDir0 = tmpDir.resolve(sourceDirectory)
-        val targetDir0 = tmpDir.resolve(targetDirectory)
-        val invoiceSourceDir = sourceDir0.resolve("invoice").also { it.createDirectories() }
+        val invoiceSourceDir = sourceDir0.resolve("invoice").also { it.resolve(ERROR_DIR_NAME).createDirectories() }
 
         every { config.customer } returns Customer(
             mutableListOf(
@@ -664,7 +557,12 @@ internal class PollingPushFileHandlingTest {
                     contentType = forumDatenaustauschMediaType.toString(),
                     mode = CdrClientConfig.Mode.TEST,
                     sourceErrorFolder = relativeErrorDir,
-                    docTypeFolders = mapOf(DocumentType.INVOICE to Connector.DocTypeFolders(sourceFolder = invoiceSourceDir))
+                    docTypeFolders = mapOf(
+                        DocumentType.INVOICE to Connector.DocTypeFolders(
+                            sourceFolder = invoiceSourceDir,
+                            errorFolder = relativeErrorDir,
+                        )
+                    )
                 )
             )
         )
@@ -676,72 +574,51 @@ internal class PollingPushFileHandlingTest {
             .build()
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.BAD_REQUEST.value()).body("{\"message\": \"Exception\"}").build())
 
         val payload1 = invoiceSourceDir.resolve("dummy.xml.tmp")
-        payload1.outputStream().use { it.write("Hello".toByteArray()) }
+        payload1.outputStream()
+            .use {
+                it.write(
+                    """
+                <invoice:request xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:invoice="http://www.forum-datenaustausch.ch/invoice" 
+                xsi:schemaLocation="http://www.forum-datenaustausch.ch/invoice generalInvoiceRequest_450.xsd" />
+                """.trimIndent().toByteArray()
+                )
+            }
         val payload2 = invoiceSourceDir.resolve("dummy-2.xml.tmp")
-        payload2.outputStream().use { it.write("Hello 2".toByteArray()) }
+        payload2.outputStream().use {
+            it.write(
+                """
+                <invoice:request xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:invoice="http://www.forum-datenaustausch.ch/invoice" 
+                xsi:schemaLocation="http://www.forum-datenaustausch.ch/invoice generalInvoiceRequest_450.xsd" />
+                """.trimIndent().toByteArray()
+            )
+        }
         val payload3 = invoiceSourceDir.resolve("dummy-3.xml.tmp")
-        payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
+        payload3.outputStream().use {
+            it.write(
+                """
+                <invoice:request xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:invoice="http://www.forum-datenaustausch.ch/invoice" 
+                xsi:schemaLocation="http://www.forum-datenaustausch.ch/invoice generalInvoiceRequest_450.xsd" />
+                """.trimIndent().toByteArray()
+            )
+        }
 
         assertEquals(3, invoiceSourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
         Files.move(payload3, payload3.resolveSibling(payload3.nameWithoutExtension))
-        val errorDir = config.customer.first().getEffectiveSourceErrorFolder()
 
-        await().during(1, TimeUnit.SECONDS).until(cdrServiceMock::requestCount) { it == 6 }
-        await().during(100L, TimeUnit.MILLISECONDS).until(invoiceSourceDir::listDirectoryEntries) { it.none { it.isRegularFile() } }
+        val errorDir = config.customer.first().getEffectiveSourceErrorFolder(DocumentType.INVOICE)
+        assertTrue(errorDir.contains(Path.of("invoice")))
+
+        await().during(1, TimeUnit.SECONDS).until(cdrServiceMock::requestCount) { it == 3 }
+        await().during(100L, TimeUnit.MILLISECONDS).until(invoiceSourceDir::listDirectoryEntries) { paths -> paths.none { path -> path.isRegularFile() } }
         await().during(100L, TimeUnit.MILLISECONDS).until { errorDir.listDirectoryEntries("*response").size == 1 }
 
         assertTrue(errorDir.startsWith(invoiceSourceDir))
-        assertNotEquals(relativeErrorDir, config.customer[0].getEffectiveSourceErrorFolder())
-        assertEquals(1, errorDir.listDirectoryEntries("*xml").size)
-        assertEquals(1, errorDir.listDirectoryEntries("*response").size)
-
-        // but no additional requests for the error and response file should have been made, i.e. the request count
-        // should still be 6 (2 successful and four failed requests)
-        await().during(100, TimeUnit.MILLISECONDS).until(cdrServiceMock::requestCount) { it == 6 }
-
-        // ignored files like the error and response file don't get processed and thus are not supposed to be in the processing cache
-        await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
-    }
-
-    @Test
-    fun `test successfully write two files to API fail with third do not retry - no separate error directory defined,  mean error subdirectory`() {
-        val mockResponse = MockResponse.Builder()
-            .code(HttpStatus.OK.value())
-            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
-            .body("{\"message\": \"Upload successful\"}")
-            .build()
-        cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(mockResponse)
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.BAD_REQUEST.value()).body("{\"message\": \"Exception\"}").build())
-
-        val sourceDir = tmpDir.resolve(sourceDirectory)
-        val errorDir = sourceDir.resolve(errorDirectory)
-
-        val payload1 = sourceDir.resolve("dummy.xml.tmp")
-        payload1.outputStream().use { it.write("Hello".toByteArray()) }
-        val payload2 = sourceDir.resolve("dummy-2.xml.tmp")
-        payload2.outputStream().use { it.write("Hello 2".toByteArray()) }
-        val payload3 = sourceDir.resolve("dummy-3.xml.tmp")
-        payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
-
-        assertEquals(3, sourceDir.listDirectoryEntries().size)
-
-        Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
-        Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
-        Files.move(payload3, payload3.resolveSibling(payload3.nameWithoutExtension))
-
-        await().during(1, TimeUnit.SECONDS).until(cdrServiceMock::requestCount) { it == 3 }
-        await().during(100L, TimeUnit.MILLISECONDS).until { errorDir.listDirectoryEntries("*response").size == 1 }
-
         assertEquals(1, errorDir.listDirectoryEntries("*xml").size)
         assertEquals(1, errorDir.listDirectoryEntries("*response").size)
 
