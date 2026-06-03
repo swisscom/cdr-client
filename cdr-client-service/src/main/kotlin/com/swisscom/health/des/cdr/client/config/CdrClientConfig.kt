@@ -7,6 +7,7 @@ import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Mode
 import com.swisscom.health.des.cdr.client.xml.DocumentType
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.util.unit.DataSize
 import java.net.URL
@@ -14,10 +15,14 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
 import java.time.Instant
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import kotlin.io.path.absolute
+import kotlin.io.path.createDirectories
 import kotlin.io.path.isDirectory
 
+private val logger = KotlinLogging.logger {}
 
 @JsonIgnoreProperties(value = ["propertyName", "property-name"])
 internal interface PropertyNameAware {
@@ -208,7 +213,7 @@ internal data class Connector(
             ?: sourceFolder
 
     @JsonIgnore
-    fun getEffectiveTargetFolders(): Map<DocumentType,Path> = DocumentType.entries.associateWith { getEffectiveTargetFolder(it) }
+    fun getEffectiveTargetFolders(): Map<DocumentType, Path> = DocumentType.entries.associateWith { getEffectiveTargetFolder(it) }
 
     @JsonIgnore
     fun getEffectiveTargetFolder(docType: DocumentType): Path =
@@ -256,6 +261,15 @@ internal data class Connector(
             null
         }
 
+    fun getDailyEffectiveSourceArchiveFolder(docType: DocumentType): Path? =
+        getEffectiveSourceArchiveFolder(docType)?.let { archiveRootFolder: Path ->
+            runCatching {
+                archiveRootFolder.resolve(getDateNow()).createDirectories()
+            }.getOrElse { t ->
+                logger.warn { "Failed to create daily archive folder ${archiveRootFolder.resolve(getDateNow())}: $t" }
+                archiveRootFolder // fallback to non-daily folder if creation of daily folder fails
+            }
+        }
 
     /**
      * Returns the source archive folder as an absolute path; if no explicit archive folder config was set,
@@ -273,16 +287,7 @@ internal data class Connector(
             null
         }
 
-//    @Suppress("TooGenericExceptionCaught")
-//    private fun createDirectoryIfMissing(path: Path): Path = try {
-//        path.createDirectories()
-//    } catch (t: Throwable) {
-//        logger.error { "Failed to create directory '$path' for connector '$connectorId': $t" }
-//        throw t
-//    }
-
-//    private fun getDateNow(): String = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
-
+    private fun getDateNow(): String = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
 
     @JsonIgnore
     fun getEffectiveErrorFolders(): Map<DocumentType, Path> = DocumentType.entries.associateWith { getEffectiveSourceErrorFolder(it) }

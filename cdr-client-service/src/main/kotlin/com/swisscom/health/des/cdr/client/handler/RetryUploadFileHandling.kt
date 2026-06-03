@@ -160,7 +160,7 @@ internal class RetryUploadFileHandling(
 
     private fun deleteOrArchiveFile(file: Path, docType: DocumentType): Unit = runCatching {
         cdrClientConfig.customer.getConnectorBySourceFolder(file, docType).let { connector ->
-            connector.getEffectiveSourceArchiveFolder(docType)?.let { archiveDir ->
+            connector.getDailyEffectiveSourceArchiveFolder(docType)?.let { archiveDir ->
                 file.moveTo(
                     archiveDir.resolve("${file.nameWithoutExtension}_${UUID.randomUUID()}.$EXTENSION_XML")
                 )

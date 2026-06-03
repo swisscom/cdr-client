@@ -256,7 +256,7 @@ internal class PollingPushFileHandlingTest {
         val archiveDir = config.customer.first().getEffectiveSourceArchiveFolder(DocumentType.UNDEFINED)!!
 
         await().during(1000L, TimeUnit.MILLISECONDS)
-            .until({ sourceDir0.listDirectoryEntries().also { println("XXXXX : $it") } }) { paths -> paths.none { path -> path.isRegularFile() } }
+            .until({ sourceDir0.listDirectoryEntries() }) { paths -> paths.none { path -> path.isRegularFile() } }
         await().during(100L, TimeUnit.MILLISECONDS)
             .until({
                 archiveDir.walk().filter { path -> path.isRegularFile() }.toList()
@@ -264,7 +264,7 @@ internal class PollingPushFileHandlingTest {
 
         // make sure no error files have been written or temporary files have been left
         await().during(100L, TimeUnit.MILLISECONDS).until(
-            { tmpDir.walk().filter { it.isRegularFile() && it.parent != archiveDir } })
+            { tmpDir.walk().filter { it.isRegularFile() && !it.startsWith(archiveDir) } })
         { it.none() }
 
         assertEquals(2, cdrServiceMock.requestCount)

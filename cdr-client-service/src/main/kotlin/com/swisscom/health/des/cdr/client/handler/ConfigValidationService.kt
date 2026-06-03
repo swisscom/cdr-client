@@ -25,6 +25,7 @@ import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toCdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.annotation.PostConstruct
 import org.springframework.stereotype.Service
 import java.nio.file.Files
 import java.nio.file.Path
@@ -45,6 +46,45 @@ internal class ConfigValidationService(
 ) {
 
     val isConfigValid: Boolean by lazy { validateAllConfigurationItems(config) is ValidationResult.Success }
+
+    /**
+     * Actually, we should only attempt to create error and archive folders that are configured
+     * relative to (a document type specific) source directory, but to keep it simple we attempt
+     * to create no matter what.
+     *
+     * If we fail to do so we just log that fact and [validateConnectorFolders] will report the
+     * missing directories and prevent document synchronization from starting until the problem
+     * is resolved.
+     *
+     * TODO: Do we need to make sure the created directories are not world readable?
+     *   Using Posix permissions this is straight forward on Linux/macOS; not so much
+     *   on Windows.
+     */
+    @Suppress("UnusedPrivateMember")
+    @PostConstruct
+    private fun createErrorAndArchiveFolders() {
+        fun createFolderIfMissing(path: Path, type: String) {
+            runCatching {
+                if (!path.exists()) {
+                    logger.debug { "$type folder [$path] does not exist, attempting to create it" }
+                    Files.createDirectories(path)
+                    logger.debug { "$type folder [$path] created successfully" }
+                } else {
+                    logger.debug { "$type folder [$path] already exists, no need to create it" }
+                }
+            }.onFailure { e ->
+                logger.warn { "failed to create $type folder: [${path}], error: [$e]" }
+            }
+        }
+
+        config.customer.flatMap { connector -> connector.getEffectiveErrorFolders().values }.distinct().forEach { errorFolder ->
+            createFolderIfMissing(errorFolder, "error")
+        }
+
+        config.customer.flatMap { connector -> connector.getEffectiveArchiveFolders().values.filterNotNull() }.distinct().forEach { archiveFolder ->
+            createFolderIfMissing(archiveFolder, "archive")
+        }
+    }
 
     /**
      * Validates the complete rule set.
@@ -315,7 +355,7 @@ internal class ConfigValidationService(
                             ValidationResult.Success
                         },
                         onFailure = { accessException ->
-                            logger.warn { "Path access attempt failed: [${path}], error: ${accessException::class.simpleName}: ${accessException.message}" }
+                            logger.info { "Path access attempt failed: [${path}], error: ${accessException::class.simpleName}: ${accessException.message}" }
                             ValidationResult.Failure(
                                 listOf(ValidationDetail.PathDetail(path = path.toString(), messageKey = DIRECTORY_NOT_FOUND))
                             )
@@ -640,8 +680,16 @@ internal class ConfigValidationService(
                     validateReadWritableIfAbsolutePath(docTypeFolder.errorFolder)
         }.fold(initial = ValidationResult.Success) { acc: ValidationResult, result: ValidationResult -> acc + result }
 
+        val allErrorFoldersExist = connector.toCdrClientConfig().getEffectiveErrorFolders().values
+                .distinct()
+                .fold(initial = ValidationResult.Success) { acc: ValidationResult, errorFolder: Path -> acc + checkPathExists(errorFolder) }
 
-        return baseValidation + archiveValidation + errorValidation + docTypeValidation
+        val allArchiveFoldersExist = connector.toCdrClientConfig().getEffectiveArchiveFolders().values
+                .filterNotNull()
+                .distinct()
+                .fold(initial = ValidationResult.Success) { acc: ValidationResult, archiveFolder: Path -> acc + checkPathExists(archiveFolder) }
+
+        return baseValidation + archiveValidation + errorValidation + docTypeValidation + allErrorFoldersExist + allArchiveFoldersExist
     }
 
     @Suppress("NestedBlockDepth")
