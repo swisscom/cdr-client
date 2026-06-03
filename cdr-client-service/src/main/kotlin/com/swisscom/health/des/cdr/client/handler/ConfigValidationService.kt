@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
+import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector
@@ -601,12 +602,53 @@ internal class ConfigValidationService(
                         }
                     }
 
+            // no non archive dir end in the default archive folder name
+            val archiveFolderNameOverlap: ValidationResult =
+                (localFolder + sourceFolders + targetFolders + errorFolders)
+                    .filter { it.fileName?.toString() == ARCHIVE_DIR_NAME }
+                    .let { overlappingArchiveFolderDirs ->
+                        if (overlappingArchiveFolderDirs.isNotEmpty()) {
+                            ValidationResult.Failure(
+                                validationDetails =
+                                    overlappingArchiveFolderDirs.map { path: Path ->
+                                        ValidationDetail.PathDetail(
+                                            path = path.toString(),
+                                            messageKey = DTOs.ValidationMessageKey.ARCHIVE_AS_NON_ARCHIVE_FOLDER_NAME_USED,
+                                        )
+                                    }
+                            )
+                        } else {
+                            ValidationResult.Success
+                        }
+                    }
+
+            val archiveFolderOverlap: ValidationResult =
+                archiveFolders
+                    .intersect((localFolder + sourceFolders + targetFolders + errorFolders).toSet())
+                    .let { overlappingDirs ->
+                        if (overlappingDirs.isNotEmpty()) {
+                            ValidationResult.Failure(
+                                validationDetails =
+                                    overlappingDirs.map { path: Path ->
+                                        ValidationDetail.PathDetail(
+                                            path = path.toString(),
+                                            messageKey = DTOs.ValidationMessageKey.ARCHIVE_DIR_OVERLAPS_NON_ARCHIVE_DIR,
+                                        )
+                                    }
+                            )
+                        } else {
+                            ValidationResult.Success
+                        }
+                    }
+
             val overlapResult = localDirSourceDirsOverlap +
                     localDirTargetDirsOverlap +
                     sourceDirsOverlap +
                     targetDirsOverlapWithSourceDirs +
                     errorFolderNameOverlap +
-                    errorFolderOverlap
+                    errorFolderOverlap +
+                    archiveFolderNameOverlap +
+                    archiveFolderOverlap
 
             overlapResult
         }
@@ -681,13 +723,13 @@ internal class ConfigValidationService(
         }.fold(initial = ValidationResult.Success) { acc: ValidationResult, result: ValidationResult -> acc + result }
 
         val allErrorFoldersExist = connector.toCdrClientConfig().getEffectiveErrorFolders().values
-                .distinct()
-                .fold(initial = ValidationResult.Success) { acc: ValidationResult, errorFolder: Path -> acc + checkPathExists(errorFolder) }
+            .distinct()
+            .fold(initial = ValidationResult.Success) { acc: ValidationResult, errorFolder: Path -> acc + checkPathExists(errorFolder) }
 
         val allArchiveFoldersExist = connector.toCdrClientConfig().getEffectiveArchiveFolders().values
-                .filterNotNull()
-                .distinct()
-                .fold(initial = ValidationResult.Success) { acc: ValidationResult, archiveFolder: Path -> acc + checkPathExists(archiveFolder) }
+            .filterNotNull()
+            .distinct()
+            .fold(initial = ValidationResult.Success) { acc: ValidationResult, archiveFolder: Path -> acc + checkPathExists(archiveFolder) }
 
         return baseValidation + archiveValidation + errorValidation + docTypeValidation + allErrorFoldersExist + allArchiveFoldersExist
     }

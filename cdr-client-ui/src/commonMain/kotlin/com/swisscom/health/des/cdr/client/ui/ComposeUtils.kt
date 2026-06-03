@@ -46,6 +46,8 @@ import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.archive_folder_name_used
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.archive_folder_overlaps_non_archive
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.arrow_drop_down_24dp_000000_FILL0_wght400_GRAD0_opsz24
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.arrow_drop_up_24dp_000000_FILL0_wght400_GRAD0_opsz24
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_directory_not_found
@@ -118,6 +120,8 @@ internal val DTOs.ValidationMessageKey.stringResource: StringResource
             DTOs.ValidationMessageKey.PROXY_URL_INVALID_FORMAT -> Res.string.error_proxy_url_invalid_format
             DTOs.ValidationMessageKey.ILLEGAL_VALUE -> Res.string.error_illegal_value
             DTOs.ValidationMessageKey.ILLEGAL_VALUE_COMBINATION -> Res.string.error_illegal_value_combination
+            DTOs.ValidationMessageKey.ARCHIVE_AS_NON_ARCHIVE_FOLDER_NAME_USED -> Res.string.archive_folder_name_used
+            DTOs.ValidationMessageKey.ARCHIVE_DIR_OVERLAPS_NON_ARCHIVE_DIR -> Res.string.archive_folder_overlaps_non_archive
         }
 
 @Composable
