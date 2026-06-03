@@ -193,7 +193,10 @@ internal class ConfigValidationServiceTest {
             val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(cdrClientConfig)
 
             assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
-            assertEquals(if (notLegalLocalDir == sourceErrorFolder4) 2 else 1, validationResult.validationDetails.size)
+            assertEquals(
+                if (notLegalLocalDir == sourceErrorFolder4 || notLegalLocalDir == sourceArchiveFolder1) 2 else 1,
+                validationResult.validationDetails.size
+            )
             validationResult.validationDetails.first().let { validationDetail ->
                 assertInstanceOf<DTOs.ValidationDetail.PathDetail>(validationDetail)
                 assertEquals(notLegalLocalDir.toString(), validationDetail.path)
