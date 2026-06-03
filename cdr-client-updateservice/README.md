@@ -7,13 +7,16 @@ This service automatically manages updates for CDR Client on Windows Server (esp
 ## Overview
 
 The Update Service:
-- Checks for new versions on GitHub every 2 hours (configurable, with immediate check at startup)
-- Downloads available artifacts from GitHub releases (only those present in the release)
+- Checks for new versions from Azure Storage every 2 hours (configurable, with immediate check at startup)
+- Downloads available artifacts from Azure Storage with SHA256 checksum verification
 - Stops the Watchdog service (which stops the CDR service)
+- Creates backup of current files before applying updates
 - Applies updates to present components (Service JAR, Watchdog)
 - Restarts the Watchdog service
 - Tracks component versions independently
 - Logs all operations to Windows Event Log
+- Supports version pinning to prevent unwanted updates
+- Automatic rollback on failure
 
 ### Intelligent Component Updates
 
@@ -66,9 +69,10 @@ Edit `appsettings.json` to customize behavior:
 ```json
 {
   "UpdateCheckIntervalHours": 2,
-  "GitHubRepository": "swisscom/cdr-client",
   "WatchdogServiceName": "CDRClientWatchdog",
   "InstallationPath": "",
+  "PinnedVersion": "",
+  "MaxBackupsToKeep": 3,
   "CurrentVersions": {
     "Service": "1.0.0",
     "Watchdog": "1.0.0",
@@ -91,26 +95,43 @@ Edit `appsettings.json` to customize behavior:
 ### Configuration Parameters
 
 - **UpdateCheckIntervalHours**: How often to check for updates (default: 2 hours)
-- **GitHubRepository**: GitHub repository in format "owner/repo"
 - **WatchdogServiceName**: Name of the watchdog Windows service
 - **InstallationPath**: Root installation path (auto-detected if empty)
+- **PinnedVersion**: Pin to a specific version (empty = auto-update, "5.3.0" = stay on that version)
+- **MaxBackupsToKeep**: Number of backups to retain (default: 3)
 - **CurrentVersions**: Current installed versions (updated automatically after each update)
 - **Artifacts**: Configuration for each updateable component
-  - **FileName**: Template for GitHub release artifact name (use `{version}` placeholder)
+  - **FileName**: Template for artifact name (use `{version}` placeholder)
   - **TargetPath**: Where to install the artifact (relative to installation path)
 - **JavaExecutablePath**: Path to Java executable for running JARs
 
+### Security Features
+
+- **Hardcoded Update URL**: The Azure Storage URL (`https://cdr.health.swisscom.ch/share/downloads/manualInstallation`) is hardcoded in the service binary to prevent tampering via configuration files
+- **System Proxy Support**: Automatically uses Windows system proxy settings with default network credentials for corporate environments
+- **Checksum Verification**: All downloaded artifacts are verified against SHA256 checksums before installation
+
 ## Update Process
 
-When a new version is detected on GitHub:
+When a new version is detected in Azure Storage:
 
-1. **Fetch**: Query GitHub API for latest release
-2. **Download**: Download specified artifacts (Service JAR, optionally Watchdog ZIP)
-3. **Stop**: Stop watchdog service (which stops CDR service)
-4. **Apply**: Copy JAR to target location / Extract ZIP for watchdog
-5. **Config**: Update current versions in appsettings.json
-6. **Restart**: Restart watchdog service (which restarts CDR service using the new JAR)
-7. **Cleanup**: Delete temporary files
+1. **Discover**: Fetch `latest.json` to get current version pointer
+2. **Fetch Manifest**: Download `manifest.json` for that version
+3. **Download & Verify**: Download all artifacts and verify SHA256 checksums
+4. **Backup**: Create timestamped backup of current files
+5. **Stop**: Stop watchdog service (which stops CDR service)
+6. **Apply**: Copy JARs to target location / Extract ZIPs for watchdog
+7. **Config**: Update current versions in appsettings.json
+8. **Restart**: Restart watchdog service (which restarts CDR service with new JAR)
+9. **Verify**: Confirm watchdog is running
+10. **Cleanup**: Delete old backups (keep last 3), remove temporary files
+
+### Failure Handling
+
+If any step fails during update:
+- **Automatic Rollback**: Restore from backup
+- **Service Recovery**: Attempt to restart watchdog
+- **Logging**: Critical error logged with backup location for manual recovery
 
 ## Monitoring
 
@@ -134,14 +155,35 @@ sc query curaLINEClientUpdateService
 1. Check Event Log for error messages
 2. Verify CDRClientWatchdog service exists and is installed
 3. Verify `appsettings.json` configuration is valid
-4. Check GitHub repository accessibility
+4. Check Azure Storage URL accessibility: `https://cdr.health.swisscom.ch/share/downloads/manualInstallation/latest.json`
 
 ### Updates not being applied
 1. Check Event Log for download/extraction errors
-2. Verify network connectivity to GitHub
-3. Check that GitHub releases contain expected artifacts
+2. Verify network connectivity to Azure Storage
+3. Check that manifest contains expected artifacts
 4. Verify watchdog service can be stopped/started
-5. Verify Java executable path is correct
+5. Check for checksum verification failures
+6. Verify Java executable path is correct
+
+### Checksum verification failures
+1. Check Event Log for specific checksum mismatch details
+2. Re-download artifacts may be corrupted
+3. Verify Azure Storage artifacts integrity
+4. Check network proxy settings
+
+### Manual update rollback
+If automatic rollback fails:
+1. Check `backup-YYYYMMDD-HHMMSS` folders in installation directory
+2. Stop UpdateService and Watchdog
+3. Manually restore files from backup folder
+4. Restart services
+
+### Prevent automatic updates
+To temporarily disable updates:
+1. Edit `appsettings.json`
+2. Set `"PinnedVersion": "5.3.0"` (your current version)
+3. Restart UpdateService
+4. Updates will be skipped until PinnedVersion is cleared
 
 ### Manual update check
 To force an immediate update check, restart the service:
@@ -150,16 +192,44 @@ sc stop curaLINEClientUpdateService
 sc start curaLINEClientUpdateService
 ```
 
-## GitHub Release Artifacts
+## Azure Storage Release Structure
 
-For automatic updates to work, each GitHub release must include:
+For automatic updates to work, artifacts are published to Azure Storage with this structure:
 
-1. **cdr-client-service-{version}.jar** - Main service (required for every release)
-2. **CdrClientWatchdog-{version}.zip** - (Optional) Only when watchdog has changes
+```
+downloads/manualInstallation/
+├── latest.json                          # Points to current version
+├── 5.3.0/
+│   ├── manifest.json                    # Describes available artifacts
+│   ├── cdr-client-service-5.3.0.jar    # Service JAR (always included)
+│   └── CdrClientWatchdog-5.3.0.zip     # Watchdog (when changed)
+└── 5.3.1/
+    ├── manifest.json
+    ├── cdr-client-service-5.3.1.jar
+    └── CdrClientWatchdog-5.3.1.zip
+```
+
+### Manifest Format
+
+Each version has a `manifest.json`:
+```json
+{
+  "version": "5.3.1",
+  "releaseDate": "2026-06-01T10:00:00Z",
+  "artifacts": [
+    {
+      "name": "Service",
+      "fileName": "cdr-client-service-5.3.1.jar",
+      "url": "https://cdr.health.swisscom.ch/share/downloads/manualInstallation/5.3.1/cdr-client-service-5.3.1.jar",
+      "checksum": "sha256:abc123..."
+    }
+  ]
+}
+```
 
 The UpdateService is **not** auto-updated and its artifact is not checked by the service.
 
-See `RELEASE_ARTIFACTS.md` for build instructions.
+Publishing is automated via Azure Pipelines on every commit to `main`.
 
 ## Updating the Update Service
 
@@ -192,6 +262,3 @@ This service is primarily for Windows Server 2019 that don't support MSIX packag
 ---
 
 **Copyright © Swisscom (Schweiz) AG**
-
-
-

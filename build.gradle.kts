@@ -478,6 +478,66 @@ tasks.register("buildAll") {
     dependsOn(subprojects.map { "${it.path}:build" })
 }
 
+/**
+ * Builds all artifacts for manual Windows Server installation and prepares them for release
+ */
+tasks.register("buildManualInstallationArtifacts") {
+    group = "release"
+    description = "Builds all artifacts for manual Windows Server installation (service JAR, watchdog, updateservice)"
+
+    // Only depend on service JAR - watchdog and updateservice are built conditionally by the pipeline
+    dependsOn(":cdr-client-service:bootJar")
+
+    doLast {
+        val version = project.version.toString()
+        val releaseDir = file("release-artifacts")
+
+        // Clean and create release directory
+        delete(releaseDir)
+        releaseDir.mkdirs()
+
+        logger.info("Preparing manual installation artifacts for version $version...")
+
+        logger.info("Copying service JAR...")
+        copy {
+            from("cdr-client-service/build/libs")
+            include("cdr-client-service-*.jar")
+            into(releaseDir)
+        }
+
+        // Copy watchdog ZIP (only if it was built - buildWatchdogRelease creates publish-release/)
+        val watchdogPublishDir = file("cdr-client-watchdog/publish-release")
+        if (watchdogPublishDir.exists() && watchdogPublishDir.listFiles()?.isNotEmpty() == true) {
+            logger.info("Packaging watchdog...")
+            val watchdogZip = file("$releaseDir/CdrClientWatchdog-${version}.zip")
+            ant.invokeMethod("zip", mapOf(
+                "destfile" to watchdogZip,
+                "basedir" to watchdogPublishDir
+            ))
+            logger.info("Created: ${watchdogZip.name}")
+        } else {
+            logger.warn("Watchdog publish-release directory not found or empty - skipping watchdog artifact")
+        }
+
+        val updateServicePublishDir = file("cdr-client-updateservice/publish")
+        if (updateServicePublishDir.exists() && updateServicePublishDir.listFiles()?.isNotEmpty() == true) {
+            logger.info("Packaging update service...")
+            val updateServiceZip = file("$releaseDir/curaLINEClient-updateservice-${version}.zip")
+            ant.invokeMethod("zip", mapOf(
+                "destfile" to updateServiceZip,
+                "basedir" to updateServicePublishDir
+            ))
+            logger.info("Created: ${updateServiceZip.name}")
+        } else {
+            logger.warn("UpdateService publish directory not found or empty - skipping updateservice artifact")
+        }
+
+        logger.info("Manual installation artifacts prepared in: ${releaseDir.absolutePath}")
+        logger.info("Contents:")
+        releaseDir.listFiles()?.forEach { logger.info("  - ${it.name}") }
+    }
+}
+
 // Create a comprehensive clean task that includes watchdog
 tasks.register("cleanAll") {
     group = "build"
