@@ -435,8 +435,8 @@ tasks.register("buildUpdateService") {
             val currentVersion = project.version.toString()
             val appsettingsContent = appsettingsFile.readText()
             val updatedContent = appsettingsContent.replace(
-                """"Service": "1.0.0"""",
-                """"Service": "$currentVersion""""
+                """"1.0.0"""",
+                """"$currentVersion""""
             )
             appsettingsFile.writeText(updatedContent)
             logger.info("Updated Service version to: $currentVersion")

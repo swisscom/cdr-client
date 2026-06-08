@@ -45,8 +45,7 @@ if !ERRORLEVEL! == 0 (
     sc query "!SERVICE_NAME!" | findstr /I "RUNNING" >nul && (
         echo Service reached RUNNING state.
         echo.
-        echo The !SERVICE_NAME! service is now monitoring your curaLINE Client service.
-        echo It will automatically restart the service if it exits with a non-zero exit code.
+        echo The !SERVICE_NAME! is now checking for updates.
     ) || (
         echo Warning: Service did not reach RUNNING within !WAIT_SECONDS! seconds. Manual check is required.
         REM Show current sc query output for debugging

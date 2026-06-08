@@ -211,6 +211,14 @@ downloads/manualInstallation/
 
 ### Manifest Format
 
+Root has a `latest.json`:
+```json
+{
+  "version": "5.3.1",
+  "url": "https://cdr.health.swisscom.ch/share/downloads/manualInstallation/5.3.1/"
+}
+```
+
 Each version has a `manifest.json`:
 ```json
 {

@@ -159,18 +159,16 @@ steps:
       
       # Add service JAR (always present)
       SERVICE_FILE="cdr-client-service-${VERSION}.jar"
-      if [ -f "$MANIFEST_DIR/$SERVICE_FILE" ]; then
-        SERVICE_SHA=$(sha256sum "$MANIFEST_DIR/$SERVICE_FILE" | awk '{print $1}')
-        echo "Adding Service JAR: $SERVICE_FILE (sha256: ${SERVICE_SHA:0:16}...)"
-        
-        jq --arg name "Service" \
-           --arg file "$SERVICE_FILE" \
-           --arg url "$BASE_URL/$VERSION/$SERVICE_FILE" \
-           --arg checksum "sha256:$SERVICE_SHA" \
-           '.artifacts += [{"name": $name, "fileName": $file, "url": $url, "checksum": $checksum}]' \
-           "$MANIFEST_DIR/manifest.json" > "$MANIFEST_DIR/manifest.tmp.json"
-        mv "$MANIFEST_DIR/manifest.tmp.json" "$MANIFEST_DIR/manifest.json"
-      fi
+      SERVICE_SHA=$(sha256sum "$MANIFEST_DIR/$SERVICE_FILE" | awk '{print $1}')
+      echo "Adding Service JAR: $SERVICE_FILE (sha256: ${SERVICE_SHA:0:16}...)"
+      
+      jq --arg name "Service" \
+         --arg file "$SERVICE_FILE" \
+         --arg url "$BASE_URL/$VERSION/$SERVICE_FILE" \
+         --arg checksum "sha256:$SERVICE_SHA" \
+         '.artifacts += [{"name": $name, "fileName": $file, "url": $url, "checksum": $checksum}]' \
+         "$MANIFEST_DIR/manifest.json" > "$MANIFEST_DIR/manifest.tmp.json"
+      mv "$MANIFEST_DIR/manifest.tmp.json" "$MANIFEST_DIR/manifest.json"
       
       # Conditionally add watchdog if it was built
       WATCHDOG_FILE="CdrClientWatchdog-${VERSION}.zip"

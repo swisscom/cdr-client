@@ -128,8 +128,8 @@ public class UpdateService : BackgroundService
         try
         {
             // Wait a bit before first check to allow system to stabilize
-            _logger.LogInformation("Waiting 30 seconds for system stabilization before first update check...");
-            await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            _logger.LogInformation("Waiting 20 seconds for system stabilization before first update check...");
+            await Task.Delay(TimeSpan.FromSeconds(20), stoppingToken);
 
             // Perform first update check at startup
             _logger.LogInformation("Performing initial update check at startup...");
@@ -285,9 +285,28 @@ public class UpdateService : BackgroundService
     {
         try
         {
-            var remote = Version.Parse(remoteVersion);
-            var current = Version.Parse(currentVersion);
-            return remote > current;
+            // Handle semantic versioning with suffixes like "1.0.0-SNAPSHOT"
+            // Strip suffix and compare base versions, then consider suffix if base versions are equal
+            var (remoteBase, remoteSuffix) = ParseSemanticVersion(remoteVersion);
+            var (currentBase, currentSuffix) = ParseSemanticVersion(currentVersion);
+
+            var remote = Version.Parse(remoteBase);
+            var current = Version.Parse(currentBase);
+
+            // If base versions differ, that determines the result
+            if (remote > current) return true;
+            if (remote < current) return false;
+
+            // Base versions are equal - check suffixes
+            // A version without suffix (release) is newer than one with suffix (pre-release)
+            // e.g., "1.0.0" > "1.0.0-SNAPSHOT"
+            if (string.IsNullOrEmpty(remoteSuffix) && !string.IsNullOrEmpty(currentSuffix))
+                return true;  // Remote is release, current is pre-release
+            if (!string.IsNullOrEmpty(remoteSuffix) && string.IsNullOrEmpty(currentSuffix))
+                return false; // Remote is pre-release, current is release
+
+            // Both have suffixes or both don't - they're equal
+            return false;
         }
         catch (Exception ex)
         {
@@ -296,16 +315,25 @@ public class UpdateService : BackgroundService
         }
     }
 
+    private (string baseVersion, string? suffix) ParseSemanticVersion(string version)
+    {
+        // Handle versions like "1.0.0-SNAPSHOT" by splitting on the first hyphen
+        var parts = version.Split(new[] { '-' }, 2);
+        return parts.Length == 2
+            ? (parts[0], parts[1])
+            : (version, null);
+    }
+
     private async Task ApplyUpdates(ManifestInfo manifest, string newVersion, CancellationToken cancellationToken)
     {
         var updatedComponents = new List<string>();
         var backupPath = Path.Combine(_installationPath, $"backup-{DateTime.UtcNow:yyyyMMdd-HHmmss}");
+        var downloadedFiles = new Dictionary<string, string>();
 
         try
         {
             // Step 1: Download and verify ALL artifacts first (don't touch anything yet)
             _logger.LogInformation("Downloading and verifying artifacts...");
-            var downloadedFiles = new Dictionary<string, string>();
             var skippedComponents = new List<string>();
 
             foreach (var manifestArtifact in manifest.artifacts)
@@ -353,7 +381,9 @@ public class UpdateService : BackgroundService
             // Step 3: Stop the watchdog service (which stops the CDR service)
             _logger.LogInformation("Stopping watchdog service: {ServiceName}", _watchdogServiceName);
             StopWatchdogService();
-            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+
+            // Verify service is actually stopped before proceeding
+            VerifyWatchdogStopped();
 
             // Step 4: Apply updates for each component
             foreach (var (componentName, downloadedPath) in downloadedFiles)
@@ -411,18 +441,79 @@ public class UpdateService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Update failed! Attempting rollback from backup...");
+            HandleUpdateFailure(ex, updatedComponents, backupPath, downloadedFiles);
+        }
+    }
 
-            try
+    private void HandleUpdateFailure(
+        Exception ex,
+        List<string> updatedComponents,
+        string backupPath,
+        Dictionary<string, string> downloadedFiles)
+    {
+        _logger.LogError(ex, "Update failed at stage: {Stage}",
+            updatedComponents.Count == 0 ? "before file modifications" : $"after updating {updatedComponents.Count} component(s)");
+
+        try
+        {
+            if (updatedComponents.Count > 0)
             {
+                // Files were modified - need to restore from backup
+                _logger.LogWarning("Attempting rollback from backup...");
                 RestoreFromBackup(backupPath);
                 StartWatchdogService();
                 _logger.LogInformation("Rollback successful. System restored to previous state.");
             }
-            catch (Exception rollbackEx)
+            else
             {
-                _logger.LogCritical(rollbackEx, "ROLLBACK FAILED! Manual intervention required. Backup location: {BackupPath}", backupPath);
+                // Failed before modifying any files - no restore needed, just cleanup
+                _logger.LogInformation("No files were modified before failure - no restore needed. Cleaning up backup...");
+                if (Directory.Exists(backupPath))
+                {
+                    try
+                    {
+                        Directory.Delete(backupPath, recursive: true);
+                        _logger.LogInformation("Backup directory cleaned up: {BackupPath}", backupPath);
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        _logger.LogWarning(cleanupEx, "Failed to delete backup directory (non-critical): {BackupPath}", backupPath);
+                    }
+                }
+
+                // Ensure watchdog is running (might have been stopped)
+                using (var service = new ServiceController(_watchdogServiceName))
+                {
+                    service.Refresh();
+                    if (service.Status != ServiceControllerStatus.Running)
+                    {
+                        _logger.LogInformation("Restarting watchdog service after failed update...");
+                        StartWatchdogService();
+                    }
+                }
             }
+
+            // Cleanup downloaded temp files regardless of restore/cleanup path
+            _logger.LogDebug("Cleaning up downloaded temporary files...");
+            foreach (var path in downloadedFiles.Values)
+            {
+                try
+                {
+                    if (File.Exists(path))
+                    {
+                        File.Delete(path);
+                        _logger.LogDebug("Deleted temp file: {Path}", path);
+                    }
+                }
+                catch (Exception cleanupEx)
+                {
+                    _logger.LogWarning(cleanupEx, "Failed to delete temp file: {Path}", path);
+                }
+            }
+        }
+        catch (Exception rollbackEx)
+        {
+            _logger.LogCritical(rollbackEx, "ROLLBACK/CLEANUP FAILED! Manual intervention required. Backup location: {BackupPath}", backupPath);
         }
     }
 
@@ -472,17 +563,18 @@ public class UpdateService : BackgroundService
                     }
                 }
 
-                // Delete the entire directory to remove old files
-                Directory.Delete(targetPath, recursive: true);
-                _logger.LogDebug("Deleted old directory to ensure clean update");
+                // Delete the contents of the directory to remove old files
+                _logger.LogDebug("Deleting contents of directory: {TargetPath}", targetPath);
+                DeleteDirectoryContentsWithRetry(targetPath);
+                _logger.LogDebug("Deleted old files to ensure clean update");
             }
             else
             {
                 _logger.LogDebug("Target directory does not exist - this appears to be a fresh installation");
+                Directory.CreateDirectory(targetPath);
             }
 
             // Step 2: Extract new files
-            Directory.CreateDirectory(targetPath);
             _logger.LogInformation("Extracting ZIP to: {TargetPath}", targetPath);
             ZipFile.ExtractToDirectory(downloadedFilePath, targetPath);
 
@@ -576,6 +668,63 @@ public class UpdateService : BackgroundService
         }
     }
 
+    private void DeleteDirectoryContentsWithRetry(string path, int maxRetries = 5)
+    {
+        if (!Directory.Exists(path))
+        {
+            _logger.LogDebug("Directory does not exist, nothing to clean: {Path}", path);
+            return;
+        }
+
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try
+            {
+                var directory = new DirectoryInfo(path);
+
+                // Delete all files in the directory
+                foreach (var file in directory.GetFiles())
+                {
+                    file.Delete();
+                }
+
+                // Delete all subdirectories recursively
+                foreach (var subDirectory in directory.GetDirectories())
+                {
+                    subDirectory.Delete(recursive: true);
+                }
+
+                _logger.LogDebug("Successfully deleted contents of directory: {Path}", path);
+                return;
+            }
+            catch (IOException ex) when (i < maxRetries - 1)
+            {
+                // File might still be locked by recently stopped process - wait and retry
+                _logger.LogWarning("Failed to delete directory contents (attempt {Attempt}/{MaxRetries}): {Message}. Retrying in 2 seconds...",
+                    i + 1, maxRetries, ex.Message);
+                Thread.Sleep(TimeSpan.FromSeconds(2));
+            }
+            catch (UnauthorizedAccessException ex) when (i < maxRetries - 1)
+            {
+                // File might still be locked - wait and retry
+                _logger.LogWarning("Access denied deleting directory contents (attempt {Attempt}/{MaxRetries}): {Message}. Retrying in 2 seconds...",
+                    i + 1, maxRetries, ex.Message);
+                Thread.Sleep(TimeSpan.FromSeconds(2));
+            }
+        }
+
+        // Final attempt - let exception propagate if it still fails
+        var finalDirectory = new DirectoryInfo(path);
+        foreach (var file in finalDirectory.GetFiles())
+        {
+            file.Delete();
+        }
+        foreach (var subDirectory in finalDirectory.GetDirectories())
+        {
+            subDirectory.Delete(recursive: true);
+        }
+    }
+
     #endregion
 
     #region Backup and Restore
@@ -648,7 +797,11 @@ public class UpdateService : BackgroundService
                     // Restore directory
                     if (Directory.Exists(targetPath))
                     {
-                        Directory.Delete(targetPath, recursive: true);
+                        DeleteDirectoryContentsWithRetry(targetPath);
+                    }
+                    else
+                    {
+                        Directory.CreateDirectory(targetPath);
                     }
                     CopyDirectory(backupDir, targetPath);
                     _logger.LogInformation("Restored {Component} directory from backup", componentName);
@@ -811,6 +964,53 @@ public class UpdateService : BackgroundService
             }
 
             _logger.LogInformation("Verified watchdog service is running");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verifying watchdog service status");
+            throw;
+        }
+    }
+
+    private void VerifyWatchdogStopped()
+    {
+        try
+        {
+            var maxWaitTime = TimeSpan.FromSeconds(60);
+            var checkInterval = TimeSpan.FromSeconds(2);
+            var stopwatch = Stopwatch.StartNew();
+
+            while (stopwatch.Elapsed < maxWaitTime)
+            {
+                using var service = new ServiceController(_watchdogServiceName);
+                service.Refresh();
+
+                if (service.Status == ServiceControllerStatus.Stopped)
+                {
+                    _logger.LogInformation("Verified watchdog service is stopped - safe to proceed with file operations (verified after {Elapsed:F1}s)",
+                        stopwatch.Elapsed.TotalSeconds);
+                    return;
+                }
+
+                _logger.LogWarning("Watchdog service status is {Status} (expected Stopped). Waiting {CheckInterval}s before retry... ({Elapsed:F1}s elapsed)",
+                    service.Status, checkInterval.TotalSeconds, stopwatch.Elapsed.TotalSeconds);
+
+                Thread.Sleep(checkInterval);
+            }
+
+            // Final check after timeout
+            using (var service = new ServiceController(_watchdogServiceName))
+            {
+                service.Refresh();
+                _logger.LogError("Watchdog service is not stopped after {Timeout}s. Status: {Status}. Cannot safely perform file operations.",
+                    maxWaitTime.TotalSeconds, service.Status);
+                throw new InvalidOperationException($"Watchdog service must be stopped before updates. Current status after {maxWaitTime.TotalSeconds}s: {service.Status}");
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // Re-throw our custom exception as-is
+            throw;
         }
         catch (Exception ex)
         {

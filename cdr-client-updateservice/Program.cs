@@ -51,5 +51,3 @@ public class Program
         await builder.Build().RunAsync();
     }
 }
-
-

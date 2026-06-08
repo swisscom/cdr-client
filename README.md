@@ -158,8 +158,11 @@ You can use [Hydraulic Conveyor](https://conveyor.hydraulic.dev) to build instal
 Run following to build the project and create and install the package on your DEBIAN system:
 ```
 ./gradlew cleanAll buildAll -x test && conveyor -f conveyor-dev.conf make site && sudo dpkg -i output/debian/swisscom-schweiz-ag-cdr-client_1.0.0_amd64.deb
-#### or
-./gradlew cleanAll buildAll -x test && conveyor -f conveyor_w2019-dev.conf make site --output-dir=output_w2019
+```
+
+Run the following to build all artifacts for manual installation (placed in the release-artifacts folder):
+```
+./gradlew cleanAll :cdr-client-service:bootJar buildWatchdogRelease buildUpdateService buildManualInstallationArtifacts
 ```
 
 ### Running the Fat-JAR
