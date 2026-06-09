@@ -109,7 +109,6 @@ Edit `appsettings.json` to customize behavior:
 
 - **Hardcoded Update URL**: The Azure Storage URL (`https://cdr.health.swisscom.ch/share/downloads/manualInstallation`) is hardcoded in the service binary to prevent tampering via configuration files
 - **System Proxy Support**: Automatically uses Windows system proxy settings with default network credentials for corporate environments
-- **Checksum Verification**: All downloaded artifacts are verified against SHA256 checksums before installation
 
 ## Update Process
 
