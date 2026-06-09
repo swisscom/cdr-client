@@ -15,7 +15,6 @@ import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientSecret
 import com.swisscom.health.des.cdr.client.config.PropertyNameAware
 import com.swisscom.health.des.cdr.client.config.ProxyPassword
-import com.swisscom.health.des.cdr.client.config.toDto
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.origin.Origin
 import org.springframework.boot.origin.OriginLookup
@@ -421,7 +420,7 @@ internal class ConfigurationWriter(
 
     private fun validate(config: CdrClientConfig): Map<String, ValidationMessageKey> {
         logger.debug { "config to validate: '$config'" }
-        return when (val validateAllConfigurationItems: ValidationResult = configValidationService.validateAllConfigurationItems(config.toDto())) {
+        return when (val validateAllConfigurationItems: ValidationResult = configValidationService.validateAllConfigurationItems(config)) {
             is ValidationResult.Success -> emptyMap()
             is ValidationResult.Failure -> validateAllConfigurationItems.validationDetails.associate { detail ->
                 when (detail) {

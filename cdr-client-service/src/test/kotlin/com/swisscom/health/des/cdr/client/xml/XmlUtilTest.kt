@@ -1,7 +1,6 @@
 package com.swisscom.health.des.cdr.client.xml
 
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.params.ParameterizedTest
@@ -9,13 +8,6 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.xml.sax.SAXParseException
 
 internal class XmlUtilTest {
-
-    private lateinit var xmlUtil: XmlUtil
-
-    @BeforeEach
-    fun setUp() {
-        xmlUtil = XmlUtil()
-    }
 
     @ParameterizedTest
     @CsvSource(
@@ -29,7 +21,7 @@ internal class XmlUtilTest {
     fun `test find schema definition`(invoiceFile: String, uri: String) {
         this::class.java.getResourceAsStream(invoiceFile)?.use {
             it.toDom().let { dom ->
-                val schema = xmlUtil.findSchemaDefinition(dom)
+                val schema = dom.fdDocType
                 assertEquals(DocumentType.fromUri(uri), schema)
             }
         }
@@ -39,7 +31,7 @@ internal class XmlUtilTest {
     fun `test fail finding schema definition`() {
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><hello/>".byteInputStream().use {
             it.toDom().let { dom ->
-                val findSchemaDefinition = xmlUtil.findSchemaDefinition(dom)
+                val findSchemaDefinition = dom.fdDocType
                 assertEquals(DocumentType.UNDEFINED, findSchemaDefinition)
             }
         }

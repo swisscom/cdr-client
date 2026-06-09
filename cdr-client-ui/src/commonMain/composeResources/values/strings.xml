@@ -44,11 +44,17 @@
     <string name="label_client_connector_mode">Connector mode</string>
     <string name="label_client_connector_mode_placeholder">Signals the curaLINE API the intended connector purpose</string>
     <string name="label_client_connector_upload_dirs">Upload Directories</string>
+    <string name="label_client_connector_error_dirs">Error Directories</string>
+    <string name="label_client_connector_archive_dirs">Archive Directories</string>
     <string name="label_client_connector_download_dirs">Download Directories</string>
     <string name="label_client_connector_error_dir">Error directory</string>
     <string name="label_client_connector_error_dir_placeholder">Files that failed to upload are moved here</string>
+    <string name="label_client_connector_doctype_error_dir">%1$s error directory</string>
+    <string name="label_client_connector_doctype_error_dir_placeholder">Default error directory if no document type specific directory is defined</string>
     <string name="label_client_connector_archive_dir">Archive directory</string>
     <string name="label_client_connector_archive_dir_placeholder">Files that were successfully processed are moved here</string>
+    <string name="label_client_connector_doctype_archive_dir">%1$s archive directory</string>
+    <string name="label_client_connector_doctype_archive_dir_placeholder">Default archive directory if no document type specific directory is defined</string>
     <string name="label_client_connector_base_source_dir">Default upload directory</string>
     <string name="label_client_connector_base_source_dir_placeholder">Default upload directory if no document type specific directory is defined</string>
     <string name="label_client_connector_doctype_source_dir">%1$s upload directory</string>
@@ -104,7 +110,9 @@
     <string name="error_is_placeholder">Placeholder value, needs to be replaced</string>
     <string name="error_is_credentials">Credential check failed. Either the given values are wrong or connection couldn't be established.</string>
     <string name="error_folder_name_used">Using the name 'error' for a directory is only allowed for error directories</string>
+    <string name="archive_folder_name_used">Using the name 'archive' for a directory is only allowed for archive directories</string>
     <string name="error_folder_overlaps_non_error">Error folders must not overlap with non-error directories</string>
+    <string name="archive_folder_overlaps_non_archive">Archive folders must not overlap with non-archive directories</string>
     <string name="error_folder_needs_absolute_path_error">Directories need to be defined with an absolute path (e.g. C:\home\myuser\archive)</string>
     <string name="error_proxy_url_must_start_with_http_or_https">Proxy URL must start with http:// or https://</string>
     <string name="error_proxy_url_invalid_format">Invalid proxy URL format</string>

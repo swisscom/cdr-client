@@ -129,6 +129,8 @@ class DTOs {
         CREDENTIAL_VALIDATION_FAILED,
         ERROR_AS_NON_ERROR_FOLDER_NAME_USED,
         ERROR_DIR_OVERLAPS_NON_ERROR_DIR,
+        ARCHIVE_AS_NON_ARCHIVE_FOLDER_NAME_USED,
+        ARCHIVE_DIR_OVERLAPS_NON_ARCHIVE_DIR,
         DIRECTORY_NEEDS_ABSOLUTE_PATH,
         PROXY_URL_MUST_START_WITH_HTTP_OR_HTTPS,
         PROXY_URL_INVALID_FORMAT
@@ -268,6 +270,8 @@ class DTOs {
             @Serializable
             data class DocTypeFolders(
                 val sourceFolder: String? = null,
+                val archiveFolder: String? = null,
+                val errorFolder: String? = null,
                 val targetFolder: String? = null,
             ) {
                 companion object {

@@ -393,7 +393,7 @@ internal class CdrConfigViewModel(
      */
     fun setConnectorArchiveDir(archiveDir: String, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorArchiveDir: '$archiveDir'" }
-        val updatedConnector: DTOs.CdrClientConfig.Connector = connector.copy(sourceArchiveFolder = archiveDir)
+        val updatedConnector: DTOs.CdrClientConfig.Connector = connector.copy(sourceArchiveFolder = archiveDir.ifBlank { null })
         replaceConnector(connector, updatedConnector)
     }
 
@@ -417,7 +417,7 @@ internal class CdrConfigViewModel(
      */
     fun setConnectorErrorDir(errorDir: String, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorErrorDir: '$errorDir'" }
-        val updatedConnector: DTOs.CdrClientConfig.Connector = connector.copy(sourceErrorFolder = errorDir)
+        val updatedConnector: DTOs.CdrClientConfig.Connector = connector.copy(sourceErrorFolder = errorDir.ifBlank { null })
         replaceConnector(connector, updatedConnector)
     }
 
@@ -513,6 +513,44 @@ internal class CdrConfigViewModel(
         logger.debug { "setConnectorDocTypeSourceDir: '$docType' -> '$sourceDir'" }
         val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
             connector.docTypeFolders[docType]?.copy(sourceFolder = sourceDir) ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceDir)
+        val updatedConnector: DTOs.CdrClientConfig.Connector = updateDocTypeDirs(connector, docTypeFolders, docType)
+        replaceConnector(connector, updatedConnector)
+    }
+
+    /**
+     * Sets the error directory for a specific document type in the connector in the client
+     * service configuration. The document type specific error directory can either be relative
+     * (to the base source directory) or absolute.
+     *
+     * @param docType The document type for which to set the error directory.
+     * @param errorDir The error directory to use for this document type.
+     * @param connector The connector to update.
+     * @see DTOs.CdrClientConfig.DocumentType
+     */
+    fun setConnectorDocTypeErrorDir(docType: DTOs.CdrClientConfig.DocumentType, errorDir: String, connector: DTOs.CdrClientConfig.Connector) {
+        logger.debug { "setConnectorDocTypeErrorDir: '$docType' -> '$errorDir'" }
+        val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
+            connector.docTypeFolders[docType]?.copy(errorFolder = errorDir.ifBlank { null })
+                ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(errorFolder = errorDir.ifBlank { null })
+        val updatedConnector: DTOs.CdrClientConfig.Connector = updateDocTypeDirs(connector, docTypeFolders, docType)
+        replaceConnector(connector, updatedConnector)
+    }
+
+    /**
+     * Sets the archive directory for a specific document type in the connector in the client
+     * service configuration. The document type specific archive directory can either be relative
+     * (to the base source directory) or absolute.
+     *
+     * @param docType The document type for which to set the archive directory.
+     * @param archiveDir The archive directory to use for this document type.
+     * @param connector The connector to update.
+     * @see DTOs.CdrClientConfig.DocumentType
+     */
+    fun setConnectorDocTypeArchiveDir(docType: DTOs.CdrClientConfig.DocumentType, archiveDir: String, connector: DTOs.CdrClientConfig.Connector) {
+        logger.debug { "setConnectorDocTypeArchiveDir: '$docType' -> '$archiveDir'" }
+        val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
+            connector.docTypeFolders[docType]?.copy(archiveFolder = archiveDir.ifBlank { null })
+                ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(archiveFolder = archiveDir.ifBlank { null })
         val updatedConnector: DTOs.CdrClientConfig.Connector = updateDocTypeDirs(connector, docTypeFolders, docType)
         replaceConnector(connector, updatedConnector)
     }

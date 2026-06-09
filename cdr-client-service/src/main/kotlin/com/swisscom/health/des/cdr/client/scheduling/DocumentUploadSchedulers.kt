@@ -7,9 +7,11 @@ import com.swisscom.health.des.cdr.client.TraceSupport.startSpan
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.FileBusyTester
-import com.swisscom.health.des.cdr.client.config.getConnectorForSourceFile
+import com.swisscom.health.des.cdr.client.config.getConnectorBySourceFolder
 import com.swisscom.health.des.cdr.client.handler.RetryUploadFileHandling
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
+import com.swisscom.health.des.cdr.client.xml.DocumentType
+import com.swisscom.health.des.cdr.client.xml.extractDocumentType
 import io.github.irgaly.kfswatch.KfsDirectoryWatcher
 import io.github.irgaly.kfswatch.KfsDirectoryWatcherEvent
 import io.github.irgaly.kfswatch.KfsEvent
@@ -69,13 +71,13 @@ internal class EventTriggerUploadScheduler(
     private val config: CdrClientConfig,
     private val schedulingValidationService: SchedulingValidationService,
     private val tracer: Tracer,
-    @param:Value("\${management.tracing.sampling.probability:0.0}")
+    @param:Value($$"${management.tracing.sampling.probability:0.0}")
     private val samplerProbability: Double,
     @Qualifier("limitedParallelismCdrUploadsDispatcher")
     cdrUploadsDispatcher: CoroutineDispatcher,
     retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
-    fileBusyTester: FileBusyTester
+    fileBusyTester: FileBusyTester,
 ) : BaseUploadScheduler(
     config = config,
     retryUploadFileHandling = retryUploadFileHandling,
@@ -104,7 +106,7 @@ internal class EventTriggerUploadScheduler(
 
         logger.info { "Renaming '.$RESTART_FILE_EXTENSION' files to '.xml' in source directories..." }
         config.customer.forEach { connector ->
-            val allSourceFolders: List<Path> = listOf(connector.sourceFolder) + connector.getAllSourceDocTypeFolders()
+            val allSourceFolders: Collection<Path> = connector.getEffectiveSourceFolders().values.distinct()
             allSourceFolders.forEach { dir ->
                 if (Files.exists(dir) && Files.isDirectory(dir)) {
                     dir.listDirectoryEntries("*.$RESTART_FILE_EXTENSION").forEach { file ->
@@ -128,9 +130,7 @@ internal class EventTriggerUploadScheduler(
         if (schedulingValidationService.isSchedulingAllowed) {
             logger.info { "Starting file watcher process..." }
             config.customer.forEach { connector ->
-                logger.info { "Watching source directory: '${connector.sourceFolder}'" }
-                connector.effectiveDocTypeFolders.filter { map -> map.value.sourceFolder != null }
-                    .forEach { (_, typeFolders) -> logger.info { "Watching additional source directory: '${connector.effectiveSourceFolder(typeFolders)}'" } }
+                logger.info { "Watching source directories for connector '${connector.connectorId}': '${connector.getEffectiveSourceFolders()}'" }
             }
 
             coroutineScope {
@@ -156,10 +156,9 @@ internal class EventTriggerUploadScheduler(
     )
 
     private suspend fun watchForNewFilesToUpload(watcher: KfsDirectoryWatcher): Flow<Pair<Path, Span>> {
-        val sourceTypeDirectories: List<Path> = config.customer.map { it.getAllSourceDocTypeFolders() }.flatten()
-        val directories = config.customer.map { it.sourceFolder } + sourceTypeDirectories
+        val sourceDirectories: List<Path> = config.customer.flatMap { it.getEffectiveSourceFolders().values.distinct() }
 
-        addWatchedPaths(watcher, directories)
+        addWatchedPaths(watcher, sourceDirectories)
 
         return watcher.onEventFlow
             .onCompletion { error: Throwable? ->
@@ -228,7 +227,7 @@ internal class PollingUploadScheduler(
     private val tracer: Tracer,
     @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
-    @param:Value("\${management.tracing.sampling.probability:1.0}")
+    @param:Value($$"${management.tracing.sampling.probability:1.0}")
     private val samplerProbability: Double,
     retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
@@ -263,13 +262,10 @@ internal class PollingUploadScheduler(
             logger.info { "Starting directory polling process..." }
             config.scheduleDelay.toString().substring(2).replace("""(\d[HMS])(?!$)""".toRegex(), "$1 ").lowercase().let { humanReadableDelay ->
                 config.customer.forEach { connector ->
-                    logger.info { "Polling source directory every '$humanReadableDelay': '${connector.sourceFolder}'" }
-                    connector.effectiveDocTypeFolders.filter { map -> map.value.sourceFolder != null }
-                        .forEach { (_, typeFolders) ->
-                            logger.info {
-                                "Polling additional source directory every '$humanReadableDelay': '${connector.effectiveSourceFolder(typeFolders)}'"
-                            }
-                        }
+                    logger.info {
+                        "Polling source directory every '$humanReadableDelay' for connector " +
+                                "'${connector.connectorId}': '${connector.getEffectiveSourceFolders()}'"
+                    }
                 }
             }
             coroutineScope {
@@ -300,21 +296,20 @@ internal class PollingUploadScheduler(
             while (true) {
                 config.customer
                     .asSequence()
-                    .map {
-                        startSpan(tracer, "poll directory ${it.sourceFolder}") {
-                            logger.debug { "Polling source directory for files: ${it.sourceFolder}" }
-                            it.getAllSourceDocTypeFolders().forEach { dir -> logger.debug { "Polling additional source directory for files: $dir" } }
-                            it
+                    .map { connector ->
+                        startSpan(tracer, "poll directory ${connector.sourceFolder}") {
+                            logger.debug { "Polling source directories for files: ${connector.getEffectiveSourceFolders().values.distinct()}" }
+                            connector
                         }
                     }
                     .flatMap { (connector, span) ->
-                        val allSourceFolders: List<Path> = listOf(connector.sourceFolder) + connector.getAllSourceDocTypeFolders()
-                        allSourceFolders.flatMap { dir ->
-                            dir.listDirectoryEntries()
-                                .asSequence()
-                                .sortedBy { Files.readAttributes(it, BasicFileAttributes::class.java).lastModifiedTime() }
-                                .map { path -> path to tracer.nextSpan(span)!! }
-                        }
+                        connector.getEffectiveSourceFolders().values.distinct()
+                            .flatMap { dir ->
+                                dir.listDirectoryEntries()
+                                    .asSequence()
+                                    .sortedBy { Files.readAttributes(it, BasicFileAttributes::class.java).lastModifiedTime() }
+                                    .map { path -> path to tracer.nextSpan(span)!! }
+                            }
                     }.forEach { (path, span) ->
                         emit(path.absolute() to span)
                     }
@@ -349,7 +344,7 @@ internal abstract class BaseUploadScheduler(
     private val cdrUploadsDispatcher: CoroutineDispatcher,
     private val processingInProgressCache: ObjectKache<String, Path>,
     private val tracer: Tracer,
-    private val fileBusyTester: FileBusyTester
+    private val fileBusyTester: FileBusyTester,
 ) {
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
@@ -396,7 +391,7 @@ internal abstract class BaseUploadScheduler(
                     logger.info { "queuing '${file}' for upload" }
                     launch(SpanContextElement(span, tracer)) {
                         runCatching {
-                            dispatchForUpload(file)
+                            dispatchForUpload(file, file.extractDocumentType())
                         }.fold(
                             onSuccess = { uploaded -> logger.info { "'$file' ${if (uploaded) "uploaded or error handled" else "not uploaded"}" } },
                             onFailure = { t: Throwable ->
@@ -430,12 +425,12 @@ internal abstract class BaseUploadScheduler(
             .collect()
     }
 
-    private suspend fun dispatchForUpload(file: Path): Boolean =
-        config.customer.getConnectorForSourceFile(file).let { connector ->
+    private suspend fun dispatchForUpload(file: Path, docType: DocumentType): Boolean =
+        config.customer.getConnectorBySourceFolder(file, docType).let { connector ->
             if (!file.isBusy()) {
                 // limit parallelism of uploads; cdrUploadsDispatcher is defined as a limited parallelism IO dispatcher
                 withContext(cdrUploadsDispatcher) {
-                    retryUploadFileHandling.uploadRetrying(file, connector)
+                    retryUploadFileHandling.uploadRetrying(file, docType, connector)
                 }
                 true
             } else {

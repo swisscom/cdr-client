@@ -10,6 +10,7 @@ object Constants {
 
     const val EMPTY_STRING: String = ""
     const val ERROR_DIR_NAME: String = "error"
+    const val ARCHIVE_DIR_NAME: String = "archive"
     const val RESTART_FILE_EXTENSION: String = "clientRestartRequired"
 
     const val CONFIG_CHANGE_EXIT_CODE = 29

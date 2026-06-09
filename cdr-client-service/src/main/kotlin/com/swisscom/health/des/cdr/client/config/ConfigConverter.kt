@@ -55,6 +55,8 @@ internal fun Connector.toDto(): DTOs.CdrClientConfig.Connector {
         return map { (key, value) ->
             DTOs.CdrClientConfig.DocumentType.entries.first { it.name == key.name } to DTOs.CdrClientConfig.Connector.DocTypeFolders(
                 sourceFolder = value.sourceFolder?.toString(),
+                errorFolder = value.errorFolder?.toString(),
+                archiveFolder = value.archiveFolder?.toString(),
                 targetFolder = value.targetFolder?.toString(),
             )
         }.toMap()
@@ -145,28 +147,29 @@ internal fun DTOs.CdrClientConfig.ProxyConfig.toCdrClientConfig(): ProxyConfig {
     }
 }
 
-internal fun DTOs.CdrClientConfig.Connector.toCdrClientConfig(): Connector {
-    fun Map<DTOs.CdrClientConfig.DocumentType, DTOs.CdrClientConfig.Connector.DocTypeFolders>.toCdrClientConfig():
-            Map<DocumentType, Connector.DocTypeFolders> =
-        map { (key, value) ->
-            DocumentType.valueOf(key.name) to Connector.DocTypeFolders(
-                sourceFolder = if (value.sourceFolder != null) Path.of(value.sourceFolder!!) else null,
-                targetFolder = if (value.targetFolder != null) Path.of(value.targetFolder!!) else null,
-            )
-        }.toMap()
-
-    return Connector(
+internal fun DTOs.CdrClientConfig.Connector.toCdrClientConfig(): Connector =
+    Connector(
         connectorId = ConnectorId(connectorId),
         targetFolder = Path.of(targetFolder),
         sourceFolder = Path.of(sourceFolder),
         contentType = contentType,
         sourceArchiveEnabled = sourceArchiveEnabled,
-        sourceArchiveFolder = if (sourceArchiveFolder != null) Path.of(sourceArchiveFolder!!) else null,
-        sourceErrorFolder = if (sourceErrorFolder != null) Path.of(sourceErrorFolder!!) else null,
+        sourceArchiveFolder = sourceArchiveFolder?.let { Path.of(it) },
+        sourceErrorFolder = sourceErrorFolder?.let { Path.of(it) },
         mode = CdrClientConfig.Mode.valueOf(mode.name),
         docTypeFolders = docTypeFolders.toCdrClientConfig(),
     )
-}
+
+internal fun Map<DTOs.CdrClientConfig.DocumentType, DTOs.CdrClientConfig.Connector.DocTypeFolders>.toCdrClientConfig():
+        Map<DocumentType, Connector.DocTypeFolders> =
+    map { (key, value) ->
+        DocumentType.valueOf(key.name) to Connector.DocTypeFolders(
+            sourceFolder = value.sourceFolder?.let { Path.of(it) },
+            errorFolder = value.errorFolder?.let { Path.of(it) },
+            archiveFolder = value.archiveFolder?.let { Path.of(it) },
+            targetFolder = value.targetFolder?.let { Path.of(it) },
+        )
+    }.toMap()
 
 internal inline fun <reified T : Endpoint> DomainObjects.ApiEndpoint.toCdrClientConfig(type: KClass<T>): T =
     when (type) {

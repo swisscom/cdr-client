@@ -97,7 +97,7 @@ internal class EventPushFileHandlingTest {
 
     @BeforeEach
     fun setup() {
-        val sourceDir0 = tmpDir.resolve(sourceDirectory).also { it.createDirectories() }
+        val sourceDir0 = tmpDir.resolve(sourceDirectory).also { it.resolve(ERROR_DIR_NAME).createDirectories() }
         val targetDir0 = tmpDir.resolve(targetDirectory).also { it.createDirectories() }
 
         every { config.cdrApi } returns CdrApi(
@@ -193,12 +193,12 @@ internal class EventPushFileHandlingTest {
         val payload2 = sourceDir.resolve("dummy-2.xml.tmp")
         payload2.outputStream().use { it.write("Hello 2".toByteArray()) }
 
-        assertEquals(2, sourceDir.listDirectoryEntries().size)
+        assertEquals(2, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
 
-        await().during(1000L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.isEmpty() }
+        await().during(1000L, TimeUnit.MILLISECONDS).until { sourceDir.listDirectoryEntries().none { it.isRegularFile() } }
 
         await().during(100L, TimeUnit.MILLISECONDS).until({
             tmpDir.walk().filter { it.isRegularFile() }.toList()
@@ -210,7 +210,7 @@ internal class EventPushFileHandlingTest {
         await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
 
         // processed files should be removed from source directory
-        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.isEmpty() }
+        await().during(100L, TimeUnit.MILLISECONDS).until { sourceDir.listDirectoryEntries().none { it.isRegularFile() } }
     }
 
     @Test
@@ -224,10 +224,10 @@ internal class EventPushFileHandlingTest {
         val payload3 = sourceDir.resolve("dummy-3.log")
         payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
 
-        assertEquals(3, sourceDir.listDirectoryEntries().size)
+        assertEquals(3, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         // polling process must leave non-xml files where they are
-        await().during(1000L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.size == 3 }
+        await().during(1000L, TimeUnit.MILLISECONDS).until { sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size == 3 }
 
         assertEquals(0, cdrServiceMock.requestCount)
 
@@ -258,7 +258,7 @@ internal class EventPushFileHandlingTest {
         val payload3 = sourceDir.resolve("dummy-3.xml.tmp")
         payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
 
-        assertEquals(3, sourceDir.listDirectoryEntries().size)
+        assertEquals(3, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
@@ -276,7 +276,7 @@ internal class EventPushFileHandlingTest {
 
         // ignored files like the error and response files don't get processed and thus are not supposed to be in the processing cache
         await().during(100L, TimeUnit.MILLISECONDS).until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
-        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.size == 1  }
+        await().during(100L, TimeUnit.MILLISECONDS).until { sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size == 1 }
     }
 
     @Test
@@ -300,7 +300,7 @@ internal class EventPushFileHandlingTest {
         val payload3 = sourceDir.resolve("dummy-3.xml.tmp")
         payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
 
-        assertEquals(3, sourceDir.listDirectoryEntries().size)
+        assertEquals(3, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
@@ -321,7 +321,7 @@ internal class EventPushFileHandlingTest {
 
         // error and response files are written to a subdirectory of the source directory
         await().during(100L, TimeUnit.MILLISECONDS).until(errorDir::listDirectoryEntries) { it.size == 2 }
-        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.none { it.isRegularFile() } }
+        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { paths -> paths.none { path -> path.isRegularFile() } }
     }
 
     @Test
@@ -339,7 +339,7 @@ internal class EventPushFileHandlingTest {
         val payloadWithThreeUuids = sourceDir.resolve("${prefix}_${uuid1}_${uuid2}_${uuid3}.xml.tmp")
         payloadWithThreeUuids.outputStream().use { it.write("Document content".toByteArray()) }
 
-        assertEquals(1, sourceDir.listDirectoryEntries().size)
+        assertEquals(1, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         // Rename the file to start processing
         Files.move(payloadWithThreeUuids, payloadWithThreeUuids.resolveSibling(payloadWithThreeUuids.nameWithoutExtension))
@@ -366,7 +366,7 @@ internal class EventPushFileHandlingTest {
 
         // Verify filename structure is maintained
         assertTrue(errorFileName.startsWith("${prefix}_$uuid1"), "Filename should start with ${prefix}_ and first UUID")
-        assertTrue(errorFileName.count{ it == '_'} >= 2, "Filename should have UUID separator")
+        assertTrue(errorFileName.count { it == '_' } >= 2, "Filename should have UUID separator")
 
         // Verify response file was also created
         val responseFiles = errorDir.listDirectoryEntries("*.response").toList()
@@ -374,7 +374,7 @@ internal class EventPushFileHandlingTest {
         assertEquals(errorFileName, responseFiles[0].nameWithoutExtension, "Response file should have same base name as error file")
 
         // Source directory should only have the error subdirectory
-        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { it.none { it.isRegularFile() } }
+        await().during(100L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { paths -> paths.none { path -> path.isRegularFile() } }
     }
 
     private companion object {

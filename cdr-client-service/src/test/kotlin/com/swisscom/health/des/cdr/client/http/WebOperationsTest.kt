@@ -105,12 +105,10 @@ internal class WebOperationsTest {
     fun setUp() {
         webOperationsAdvice = WebOperationsAdvice()
 
-        every { fileMonitoringService.monitoringStatus } returns mockk {
-            every { value } returns DTOs.FileMonitoringStatusResponse(
-                errorFileCount = 0,
-                oldTempFileCount = 0
-            )
-        }
+        every { fileMonitoringService.monitoringStatus } returns DTOs.FileMonitoringStatusResponse(
+            errorFileCount = 0,
+            oldTempFileCount = 0
+        )
         coEvery { fileMonitoringService.checkFileStatus() } returns Unit
 
         webOperations = WebOperations(

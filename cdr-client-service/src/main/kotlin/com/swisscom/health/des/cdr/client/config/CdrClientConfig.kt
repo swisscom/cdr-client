@@ -2,6 +2,7 @@ package com.swisscom.health.des.cdr.client.config
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Mode
@@ -17,8 +18,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import kotlin.io.path.absolute
 import kotlin.io.path.createDirectories
-
+import kotlin.io.path.isDirectory
 
 private val logger = KotlinLogging.logger {}
 
@@ -44,7 +46,7 @@ internal data class CdrClientConfig(
     /** Maximum data size of the cache for files in progress. The cache holds filenames, not the files themselves. */
     val filesInProgressCacheSize: DataSize,
 
-    /** Client credentials and tenant info used to authenticate against the OAUth identity provider (credential flow). */
+    /** Client credentials and tenant info used to authenticate against the OAuth identity provider (credential flow). */
     val idpCredentials: IdpCredentials,
 
     /** OAuth IdP URL. */
@@ -134,6 +136,7 @@ internal data class CdrClientConfig(
 /**
  * Clients identified by their customer id
  */
+@Suppress("TooManyFunctions")
 internal data class Connector(
 
     /** Unique identifier for the connector; log into CDR web app to look up your connector ID(s). */
@@ -196,89 +199,152 @@ internal data class Connector(
     override val propertyName: String
         get() = PROPERTY_NAME
 
-    companion object {
-        private const val PROPERTY_NAME = ""
-    }
+    @JsonIgnore
+    fun getEffectiveSourceFolders(): Map<DocumentType, Path> = DocumentType.entries.associateWith { getEffectiveSourceFolder(it) }
+
+    @JsonIgnore
+    fun getEffectiveSourceFolder(docType: DocumentType): Path =
+        effectiveDocTypeFolders[docType]?.sourceFolder?.let { docTypeSourceFolder ->
+            when (docTypeSourceFolder.isAbsolute) {
+                true -> docTypeSourceFolder
+                else -> sourceFolder.resolve(docTypeSourceFolder)
+            }
+        }
+            ?: sourceFolder
+
+    @JsonIgnore
+    fun getEffectiveTargetFolders(): Map<DocumentType, Path> = DocumentType.entries.associateWith { getEffectiveTargetFolder(it) }
+
+    @JsonIgnore
+    fun getEffectiveTargetFolder(docType: DocumentType): Path =
+        effectiveDocTypeFolders[docType]?.targetFolder?.let { docTypeTargetFolder ->
+            when (docTypeTargetFolder.isAbsolute) {
+                true -> docTypeTargetFolder
+                else -> targetFolder.resolve(docTypeTargetFolder)
+            }
+        }
+            ?: targetFolder
+
+    @JsonIgnore
+    fun getEffectiveArchiveFolders(): Map<DocumentType, Path?> = DocumentType.entries.associateWith { getEffectiveSourceArchiveFolder(it) }
 
     /**
-     * If [sourceArchiveEnabled] is set to `true` returns the archive directory with a subdirectory for the current date.
-     * The directory will be created if it does not exist.
-     * If [sourceArchiveEnabled] is `false` returns an empty path.
+     * If...
+     * * [sourceArchiveEnabled] is `true` and
+     *   * the doc type specific archive folder is a relative path, then it is resolved against effective doc type specific source folder
+     *   * the doc type specific archive folder is an absolute path, then it is returned as is
+     *   * the doc type specific archive folder is not set, then the base archive folder is returned
+     * * [sourceArchiveEnabled] is `false`, then `null` is returned
      *
      * @see sourceArchiveEnabled
      * @see sourceArchiveFolder
+     * @return the potentially document type specific archive path as an absolute path
      */
     @JsonIgnore
-    fun getEffectiveSourceArchiveFolder(): Path? =
+    fun getEffectiveSourceArchiveFolder(docType: DocumentType): Path? =
         if (sourceArchiveEnabled) {
-            createDirectoryIfMissing(
-                when (sourceArchiveFolder) {
-                    null -> sourceFolder.resolve("archive")
-                    sourceFolder -> sourceFolder.resolve("archive")
-                    else -> sourceArchiveFolder
-                }.resolve(getDateNow())
-            )
+            when (val docTypeArchiveFolder = effectiveDocTypeFolders[docType]?.archiveFolder) {
+                null -> {
+                    if (getEffectiveSourceFolder(docType) == sourceFolder) {
+                        getBaseSourceArchiveFolder() // no doc type specific source dir -> use base archive dir
+                    } else {
+                        getEffectiveSourceFolder(docType).resolve(ARCHIVE_DIR_NAME) //
+                    }
+                }
+
+                else -> when (docTypeArchiveFolder.isAbsolute) {
+                    true -> docTypeArchiveFolder
+                    false -> getEffectiveSourceFolder(docType).resolve(docTypeArchiveFolder)
+                }
+            } ?: getBaseSourceArchiveFolder()
         } else {
             null
         }
 
-    /**
-     * Returns all source directories for all document types of this connector. If a [DocTypeFolders.sourceFolder] is not set, the entry is omitted.
-     */
-    @JsonIgnore
-    fun getAllSourceDocTypeFolders(): List<Path> = this.effectiveDocTypeFolders.values.mapNotNull { this.effectiveSourceFolder(it) }
+    fun getDailyEffectiveSourceArchiveFolder(docType: DocumentType): Path? =
+        getEffectiveSourceArchiveFolder(docType)?.let { archiveRootFolder: Path ->
+            runCatching {
+                archiveRootFolder.resolve(getDateNow()).createDirectories()
+            }.getOrElse { t ->
+                logger.warn { "Failed to create daily archive folder ${archiveRootFolder.resolve(getDateNow())}: $t" }
+                archiveRootFolder // fallback to non-daily folder if creation of daily folder fails
+            }
+        }
 
     /**
-     * Returns the effective source directory for a given [DocTypeFolders] instance. If the [DocTypeFolders.sourceFolder] is not set, returns `null`.
-     * @see DocTypeFolders
+     * Returns the source archive folder as an absolute path; if no explicit archive folder config was set,
+     * the archive folder is created as a [ARCHIVE_DIR_NAME] subdirectory of [sourceFolder].
      */
     @JsonIgnore
-    fun effectiveSourceFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.sourceFolder?.let { this.sourceFolder.resolve(it) }
-
-    /**
-     * Returns the effective target directory for a given [DocTypeFolders] instance. If the [DocTypeFolders.targetFolder] is not set, returns `null`.
-     * @see DocTypeFolders
-     */
-    @JsonIgnore
-    fun effectiveTargetFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.targetFolder?.let { this.targetFolder.resolve(it) }
-
-    @Suppress("TooGenericExceptionCaught")
-    private fun createDirectoryIfMissing(path: Path): Path = try {
-        path.createDirectories()
-    } catch (t: Throwable) {
-        logger.error { "Failed to create directory '$path' for connector '$connectorId': $t" }
-        throw t
-    }
+    private fun getBaseSourceArchiveFolder(): Path? =
+        if (sourceArchiveEnabled) {
+            when (sourceArchiveFolder) {
+                null -> sourceFolder.resolve(ARCHIVE_DIR_NAME)
+                sourceFolder -> sourceFolder.resolve(ARCHIVE_DIR_NAME)
+                else -> sourceFolder.resolve(sourceArchiveFolder)
+            }.absolute()
+        } else {
+            null
+        }
 
     private fun getDateNow(): String = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
 
+    @JsonIgnore
+    fun getEffectiveErrorFolders(): Map<DocumentType, Path> = DocumentType.entries.associateWith { getEffectiveSourceErrorFolder(it) }
 
     /**
-     * Returns the effective source error folder path. The directory will be created if it does not exist.
+     * Returns the effective source error folder.
+     *
+     * If ...
+     * * the doc type specific error folder is a relative path, then it is resolved against the doc type specific source folder;
+     *   if the source folder is not set an exception is raised
+     * * the doc type specific error folder is an absolute path, it is returned as is
+     * * the doc type specific error folder is not set, then the base error folder is returned
+     *
+     * The effective error folder is returned as an absolute path.
      *
      * @see sourceErrorFolder
      * @see sourceFolder
+     *
+     * @return the computed, document type specific error folder as an absolute path
      */
     @JsonIgnore
-    fun getEffectiveSourceErrorFolder(): Path =
+    fun getEffectiveSourceErrorFolder(docType: DocumentType): Path =
+        when (val docTypeErrorFolder = effectiveDocTypeFolders[docType]?.errorFolder) {
+            null -> {
+                if (getEffectiveSourceFolder(docType) == sourceFolder) {
+                    getBaseSourceErrorFolder() // no doc type specific source dir -> use base errir dir
+                } else {
+                    getEffectiveSourceFolder(docType).resolve(ERROR_DIR_NAME) //
+                }
+            }
+
+            else -> when (docTypeErrorFolder.isAbsolute) {
+                true -> docTypeErrorFolder
+                false -> getEffectiveSourceFolder(docType).resolve(docTypeErrorFolder)
+            }
+        }
+
+    /**
+     * Returns the source error folder as an absolute path; if no explicit error folder config was set,
+     * the default error folder is a subdirectory of [sourceFolder].
+     */
+    @JsonIgnore
+    private fun getBaseSourceErrorFolder(): Path =
         when (sourceErrorFolder) {
             null -> sourceFolder.resolve(ERROR_DIR_NAME)
             sourceFolder -> sourceFolder.resolve(ERROR_DIR_NAME)
-            else -> sourceErrorFolder
-        }.let { createDirectoryIfMissing(it) }
+            else -> sourceFolder.resolve(sourceErrorFolder)
+        }.absolute()
 
     override fun toString(): String {
-        return "Connector(connectorId='$connectorId', targetFolder=$targetFolder, sourceFolder=$sourceFolder, " +
-                if (effectiveDocTypeFolders.isNotEmpty())
-                    "additionalDocTypeFolders=[${
-                        effectiveDocTypeFolders.entries.joinToString("; ") { "${it.key}=source=${it.value.sourceFolder},target=${it.value.targetFolder}" }
-                    }], "
-                else {
-                    EMPTY_STRING
-                } +
+        return "Connector(connectorId='$connectorId', baseTargetFolder=$targetFolder, baseSourceFolder=$sourceFolder, " +
+                "sourceFolders=${getEffectiveSourceFolders()}, " +
+                "targetFolders=${getEffectiveTargetFolders()}" +
                 "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
-                "effectiveSourceArchiveFolder=${getEffectiveSourceArchiveFolder()}, " +
-                "sourceErrorFolder=$sourceErrorFolder, effectiveSourceErrorFolder=${getEffectiveSourceErrorFolder()} " +
+                "baseSourceArchiveFolder=${getBaseSourceArchiveFolder()}, " +
+                "archiveFolders=${getEffectiveArchiveFolders()}" +
+                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${getBaseSourceErrorFolder()}, errorFolders=${getEffectiveErrorFolders()} " +
                 "mode=$mode)"
     }
 
@@ -287,8 +353,27 @@ internal data class Connector(
      */
     data class DocTypeFolders(
         val sourceFolder: Path? = null,
+        val archiveFolder: Path? = null,
+        val errorFolder: Path? = null,
         val targetFolder: Path? = null,
     )
+
+    companion object {
+        private const val PROPERTY_NAME = ""
+
+        @JvmStatic
+        val EMPTY = Connector(
+            connectorId = ConnectorId(EMPTY_STRING),
+            targetFolder = Paths.get(EMPTY_STRING),
+            sourceFolder = Paths.get(EMPTY_STRING),
+            contentType = EMPTY_STRING,
+            sourceArchiveEnabled = false,
+            sourceArchiveFolder = null,
+            sourceErrorFolder = null,
+            mode = Mode.TEST,
+            docTypeFolders = emptyMap(),
+        )
+    }
 }
 
 @JvmInline
@@ -654,5 +739,10 @@ private const val MASK_CHAR = '*'
 
 private fun String.isAllAsterisks(): Boolean = isNotEmpty() && all { it == MASK_CHAR }
 
-internal fun List<Connector>.getConnectorForSourceFile(file: Path): Connector =
-    this.first { it.sourceFolder == file.parent || it.getAllSourceDocTypeFolders().contains(file.parent) }
+internal fun List<Connector>.getConnectorBySourceFolder(file: Path, docType: DocumentType): Connector =
+    when (file.isDirectory()) {
+        true -> file
+        false -> file.parent
+    }.let { dir ->
+        this.first { it.getEffectiveSourceFolder(docType) == dir }
+    }
