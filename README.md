@@ -191,11 +191,12 @@ At the very least you have to configure a base source (upload) and target (downl
 * `client.customer[n].source-error-folder`; defaults to the path `error` relative to `client.customer[n].source-folder`
 
 The source and target directories above must be specified as absolute paths. Sort of to anchor a connector configuration in the file system. All other paths may
-be specified
-as either absolute or relative paths. Absolute paths are recommended as the connector configuration is more explicit that way. Relative paths may feel more
-concise.
+be specified as either absolute or relative paths. Absolute paths are recommended as the connector configuration is more explicit that way. Relative paths may
+feel more concise.
 
-Per document type directories are all optional:
+#### Per Document Type Directories
+
+Per document type directories are all optional
 
 * `client.customer[n].doc-type-folders[<doc-type>].target-folder`; defaults to `client.customer[n].target-folder`; if relative resolved against
   `client.customer[n].target-folder`
@@ -221,6 +222,14 @@ Legal values for `<doc-type>` are:
 * `CONTAINER`
 * `NOTIFICATION`
 * `FORM`
+
+#### Per Document Type Directories With Request/Response Split
+
+For all document types it is possible to enable split directories for request and response documents. (Technically there are no response documents for
+the `NOTIFICATION`, `CONTAINER`, and `PUSH_ADMIN_MSG` document types, but the configuration option is still available for all document types for consistency
+reasons.) If the split option is enabled for a document type, then a source and target directory must be provided for both request and response documents. Also,
+providing the archive and error directory becomes mandatory. All directories must be absolute paths. Under the provided archive and error directories the client
+creates two subdirectories named `request` and `response` to which the respective documents are archived or moved in case of an error.
 
 ### `application-customer` YAML Example
 

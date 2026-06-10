@@ -4,7 +4,6 @@ import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.TEMP_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.scheduling.BaseUploadScheduler.Companion.EXTENSION_XML
-import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -69,12 +68,12 @@ internal class FileMonitoringService(
     private fun countErrorFiles(): Int =
         config.customer.map { connector ->
             runCatching {
-                DocumentType.entries
+                connector.getEffectiveErrorFolders().values
                     .asSequence()
-                    .map { docType: DocumentType -> connector.getEffectiveSourceErrorFolder(docType) }
+                    .flatten()
+                    .distinct() // required because multiple document types might point to the same (default) error directory
                     .filter { errorFolder: Path -> errorFolder.exists() && errorFolder.isDirectory() }
                     .flatMap { errorFolder: Path -> Files.walk(errorFolder).asSequence() }
-                    .distinct() // required because multiple document types might point to the same (default) error directory
                     .count { file: Path -> file.isRegularFile() && file.extension.lowercase() == EXTENSION_XML }
                     .also { errorCount -> logger.debug { "Found '$errorCount' error file(s) for connector '${connector.connectorId}'" } }
             }.getOrElse { t: Throwable ->

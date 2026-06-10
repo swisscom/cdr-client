@@ -306,3 +306,11 @@ sealed interface FileBusyTester {
     }
 
 }
+
+/**
+ * Wrapper for proxy username-password credentials.
+ */
+internal data class ProxyCredentials(
+    val username: ProxyUsername,
+    val password: ProxyPassword,
+)

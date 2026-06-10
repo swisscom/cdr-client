@@ -6,15 +6,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Divider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DomainObjects
+import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_idp_settings_client_id
@@ -52,39 +46,35 @@ internal fun IdpSettingsGroup(
             Divider(modifier = modifier.padding(bottom = 8.dp))
         } else {
             // Client ID
-            var clientIdValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-            LaunchedEffect(uiState.clientServiceConfig.idpCredentials.clientId) {
-                clientIdValidationResult =
-                    remoteViewValidations.validateNotBlank(uiState.clientServiceConfig.idpCredentials.clientId, DomainObjects.ConfigurationItem.IDP_CLIENT_ID)
-            }
-            ValidatedTextField(
-                name = DomainObjects.ConfigurationItem.IDP_CLIENT_ID,
+            AsyncValidatedTextField(
                 modifier = modifier.fillMaxWidth(),
-                validatable = { clientIdValidationResult },
-                label = { Text(text = stringResource(Res.string.label_client_idp_settings_client_id)) },
+                name = ConfigurationItem.IDP_CLIENT_ID,
                 value = uiState.clientServiceConfig.idpCredentials.clientId,
-                placeHolder = { Text(text = stringResource(Res.string.label_client_idp_settings_client_id_placeholder)) },
                 onValueChange = { if (canEdit) viewModel.setIdpClientId(it) },
+                label = { Text(text = stringResource(Res.string.label_client_idp_settings_client_id)) },
+                placeHolder = { Text(text = stringResource(Res.string.label_client_idp_settings_client_id_placeholder)) },
+                asyncValidation = suspend {
+                    remoteViewValidations.validateNotBlank(uiState.clientServiceConfig.idpCredentials.clientId, ConfigurationItem.IDP_CLIENT_ID)
+                },
+                revalidationKey = uiState.clientServiceConfig.idpCredentials.clientId,
                 enabled = canEdit,
             )
 
             // Client password
-            var clientPasswordValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-            LaunchedEffect(uiState.clientServiceConfig.idpCredentials.clientSecret) {
-                clientPasswordValidationResult =
+            AsyncValidatedTextField(
+                modifier = modifier.fillMaxWidth(),
+                name = ConfigurationItem.IDP_CLIENT_PASSWORD,
+                value = uiState.clientServiceConfig.idpCredentials.clientSecret,
+                onValueChange = { if (canEdit) viewModel.setIdpClientPassword(it) },
+                label = { Text(text = stringResource(Res.string.label_client_idp_settings_client_secret)) },
+                placeHolder = { Text(text = stringResource(Res.string.label_client_idp_settings_client_secret_placeholder)) },
+                asyncValidation = suspend {
                     remoteViewValidations.validateNotBlank(
                         uiState.clientServiceConfig.idpCredentials.clientSecret,
-                        DomainObjects.ConfigurationItem.IDP_CLIENT_PASSWORD
+                        ConfigurationItem.IDP_CLIENT_PASSWORD
                     )
-            }
-            ValidatedTextField(
-                name = DomainObjects.ConfigurationItem.IDP_CLIENT_PASSWORD,
-                modifier = modifier.fillMaxWidth(),
-                validatable = { clientPasswordValidationResult },
-                label = { Text(text = stringResource(Res.string.label_client_idp_settings_client_secret)) },
-                value = uiState.clientServiceConfig.idpCredentials.clientSecret,
-                placeHolder = { Text(text = stringResource(Res.string.label_client_idp_settings_client_secret_placeholder)) },
-                onValueChange = { if (canEdit) viewModel.setIdpClientPassword(it) },
+                },
+                revalidationKey = uiState.clientServiceConfig.idpCredentials.clientSecret,
                 enabled = canEdit,
             )
 

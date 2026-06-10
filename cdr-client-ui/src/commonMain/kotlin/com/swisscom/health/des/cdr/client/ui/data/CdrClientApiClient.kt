@@ -43,16 +43,26 @@ internal class CdrClientApiClient {
         data class ServiceError(val errors: Map<String, Any>) : Result<Nothing>
     }
 
+    /**
+     * Validates that each connector id has a valid mode value and that each connector id has  at most
+     * one `TEST` and at most one `PRODUCTION` variant.
+     *
+     * @param validations mode related validations, currently always [DomainObjects.ValidationType.MODE_VALUE]
+     *   and[DomainObjects.ValidationType.MODE_OVERLAP]
+     * @param connectors the list of connectors to validate
+     * @return a [Result] carrying the [DTOs.ValidationResult], if the call was successful; or error
+     *   information otherwise
+     */
     suspend fun validateConnectorMode(
         validations: List<DomainObjects.ValidationType>,
         connectors: List<DTOs.CdrClientConfig.Connector>,
     ): Result<DTOs.ValidationResult> =
         putAnything<List<DTOs.CdrClientConfig.Connector>, DTOs.ValidationResult>(
-            CDR_CLIENT_VALIDATE_CONNECTOR_MODE.addQueryParams(
+            url = CDR_CLIENT_VALIDATE_CONNECTOR_MODE.addQueryParams(
                 *(validations.map { validation -> "validation" to validation.name }.toTypedArray())
             ),
-            connectors,
-            "Validate connector mode"
+            body = connectors,
+            action = "Validate connector mode"
         )
 
     /**
@@ -64,10 +74,8 @@ internal class CdrClientApiClient {
      */
     suspend fun validateValueIsNotBlank(value: String?): Result<List<DTOs.ValidationMessageKey>> =
         getAnything<List<DTOs.ValidationMessageKey>>(
-            CDR_CLIENT_VALIDATE_VALUE_NOT_BLANK_AND_NOT_PLACEHOLDER.addQueryParams(
-                "value" to value
-            ),
-            "Validate value is not blank"
+            url = CDR_CLIENT_VALIDATE_VALUE_NOT_BLANK_AND_NOT_PLACEHOLDER.addQueryParams("value" to value),
+            action = "Validate value is not blank"
         )
 
     /**
@@ -81,42 +89,37 @@ internal class CdrClientApiClient {
     suspend fun validateDirectory(
         config: DTOs.CdrClientConfig,
         directory: String?,
-        validations: List<DomainObjects.ValidationType>
+        validations: List<DomainObjects.ValidationType>,
     ): Result<DTOs.ValidationResult> =
         when (directory) {
             null -> Result.Success(DTOs.ValidationResult.Success)
             else -> {
                 putAnything<DTOs.CdrClientConfig, DTOs.ValidationResult>(
                     CDR_CLIENT_VALIDATE_DIRECTORY_URL
-                        .run {
-                            addQueryParams(
-                                "dir" to directory
-                            )
-                        }.run {
-                            addQueryParams(*(validations.map { validation -> "validation" to validation.name }.toTypedArray()))
-                        },
+                        .addQueryParams("dir" to directory)
+                        .addQueryParams(*(validations.map { validation -> "validation" to validation.name }.toTypedArray())),
                     config,
                     "Validate directory is read/writable"
                 )
             }
         }
 
-    suspend fun validateProxy(
-        config: DTOs.CdrClientConfig,
+    /**
+     * Performs basic validation that the proxy URL is either a `https` or `http` URL.
+     * (And not, for example, a `socks` URL.)
+     *
+     * @param url The proxy URL candidate
+     * @return A [Result] carrying the [DTOs.ValidationResult]
+     */
+    suspend fun validateProxyUrl(
         url: String?,
     ): Result<DTOs.ValidationResult> =
         when (url) {
             null -> Result.Success(DTOs.ValidationResult.Success)
             else -> {
-                putAnything<DTOs.CdrClientConfig, DTOs.ValidationResult>(
-                    CDR_CLIENT_VALIDATE_PROXY_URL
-                        .run {
-                            addQueryParams(
-                                "url" to url
-                            )
-                        },
-                    config,
-                    "Validate proxy is valid"
+                getAnything<DTOs.ValidationResult>(
+                    url = CDR_CLIENT_VALIDATE_PROXY_URL.addQueryParams("url" to url),
+                    action = "Validate proxy is valid"
                 )
             }
         }
@@ -139,9 +142,17 @@ internal class CdrClientApiClient {
     suspend fun updateClientServiceConfiguration(config: DTOs.CdrClientConfig): Result<DTOs.CdrClientConfig> =
         putAnything<DTOs.CdrClientConfig, DTOs.CdrClientConfig>(CDR_CLIENT_CONFIG_URL, config, "Update client service configuration")
 
+    /**
+     * Checks whether the supplied credentials allow a successful login (without persisting the
+     * credentials in the service configuration.)
+     *
+     * @param idpCredentials The client id and password
+     * @return A [Result] carrying the outcome of the login attempt
+     */
     suspend fun checkCredentials(idpCredentials: DTOs.CdrClientConfig.IdpCredentials): Result<DTOs.ValidationResult> =
         putAnything<DTOs.CdrClientConfig.IdpCredentials, DTOs.ValidationResult>(
-            VALIDATE_CREDENTIALS_URL, idpCredentials, "Check credential values")
+            VALIDATE_CREDENTIALS_URL, idpCredentials, "Check credential values"
+        )
 
     /**
      * Sends a command to the CDR client service to shut itself down. (The platform's service control
@@ -327,7 +338,7 @@ internal class CdrClientApiClient {
             initialDelay: Duration,
             maxDelay: Duration = 10.seconds,
             factor: Double,
-            block: suspend (Int) -> DTOs.StatusResponse
+            block: suspend (Int) -> DTOs.StatusResponse,
         ): DTOs.StatusResponse {
             var currentDelay: Duration = initialDelay
             repeat(times - 1) { retryCount ->

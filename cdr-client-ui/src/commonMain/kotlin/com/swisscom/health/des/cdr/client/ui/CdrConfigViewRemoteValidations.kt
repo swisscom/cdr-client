@@ -124,13 +124,12 @@ internal class CdrConfigViewRemoteValidations(
     /**
      * Validates that the given proxy URL is either empty or a valid HTTP/HTTPS URL format.
      *
-     * @param config the proxy URL to validate
+     * @param url the proxy URL to validate
      * @return a [DTOs.ValidationResult] indicating success or failure
      */
-    internal suspend fun validateProxyUrl(config: DTOs.CdrClientConfig): DTOs.ValidationResult =
-        cdrClientApiClient.validateProxy(
-            config = config,
-            url = config.proxyConfig.url,
+    internal suspend fun validateProxyUrl(url: String): DTOs.ValidationResult =
+        cdrClientApiClient.validateProxyUrl(
+            url = url,
         ).handle(
             configurationItem = DomainObjects.ConfigurationItem.PROXY_URL,
             onSuccess = { validationResult: DTOs.ValidationResult, _ -> validationResult }

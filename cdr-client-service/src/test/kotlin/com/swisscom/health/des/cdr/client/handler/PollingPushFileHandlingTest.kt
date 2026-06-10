@@ -21,6 +21,8 @@ import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
+import com.swisscom.health.des.cdr.client.xml.CommunicationType
+import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
 import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.mockk.every
 import kotlinx.coroutines.runBlocking
@@ -77,6 +79,9 @@ import kotlin.io.path.walk
 @ActiveProfiles("test", "noEventTriggerUploadScheduler", "noDownloadScheduler", "noFileMonitoringScheduler")
 @DirtiesContext(classMode = ClassMode.BEFORE_CLASS)
 internal class PollingPushFileHandlingTest {
+
+    private val docMetaNotification = DocumentMetaData(DocumentType.NOTIFICATION, CommunicationType.UNKNOWN)
+    private val docMetaInvoice = DocumentMetaData(DocumentType.INVOICE, CommunicationType.UNKNOWN)
 
     @SpykBean
     private lateinit var config: CdrClientConfig
@@ -253,7 +258,7 @@ internal class PollingPushFileHandlingTest {
         Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
 
-        val archiveDir = config.customer.first().getEffectiveSourceArchiveFolder(DocumentType.UNDEFINED)!!
+        val archiveDir = config.customer.first().getEffectiveSourceArchiveFolder(DocumentMetaData.UNKNOWN)!!
 
         await().during(1000L, TimeUnit.MILLISECONDS)
             .until({ sourceDir0.listDirectoryEntries() }) { paths -> paths.none { path -> path.isRegularFile() } }
@@ -305,9 +310,9 @@ internal class PollingPushFileHandlingTest {
             )
         )
 
-        config.customer.first().getEffectiveSourceArchiveFolder(DocumentType.INVOICE)!!
+        config.customer.first().getEffectiveSourceArchiveFolder(docMetaInvoice)!!
             .resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)).createDirectories()
-        config.customer.first().getEffectiveSourceArchiveFolder(DocumentType.NOTIFICATION)!!
+        config.customer.first().getEffectiveSourceArchiveFolder(docMetaNotification)!!
             .resolve(LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)).createDirectories()
 
         val mockResponse = MockResponse.Builder()
@@ -319,11 +324,11 @@ internal class PollingPushFileHandlingTest {
         cdrServiceMock.enqueue(mockResponse)
         cdrServiceMock.enqueue(mockResponse)
 
-        val invoiceSourceDir = config.customer.first().getEffectiveSourceFolder(DocumentType.INVOICE)
+        val invoiceSourceDir = config.customer.first().getEffectiveSourceFolder(docMetaInvoice)
         assertTrue(invoiceSourceDir.contains(Path.of("invoice")))
         assertTrue(invoiceSourceDir.startsWith(sourceDir0))
 
-        val notificationSourceDir = config.customer.first().getEffectiveSourceFolder(DocumentType.NOTIFICATION)
+        val notificationSourceDir = config.customer.first().getEffectiveSourceFolder(docMetaNotification)
         assertEquals(sourceDir0, notificationSourceDir)
 
         val payload1 = invoiceSourceDir.resolve("dummy.xml.tmp")
@@ -362,8 +367,8 @@ internal class PollingPushFileHandlingTest {
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
         Files.move(payload3, payload3.resolveSibling(payload3.nameWithoutExtension))
 
-        val invoiceArchiveDir = config.customer.first().getEffectiveSourceArchiveFolder(DocumentType.INVOICE)!!
-        val notificationArchiveDir = config.customer.first().getEffectiveSourceArchiveFolder(DocumentType.NOTIFICATION)!!
+        val invoiceArchiveDir = config.customer.first().getEffectiveSourceArchiveFolder(docMetaInvoice)!!
+        val notificationArchiveDir = config.customer.first().getEffectiveSourceArchiveFolder(docMetaNotification)!!
 
         assertEquals(invoiceSourceDir, invoiceArchiveDir.parent)
 
@@ -611,7 +616,7 @@ internal class PollingPushFileHandlingTest {
         Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
         Files.move(payload3, payload3.resolveSibling(payload3.nameWithoutExtension))
 
-        val errorDir = config.customer.first().getEffectiveSourceErrorFolder(DocumentType.INVOICE)
+        val errorDir = config.customer.first().getEffectiveSourceErrorFolder(docMetaInvoice)
         assertTrue(errorDir.contains(Path.of("invoice")))
 
         await().during(1, TimeUnit.SECONDS).until(cdrServiceMock::requestCount) { it == 3 }

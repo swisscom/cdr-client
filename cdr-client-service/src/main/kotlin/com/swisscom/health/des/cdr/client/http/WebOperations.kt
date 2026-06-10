@@ -250,14 +250,14 @@ internal class WebOperations(
         )
     )
 
-    @PutMapping("api/validate-proxy")
-    internal suspend fun validateProxy(
+    @GetMapping("api/validate-proxy")
+    internal suspend fun validateProxyUrl(
         @RequestParam(name = "url") url: String,
     ): ResponseEntity<ValidationResult> = runCatching {
         logger.debug { "validating mode for proxy: '$url'" }
         ResponseEntity
             .ok(
-                configValidationService.validateProxySetting(url)
+                configValidationService.validateProxyUrl(url)
             )
     }.getOrElse { error: Throwable ->
         when (error) {

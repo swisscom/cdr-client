@@ -466,6 +466,23 @@ internal class CdrConfigViewModel(
     }
 
     /**
+     * Enable/disable split directories for request and response documents for the given
+     * document type for the given connector.
+     *
+     * @param docType Document type to set the split setting on
+     * @param doSplit Whether to split directories for request/response documents
+     * @param connector Connector on which to apply the document type specific setting on
+     */
+    fun setConnectorDocTypeRequestResponseSplit(docType: DTOs.CdrClientConfig.DocumentType, doSplit: Boolean, connector: DTOs.CdrClientConfig.Connector) {
+        logger.debug { "setConnectorDocTypeRequestResponseSplit: '$docType' -> '$doSplit'" }
+        val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
+            connector.docTypeFolders[docType]?.copy(requestResponseSplit = doSplit)
+                ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(requestResponseSplit = doSplit)
+        val updatedConnector: DTOs.CdrClientConfig.Connector = updateDocTypeDirs(connector, docTypeFolders, docType)
+        replaceConnector(connector, updatedConnector)
+    }
+
+    /**
      * Sets the download directory for a specific document type in the connector in the client
      * service configuration. The document type specific target directory can either be relative
      * (to the base target directory) or absolute.
@@ -486,7 +503,41 @@ internal class CdrConfigViewModel(
     }
 
     /**
-     * Sets the base source directory for the connector in the client service configuration.
+     * Set request document type specific target (download) directory for the given document type
+     * for the given connector.
+     *
+     * @param docType Document type to set the directory on
+     * @param requestTargetDir Request specific target directory
+     * @param connector Connector on which to apply the document type specific setting on
+     */
+    fun setConnectorDocTypeRequestTargetDir(docType: DTOs.CdrClientConfig.DocumentType, requestTargetDir: String, connector: DTOs.CdrClientConfig.Connector) {
+        logger.debug { "setConnectorDocTypeRequestTargetDir: '$docType' -> '$requestTargetDir'" }
+        val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
+            connector.docTypeFolders[docType]?.copy(targetFolderReq = requestTargetDir.ifBlank { null })
+                ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(targetFolderReq = requestTargetDir.ifBlank { null })
+        val updatedConnector: DTOs.CdrClientConfig.Connector = updateDocTypeDirs(connector, docTypeFolders, docType)
+        replaceConnector(connector, updatedConnector)
+    }
+
+    /**
+     * Set response document type specific target (download) directory for the given document type
+     * for the given connector.
+     *
+     * @param docType Document type to set the directory on
+     * @param responseTargetDir Response specific target directory
+     * @param connector Connector on which to apply the document type specific setting on
+     */
+    fun setConnectorDocTypeResponseTargetDir(docType: DTOs.CdrClientConfig.DocumentType, responseTargetDir: String, connector: DTOs.CdrClientConfig.Connector) {
+        logger.debug { "setConnectorDocTypeResponseTargetDir: '$docType' -> '$responseTargetDir'" }
+        val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
+            connector.docTypeFolders[docType]?.copy(targetFolderResp = responseTargetDir.ifBlank { null })
+                ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(targetFolderResp = responseTargetDir.ifBlank { null })
+        val updatedConnector: DTOs.CdrClientConfig.Connector = updateDocTypeDirs(connector, docTypeFolders, docType)
+        replaceConnector(connector, updatedConnector)
+    }
+
+    /**
+     * Sets the base source (upload) directory for the connector in the client service configuration.
      *
      * @param sourceDir The base directory to use for processing files that are uploaded to the CDR API.
      * @param connector The connector to update.
@@ -512,7 +563,42 @@ internal class CdrConfigViewModel(
     fun setConnectorDocTypeSourceDir(docType: DTOs.CdrClientConfig.DocumentType, sourceDir: String, connector: DTOs.CdrClientConfig.Connector) {
         logger.debug { "setConnectorDocTypeSourceDir: '$docType' -> '$sourceDir'" }
         val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
-            connector.docTypeFolders[docType]?.copy(sourceFolder = sourceDir) ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceDir)
+            connector.docTypeFolders[docType]?.copy(sourceFolder = sourceDir.ifBlank { null })
+                ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(sourceFolder = sourceDir.ifBlank { null })
+        val updatedConnector: DTOs.CdrClientConfig.Connector = updateDocTypeDirs(connector, docTypeFolders, docType)
+        replaceConnector(connector, updatedConnector)
+    }
+
+    /**
+     * Set request document type specific source (upload) directory for the given document type
+     * for the given connector.
+     *
+     * @param docType Document type to set the directory on
+     * @param requestSourceDir Response specific source directory
+     * @param connector Connector on which to apply the document type specific setting on
+     */
+    fun setConnectorDocTypeRequestSourceDir(docType: DTOs.CdrClientConfig.DocumentType, requestSourceDir: String, connector: DTOs.CdrClientConfig.Connector) {
+        logger.debug { "setConnectorDocTypeRequestSourceDir: '$docType' -> '$requestSourceDir'" }
+        val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
+            connector.docTypeFolders[docType]?.copy(sourceFolderReq = requestSourceDir.ifBlank { null })
+                ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(sourceFolderReq = requestSourceDir.ifBlank { null })
+        val updatedConnector: DTOs.CdrClientConfig.Connector = updateDocTypeDirs(connector, docTypeFolders, docType)
+        replaceConnector(connector, updatedConnector)
+    }
+
+    /**
+     * Set response document type specific source (upload) directory for the given document type
+     * for the given connector.
+     *
+     * @param docType Document type to set the directory on
+     * @param responseSourceDir Response specific source directory
+     * @param connector Connector on which to apply the document type specific setting on
+     */
+    fun setConnectorDocTypeResponseSourceDir(docType: DTOs.CdrClientConfig.DocumentType, responseSourceDir: String, connector: DTOs.CdrClientConfig.Connector) {
+        logger.debug { "setConnectorDocTypeResponseSourceDir: '$responseSourceDir'" }
+        val docTypeFolders: DTOs.CdrClientConfig.Connector.DocTypeFolders =
+            connector.docTypeFolders[docType]?.copy(sourceFolderResp = responseSourceDir.ifBlank { null })
+                ?: DTOs.CdrClientConfig.Connector.DocTypeFolders(sourceFolderResp = responseSourceDir.ifBlank { null })
         val updatedConnector: DTOs.CdrClientConfig.Connector = updateDocTypeDirs(connector, docTypeFolders, docType)
         replaceConnector(connector, updatedConnector)
     }

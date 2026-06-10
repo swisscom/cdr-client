@@ -3,7 +3,7 @@ package com.swisscom.health.des.cdr.client.handler
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.DownloadDocumentResult
-import com.swisscom.health.des.cdr.client.xml.extractDocumentType
+import com.swisscom.health.des.cdr.client.xml.extractDocumentMetaData
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import org.springframework.stereotype.Component
@@ -99,7 +99,7 @@ internal class PullFileHandling(
      */
     private fun moveFileToClientDirectory(connector: Connector, file: Path) {
         logger.debug { "Move file to target directory start" }
-        val targetDir = connector.getEffectiveTargetFolder(file.extractDocumentType())
+        val targetDir = connector.getEffectiveTargetFolder(file.extractDocumentMetaData())
         val targetTmpFile = targetDir.resolve(file.name)
         val targetFinal: Path by lazy(LazyThreadSafetyMode.NONE) { targetTmpFile.resolveSibling("${targetTmpFile.nameWithoutExtension}.xml") }
 

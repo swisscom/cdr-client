@@ -49,20 +49,8 @@ internal fun ProxyConfig.toDto(): DTOs.CdrClientConfig.ProxyConfig =
         password = if (password == ProxyPassword.NO_PASSWORD) password.value else ProxyPassword.MASKED_PASSWORD.value,
     )
 
-internal fun Connector.toDto(): DTOs.CdrClientConfig.Connector {
-    fun Map<DocumentType, Connector.DocTypeFolders>.toDto():
-            Map<DTOs.CdrClientConfig.DocumentType, DTOs.CdrClientConfig.Connector.DocTypeFolders> {
-        return map { (key, value) ->
-            DTOs.CdrClientConfig.DocumentType.entries.first { it.name == key.name } to DTOs.CdrClientConfig.Connector.DocTypeFolders(
-                sourceFolder = value.sourceFolder?.toString(),
-                errorFolder = value.errorFolder?.toString(),
-                archiveFolder = value.archiveFolder?.toString(),
-                targetFolder = value.targetFolder?.toString(),
-            )
-        }.toMap()
-    }
-
-    return DTOs.CdrClientConfig.Connector(
+internal fun Connector.toDto(): DTOs.CdrClientConfig.Connector =
+    DTOs.CdrClientConfig.Connector(
         connectorId = connectorId.id,
         targetFolder = targetFolder.toString(),
         sourceFolder = sourceFolder.toString(),
@@ -73,7 +61,22 @@ internal fun Connector.toDto(): DTOs.CdrClientConfig.Connector {
         mode = DTOs.CdrClientConfig.Mode.entries.first { it.name == mode.name },
         docTypeFolders = effectiveDocTypeFolders.toDto(),
     )
-}
+
+internal fun Map<DocumentType, Connector.DocTypeFolders>.toDto():
+        Map<DTOs.CdrClientConfig.DocumentType, DTOs.CdrClientConfig.Connector.DocTypeFolders> =
+    map { (key, value) ->
+        DTOs.CdrClientConfig.DocumentType.entries.first { it.name == key.name } to DTOs.CdrClientConfig.Connector.DocTypeFolders(
+            requestResponseSplit = value.requestResponseSplit,
+            sourceFolder = value.sourceFolder?.toString(),
+            sourceFolderReq = value.sourceFolderReq?.toString(),
+            sourceFolderResp = value.sourceFolderResp?.toString(),
+            targetFolder = value.targetFolder?.toString(),
+            targetFolderReq = value.targetFolderReq?.toString(),
+            targetFolderResp = value.targetFolderResp?.toString(),
+            errorFolder = value.errorFolder?.toString(),
+            archiveFolder = value.archiveFolder?.toString(),
+        )
+    }.toMap()
 
 internal fun Endpoint.toDto(): DomainObjects.ApiEndpoint =
     DomainObjects.ApiEndpoint.fromEndpointParts(protocol = scheme, port = port, host = host.fqdn)
@@ -164,10 +167,15 @@ internal fun Map<DTOs.CdrClientConfig.DocumentType, DTOs.CdrClientConfig.Connect
         Map<DocumentType, Connector.DocTypeFolders> =
     map { (key, value) ->
         DocumentType.valueOf(key.name) to Connector.DocTypeFolders(
+            requestResponseSplit = value.requestResponseSplit,
             sourceFolder = value.sourceFolder?.let { Path.of(it) },
+            sourceFolderReq = value.sourceFolderReq?.let { Path.of(it) },
+            sourceFolderResp = value.sourceFolderResp?.let { Path.of(it) },
+            targetFolder = value.targetFolder?.let { Path.of(it) },
+            targetFolderReq = value.targetFolderReq?.let { Path.of(it) },
+            targetFolderResp = value.targetFolderResp?.let { Path.of(it) },
             errorFolder = value.errorFolder?.let { Path.of(it) },
             archiveFolder = value.archiveFolder?.let { Path.of(it) },
-            targetFolder = value.targetFolder?.let { Path.of(it) },
         )
     }.toMap()
 

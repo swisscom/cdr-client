@@ -24,36 +24,41 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DomainObjects
+import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.add_circle_24dp_000000_FILL0_wght400_GRAD0_opsz24
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.delete_24dp_000000_FILL0_wght400_GRAD0_opsz24
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_advanced_settings
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_archive_dir
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_archive_dir_placeholder
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_archive_dirs
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_base_source_dir
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_base_source_dir_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_base_target_dir
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_base_target_dir_placeholder
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doc_type_dirs
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_archive_dir
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_archive_dir_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_error_dir
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_error_dir_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_source_dir
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_source_dir_placeholder
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_split_source_dir
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_split_source_dir_placeholder
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_split_switch
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_split_switch_general_section
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_split_switch_request_section
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_split_switch_response_section
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_split_switch_subtitle
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_split_target_dir
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_split_target_dir_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_target_dir
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_doctype_target_dir_placeholder
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_download_dirs
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_error_dir
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_error_dir_placeholder
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_error_dirs
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_id
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_id_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_mode
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_mode_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_settings
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_connector_upload_dirs
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_local_folder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_client_local_folder_placeholder
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_document_archive
@@ -85,12 +90,24 @@ internal fun ConnectorList(
             Text(text = stringResource(Res.string.message_loading_initial_config))
             Divider(modifier = modifier.padding(bottom = 8.dp))
         } else {
-            ValidatedTempDownloadDir(
+            // local directory (temp download directory)
+            AsyncValidatedTextField(
                 modifier = modifier.fillMaxWidth(),
-                remoteViewValidations = remoteViewValidations,
-                viewModel = viewModel,
-                clientConfig = uiState.clientServiceConfig,
-                canEdit = canEdit,
+                name = ConfigurationItem.LOCAL_DIRECTORY,
+                value = uiState.clientServiceConfig.localFolder,
+                onValueChange = { if (canEdit) viewModel.setLocalPath(it) },
+                label = { Text(text = stringResource(Res.string.label_client_local_folder)) },
+                placeHolder = { Text(text = stringResource(Res.string.label_client_local_folder_placeholder)) },
+                asyncValidation = suspend {
+                    validateNeitherBlankNorRoot(uiState.clientServiceConfig.localFolder) +
+                            remoteViewValidations.validateDirectory(
+                                uiState.clientServiceConfig,
+                                uiState.clientServiceConfig.localFolder,
+                                ConfigurationItem.LOCAL_DIRECTORY
+                            )
+                },
+                revalidationKey = uiState.clientServiceConfig,
+                enabled = canEdit,
             )
 
             for (connector in uiState.clientServiceConfig.customer) {
@@ -171,6 +188,23 @@ private fun ConnectorSettingsGroup(
         initiallyExpanded = false,
     ) { _ ->
 
+        fun mustBeAbsoluteAndReadWritable(directory: String, configItem: ConfigurationItem): suspend () -> DTOs.ValidationResult = suspend {
+            validateNeitherBlankNorRoot(directory) +
+                    remoteViewValidations.validateDirectory(
+                        uiState.clientServiceConfig,
+                        directory,
+                        configItem
+                    )
+        }
+
+        fun mustBeBlankOrAbsoluteAndReadWritable(directory: String, configItem: ConfigurationItem): suspend () -> DTOs.ValidationResult = suspend {
+            if (directory.isBlank()) {
+                DTOs.ValidationResult.Success
+            } else {
+                mustBeAbsoluteAndReadWritable(directory, configItem).invoke()
+            }
+        }
+
         Divider(modifier = modifier.padding(bottom = 8.dp))
 
         ValidatedConnectorId(
@@ -190,35 +224,47 @@ private fun ConnectorSettingsGroup(
             canEdit = canEdit,
         )
 
-        ValidatedBaseTargetDir(
+        // base target directory
+        AsyncValidatedTextField(
             modifier = modifier.fillMaxWidth(),
-            remoteViewValidations = remoteViewValidations,
-            viewModel = viewModel,
-            clientConfig = uiState.clientServiceConfig,
-            connector = connector,
-            canEdit = canEdit,
+            name = ConfigurationItem.TARGET_DIRECTORY,
+            value = connector.targetFolder,
+            onValueChange = { if (canEdit) viewModel.setConnectorBaseTargetDir(it, connector) },
+            label = { Text(text = stringResource(Res.string.label_client_connector_base_target_dir)) },
+            placeHolder = { Text(text = stringResource(Res.string.label_client_connector_base_target_dir_placeholder)) },
+            asyncValidation = mustBeAbsoluteAndReadWritable(connector.targetFolder, ConfigurationItem.TARGET_DIRECTORY),
+            revalidationKey = uiState.clientServiceConfig,
+            enabled = canEdit,
         )
 
-        ValidatedSourceBaseDir(
+        // base source directory
+        AsyncValidatedTextField(
             modifier = modifier.fillMaxWidth(),
-            remoteViewValidations = remoteViewValidations,
-            viewModel = viewModel,
-            clientConfig = uiState.clientServiceConfig,
-            connector = connector,
-            canEdit = canEdit,
+            name = ConfigurationItem.SOURCE_DIRECTORY,
+            value = connector.sourceFolder,
+            onValueChange = { if (canEdit) viewModel.setConnectorBaseSourceDir(it, connector) },
+            label = { Text(text = stringResource(Res.string.label_client_connector_base_source_dir)) },
+            placeHolder = { Text(text = stringResource(Res.string.label_client_connector_base_source_dir_placeholder)) },
+            asyncValidation = mustBeAbsoluteAndReadWritable(connector.sourceFolder, ConfigurationItem.SOURCE_DIRECTORY),
+            revalidationKey = uiState.clientServiceConfig,
+            enabled = canEdit,
         )
 
-        ValidatedErrorDir(
+        // base error directory
+        AsyncValidatedTextField(
             modifier = modifier.fillMaxWidth(),
-            remoteViewValidations = remoteViewValidations,
-            viewModel = viewModel,
-            clientConfig = uiState.clientServiceConfig,
-            connector = connector,
-            canEdit = canEdit,
+            name = ConfigurationItem.ERROR_DIRECTORY,
+            value = connector.sourceErrorFolder ?: "",
+            onValueChange = { if (canEdit) viewModel.setConnectorErrorDir(it, connector) },
+            label = { Text(text = stringResource(Res.string.label_client_connector_error_dir)) },
+            placeHolder = { Text(text = stringResource(Res.string.label_client_connector_error_dir_placeholder)) },
+            asyncValidation = mustBeBlankOrAbsoluteAndReadWritable(connector.sourceErrorFolder ?: "", ConfigurationItem.ERROR_DIRECTORY),
+            revalidationKey = uiState.clientServiceConfig,
+            enabled = canEdit,
         )
 
         OnOffSwitch(
-            name = DomainObjects.ConfigurationItem.ARCHIVE_SWITCH,
+            name = ConfigurationItem.ARCHIVE_SWITCH,
             modifier = modifier.padding(bottom = 16.dp),
             title = stringResource(Res.string.label_enable_document_archive),
             subtitle = stringResource(Res.string.label_enable_document_archive_subtitle),
@@ -227,91 +273,239 @@ private fun ConnectorSettingsGroup(
             enabled = canEdit,
         )
 
-        ValidatedArchiveDir(
+        // base archive directory
+        AsyncValidatedTextField(
             modifier = modifier.fillMaxWidth(),
-            remoteViewValidations = remoteViewValidations,
-            viewModel = viewModel,
-            clientConfig = uiState.clientServiceConfig,
-            connector = connector,
-            canEdit = canEdit,
+            name = ConfigurationItem.ARCHIVE_DIRECTORY,
+            value = connector.sourceArchiveFolder ?: "",
+            onValueChange = { if (canEdit) viewModel.setConnectorArchiveDir(it, connector) },
+            label = { Text(text = stringResource(Res.string.label_client_connector_archive_dir)) },
+            placeHolder = { Text(text = stringResource(Res.string.label_client_connector_archive_dir_placeholder)) },
+            asyncValidation =
+                suspend {
+                    if (!connector.sourceArchiveEnabled) DTOs.ValidationResult.Success
+                    else mustBeBlankOrAbsoluteAndReadWritable(connector.sourceArchiveFolder ?: "", ConfigurationItem.ARCHIVE_DIRECTORY).invoke()
+                },
+            revalidationKey = uiState.clientServiceConfig,
+            enabled = canEdit && connector.sourceArchiveEnabled,
         )
 
         //
         // BEGIN - Document Type Specific Directories
         //
 
-        // Advanced Settings - Document-type-specific directories (collapsed by default)
+        // Document-type-specific directories (collapsed by default)
         CollapsibleGroup(
             modifier = modifier,
-            title = stringResource(Res.string.label_advanced_settings),
+            title = stringResource(Res.string.label_client_connector_doc_type_dirs),
             initiallyExpanded = false,
         ) { _ ->
-            // Document-type-specific target directories
-            NamedSectionDivider(text = stringResource(Res.string.label_client_connector_download_dirs))
-
             for (doctype in DTOs.CdrClientConfig.DocumentType.entries.filter { it != DTOs.CdrClientConfig.DocumentType.UNDEFINED }) {
-                val docTypeFolder: String? = connector.docTypeFolders[doctype]?.targetFolder
-                ValidatedDocTypeTargetDir(
-                    modifier = modifier.fillMaxWidth(),
-                    remoteViewValidations = remoteViewValidations,
-                    viewModel = viewModel,
-                    clientConfig = uiState.clientServiceConfig,
-                    doctype = doctype,
-                    directory = docTypeFolder,
-                    connector = connector,
-                    canEdit = canEdit,
+                NamedSectionDivider(text = doctype.name)
+
+                OnOffSwitch(
+                    name = ConfigurationItem.UNKNOWN,
+                    modifier = modifier.padding(bottom = 16.dp),
+                    title = stringResource(Res.string.label_client_connector_doctype_split_switch),
+                    subtitle = stringResource(Res.string.label_client_connector_doctype_split_switch_subtitle),
+                    checked = connector.docTypeFolders[doctype]?.requestResponseSplit ?: false,
+                    onValueChange = { doSplit: Boolean -> if (canEdit) viewModel.setConnectorDocTypeRequestResponseSplit(doctype, doSplit, connector) },
+                    enabled = canEdit,
                 )
-            }
 
-            // Document-type-specific source directories
-            NamedSectionDivider(text = stringResource(Res.string.label_client_connector_upload_dirs))
+                if (connector.docTypeFolders[doctype]?.requestResponseSplit == true) {
+                    NamedSectionDivider(
+                        text = stringResource(Res.string.label_client_connector_doctype_split_switch_request_section),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
 
-            for (doctype in DTOs.CdrClientConfig.DocumentType.entries.filter { it != DTOs.CdrClientConfig.DocumentType.UNDEFINED }) {
-                val docTypeFolder: String? = connector.docTypeFolders[doctype]?.sourceFolder
-                ValidatedDocTypeSourceDir(
-                    modifier = modifier.fillMaxWidth(),
-                    remoteViewValidations = remoteViewValidations,
-                    viewModel = viewModel,
-                    clientConfig = uiState.clientServiceConfig,
-                    doctype = doctype,
-                    directory = docTypeFolder,
-                    connector = connector,
-                    canEdit = canEdit,
-                )
-            }
+                    // request target directory
+                    val requestTargetDir = connector.docTypeFolders[doctype]?.targetFolderReq ?: ""
+                    AsyncValidatedTextField(
+                        modifier = modifier.fillMaxWidth(),
+                        revalidationKey = uiState.clientServiceConfig,
+                        enabled = canEdit,
+                        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeRequestTargetDir(doctype, it.trim(), connector) },
+                        asyncValidation = mustBeAbsoluteAndReadWritable(requestTargetDir, ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY),
+                        name = ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY,
+                        value = requestTargetDir,
+                        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_split_target_dir, doctype.name, "request")) },
+                        placeHolder = {
+                            Text(
+                                text = stringResource(
+                                    Res.string.label_client_connector_doctype_split_target_dir_placeholder,
+                                    doctype.name,
+                                    "request"
+                                )
+                            )
+                        },
+                    )
+                    // request source directory
+                    val requestSourceDir = connector.docTypeFolders[doctype]?.sourceFolderReq ?: ""
+                    AsyncValidatedTextField(
+                        modifier = modifier.fillMaxWidth(),
+                        revalidationKey = uiState.clientServiceConfig,
+                        enabled = canEdit,
+                        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeRequestSourceDir(doctype, it.trim(), connector) },
+                        asyncValidation = mustBeAbsoluteAndReadWritable(requestSourceDir, ConfigurationItem.DOC_TYPE_SOURCE_DIRECTORY),
+                        name = ConfigurationItem.DOC_TYPE_SOURCE_DIRECTORY,
+                        value = requestSourceDir,
+                        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_split_source_dir, doctype.name, "request")) },
+                        placeHolder = {
+                            Text(
+                                text = stringResource(
+                                    Res.string.label_client_connector_doctype_split_source_dir_placeholder,
+                                    doctype.name,
+                                    "request"
+                                )
+                            )
+                        },
+                    )
 
-            // Document-type-specific error directories
-            NamedSectionDivider(text = stringResource(Res.string.label_client_connector_error_dirs))
+                    NamedSectionDivider(
+                        text = stringResource(Res.string.label_client_connector_doctype_split_switch_response_section),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
 
-            for (doctype in DTOs.CdrClientConfig.DocumentType.entries.filter { it != DTOs.CdrClientConfig.DocumentType.UNDEFINED }) {
-                val docTypeFolder: String? = connector.docTypeFolders[doctype]?.errorFolder
-                ValidatedDocTypeErrorDir(
-                    modifier = modifier.fillMaxWidth(),
-                    remoteViewValidations = remoteViewValidations,
-                    viewModel = viewModel,
-                    clientConfig = uiState.clientServiceConfig,
-                    doctype = doctype,
-                    directory = docTypeFolder,
-                    connector = connector,
-                    canEdit = canEdit,
-                )
-            }
+                    // response target directory
+                    val responseTargetDir = connector.docTypeFolders[doctype]?.targetFolderResp ?: ""
+                    AsyncValidatedTextField(
+                        modifier = modifier.fillMaxWidth(),
+                        revalidationKey = uiState.clientServiceConfig,
+                        enabled = canEdit,
+                        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeResponseTargetDir(doctype, it.trim(), connector) },
+                        asyncValidation = mustBeAbsoluteAndReadWritable(responseTargetDir, ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY),
+                        name = ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY,
+                        value = responseTargetDir,
+                        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_split_target_dir, doctype.name, "response")) },
+                        placeHolder = {
+                            Text(
+                                text = stringResource(
+                                    Res.string.label_client_connector_doctype_split_target_dir_placeholder,
+                                    doctype.name,
+                                    "response"
+                                )
+                            )
+                        },
+                    )
 
-            // Document-type-specific archive directories
-            NamedSectionDivider(text = stringResource(Res.string.label_client_connector_archive_dirs))
+                    // response source directory
+                    val responseSourceDir = connector.docTypeFolders[doctype]?.sourceFolderResp ?: ""
+                    AsyncValidatedTextField(
+                        modifier = modifier.fillMaxWidth(),
+                        revalidationKey = uiState.clientServiceConfig,
+                        enabled = canEdit,
+                        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeResponseSourceDir(doctype, it.trim(), connector) },
+                        asyncValidation = mustBeAbsoluteAndReadWritable(responseSourceDir, ConfigurationItem.DOC_TYPE_SOURCE_DIRECTORY),
+                        name = ConfigurationItem.DOC_TYPE_SOURCE_DIRECTORY,
+                        value = responseSourceDir,
+                        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_split_source_dir, doctype.name, "response")) },
+                        placeHolder = {
+                            Text(
+                                text = stringResource(
+                                    Res.string.label_client_connector_doctype_split_source_dir_placeholder,
+                                    doctype.name,
+                                    "response"
+                                )
+                            )
+                        },
+                    )
 
-            for (doctype in DTOs.CdrClientConfig.DocumentType.entries.filter { it != DTOs.CdrClientConfig.DocumentType.UNDEFINED }) {
-                val docTypeFolder: String? = connector.docTypeFolders[doctype]?.archiveFolder
-                ValidatedDocTypeArchiveDir(
-                    modifier = modifier.fillMaxWidth(),
-                    remoteViewValidations = remoteViewValidations,
-                    viewModel = viewModel,
-                    clientConfig = uiState.clientServiceConfig,
-                    doctype = doctype,
-                    directory = docTypeFolder,
-                    connector = connector,
-                    canEdit = canEdit,
-                )
+                    NamedSectionDivider(
+                        text = stringResource(Res.string.label_client_connector_doctype_split_switch_general_section),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+
+                    // error directory
+                    val errorDir = connector.docTypeFolders[doctype]?.errorFolder ?: ""
+                    AsyncValidatedTextField(
+                        modifier = modifier.fillMaxWidth(),
+                        revalidationKey = uiState.clientServiceConfig,
+                        enabled = canEdit,
+                        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeErrorDir(doctype, it.trim(), connector) },
+                        asyncValidation = mustBeAbsoluteAndReadWritable(errorDir, ConfigurationItem.DOC_TYPE_ERROR_DIRECTORY),
+                        name = ConfigurationItem.DOC_TYPE_ERROR_DIRECTORY,
+                        value = errorDir,
+                        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_error_dir, doctype.name)) },
+                        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_error_dir_placeholder, doctype)) },
+                    )
+
+                    // archive directory (only enabled if document archive is enabled at connector level)
+                    val archiveDir = connector.docTypeFolders[doctype]?.archiveFolder ?: ""
+                    AsyncValidatedTextField(
+                        modifier = modifier.fillMaxWidth(),
+                        revalidationKey = uiState.clientServiceConfig,
+                        enabled = canEdit && connector.sourceArchiveEnabled,
+                        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeArchiveDir(doctype, it.trim(), connector) },
+                        asyncValidation = suspend {
+                            if (!connector.sourceArchiveEnabled) DTOs.ValidationResult.Success
+                            else mustBeAbsoluteAndReadWritable(archiveDir, ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY).invoke()
+                        },
+                        name = ConfigurationItem.DOC_TYPE_ARCHIVE_DIRECTORY,
+                        value = archiveDir,
+                        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_archive_dir, doctype.name)) },
+                        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_archive_dir_placeholder, doctype.name)) },
+                    )
+                } else {
+                    // target directory
+                    val targetDir = connector.docTypeFolders[doctype]?.targetFolder ?: ""
+                    AsyncValidatedTextField(
+                        modifier = modifier.fillMaxWidth(),
+                        revalidationKey = uiState.clientServiceConfig,
+                        enabled = canEdit,
+                        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeTargetDir(doctype, it.trim(), connector) },
+                        asyncValidation = mustBeBlankOrAbsoluteAndReadWritable(targetDir, ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY),
+                        name = ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY,
+                        value = targetDir,
+                        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_target_dir, doctype.name)) },
+                        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_target_dir_placeholder, doctype.name)) },
+                    )
+
+                    // source directory
+                    val sourceDir = connector.docTypeFolders[doctype]?.sourceFolder ?: ""
+                    AsyncValidatedTextField(
+                        modifier = modifier.fillMaxWidth(),
+                        revalidationKey = uiState.clientServiceConfig,
+                        enabled = canEdit,
+                        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeSourceDir(doctype, it.trim(), connector) },
+                        asyncValidation = mustBeBlankOrAbsoluteAndReadWritable(sourceDir, ConfigurationItem.DOC_TYPE_SOURCE_DIRECTORY),
+                        name = ConfigurationItem.DOC_TYPE_SOURCE_DIRECTORY,
+                        value = sourceDir,
+                        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_source_dir, doctype.name)) },
+                        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_source_dir_placeholder, doctype.name)) },
+                    )
+
+                    // error directory
+                    val errorDir = connector.docTypeFolders[doctype]?.errorFolder ?: ""
+                    AsyncValidatedTextField(
+                        modifier = modifier.fillMaxWidth(),
+                        revalidationKey = uiState.clientServiceConfig,
+                        enabled = canEdit,
+                        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeErrorDir(doctype, it.trim(), connector) },
+                        asyncValidation = mustBeBlankOrAbsoluteAndReadWritable(errorDir, ConfigurationItem.DOC_TYPE_ERROR_DIRECTORY),
+                        name = ConfigurationItem.DOC_TYPE_ERROR_DIRECTORY,
+                        value = errorDir,
+                        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_error_dir, doctype.name)) },
+                        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_error_dir_placeholder, doctype)) },
+                    )
+
+                    // archive directory (only enabled if document archive is enabled at connector level)
+                    val archiveDir = connector.docTypeFolders[doctype]?.archiveFolder ?: ""
+                    AsyncValidatedTextField(
+                        modifier = modifier.fillMaxWidth(),
+                        revalidationKey = uiState.clientServiceConfig,
+                        enabled = canEdit && connector.sourceArchiveEnabled,
+                        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeArchiveDir(doctype, it.trim(), connector) },
+                        asyncValidation = suspend {
+                            if (!connector.sourceArchiveEnabled) DTOs.ValidationResult.Success
+                            else mustBeBlankOrAbsoluteAndReadWritable(archiveDir, ConfigurationItem.DOC_TYPE_ARCHIVE_DIRECTORY).invoke()
+                        },
+                        name = ConfigurationItem.DOC_TYPE_ARCHIVE_DIRECTORY,
+                        value = archiveDir,
+                        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_archive_dir, doctype.name)) },
+                        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_archive_dir_placeholder, doctype.name)) },
+                    )
+                }
             }
         }
 
@@ -322,35 +516,6 @@ private fun ConnectorSettingsGroup(
 }
 
 @Composable
-private fun ValidatedTempDownloadDir(
-    modifier: Modifier,
-    remoteViewValidations: CdrConfigViewRemoteValidations,
-    viewModel: CdrConfigViewModel,
-    clientConfig: DTOs.CdrClientConfig,
-    canEdit: Boolean,
-) {
-    var tmpDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-    LaunchedEffect(clientConfig) {
-        tmpDirValidationResult = validateNeitherBlankNorRoot(clientConfig.localFolder) +
-                remoteViewValidations.validateDirectory(
-                    clientConfig,
-                    clientConfig.localFolder,
-                    DomainObjects.ConfigurationItem.LOCAL_DIRECTORY
-                )
-    }
-    ValidatedTextField(
-        name = DomainObjects.ConfigurationItem.LOCAL_DIRECTORY,
-        modifier = modifier,
-        validatable = { tmpDirValidationResult },
-        label = { Text(text = stringResource(Res.string.label_client_local_folder)) },
-        value = clientConfig.localFolder,
-        placeHolder = { Text(text = stringResource(Res.string.label_client_local_folder_placeholder)) },
-        onValueChange = { if (canEdit) viewModel.setLocalPath(it) },
-        enabled = canEdit,
-    )
-}
-
-@Composable
 private fun ValidatedConnectorId(
     modifier: Modifier,
     remoteViewValidations: CdrConfigViewRemoteValidations,
@@ -358,23 +523,22 @@ private fun ValidatedConnectorId(
     connector: DTOs.CdrClientConfig.Connector,
     canEdit: Boolean,
 ) {
-    var connectorIdValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-    LaunchedEffect(connector.connectorId) {
-        connectorIdValidationResult =
-            remoteViewValidations.validateNotBlank(
-                connector.connectorId,
-                DomainObjects.ConfigurationItem.CONNECTOR_ID
-            )
+    val connectorIdValidation: suspend () -> DTOs.ValidationResult = suspend {
+        remoteViewValidations.validateNotBlank(
+            connector.connectorId,
+            ConfigurationItem.CONNECTOR_ID
+        )
     }
-    ValidatedTextField(
-        name = DomainObjects.ConfigurationItem.CONNECTOR_ID,
+    AsyncValidatedTextField(
+        name = ConfigurationItem.CONNECTOR_ID,
         modifier = modifier,
-        validatable = { connectorIdValidationResult },
+        asyncValidation = connectorIdValidation,
         label = { Text(text = stringResource(Res.string.label_client_connector_id)) },
         value = connector.connectorId,
         placeHolder = { Text(text = stringResource(Res.string.label_client_connector_id_placeholder)) },
         onValueChange = { if (canEdit) viewModel.setConnectorId(it, connector) },
         enabled = canEdit,
+        revalidationKey = connector.connectorId,
     )
 }
 
@@ -393,11 +557,11 @@ private fun ValidatedMode(
             remoteViewValidations.validateConnectorMode(
                 connectorId = connector.connectorId,
                 config = clientConfig,
-                fieldName = DomainObjects.ConfigurationItem.CONNECTOR_MODE
+                fieldName = ConfigurationItem.CONNECTOR_MODE
             )
     }
     DropDownList(
-        name = DomainObjects.ConfigurationItem.CONNECTOR_MODE,
+        name = ConfigurationItem.CONNECTOR_MODE,
         modifier = modifier,
         validatable = { connectorModeValidationResult },
         initiallyExpanded = false,
@@ -406,292 +570,6 @@ private fun ValidatedMode(
         value = connector.mode.toString(),
         placeHolder = { Text(text = stringResource(Res.string.label_client_connector_mode_placeholder)) },
         onValueChange = { if (canEdit) viewModel.setConnectorMode(it, connector) },
-        enabled = canEdit,
-    )
-}
-
-@Composable
-private fun ValidatedErrorDir(
-    modifier: Modifier,
-    remoteViewValidations: CdrConfigViewRemoteValidations,
-    viewModel: CdrConfigViewModel,
-    clientConfig: DTOs.CdrClientConfig,
-    connector: DTOs.CdrClientConfig.Connector,
-    canEdit: Boolean,
-) {
-    var errorDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-    LaunchedEffect(clientConfig) {
-        errorDirValidationResult =
-            if (connector.sourceErrorFolder.isNullOrBlank()) {
-                DTOs.ValidationResult.Success
-            } else {
-                validateNeitherBlankNorRoot(connector.sourceErrorFolder) +
-                        remoteViewValidations.validateDirectory(
-                            clientConfig,
-                            connector.sourceErrorFolder,
-                            DomainObjects.ConfigurationItem.ERROR_DIRECTORY
-                        )
-            }
-    }
-    ValidatedTextField(
-        name = DomainObjects.ConfigurationItem.ERROR_DIRECTORY,
-        modifier = modifier,
-        validatable = { errorDirValidationResult },
-        label = { Text(text = stringResource(Res.string.label_client_connector_error_dir)) },
-        value = connector.sourceErrorFolder,
-        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_error_dir_placeholder)) },
-        onValueChange = { if (canEdit) viewModel.setConnectorErrorDir(it, connector) },
-        enabled = canEdit,
-    )
-}
-
-@Composable
-private fun ValidatedDocTypeErrorDir(
-    modifier: Modifier,
-    remoteViewValidations: CdrConfigViewRemoteValidations,
-    viewModel: CdrConfigViewModel,
-    clientConfig: DTOs.CdrClientConfig,
-    doctype: DTOs.CdrClientConfig.DocumentType,
-    directory: String?,
-    connector: DTOs.CdrClientConfig.Connector,
-    canEdit: Boolean,
-) {
-    var docTypeDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-    LaunchedEffect(clientConfig) {
-        docTypeDirValidationResult =
-            if (directory.isNullOrBlank()) {
-                DTOs.ValidationResult.Success
-            } else {
-                // Validate the document type specific error directory
-                validateNeitherBlankNorRoot(directory) +
-                        remoteViewValidations.validateDirectory(
-                            clientConfig,
-                            directory,
-                            DomainObjects.ConfigurationItem.DOC_TYPE_ERROR_DIRECTORY
-                        )
-            }
-    }
-    ValidatedTextField(
-        name = DomainObjects.ConfigurationItem.DOC_TYPE_ERROR_DIRECTORY,
-        modifier = modifier,
-        validatable = { docTypeDirValidationResult },
-        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_error_dir, doctype.name)) },
-        value = directory ?: "",
-        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_error_dir_placeholder)) },
-        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeErrorDir(doctype, it.trim(), connector) },
-        enabled = canEdit,
-    )
-}
-
-@Composable
-private fun ValidatedArchiveDir(
-    modifier: Modifier,
-    remoteViewValidations: CdrConfigViewRemoteValidations,
-    viewModel: CdrConfigViewModel,
-    clientConfig: DTOs.CdrClientConfig,
-    connector: DTOs.CdrClientConfig.Connector,
-    canEdit: Boolean,
-) {
-    var archiveDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-    LaunchedEffect(clientConfig) {
-        archiveDirValidationResult =
-            if (connector.sourceArchiveEnabled) {
-                if (connector.sourceArchiveFolder.isNullOrBlank()) {
-                    DTOs.ValidationResult.Success
-                } else {
-                    validateNeitherBlankNorRoot(connector.sourceArchiveFolder) +
-                            remoteViewValidations.validateDirectory(
-                                clientConfig,
-                                connector.sourceArchiveFolder,
-                                DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY
-                            )
-                }
-            } else {
-                DTOs.ValidationResult.Success
-            }
-    }
-    ValidatedTextField(
-        name = DomainObjects.ConfigurationItem.ARCHIVE_DIRECTORY,
-        modifier = modifier,
-        validatable = { archiveDirValidationResult },
-        label = { Text(text = stringResource(Res.string.label_client_connector_archive_dir)) },
-        value = connector.sourceArchiveFolder,
-        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_archive_dir_placeholder)) },
-        onValueChange = { if (canEdit) viewModel.setConnectorArchiveDir(it, connector) },
-        enabled = canEdit && connector.sourceArchiveEnabled,
-    )
-}
-
-@Composable
-private fun ValidatedDocTypeArchiveDir(
-    modifier: Modifier,
-    remoteViewValidations: CdrConfigViewRemoteValidations,
-    viewModel: CdrConfigViewModel,
-    clientConfig: DTOs.CdrClientConfig,
-    doctype: DTOs.CdrClientConfig.DocumentType,
-    directory: String?,
-    connector: DTOs.CdrClientConfig.Connector,
-    canEdit: Boolean,
-) {
-    var docTypeDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-    LaunchedEffect(clientConfig) {
-        docTypeDirValidationResult =
-            if (directory.isNullOrBlank()) {
-                DTOs.ValidationResult.Success
-            } else {
-                // Validate the document type specific archive directory
-                validateNeitherBlankNorRoot(directory) +
-                        remoteViewValidations.validateDirectory(
-                            clientConfig,
-                            directory,
-                            DomainObjects.ConfigurationItem.DOC_TYPE_ARCHIVE_DIRECTORY
-                        )
-            }
-    }
-    ValidatedTextField(
-        name = DomainObjects.ConfigurationItem.DOC_TYPE_ARCHIVE_DIRECTORY,
-        modifier = modifier,
-        validatable = { docTypeDirValidationResult },
-        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_archive_dir, doctype.name)) },
-        value = directory ?: "",
-        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_archive_dir_placeholder)) },
-        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeArchiveDir(doctype, it.trim(), connector) },
-        enabled = canEdit && connector.sourceArchiveEnabled,
-    )
-}
-
-@Composable
-private fun ValidatedBaseTargetDir(
-    modifier: Modifier,
-    remoteViewValidations: CdrConfigViewRemoteValidations,
-    viewModel: CdrConfigViewModel,
-    clientConfig: DTOs.CdrClientConfig,
-    connector: DTOs.CdrClientConfig.Connector,
-    canEdit: Boolean,
-) {
-    var targetDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-    LaunchedEffect(clientConfig) {
-        targetDirValidationResult = validateNeitherBlankNorRoot(connector.targetFolder) +
-                remoteViewValidations.validateDirectory(
-                    clientConfig,
-                    connector.targetFolder,
-                    DomainObjects.ConfigurationItem.TARGET_DIRECTORY
-                )
-    }
-    ValidatedTextField(
-        name = DomainObjects.ConfigurationItem.TARGET_DIRECTORY,
-        modifier = modifier,
-        validatable = { targetDirValidationResult },
-        label = { Text(text = stringResource(Res.string.label_client_connector_base_target_dir)) },
-        value = connector.targetFolder,
-        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_base_target_dir_placeholder)) },
-        onValueChange = { if (canEdit) viewModel.setConnectorBaseTargetDir(it, connector) },
-        enabled = canEdit,
-    )
-}
-
-@Composable
-private fun ValidatedDocTypeTargetDir(
-    modifier: Modifier,
-    remoteViewValidations: CdrConfigViewRemoteValidations,
-    viewModel: CdrConfigViewModel,
-    clientConfig: DTOs.CdrClientConfig,
-    doctype: DTOs.CdrClientConfig.DocumentType,
-    directory: String?,
-    connector: DTOs.CdrClientConfig.Connector,
-    canEdit: Boolean,
-) {
-    var docTypeDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-    LaunchedEffect(clientConfig) {
-        docTypeDirValidationResult =
-            if (directory.isNullOrBlank()) {
-                DTOs.ValidationResult.Success
-            } else {
-                // Validate the document type specific target directory
-                validateNeitherBlankNorRoot(directory) +
-                        remoteViewValidations.validateDirectory(
-                            clientConfig,
-                            directory,
-                            DomainObjects.ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY
-                        )
-            }
-    }
-    ValidatedTextField(
-        name = DomainObjects.ConfigurationItem.DOC_TYPE_TARGET_DIRECTORY,
-        modifier = modifier,
-        validatable = { docTypeDirValidationResult },
-        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_target_dir, doctype.name)) },
-        value = directory ?: "",
-        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_target_dir_placeholder)) },
-        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeTargetDir(doctype, it.trim(), connector) },
-        enabled = canEdit,
-    )
-}
-
-@Composable
-private fun ValidatedSourceBaseDir(
-    modifier: Modifier,
-    remoteViewValidations: CdrConfigViewRemoteValidations,
-    viewModel: CdrConfigViewModel,
-    clientConfig: DTOs.CdrClientConfig,
-    connector: DTOs.CdrClientConfig.Connector,
-    canEdit: Boolean,
-) {
-    var sourceDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-    LaunchedEffect(clientConfig) {
-        sourceDirValidationResult = validateNeitherBlankNorRoot(connector.sourceFolder) +
-                remoteViewValidations.validateDirectory(
-                    clientConfig,
-                    connector.sourceFolder,
-                    DomainObjects.ConfigurationItem.SOURCE_DIRECTORY
-                )
-    }
-    ValidatedTextField(
-        name = DomainObjects.ConfigurationItem.SOURCE_DIRECTORY,
-        modifier = modifier,
-        validatable = { sourceDirValidationResult },
-        label = { Text(text = stringResource(Res.string.label_client_connector_base_source_dir)) },
-        value = connector.sourceFolder,
-        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_base_source_dir_placeholder)) },
-        onValueChange = { if (canEdit) viewModel.setConnectorBaseSourceDir(it, connector) },
-        enabled = canEdit,
-    )
-}
-
-@Composable
-private fun ValidatedDocTypeSourceDir(
-    modifier: Modifier,
-    remoteViewValidations: CdrConfigViewRemoteValidations,
-    viewModel: CdrConfigViewModel,
-    clientConfig: DTOs.CdrClientConfig,
-    doctype: DTOs.CdrClientConfig.DocumentType,
-    directory: String?,
-    connector: DTOs.CdrClientConfig.Connector,
-    canEdit: Boolean,
-) {
-    var docTypeDirValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-    LaunchedEffect(clientConfig) {
-        docTypeDirValidationResult =
-            if (directory.isNullOrBlank()) {
-                DTOs.ValidationResult.Success
-            } else {
-                // Validate the document type specific source directory
-                validateNeitherBlankNorRoot(directory) +
-                        remoteViewValidations.validateDirectory(
-                            clientConfig,
-                            directory,
-                            DomainObjects.ConfigurationItem.DOC_TYPE_SOURCE_DIRECTORY
-                        )
-            }
-    }
-    ValidatedTextField(
-        name = DomainObjects.ConfigurationItem.DOC_TYPE_SOURCE_DIRECTORY,
-        modifier = modifier,
-        validatable = { docTypeDirValidationResult },
-        label = { Text(text = stringResource(Res.string.label_client_connector_doctype_source_dir, doctype.name)) },
-        value = directory ?: "",
-        placeHolder = { Text(text = stringResource(Res.string.label_client_connector_doctype_source_dir_placeholder)) },
-        onValueChange = { if (canEdit) viewModel.setConnectorDocTypeSourceDir(doctype, it.trim(), connector) },
         enabled = canEdit,
     )
 }
@@ -707,7 +585,7 @@ private fun validateNeitherBlankNorRoot(path: String?): DTOs.ValidationResult {
         DTOs.ValidationResult.Failure(
             listOf(
                 DTOs.ValidationDetail.ConfigItemDetail(
-                    configItem = DomainObjects.ConfigurationItem.LOCAL_DIRECTORY,
+                    configItem = ConfigurationItem.LOCAL_DIRECTORY,
                     messageKey = DTOs.ValidationMessageKey.NOT_A_DIRECTORY
                 )
             )

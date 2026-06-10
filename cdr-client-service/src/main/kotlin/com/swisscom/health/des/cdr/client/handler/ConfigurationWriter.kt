@@ -420,6 +420,7 @@ internal class ConfigurationWriter(
 
     private fun validate(config: CdrClientConfig): Map<String, ValidationMessageKey> {
         logger.debug { "config to validate: '$config'" }
+        configValidationService.createErrorAndArchiveFolders(config)
         return when (val validateAllConfigurationItems: ValidationResult = configValidationService.validateAllConfigurationItems(config)) {
             is ValidationResult.Success -> emptyMap()
             is ValidationResult.Failure -> validateAllConfigurationItems.validationDetails.associate { detail ->

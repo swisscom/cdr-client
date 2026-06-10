@@ -269,17 +269,19 @@ class DTOs {
 
             @Serializable
             data class DocTypeFolders(
+                val requestResponseSplit: Boolean = false,
                 val sourceFolder: String? = null,
+                val sourceFolderReq: String? = null,
+                val sourceFolderResp: String? = null,
+                val targetFolder: String? = null,
+                val targetFolderReq: String? = null,
+                val targetFolderResp: String? = null,
                 val archiveFolder: String? = null,
                 val errorFolder: String? = null,
-                val targetFolder: String? = null,
             ) {
                 companion object {
                     @JvmStatic
-                    val EMPTY = DocTypeFolders(
-                        sourceFolder = null,
-                        targetFolder = null
-                    )
+                    val EMPTY = DocTypeFolders()
                 }
             }
 
