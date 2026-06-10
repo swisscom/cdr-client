@@ -7,6 +7,7 @@ REM Configuration - change this to customize the service name
 set SERVICE_NAME=curaLINEClientUpdateService
 set DISPLAY_NAME=curaLINE Client Update Service
 set DESCRIPTION=Automatically manages updates for curaLINE Client on Windows Server
+set "WAIT_SECONDS=7"
 
 echo Installing !DISPLAY_NAME!...
 
@@ -21,8 +22,6 @@ sc create "!SERVICE_NAME!" ^
     binPath= "\"%~dp0CuraLineClientUpdateService.exe\" --service-name !SERVICE_NAME!" ^
     start= auto ^
     DisplayName= "!DISPLAY_NAME!"
-
-set "WAIT_SECONDS=7"
 
 echo Wait set %ERRORLEVEL%
 

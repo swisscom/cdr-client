@@ -11,7 +11,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.ServiceProcess;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -127,10 +126,6 @@ public class UpdateService : BackgroundService
 
         try
         {
-            // Wait a bit before first check to allow system to stabilize
-            _logger.LogInformation("Waiting 20 seconds for system stabilization before first update check...");
-            await Task.Delay(TimeSpan.FromSeconds(20), stoppingToken);
-
             // Perform first update check at startup
             _logger.LogInformation("Performing initial update check at startup...");
             await CheckAndApplyUpdates(stoppingToken);
@@ -169,14 +164,7 @@ public class UpdateService : BackgroundService
     {
         try
         {
-            // Check if version is pinned
-            if (!string.IsNullOrEmpty(_pinnedVersion))
-            {
-                _logger.LogInformation("Version pinned to {PinnedVersion}. Skipping update check.", _pinnedVersion);
-                return;
-            }
-
-            _logger.LogInformation("Checking for updates from Azure Storage...");
+            _logger.LogInformation("Checking for updates from update site...");
             _logger.LogDebug("Current versions - Service: {Service}, Watchdog: {Watchdog}",
                 _currentVersions.GetValueOrDefault("Service", "unknown"),
                 _currentVersions.GetValueOrDefault("Watchdog", "unknown"));
@@ -184,7 +172,7 @@ public class UpdateService : BackgroundService
             var manifestInfo = await GetLatestReleaseFromManifest(cancellationToken);
             if (manifestInfo == null)
             {
-                _logger.LogWarning("Could not retrieve latest release information from Azure Storage");
+                _logger.LogWarning("Could not retrieve latest release information from update site");
                 return;
             }
 
@@ -193,6 +181,25 @@ public class UpdateService : BackgroundService
 
             _logger.LogInformation("Latest release: {Remote} (current service: {Current})",
                 remoteVersion, currentServiceVersion);
+
+            // Check if version is pinned
+            if (!string.IsNullOrEmpty(_pinnedVersion) && !IsNewerVersion(_pinnedVersion, currentServiceVersion))
+            {
+                _logger.LogInformation("Version pinned to {PinnedVersion}. Skipping update check.", _pinnedVersion);
+                return;
+            } else if (!string.IsNullOrEmpty(_pinnedVersion) && IsNewerVersion(_pinnedVersion, currentServiceVersion))
+            {
+                _logger.LogInformation("Pinned version {PinnedVersion} is newer than current service version {Current}. Checking if pinned version is available in release manifest...",
+                    _pinnedVersion, currentServiceVersion);
+
+                if (manifestInfo.version != _pinnedVersion)
+                {
+                    _logger.LogWarning("Pinned version {PinnedVersion} does not match latest release version {Remote}. Skipping update check.",
+                        _pinnedVersion, manifestInfo.version);
+                    return;
+                }
+                _logger.LogInformation("Pinned version {PinnedVersion} matches latest release. Proceeding with update check...", _pinnedVersion);
+            }
 
             if (IsNewerVersion(remoteVersion, currentServiceVersion))
             {
@@ -253,7 +260,7 @@ public class UpdateService : BackgroundService
                 return null;
             }
 
-            _logger.LogDebug("Latest version from Azure Storage: {Version}", latestInfo.version);
+            _logger.LogDebug("Latest version from update site: {Version}", latestInfo.version);
 
             // Step 2: Fetch the manifest.json for that version
             var manifestUrl = latestInfo.manifestUrl;
@@ -276,41 +283,41 @@ public class UpdateService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error fetching latest release from Azure Storage");
+            _logger.LogError(ex, "Error fetching latest release from update site");
             return null;
         }
     }
 
-    private bool IsNewerVersion(string remoteVersion, string currentVersion)
+    private bool IsNewerVersion(string newVersion, string currentVersion)
     {
         try
         {
             // Handle semantic versioning with suffixes like "1.0.0-SNAPSHOT"
             // Strip suffix and compare base versions, then consider suffix if base versions are equal
-            var (remoteBase, remoteSuffix) = ParseSemanticVersion(remoteVersion);
+            var (newBase, newSuffix) = ParseSemanticVersion(newVersion);
             var (currentBase, currentSuffix) = ParseSemanticVersion(currentVersion);
 
-            var remote = Version.Parse(remoteBase);
+            var newV = Version.Parse(newBase);
             var current = Version.Parse(currentBase);
 
             // If base versions differ, that determines the result
-            if (remote > current) return true;
-            if (remote < current) return false;
+            if (newV > current) return true;
+            if (newV < current) return false;
 
             // Base versions are equal - check suffixes
             // A version without suffix (release) is newer than one with suffix (pre-release)
             // e.g., "1.0.0" > "1.0.0-SNAPSHOT"
-            if (string.IsNullOrEmpty(remoteSuffix) && !string.IsNullOrEmpty(currentSuffix))
-                return true;  // Remote is release, current is pre-release
-            if (!string.IsNullOrEmpty(remoteSuffix) && string.IsNullOrEmpty(currentSuffix))
-                return false; // Remote is pre-release, current is release
+            if (string.IsNullOrEmpty(newSuffix) && !string.IsNullOrEmpty(currentSuffix))
+                return true;  // New version is release, current is pre-release
+            if (!string.IsNullOrEmpty(newSuffix) && string.IsNullOrEmpty(currentSuffix))
+                return false; // New version is pre-release, current is release
 
             // Both have suffixes or both don't - they're equal
             return false;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error comparing versions: {Remote} vs {Current}", remoteVersion, currentVersion);
+            _logger.LogError(ex, "Error comparing versions: {NewVersion} vs {CurrentVersion}", newVersion, currentVersion);
             return false;
         }
     }
@@ -333,11 +340,14 @@ public class UpdateService : BackgroundService
         try
         {
             // Step 1: Download and verify ALL artifacts first (don't touch anything yet)
+            // This step is cancellable - if cancelled, no files have been modified
             _logger.LogInformation("Downloading and verifying artifacts...");
-            var skippedComponents = new List<string>();
 
             foreach (var manifestArtifact in manifest.artifacts)
             {
+                // Check for cancellation at safe checkpoint (before downloading)
+                cancellationToken.ThrowIfCancellationRequested();
+
                 // Check if this artifact matches one of our configured components
                 var componentName = manifestArtifact.name;
 
@@ -366,13 +376,15 @@ public class UpdateService : BackgroundService
                 }
             }
 
-            if (downloadedFiles.Count == 0)
-            {
-                _logger.LogWarning("No artifacts were downloaded from release {Version}. All components may already be up to date.", newVersion);
-                return;
-            }
+            // Final cancellation check before entering critical section
+            cancellationToken.ThrowIfCancellationRequested();
 
             _logger.LogInformation("All artifacts downloaded and verified successfully. Proceeding with update...");
+
+            // ============================================================================
+            // CRITICAL SECTION: Beyond this point, operations should NOT be cancelled
+            // to prevent partial updates. We must complete the update or rollback.
+            // ============================================================================
 
             // Step 2: Create backup of current files
             _logger.LogInformation("Creating backup at: {BackupPath}", backupPath);
@@ -390,7 +402,7 @@ public class UpdateService : BackgroundService
             {
                 try
                 {
-                    await ApplyComponentUpdate(componentName, downloadedPath, cancellationToken);
+                    await ApplyComponentUpdate(componentName, downloadedPath);
                     updatedComponents.Add(componentName);
                     _logger.LogInformation("Successfully updated {Component}", componentName);
                 }
@@ -420,28 +432,68 @@ public class UpdateService : BackgroundService
             StartWatchdogService();
 
             // Step 7: Verify service started successfully
-            await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
-            VerifyWatchdogRunning();
+            // This can be cancelled (if shutdown requested after update), but update is complete
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken);
+                VerifyWatchdogRunning();
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Service verification cancelled, but update completed successfully");
+            }
 
             _logger.LogInformation("Update process completed successfully! Updated components: {Components}",
                 string.Join(", ", updatedComponents));
 
             // Step 8: Cleanup - delete old backups and downloaded files
             CleanupOldBackups();
+            CleanupDownloadedFiles(downloadedFiles);
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("Update operation cancelled. Updated components: {Count}", updatedComponents.Count);
 
-            foreach (var path in downloadedFiles.Values)
+            // If we were cancelled during download phase (updatedComponents is empty), just cleanup
+            if (updatedComponents.Count == 0)
             {
-                try
-                {
-                    if (File.Exists(path))
-                        File.Delete(path);
-                }
-                catch { /* Ignore cleanup errors */ }
+                _logger.LogInformation("Cancellation occurred before any file modifications - safe to abort");
+                CleanupDownloadedFiles(downloadedFiles);
             }
+            else
+            {
+                // This shouldn't happen due to our non-cancellable critical section,
+                // but handle it defensively
+                _logger.LogError("Cancellation occurred after file modifications - triggering rollback");
+                HandleUpdateFailure(
+                    new InvalidOperationException("Update cancelled after partial modifications"),
+                    updatedComponents,
+                    backupPath,
+                    downloadedFiles);
+            }
+            throw; // Re-throw to exit the update check loop
         }
         catch (Exception ex)
         {
             HandleUpdateFailure(ex, updatedComponents, backupPath, downloadedFiles);
+        }
+    }
+
+    private void CleanupDownloadedFiles(Dictionary<string, string> downloadedFiles)
+    {
+        foreach (var path in downloadedFiles.Values)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+                _logger.LogWarning(cleanupEx, "Failed to delete temp file: {Path}", path);
+            }
         }
     }
 
@@ -494,22 +546,7 @@ public class UpdateService : BackgroundService
             }
 
             // Cleanup downloaded temp files regardless of restore/cleanup path
-            _logger.LogDebug("Cleaning up downloaded temporary files...");
-            foreach (var path in downloadedFiles.Values)
-            {
-                try
-                {
-                    if (File.Exists(path))
-                    {
-                        File.Delete(path);
-                        _logger.LogDebug("Deleted temp file: {Path}", path);
-                    }
-                }
-                catch (Exception cleanupEx)
-                {
-                    _logger.LogWarning(cleanupEx, "Failed to delete temp file: {Path}", path);
-                }
-            }
+            CleanupDownloadedFiles(downloadedFiles);
         }
         catch (Exception rollbackEx)
         {
@@ -517,7 +554,7 @@ public class UpdateService : BackgroundService
         }
     }
 
-    private async Task ApplyComponentUpdate(string componentName, string downloadedFilePath, CancellationToken cancellationToken)
+    private async Task ApplyComponentUpdate(string componentName, string downloadedFilePath)
     {
         if (!_artifacts.TryGetValue(componentName, out var artifactConfig))
         {
@@ -697,31 +734,32 @@ public class UpdateService : BackgroundService
                 _logger.LogDebug("Successfully deleted contents of directory: {Path}", path);
                 return;
             }
-            catch (IOException ex) when (i < maxRetries - 1)
+            catch (IOException ex)
             {
+                if (i >= maxRetries - 1)
+                {
+                    // Final attempt - let exception propagate
+                    throw;
+                }
+
                 // File might still be locked by recently stopped process - wait and retry
                 _logger.LogWarning("Failed to delete directory contents (attempt {Attempt}/{MaxRetries}): {Message}. Retrying in 2 seconds...",
                     i + 1, maxRetries, ex.Message);
                 Thread.Sleep(TimeSpan.FromSeconds(2));
             }
-            catch (UnauthorizedAccessException ex) when (i < maxRetries - 1)
+            catch (UnauthorizedAccessException ex)
             {
+                if (i >= maxRetries - 1)
+                {
+                    // Final attempt - let exception propagate
+                    throw;
+                }
+
                 // File might still be locked - wait and retry
                 _logger.LogWarning("Access denied deleting directory contents (attempt {Attempt}/{MaxRetries}): {Message}. Retrying in 2 seconds...",
                     i + 1, maxRetries, ex.Message);
                 Thread.Sleep(TimeSpan.FromSeconds(2));
             }
-        }
-
-        // Final attempt - let exception propagate if it still fails
-        var finalDirectory = new DirectoryInfo(path);
-        foreach (var file in finalDirectory.GetFiles())
-        {
-            file.Delete();
-        }
-        foreach (var subDirectory in finalDirectory.GetDirectories())
-        {
-            subDirectory.Delete(recursive: true);
         }
     }
 
@@ -1058,11 +1096,46 @@ public class UpdateService : BackgroundService
 
             var configContent = await File.ReadAllTextAsync(configPath);
 
-            // Update the specific component version in CurrentVersions section
-            var pattern = $"(\"{componentName}\"\\s*:\\s*)\"[^\"]+\"";
-            var replacement = $"$1\"{newVersion}\"";
-            var updatedContent = Regex.Replace(configContent, pattern, replacement);
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNameCaseInsensitive = true
+            };
 
+            using var jsonDoc = JsonDocument.Parse(configContent);
+            using var stream = new MemoryStream();
+            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+            {
+                writer.WriteStartObject();
+
+                foreach (var property in jsonDoc.RootElement.EnumerateObject())
+                {
+                    if (property.Name == "CurrentVersions")
+                    {
+                        writer.WriteStartObject("CurrentVersions");
+                        foreach (var versionProperty in property.Value.EnumerateObject())
+                        {
+                            if (versionProperty.Name == componentName)
+                            {
+                                writer.WriteString(versionProperty.Name, newVersion);
+                            }
+                            else
+                            {
+                                versionProperty.WriteTo(writer);
+                            }
+                        }
+                        writer.WriteEndObject();
+                    }
+                    else
+                    {
+                        property.WriteTo(writer);
+                    }
+                }
+
+                writer.WriteEndObject();
+            }
+
+            var updatedContent = System.Text.Encoding.UTF8.GetString(stream.ToArray());
             await File.WriteAllTextAsync(configPath, updatedContent);
             _logger.LogInformation("Updated {Component} version in configuration to: {Version}", componentName, newVersion);
         }

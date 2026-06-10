@@ -1,29 +1,29 @@
 # curaLINE Client updateservice
 
-This service automatically manages updates for CDR Client on Windows Server (especially 2019 and older versions), where MSIX auto-update functionality is not available.
+This service automatically manages updates of the curaLINE Client on Windows Server (especially 2019 and older versions), where MSIX auto-update functionality is not available.
 
-> ⚠️ **Note**: If you're using **Windows Server 2022 or newer**, please use the default MSIX installer instead. This advanced installation method is primarily for Windows Server 2019 version that don't support MSIX packages.
+> ⚠️ **Note**: If you're using **Windows Server 2022 or newer**, please use the default MSIX installer instead. This advanced installation method is primarily for Windows Server version 2019 which does not fully support MSIX packages.
 
 ## Overview
 
 The Update Service:
-- Checks for new versions from Azure Storage every 2 hours (configurable, with immediate check at startup)
-- Downloads available artifacts from Azure Storage with SHA256 checksum verification
-- Stops the Watchdog service (which stops the CDR service)
-- Creates backup of current files before applying updates
+- Checks for new versions from the update site every 2 hours (configurable, with immediate check at startup)
+- Downloads available artifacts from the update site with SHA256 checksum verification
+- Stops the Watchdog service (which stops the curaLINE Client application)
+- Creates a backup of current files before applying updates
 - Applies updates to present components (Service JAR, Watchdog)
 - Restarts the Watchdog service
 - Tracks component versions independently
 - Logs all operations to Windows Event Log
 - Supports version pinning to prevent unwanted updates
-- Automatic rollback on failure
+- Rolls back updates on failure
 
 ### Intelligent Component Updates
 
 **Components are updated independently based on what's available in each release:**
 
 - **Service JAR**: Always included in every release
-- **Watchdog**: Only included when watchdog code changes
+- **Watchdog**: Only included if watchdog code changes
 
 This means:
 - Release `5.3.1` might only update the Service JAR (if only service code changed)
@@ -35,7 +35,7 @@ This means:
 ```
 curaLINEClientUpdateService (this service, displayed as "curaLINE Client updateservice")
     ↓ manages/stops/starts
-CDRClientWatchdog (runs CDR service as JAR)
+CDRClientWatchdog
     ↓ monitors/restarts
 CDRClientService (main application JAR)
 ```
@@ -52,7 +52,7 @@ CDRClientService (main application JAR)
 
 **Note**: UpdateService is Windows-only (for Windows Server advanced installation).
 
-1. **Install the Service** (choose one):
+1. **Install the Service**:
    ```cmd
    install-service.bat
    ```
@@ -97,7 +97,7 @@ Edit `appsettings.json` to customize behavior:
 - **UpdateCheckIntervalHours**: How often to check for updates (default: 2 hours)
 - **WatchdogServiceName**: Name of the watchdog Windows service
 - **InstallationPath**: Root installation path (auto-detected if empty)
-- **PinnedVersion**: Pin to a specific version (empty = auto-update, "5.3.0" = stay on that version)
+- **PinnedVersion**: Pin to a specific curaLINE client version (empty = auto-update, "5.3.0" = stay on that version, watchdog won't be auto-updated either)
 - **MaxBackupsToKeep**: Number of backups to retain (default: 3)
 - **CurrentVersions**: Current installed versions (updated automatically after each update)
 - **Artifacts**: Configuration for each updateable component
@@ -107,21 +107,21 @@ Edit `appsettings.json` to customize behavior:
 
 ### Security Features
 
-- **Hardcoded Update URL**: The Azure Storage URL (`https://cdr.health.swisscom.ch/share/downloads/manualInstallation`) is hardcoded in the service binary to prevent tampering via configuration files
+- **Hardcoded Update URL**: The update site URL (`https://cdr.health.swisscom.ch/share/downloads/manualInstallation`) is hardcoded in the service binary to prevent tampering via configuration files
 - **System Proxy Support**: Automatically uses Windows system proxy settings with default network credentials for corporate environments
 
 ## Update Process
 
-When a new version is detected in Azure Storage:
+When a new version is detected in the update site:
 
 1. **Discover**: Fetch `latest.json` to get current version pointer
 2. **Fetch Manifest**: Download `manifest.json` for that version
 3. **Download & Verify**: Download all artifacts and verify SHA256 checksums
 4. **Backup**: Create timestamped backup of current files
-5. **Stop**: Stop watchdog service (which stops CDR service)
+5. **Stop**: Stop watchdog service (which stops curaLINE client service)
 6. **Apply**: Copy JARs to target location / Extract ZIPs for watchdog
 7. **Config**: Update current versions in appsettings.json
-8. **Restart**: Restart watchdog service (which restarts CDR service with new JAR)
+8. **Restart**: Restart watchdog service (which restarts curaLINE client service with new JAR)
 9. **Verify**: Confirm watchdog is running
 10. **Cleanup**: Delete old backups (keep last 3), remove temporary files
 
@@ -150,15 +150,15 @@ sc query curaLINEClientUpdateService
 
 ## Troubleshooting
 
-### Service won't start
+### Service does not start
 1. Check Event Log for error messages
 2. Verify CDRClientWatchdog service exists and is installed
 3. Verify `appsettings.json` configuration is valid
-4. Check Azure Storage URL accessibility: `https://cdr.health.swisscom.ch/share/downloads/manualInstallation/latest.json`
+4. Check update site URL accessibility: `https://cdr.health.swisscom.ch/share/downloads/manualInstallation/latest.json`
 
 ### Updates not being applied
 1. Check Event Log for download/extraction errors
-2. Verify network connectivity to Azure Storage
+2. Verify network connectivity to the update site
 3. Check that manifest contains expected artifacts
 4. Verify watchdog service can be stopped/started
 5. Check for checksum verification failures
@@ -166,8 +166,8 @@ sc query curaLINEClientUpdateService
 
 ### Checksum verification failures
 1. Check Event Log for specific checksum mismatch details
-2. Re-download artifacts may be corrupted
-3. Verify Azure Storage artifacts integrity
+2. Re-download artifacts that may be corrupted
+3. Verify update site artifacts integrity
 4. Check network proxy settings
 
 ### Manual update rollback
@@ -191,9 +191,9 @@ sc stop curaLINEClientUpdateService
 sc start curaLINEClientUpdateService
 ```
 
-## Azure Storage Release Structure
+## Update Site Release Structure
 
-For automatic updates to work, artifacts are published to Azure Storage with this structure:
+For automatic updates to work, artifacts are published to the update site with this structure:
 
 ```
 downloads/manualInstallation/
@@ -254,13 +254,32 @@ The update service cannot update itself. To update the update service:
    sc start curaLINEClientUpdateService
    ```
 
-## Uninstallation
+## Uninstalling the Update Service
 
 ```cmd
 uninstall-service.bat
 ```
 
 This stops and removes the service. Event log source is intentionally preserved to keep historical logs.
+
+## Development and Testing
+### Running the Tests
+
+#### Via Gradle (Recommended)
+
+```bash
+# Tests run automatically before build
+./gradlew buildUpdateService
+```
+
+The tests are automatically executed as part of the build process. If tests fail, the build will fail and no artifacts will be published.
+
+#### Via .NET CLI Directly
+
+```bash
+cd cdr-client-updateservice
+dotnet test CuraLineClientUpdateService.Tests.csproj --verbosity normal
+```
 
 ## Legacy Windows Server Support
 

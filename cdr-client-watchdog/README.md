@@ -161,7 +161,7 @@ windows {
 
 ## Troubleshooting
 
-### Service Won't Start
+### Service Does Not Start
 - Check that the path in `appsettings.json` is correct
 - Ensure the CDR Client executable exists and is accessible
 - Check Windows Event Log for error details

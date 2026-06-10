@@ -7,7 +7,7 @@ echo Building curaLINE Client update service...
 REM Clean previous build
 if exist publish rmdir /s /q publish
 
-REM Build and publish
+REM Build and publish, x64 is suffice as this is only intended for Windows Server 2019
 dotnet publish -c Release -r win-x64 --self-contained false -o publish
 
 if %ERRORLEVEL% NEQ 0 (

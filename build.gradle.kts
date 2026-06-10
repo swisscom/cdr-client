@@ -392,10 +392,79 @@ tasks.register("buildUpdateService") {
         val dotnetCmd = getDotnetCommand()
         logger.info("Using dotnet command: $dotnetCmd")
 
+        // Restore test dependencies first
+        logger.info("Restoring UpdateService test dependencies...")
+        val restoreProcessBuilder = ProcessBuilder(
+            dotnetCmd,
+            "restore",
+            "CuraLineClientUpdateService.Tests.csproj"
+        )
+            .directory(file("cdr-client-updateservice"))
+            .redirectErrorStream(true)
+
+        if (dotnetCmd == dotnetExecutable.absolutePath) {
+            restoreProcessBuilder.environment().apply {
+                put("DOTNET_ROOT", dotnetInstallDir.absolutePath)
+                put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
+            }
+        }
+
+        val restoreOutput = StringBuilder()
+        val restoreProcess = restoreProcessBuilder.start()
+        restoreProcess.inputStream.bufferedReader().forEachLine {
+            logger.info(it)
+            restoreOutput.appendLine(it)
+        }
+        val restoreExitCode = restoreProcess.waitFor()
+        if (restoreExitCode != 0) {
+            logger.error("=== Restore Output ===")
+            logger.error(restoreOutput.toString())
+            throw GradleException("UpdateService test dependency restore failed with exit code $restoreExitCode")
+        }
+
+        // Run tests
+        logger.info("Running UpdateService tests...")
+        val testProcessBuilder = ProcessBuilder(
+            dotnetCmd,
+            "test",
+            "CuraLineClientUpdateService.Tests.csproj",
+            "--no-restore",
+            "--verbosity", "normal"
+        )
+            .directory(file("cdr-client-updateservice"))
+            .redirectErrorStream(true)
+
+        if (dotnetCmd == dotnetExecutable.absolutePath) {
+            testProcessBuilder.environment().apply {
+                put("DOTNET_ROOT", dotnetInstallDir.absolutePath)
+                put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
+            }
+        }
+
+        val testOutput = StringBuilder()
+        val testProcess = testProcessBuilder.start()
+        testProcess.inputStream.bufferedReader().forEachLine { line ->
+            testOutput.appendLine(line)
+            // Show pass/fail summary but suppress verbose details
+            if (line.contains("Passed") || line.contains("Failed") || line.contains("Total tests") ||
+                line.contains("error") || line.contains("Error")) {
+                logger.lifecycle(line)
+            }
+        }
+        val testExitCode = testProcess.waitFor()
+        if (testExitCode != 0) {
+            logger.error("=== FULL TEST OUTPUT (exitCode=$testExitCode) ===")
+            logger.error(testOutput.toString())
+            logger.error("=============================================")
+            throw GradleException("UpdateService tests failed with exit code $testExitCode. See full output above.")
+        }
+        logger.lifecycle("UpdateService tests passed")
+
         // Build using dotnet directly (works on all platforms)
         val processBuilder = ProcessBuilder(
             dotnetCmd,
             "publish",
+            "CuraLineClientUpdateService.csproj",
             "-c", "Release",
             "-r", "win-x64",
             "--self-contained", "false",
