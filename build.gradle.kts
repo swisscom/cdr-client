@@ -231,7 +231,8 @@ tasks.register("buildWatchdog") {
 
     // Ensure .NET SDK is available if not present on system
     dependsOn("ensureDotnetSdk")
-    
+    mustRunAfter("cleanAll", "cleanWatchdog") // Ensure clean tasks complete before building
+
     inputs.files(fileTree("cdr-client-watchdog") {
         include("**/*.cs", "**/*.csproj", "**/*.json")
     })
@@ -301,7 +302,7 @@ tasks.register("buildWatchdogRelease") {
     description = "Builds the CDR Client Watchdog Windows service (framework-dependent for GitHub releases)"
 
     dependsOn("ensureDotnetSdk")
-    mustRunAfter("buildWatchdog") // Ensure proper task ordering when both are run
+    mustRunAfter("buildWatchdog", "cleanAll", "cleanWatchdog") // Ensure proper task ordering when both are run
 
     inputs.files(fileTree("cdr-client-watchdog") {
         include("**/*.cs", "**/*.csproj", "**/*.json")
@@ -369,66 +370,44 @@ tasks.register("buildWatchdogRelease") {
 }
 
 /**
- * Builds the CDR Client Update Service (Windows Server 2019 only)
+ * Runs the CDR Client Update Service tests
  */
-tasks.register("buildUpdateService") {
+tasks.register("testUpdateService") {
     group = "dotnet"
-    description = "Builds the CDR Client Update Service for Windows Server 2019"
+    description = "Runs the CDR Client Update Service tests"
 
-    // Ensure .NET SDK is available if not present on system
     dependsOn("ensureDotnetSdk")
+    mustRunAfter("cleanAll", "cleanUpdateService", "buildWatchdog", "buildWatchdogRelease")
 
     inputs.files(fileTree("cdr-client-updateservice") {
         include("**/*.cs", "**/*.csproj", "**/*.json")
     })
-    outputs.dir("cdr-client-updateservice/publish")
 
     doLast {
-        logger.info("Building CDR Client Update Service (Windows-only, cross-platform build)")
-
-        // Clean previous publish directory
-        delete("cdr-client-updateservice/publish")
-
         val dotnetCmd = getDotnetCommand()
         logger.info("Using dotnet command: $dotnetCmd")
 
-        // Restore test dependencies first
-        logger.info("Restoring UpdateService test dependencies...")
-        val restoreProcessBuilder = ProcessBuilder(
-            dotnetCmd,
-            "restore",
-            "CuraLineClientUpdateService.Tests.csproj"
-        )
+        // Shutdown any lingering .NET build servers from previous dotnet tasks to prevent interference
+        logger.info("Shutting down .NET build servers...")
+        val shutdownBuilder = ProcessBuilder(dotnetCmd, "build-server", "shutdown")
             .directory(file("cdr-client-updateservice"))
             .redirectErrorStream(true)
-
         if (dotnetCmd == dotnetExecutable.absolutePath) {
-            restoreProcessBuilder.environment().apply {
+            shutdownBuilder.environment().apply {
                 put("DOTNET_ROOT", dotnetInstallDir.absolutePath)
                 put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
             }
         }
+        val shutdownProcess = shutdownBuilder.start()
+        shutdownProcess.inputStream.bufferedReader().readText()
+        shutdownProcess.waitFor()
 
-        val restoreOutput = StringBuilder()
-        val restoreProcess = restoreProcessBuilder.start()
-        restoreProcess.inputStream.bufferedReader().forEachLine {
-            logger.info(it)
-            restoreOutput.appendLine(it)
-        }
-        val restoreExitCode = restoreProcess.waitFor()
-        if (restoreExitCode != 0) {
-            logger.error("=== Restore Output ===")
-            logger.error(restoreOutput.toString())
-            throw GradleException("UpdateService test dependency restore failed with exit code $restoreExitCode")
-        }
-
-        // Run tests
+        // Run tests (with implicit restore)
         logger.info("Running UpdateService tests...")
         val testProcessBuilder = ProcessBuilder(
             dotnetCmd,
             "test",
             "CuraLineClientUpdateService.Tests.csproj",
-            "--no-restore",
             "--verbosity", "normal"
         )
             .directory(file("cdr-client-updateservice"))
@@ -445,7 +424,6 @@ tasks.register("buildUpdateService") {
         val testProcess = testProcessBuilder.start()
         testProcess.inputStream.bufferedReader().forEachLine { line ->
             testOutput.appendLine(line)
-            // Show pass/fail summary but suppress verbose details
             if (line.contains("Passed") || line.contains("Failed") || line.contains("Total tests") ||
                 line.contains("error") || line.contains("Error")) {
                 logger.lifecycle(line)
@@ -459,6 +437,32 @@ tasks.register("buildUpdateService") {
             throw GradleException("UpdateService tests failed with exit code $testExitCode. See full output above.")
         }
         logger.lifecycle("UpdateService tests passed")
+    }
+}
+
+/**
+ * Builds the CDR Client Update Service (Windows Server 2019 only)
+ */
+tasks.register("buildUpdateService") {
+    group = "dotnet"
+    description = "Builds the CDR Client Update Service for Windows Server 2019"
+
+    dependsOn("ensureDotnetSdk")
+    mustRunAfter("cleanAll", "cleanUpdateService", "buildWatchdog", "buildWatchdogRelease", "testUpdateService")
+
+    inputs.files(fileTree("cdr-client-updateservice") {
+        include("**/*.cs", "**/*.csproj", "**/*.json")
+    })
+    outputs.dir("cdr-client-updateservice/publish")
+
+    doLast {
+        logger.info("Building CDR Client Update Service (Windows-only, cross-platform build)")
+
+        // Clean previous publish directory
+        delete("cdr-client-updateservice/publish")
+
+        val dotnetCmd = getDotnetCommand()
+        logger.info("Using dotnet command: $dotnetCmd")
 
         // Build using dotnet directly (works on all platforms)
         val processBuilder = ProcessBuilder(
@@ -556,6 +560,7 @@ tasks.register("buildManualInstallationArtifacts") {
 
     // Only depend on service JAR - watchdog and updateservice are built conditionally by the pipeline
     dependsOn(":cdr-client-service:bootJar")
+    mustRunAfter("cleanAll", "buildWatchdogRelease", "buildUpdateService") // Ensure artifacts exist before packaging
 
     doLast {
         val version = project.version.toString()
