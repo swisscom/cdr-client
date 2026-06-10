@@ -1085,6 +1085,9 @@ public class UpdateService : BackgroundService
 
     private async Task UpdateCurrentVersionInConfig(string componentName, string newVersion)
     {
+        // Update in-memory version immediately so the next check cycle uses the correct version
+        _currentVersions[componentName] = newVersion;
+
         try
         {
             var configPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");

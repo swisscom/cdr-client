@@ -387,28 +387,40 @@ tasks.register("testUpdateService") {
         val dotnetCmd = getDotnetCommand()
         logger.info("Using dotnet command: $dotnetCmd")
 
-        // Shutdown any lingering .NET build servers from previous dotnet tasks to prevent interference
-        logger.info("Shutting down .NET build servers...")
-        val shutdownBuilder = ProcessBuilder(dotnetCmd, "build-server", "shutdown")
+        // Explicit restore to ensure all packages (including xunit, Moq) are available
+        // doesn't really work, build fails (like every 3rd) when doing "gradlew cleanAll buildUpdateService"
+        logger.info("Restoring UpdateService test packages...")
+        val restoreProcessBuilder = ProcessBuilder(
+            dotnetCmd,
+            "restore",
+            "CuraLineClientUpdateService.Tests.csproj"
+        )
             .directory(file("cdr-client-updateservice"))
             .redirectErrorStream(true)
+
         if (dotnetCmd == dotnetExecutable.absolutePath) {
-            shutdownBuilder.environment().apply {
+            restoreProcessBuilder.environment().apply {
                 put("DOTNET_ROOT", dotnetInstallDir.absolutePath)
                 put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
             }
         }
-        val shutdownProcess = shutdownBuilder.start()
-        shutdownProcess.inputStream.bufferedReader().readText()
-        shutdownProcess.waitFor()
 
-        // Run tests (with implicit restore)
+        val restoreProcess = restoreProcessBuilder.start()
+        restoreProcess.inputStream.bufferedReader().readText()
+        val restoreExitCode = restoreProcess.waitFor()
+        if (restoreExitCode != 0) {
+            throw GradleException("UpdateService test restore failed with exit code $restoreExitCode")
+        }
+
+        // Run tests (skip restore since we just did it explicitly)
         logger.info("Running UpdateService tests...")
         val testProcessBuilder = ProcessBuilder(
             dotnetCmd,
             "test",
             "CuraLineClientUpdateService.Tests.csproj",
-            "--verbosity", "normal"
+            "--no-restore",
+            "--verbosity", "normal",
+            "-p:UseSharedCompilation=false"
         )
             .directory(file("cdr-client-updateservice"))
             .redirectErrorStream(true)
@@ -447,8 +459,8 @@ tasks.register("buildUpdateService") {
     group = "dotnet"
     description = "Builds the CDR Client Update Service for Windows Server 2019"
 
-    dependsOn("ensureDotnetSdk")
-    mustRunAfter("cleanAll", "cleanUpdateService", "buildWatchdog", "buildWatchdogRelease", "testUpdateService")
+    dependsOn("ensureDotnetSdk", "testUpdateService")
+    mustRunAfter("cleanAll", "cleanUpdateService", "buildWatchdog", "buildWatchdogRelease")
 
     inputs.files(fileTree("cdr-client-updateservice") {
         include("**/*.cs", "**/*.csproj", "**/*.json")

@@ -5,7 +5,10 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Reflection;
+using System.Threading.Tasks;
 
 #nullable enable
 
@@ -181,6 +184,198 @@ public class UpdateServiceTests
                     Assert.Equal(pinnedVersion, manifestVersion);
                     break;
             }
+        }
+    }
+
+    #endregion
+
+    #region ZIP Update Tests
+
+    [Fact]
+    public async Task ApplyComponentUpdate_ZipArtifact_BacksUpAllOldFilesAndRemovesThem()
+    {
+        // Arrange
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"cdr-update-test-{Guid.NewGuid()}");
+        var installPath = Path.Combine(tempRoot, "install");
+        var watchdogDir = Path.Combine(installPath, "watchdog");
+
+        try
+        {
+            // Create existing installation with multiple files and subdirectories
+            Directory.CreateDirectory(watchdogDir);
+            var existingFiles = new Dictionary<string, string>
+            {
+                ["WatchdogService.exe"] = "old-executable-content",
+                ["appsettings.json"] = "{\"old\": \"config\"}",
+                ["install-service.bat"] = "old install script",
+                ["uninstall-service.bat"] = "old uninstall script",
+                ["some-library.dll"] = "old-dll-content",
+                ["README.md"] = "old readme"
+            };
+
+            foreach (var (fileName, content) in existingFiles)
+            {
+                File.WriteAllText(Path.Combine(watchdogDir, fileName), content);
+            }
+
+            // Create a subdirectory with files
+            var subDir = Path.Combine(watchdogDir, "logs");
+            Directory.CreateDirectory(subDir);
+            File.WriteAllText(Path.Combine(subDir, "old-log.txt"), "old log content");
+
+            // Create a ZIP with new content (simulating the update artifact)
+            var zipPath = Path.Combine(tempRoot, "Watchdog-update.zip");
+            using (var zipArchive = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+            {
+                AddZipEntry(zipArchive, "WatchdogService.exe", "new-executable-content");
+                AddZipEntry(zipArchive, "appsettings.json", "{\"new\": \"config\"}");
+                AddZipEntry(zipArchive, "install-service.bat", "new install script");
+                AddZipEntry(zipArchive, "uninstall-service.bat", "new uninstall script");
+                AddZipEntry(zipArchive, "new-library.dll", "new-dll-content");
+            }
+
+            // Configure update service with artifacts pointing to our temp directory
+            var overrides = new Dictionary<string, string?>
+            {
+                ["InstallationPath"] = installPath,
+                ["Artifacts:Watchdog:FileName"] = "Watchdog-update.zip",
+                ["Artifacts:Watchdog:TargetPath"] = "watchdog"
+            };
+
+            var service = CreateUpdateService(overrides);
+
+            // Act - Step 1: Create backup
+            var backupPath = Path.Combine(installPath, $"backup-test");
+            InvokePrivateMethod<object>(service, "CreateBackup", backupPath, (IEnumerable<string>)new[] { "Watchdog" });
+
+            // Assert - Verify all old files were backed up
+            var backupDir = Path.Combine(backupPath, "Watchdog");
+            Assert.True(Directory.Exists(backupDir), "Backup directory should exist");
+
+            foreach (var (fileName, expectedContent) in existingFiles)
+            {
+                var backedUpFile = Path.Combine(backupDir, fileName);
+                Assert.True(File.Exists(backedUpFile), $"Backup should contain: {fileName}");
+                Assert.Equal(expectedContent, File.ReadAllText(backedUpFile));
+            }
+
+            // Verify subdirectory was also backed up
+            Assert.True(File.Exists(Path.Combine(backupDir, "logs", "old-log.txt")),
+                "Backup should contain files from subdirectories");
+            Assert.Equal("old log content", File.ReadAllText(Path.Combine(backupDir, "logs", "old-log.txt")));
+
+            // Act - Step 2: Apply the ZIP update
+            await InvokePrivateMethodAsync(service, "ApplyComponentUpdate", "Watchdog", zipPath);
+
+            // Assert - Verify old files that are NOT in the new ZIP are removed
+            Assert.False(File.Exists(Path.Combine(watchdogDir, "some-library.dll")),
+                "Old files not in the update ZIP should be removed");
+            Assert.False(File.Exists(Path.Combine(watchdogDir, "README.md")),
+                "Old files not in the update ZIP should be removed");
+            Assert.False(Directory.Exists(Path.Combine(watchdogDir, "logs")),
+                "Old subdirectories not in the update ZIP should be removed");
+
+            // Assert - Verify new files from ZIP are present
+            Assert.True(File.Exists(Path.Combine(watchdogDir, "new-library.dll")),
+                "New files from ZIP should be extracted");
+            Assert.Equal("new-dll-content", File.ReadAllText(Path.Combine(watchdogDir, "new-library.dll")));
+
+            // Assert - Verify new executable is present
+            Assert.True(File.Exists(Path.Combine(watchdogDir, "WatchdogService.exe")));
+            Assert.Equal("new-executable-content", File.ReadAllText(Path.Combine(watchdogDir, "WatchdogService.exe")));
+
+            // Assert - Verify protected files are preserved (kept from old installation)
+            Assert.Equal("{\"old\": \"config\"}", File.ReadAllText(Path.Combine(watchdogDir, "appsettings.json")));
+            Assert.Equal("old install script", File.ReadAllText(Path.Combine(watchdogDir, "install-service.bat")));
+            Assert.Equal("old uninstall script", File.ReadAllText(Path.Combine(watchdogDir, "uninstall-service.bat")));
+
+            // Assert - Verify .new files are created for protected files with new versions
+            Assert.True(File.Exists(Path.Combine(watchdogDir, "appsettings.json.new")),
+                "New version of protected file should be saved as .new");
+            Assert.Equal("{\"new\": \"config\"}", File.ReadAllText(Path.Combine(watchdogDir, "appsettings.json.new")));
+        }
+        finally
+        {
+            // Cleanup
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ApplyComponentUpdate_ZipArtifact_FreshInstallation_ExtractsAllFiles()
+    {
+        // Arrange
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"cdr-update-test-{Guid.NewGuid()}");
+        var installPath = Path.Combine(tempRoot, "install");
+
+        try
+        {
+            Directory.CreateDirectory(installPath);
+            // Note: watchdog directory does NOT exist (fresh installation)
+
+            // Create a ZIP with content
+            var zipPath = Path.Combine(tempRoot, "Watchdog-update.zip");
+            using (var zipArchive = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+            {
+                AddZipEntry(zipArchive, "WatchdogService.exe", "executable-content");
+                AddZipEntry(zipArchive, "appsettings.json", "{\"fresh\": \"config\"}");
+                AddZipEntry(zipArchive, "install-service.bat", "install script");
+                AddZipEntry(zipArchive, "uninstall-service.bat", "uninstall script");
+            }
+
+            var overrides = new Dictionary<string, string?>
+            {
+                ["InstallationPath"] = installPath,
+                ["Artifacts:Watchdog:FileName"] = "Watchdog-update.zip",
+                ["Artifacts:Watchdog:TargetPath"] = "watchdog"
+            };
+
+            var service = CreateUpdateService(overrides);
+
+            // Act
+            var watchdogDir = Path.Combine(installPath, "watchdog");
+            await InvokePrivateMethodAsync(service, "ApplyComponentUpdate", "Watchdog", zipPath);
+
+            // Assert - All files extracted (no preservation since it's a fresh install)
+            Assert.True(File.Exists(Path.Combine(watchdogDir, "WatchdogService.exe")));
+            Assert.Equal("executable-content", File.ReadAllText(Path.Combine(watchdogDir, "WatchdogService.exe")));
+            Assert.Equal("{\"fresh\": \"config\"}", File.ReadAllText(Path.Combine(watchdogDir, "appsettings.json")));
+            Assert.Equal("install script", File.ReadAllText(Path.Combine(watchdogDir, "install-service.bat")));
+
+            // No .new files should exist for fresh installation
+            Assert.False(File.Exists(Path.Combine(watchdogDir, "appsettings.json.new")));
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    private void AddZipEntry(ZipArchive archive, string entryName, string content)
+    {
+        var entry = archive.CreateEntry(entryName);
+        using var writer = new StreamWriter(entry.Open());
+        writer.Write(content);
+    }
+
+    private async Task InvokePrivateMethodAsync(object obj, string methodName, params object[] parameters)
+    {
+        var method = obj.GetType().GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Instance);
+        if (method == null)
+        {
+            throw new InvalidOperationException($"Method '{methodName}' not found");
+        }
+
+        var result = method.Invoke(obj, parameters);
+        if (result is Task task)
+        {
+            await task;
         }
     }
 
