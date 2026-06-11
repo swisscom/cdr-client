@@ -122,10 +122,10 @@ public class UpdateService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("curaLINEClientUpdateService started. Check interval: {Interval} hours", _updateCheckInterval.TotalHours);
-
         try
         {
+            _logger.LogInformation("curaLINEClientUpdateService started. Check interval: {Interval} hours", _updateCheckInterval.TotalHours);
+
             // Perform first update check at startup
             _logger.LogInformation("Performing initial update check at startup...");
             await CheckAndApplyUpdates(stoppingToken);
@@ -138,13 +138,17 @@ public class UpdateService : BackgroundService
                 await CheckAndApplyUpdates(stoppingToken);
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            _logger.LogInformation("Update service cancelled - service shutdown requested");
+            // Graceful shutdown requested — this is expected, do not log as error
+            _logger.LogInformation("curaLINEClientUpdateService shutting down gracefully");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error in update service loop");
+            // Unhandled exception in the service loop — log critical and request stop
+            // Without this, BackgroundService transitions to Faulted but the process stays alive doing nothing
+            _logger.LogCritical(ex, "Unrecoverable error in update service loop. Requesting application stop.");
+            _hostLifetime.StopApplication();
         }
     }
 
@@ -187,7 +191,8 @@ public class UpdateService : BackgroundService
             {
                 _logger.LogInformation("Version pinned to {PinnedVersion}. Skipping update check.", _pinnedVersion);
                 return;
-            } else if (!string.IsNullOrEmpty(_pinnedVersion) && IsNewerVersion(_pinnedVersion, currentServiceVersion))
+            }
+            else if (!string.IsNullOrEmpty(_pinnedVersion) && IsNewerVersion(_pinnedVersion, currentServiceVersion))
             {
                 _logger.LogInformation("Pinned version {PinnedVersion} is newer than current service version {Current}. Checking if pinned version is available in release manifest...",
                     _pinnedVersion, currentServiceVersion);
@@ -227,9 +232,16 @@ public class UpdateService : BackgroundService
                 _logger.LogInformation("No new releases available. Current version {Current} is up to date.", currentServiceVersion);
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Propagate cancellation — the caller (ExecuteAsync) handles graceful shutdown
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during update check");
+            // Log and continue — transient failures (network, IO) should not crash the service.
+            // The next polling cycle will retry.
+            _logger.LogError(ex, "Error during update check. Will retry at next interval.");
         }
     }
 
@@ -281,9 +293,26 @@ public class UpdateService : BackgroundService
 
             return manifest;
         }
+        catch (OperationCanceledException)
+        {
+            // Propagate cancellation for graceful shutdown
+            throw;
+        }
+        catch (HttpRequestException ex)
+        {
+            // Network errors are transient — log and return null so the caller retries next cycle
+            _logger.LogWarning(ex, "Network error fetching latest release from update site");
+            return null;
+        }
+        catch (JsonException ex)
+        {
+            // Malformed JSON from the server — log and return null
+            _logger.LogWarning(ex, "Failed to parse release manifest JSON");
+            return null;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error fetching latest release from update site");
+            _logger.LogError(ex, "Unexpected error fetching latest release from update site");
             return null;
         }
     }
@@ -317,7 +346,7 @@ public class UpdateService : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error comparing versions: {NewVersion} vs {CurrentVersion}", newVersion, currentVersion);
+            _logger.LogWarning(ex, "Failed to compare versions: '{NewVersion}' vs '{CurrentVersion}'. Treating as no update available.", newVersion, currentVersion);
             return false;
         }
     }
@@ -656,6 +685,7 @@ public class UpdateService : BackgroundService
 
     private async Task<string?> DownloadAndVerifyFile(string url, string fileName, string expectedChecksum, CancellationToken cancellationToken)
     {
+        string? tempFilePath = null;
         try
         {
             _logger.LogDebug("Downloading from: {Url}", url);
@@ -667,7 +697,7 @@ public class UpdateService : BackgroundService
                 return null;
             }
 
-            var tempFilePath = Path.Combine(Path.GetTempPath(), $"cdr-update-{Guid.NewGuid()}-{fileName}");
+            tempFilePath = Path.Combine(Path.GetTempPath(), $"cdr-update-{Guid.NewGuid()}-{fileName}");
 
             using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 8192, useAsync: true))
             {
@@ -698,9 +728,40 @@ public class UpdateService : BackgroundService
 
             return tempFilePath;
         }
+        catch (OperationCanceledException)
+        {
+            // Cleanup partially downloaded file and propagate cancellation
+            if (tempFilePath != null && File.Exists(tempFilePath))
+            {
+                try { File.Delete(tempFilePath); } catch { /* best effort cleanup */ }
+            }
+            throw;
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Network error downloading file from: {Url}", url);
+            if (tempFilePath != null && File.Exists(tempFilePath))
+            {
+                try { File.Delete(tempFilePath); } catch { /* best effort cleanup */ }
+            }
+            return null;
+        }
+        catch (IOException ex)
+        {
+            _logger.LogError(ex, "IO error downloading or verifying file from: {Url}", url);
+            if (tempFilePath != null && File.Exists(tempFilePath))
+            {
+                try { File.Delete(tempFilePath); } catch { /* best effort cleanup */ }
+            }
+            return null;
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error downloading or verifying file from: {Url}", url);
+            _logger.LogError(ex, "Unexpected error downloading or verifying file from: {Url}", url);
+            if (tempFilePath != null && File.Exists(tempFilePath))
+            {
+                try { File.Delete(tempFilePath); } catch { /* best effort cleanup */ }
+            }
             return null;
         }
     }
@@ -713,8 +774,10 @@ public class UpdateService : BackgroundService
             return;
         }
 
-        for (int i = 0; i < maxRetries; i++)
+        var tryCount = 0;
+        while (tryCount < maxRetries)
         {
+            tryCount++;
             try
             {
                 var directory = new DirectoryInfo(path);
@@ -734,9 +797,9 @@ public class UpdateService : BackgroundService
                 _logger.LogDebug("Successfully deleted contents of directory: {Path}", path);
                 return;
             }
-            catch (IOException ex)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                if (i >= maxRetries - 1)
+                if (tryCount == maxRetries)
                 {
                     // Final attempt - let exception propagate
                     throw;
@@ -744,20 +807,7 @@ public class UpdateService : BackgroundService
 
                 // File might still be locked by recently stopped process - wait and retry
                 _logger.LogWarning("Failed to delete directory contents (attempt {Attempt}/{MaxRetries}): {Message}. Retrying in 2 seconds...",
-                    i + 1, maxRetries, ex.Message);
-                Thread.Sleep(TimeSpan.FromSeconds(2));
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                if (i >= maxRetries - 1)
-                {
-                    // Final attempt - let exception propagate
-                    throw;
-                }
-
-                // File might still be locked - wait and retry
-                _logger.LogWarning("Access denied deleting directory contents (attempt {Attempt}/{MaxRetries}): {Message}. Retrying in 2 seconds...",
-                    i + 1, maxRetries, ex.Message);
+                    tryCount, maxRetries, ex.Message);
                 Thread.Sleep(TimeSpan.FromSeconds(2));
             }
         }
@@ -1142,9 +1192,16 @@ public class UpdateService : BackgroundService
             await File.WriteAllTextAsync(configPath, updatedContent);
             _logger.LogInformation("Updated {Component} version in configuration to: {Version}", componentName, newVersion);
         }
+        catch (OperationCanceledException)
+        {
+            // Propagate — should not silently swallow shutdown signals
+            throw;
+        }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not update version in configuration file");
+            // Non-fatal: in-memory state is already updated, config file will be stale but
+            // the service will still function correctly until next restart
+            _logger.LogWarning(ex, "Could not persist version update to configuration file (in-memory state is correct)");
         }
     }
 
