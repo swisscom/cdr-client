@@ -1,5 +1,4 @@
-trigger:
-  - main
+trigger: none
 
 variables:
   - group: remote-connections
@@ -20,5 +19,5 @@ pool:
 steps:
   - template: azure-pipelines-template.yml
     parameters:
-      uploadStorageName: $(uploadStorageNameStg)
-      uploadStorageHostnamePath: $(uploadStorageHostnamePathStg)
+      uploadStorageName: $(uploadStorageName)
+      uploadStorageHostnamePath: $(uploadStorageHostnamePath)
