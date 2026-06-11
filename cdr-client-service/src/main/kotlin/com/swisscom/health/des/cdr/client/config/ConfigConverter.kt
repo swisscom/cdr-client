@@ -3,24 +3,25 @@
 package com.swisscom.health.des.cdr.client.config
 
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
-import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.RetryTemplateConfig
-import com.swisscom.health.des.cdr.client.xml.DocumentType
 import org.springframework.util.unit.DataSize
 import java.nio.file.Path
 import kotlin.io.path.absolutePathString
 import kotlin.reflect.KClass
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector as ConnectorDto
 
 /*
  * BEGIN - Spring Configuration -> Configuration DTOs
  */
-internal fun CdrClientConfig.toDto(): DTOs.CdrClientConfig {
-    fun List<Connector>.toDto(): List<DTOs.CdrClientConfig.Connector> = map { it.toDto() }
-    fun FileBusyTestStrategyProperty.toDto(): DTOs.CdrClientConfig.FileBusyTestStrategy =
-        DTOs.CdrClientConfig.FileBusyTestStrategy.entries.first { it.name == strategy.name }
+internal fun CdrClientConfig.toDto(): CdrClientConfigDto {
+    fun List<Connector>.toDto(): List<ConnectorDto> = map { it.toDto() }
+    fun FileBusyTestStrategyProperty.toDto(): CdrClientConfigDto.FileBusyTestStrategy =
+        CdrClientConfigDto.FileBusyTestStrategy.entries.first { it.name == strategy.name }
 
-    return DTOs.CdrClientConfig(
+    return CdrClientConfigDto(
         fileSynchronizationEnabled = fileSynchronizationEnabled.value,
         customer = customer.toDto(),
         cdrApi = cdrApi.toDto(),
@@ -42,15 +43,15 @@ internal fun CdrClientConfig.toDto(): DTOs.CdrClientConfig {
     )
 }
 
-internal fun ProxyConfig.toDto(): DTOs.CdrClientConfig.ProxyConfig =
-    DTOs.CdrClientConfig.ProxyConfig(
+internal fun ProxyConfig.toDto(): CdrClientConfigDto.ProxyConfig =
+    CdrClientConfigDto.ProxyConfig(
         url = url.value,
         username = username.value,
         password = if (password == ProxyPassword.NO_PASSWORD) password.value else ProxyPassword.MASKED_PASSWORD.value,
     )
 
-internal fun Connector.toDto(): DTOs.CdrClientConfig.Connector =
-    DTOs.CdrClientConfig.Connector(
+internal fun Connector.toDto(): ConnectorDto =
+    ConnectorDto(
         connectorId = connectorId.id,
         targetFolder = targetFolder.toString(),
         sourceFolder = sourceFolder.toString(),
@@ -58,14 +59,14 @@ internal fun Connector.toDto(): DTOs.CdrClientConfig.Connector =
         sourceArchiveEnabled = sourceArchiveEnabled,
         sourceArchiveFolder = sourceArchiveFolder?.toString(),
         sourceErrorFolder = sourceErrorFolder?.toString(),
-        mode = DTOs.CdrClientConfig.Mode.entries.first { it.name == mode.name },
+        mode = CdrClientConfigDto.Mode.entries.first { it.name == mode.name },
         docTypeFolders = effectiveDocTypeFolders.toDto(),
     )
 
 internal fun Map<DocumentType, Connector.DocTypeFolders>.toDto():
-        Map<DTOs.CdrClientConfig.DocumentType, DTOs.CdrClientConfig.Connector.DocTypeFolders> =
+        Map<DocumentType, ConnectorDto.DocTypeFolders> =
     map { (key, value) ->
-        DTOs.CdrClientConfig.DocumentType.entries.first { it.name == key.name } to DTOs.CdrClientConfig.Connector.DocTypeFolders(
+        DocumentType.entries.first { it.name == key.name } to ConnectorDto.DocTypeFolders(
             requestResponseSplit = value.requestResponseSplit,
             sourceFolder = value.sourceFolder?.toString(),
             sourceFolderReq = value.sourceFolderReq?.toString(),
@@ -81,8 +82,8 @@ internal fun Map<DocumentType, Connector.DocTypeFolders>.toDto():
 internal fun Endpoint.toDto(): DomainObjects.ApiEndpoint =
     DomainObjects.ApiEndpoint.fromEndpointParts(protocol = scheme, port = port, host = host.fqdn)
 
-internal fun IdpCredentials.toDto(): DTOs.CdrClientConfig.IdpCredentials =
-    DTOs.CdrClientConfig.IdpCredentials(
+internal fun IdpCredentials.toDto(): CdrClientConfigDto.IdpCredentials =
+    CdrClientConfigDto.IdpCredentials(
         tenantId = DomainObjects.TenantId.fromTenantId(tenantId.id),
         clientId = clientId.id,
         clientSecret = if (clientSecret == ClientSecret.NO_SECRET) clientSecret.value else ClientSecret.MASKED_SECRET.value,
@@ -92,8 +93,8 @@ internal fun IdpCredentials.toDto(): DTOs.CdrClientConfig.IdpCredentials =
         lastCredentialRenewalTime = lastCredentialRenewalTime.instant,
     )
 
-internal fun RetryTemplateConfig.toDto(): DTOs.CdrClientConfig.RetryTemplateConfig =
-    DTOs.CdrClientConfig.RetryTemplateConfig(
+internal fun RetryTemplateConfig.toDto(): CdrClientConfigDto.RetryTemplateConfig =
+    CdrClientConfigDto.RetryTemplateConfig(
         retries = retries,
         initialDelay = initialDelay,
         maxDelay = maxDelay,
@@ -106,9 +107,9 @@ internal fun RetryTemplateConfig.toDto(): DTOs.CdrClientConfig.RetryTemplateConf
 /*
  * BEGIN - Configuration DTOs -> Spring Configuration
  */
-internal fun DTOs.CdrClientConfig.toCdrClientConfig(): CdrClientConfig {
-    fun List<DTOs.CdrClientConfig.Connector>.toCdrClientConfig(): MutableList<Connector> = map { it.toCdrClientConfig() }.toMutableList()
-    fun DTOs.CdrClientConfig.FileBusyTestStrategy.toCdrClientConfig(): FileBusyTestStrategyProperty = FileBusyTestStrategyProperty.valueOf(name)
+internal fun CdrClientConfigDto.toCdrClientConfig(): CdrClientConfig {
+    fun List<ConnectorDto>.toCdrClientConfig(): MutableList<Connector> = map { it.toCdrClientConfig() }.toMutableList()
+    fun CdrClientConfigDto.FileBusyTestStrategy.toCdrClientConfig(): FileBusyTestStrategyProperty = FileBusyTestStrategyProperty.valueOf(name)
 
     return CdrClientConfig(
         fileSynchronizationEnabled = if (fileSynchronizationEnabled) FileSynchronization.ENABLED else FileSynchronization.DISABLED,
@@ -134,7 +135,7 @@ internal fun DTOs.CdrClientConfig.toCdrClientConfig(): CdrClientConfig {
     )
 }
 
-internal fun DTOs.CdrClientConfig.ProxyConfig.toCdrClientConfig(): ProxyConfig {
+internal fun CdrClientConfigDto.ProxyConfig.toCdrClientConfig(): ProxyConfig {
     return if (url.isBlank()) {
         ProxyConfig(
             url = ProxyUrl(EMPTY_STRING),
@@ -150,7 +151,7 @@ internal fun DTOs.CdrClientConfig.ProxyConfig.toCdrClientConfig(): ProxyConfig {
     }
 }
 
-internal fun DTOs.CdrClientConfig.Connector.toCdrClientConfig(): Connector =
+internal fun ConnectorDto.toCdrClientConfig(): Connector =
     Connector(
         connectorId = ConnectorId(connectorId),
         targetFolder = Path.of(targetFolder),
@@ -163,7 +164,7 @@ internal fun DTOs.CdrClientConfig.Connector.toCdrClientConfig(): Connector =
         docTypeFolders = docTypeFolders.toCdrClientConfig(),
     )
 
-internal fun Map<DTOs.CdrClientConfig.DocumentType, DTOs.CdrClientConfig.Connector.DocTypeFolders>.toCdrClientConfig():
+internal fun Map<DocumentType, ConnectorDto.DocTypeFolders>.toCdrClientConfig():
         Map<DocumentType, Connector.DocTypeFolders> =
     map { (key, value) ->
         DocumentType.valueOf(key.name) to Connector.DocTypeFolders(
@@ -199,7 +200,7 @@ internal inline fun <reified T : Endpoint> DomainObjects.ApiEndpoint.toCdrClient
     } as T
 
 
-internal fun DTOs.CdrClientConfig.IdpCredentials.toCdrClientConfig(): IdpCredentials =
+internal fun CdrClientConfigDto.IdpCredentials.toCdrClientConfig(): IdpCredentials =
     IdpCredentials(
         tenantId = TenantId(tenantId.tenantId),
         clientId = ClientId(clientId),
@@ -210,7 +211,7 @@ internal fun DTOs.CdrClientConfig.IdpCredentials.toCdrClientConfig(): IdpCredent
         lastCredentialRenewalTime = LastCredentialRenewalTime(lastCredentialRenewalTime),
     )
 
-internal fun DTOs.CdrClientConfig.RetryTemplateConfig.toCdrClientConfig(): RetryTemplateConfig =
+internal fun CdrClientConfigDto.RetryTemplateConfig.toCdrClientConfig(): RetryTemplateConfig =
     RetryTemplateConfig(
         retries = retries,
         initialDelay = java.time.Duration.ofMillis(initialDelay.toMillis()),

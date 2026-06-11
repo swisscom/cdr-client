@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_advanced_settings
@@ -102,7 +103,7 @@ internal fun AdvancedSettingsGroup(
             name = DomainObjects.ConfigurationItem.FILE_BUSY_TEST_STRATEGY,
             modifier = modifier.padding(8.dp).fillMaxWidth(),
             initiallyExpanded = false,
-            options = { DTOs.CdrClientConfig.FileBusyTestStrategy.entries.filter { it != DTOs.CdrClientConfig.FileBusyTestStrategy.ALWAYS_BUSY } },
+            options = { CdrClientConfigDto.FileBusyTestStrategy.entries.filter { it != CdrClientConfigDto.FileBusyTestStrategy.ALWAYS_BUSY } },
             label = { Text(text = stringResource(Res.string.label_client_file_busy_strategy)) },
             placeHolder = { Text(text = stringResource(Res.string.label_client_file_busy_strategy_placeholder)) },
             value = uiState.clientServiceConfig.fileBusyTestStrategy.toString(),

@@ -3,7 +3,6 @@ package com.swisscom.health.des.cdr.client.handler
 import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationDetail
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.DIRECTORY_NEEDS_ABSOLUTE_PATH
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.DIRECTORY_NOT_FOUND
@@ -23,6 +22,11 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem.CONNECTOR_MODE
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem.FILE_BUSY_TEST_TIMEOUT
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Connector
+import com.swisscom.health.des.cdr.client.config.effectiveArchiveFolders
+import com.swisscom.health.des.cdr.client.config.effectiveErrorFolders
+import com.swisscom.health.des.cdr.client.config.effectiveSourceFolders
+import com.swisscom.health.des.cdr.client.config.effectiveTargetFolders
 import com.swisscom.health.des.cdr.client.config.toCdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -37,6 +41,8 @@ import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.isWritable
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector as ConnectorDto
 
 private val logger = KotlinLogging.logger {}
 
@@ -80,11 +86,11 @@ internal class ConfigValidationService(
             }
         }
 
-        config.customer.flatMap { connector -> connector.getEffectiveErrorFolders().values.flatten() }.distinct().forEach { errorFolder ->
+        config.customer.flatMap { connector -> connector.effectiveErrorFolders.values.flatten() }.distinct().forEach { errorFolder ->
             createFolderIfMissing(errorFolder, "error")
         }
 
-        config.customer.flatMap { connector -> connector.getEffectiveArchiveFolders().values.flatten() }.distinct().forEach { archiveFolder ->
+        config.customer.flatMap { connector -> connector.effectiveArchiveFolders.values.flatten() }.distinct().forEach { archiveFolder ->
             createFolderIfMissing(archiveFolder, "archive")
         }
     }
@@ -138,7 +144,7 @@ internal class ConfigValidationService(
     }
 
     @Suppress("CyclomaticComplexMethod")
-    fun validateCdrApiEndpoint(cdrApiEndpoint: DomainObjects.ApiEndpoint, idpCredentials: DTOs.CdrClientConfig.IdpCredentials): ValidationResult {
+    fun validateCdrApiEndpoint(cdrApiEndpoint: DomainObjects.ApiEndpoint, idpCredentials: CdrClientConfigDto.IdpCredentials): ValidationResult {
         fun failure(messageKey: DTOs.ValidationMessageKey) = ValidationResult.Failure(
             listOf(
                 ValidationDetail.ConfigItemDetail(
@@ -194,7 +200,7 @@ internal class ConfigValidationService(
         }
     }
 
-    fun validateConnectorIsPresent(customer: List<Connector>?): ValidationResult =
+    fun validateConnectorIsPresent(customer: List<ConnectorDto>?): ValidationResult =
         if (customer.isNullOrEmpty()) {
             ValidationResult.Failure(
                 listOf(
@@ -208,7 +214,7 @@ internal class ConfigValidationService(
             ValidationResult.Success
         }
 
-    fun validateConnectorIdIsPresent(customer: List<Connector>?): ValidationResult =
+    fun validateConnectorIdIsPresent(customer: List<ConnectorDto>?): ValidationResult =
         if (customer != null && customer.any { it.connectorId.isBlank() }) {
             ValidationResult.Failure(
                 listOf(
@@ -236,13 +242,13 @@ internal class ConfigValidationService(
             ValidationResult.Success
         }
 
-    fun validateModeValue(connectors: List<Connector>): ValidationResult =
+    fun validateModeValue(connectors: List<ConnectorDto>): ValidationResult =
         connectors.fold(
             initial = ValidationResult.Success,
-            operation = { acc: ValidationResult, connector: Connector ->
+            operation = { acc: ValidationResult, connector: ConnectorDto ->
                 when (connector.mode) {
-                    DTOs.CdrClientConfig.Mode.TEST, DTOs.CdrClientConfig.Mode.PRODUCTION -> acc
-                    DTOs.CdrClientConfig.Mode.NONE -> {
+                    CdrClientConfigDto.Mode.TEST, CdrClientConfigDto.Mode.PRODUCTION -> acc
+                    CdrClientConfigDto.Mode.NONE -> {
                         acc + ValidationResult.Failure(
                             listOf(
                                 ValidationDetail.ConnectorDetail(
@@ -257,11 +263,11 @@ internal class ConfigValidationService(
             }
         )
 
-    fun validateModeOverlap(connectors: List<Connector>): ValidationResult =
+    fun validateModeOverlap(connectors: List<ConnectorDto>): ValidationResult =
         connectors
             .groupBy { it.connectorId }
             .filter { cd -> cd.value.size > 1 }
-            .map { (connectorId: String, connectors: List<Connector>) ->
+            .map { (connectorId: String, connectors: List<ConnectorDto>) ->
                 if (connectors.groupingBy { connector -> connector.mode }.eachCount().any { it.value > 1 }) {
                     ValidationResult.Failure(
                         listOf(
@@ -435,10 +441,10 @@ internal class ConfigValidationService(
         }
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
-    fun validateDirectoryOverlap(config: DTOs.CdrClientConfig): ValidationResult {
+    fun validateDirectoryOverlap(config: CdrClientConfigDto): ValidationResult {
         val pathStringValidation = config.customer.fold(
             initial = ValidationResult.Success,
-            operation = { acc: ValidationResult, connector: Connector ->
+            operation = { acc: ValidationResult, connector: ConnectorDto ->
                 acc +
                         validatePathString(connector.sourceFolder) +
                         validatePathString(connector.targetFolder) +
@@ -446,7 +452,7 @@ internal class ConfigValidationService(
                         validatePathString(connector.sourceArchiveFolder ?: "") +
                         connector.docTypeFolders.values.fold(
                             initial = ValidationResult.Success,
-                            operation = { docTypeAcc: ValidationResult, docTypeFolder: Connector.DocTypeFolders ->
+                            operation = { docTypeAcc: ValidationResult, docTypeFolder: ConnectorDto.DocTypeFolders ->
                                 docTypeAcc +
                                         validatePathString(docTypeFolder.sourceFolder ?: "") +
                                         validatePathString(docTypeFolder.sourceFolderResp ?: "") +
@@ -465,31 +471,22 @@ internal class ConfigValidationService(
         return if (pathStringValidation == ValidationResult.Failure) {
             pathStringValidation
         } else {
-            val connectors = config.customer.map { connector ->
-                com.swisscom.health.des.cdr.client.config.Connector.EMPTY.copy(
-                    sourceFolder = Path.of(connector.sourceFolder),
-                    targetFolder = Path.of(connector.targetFolder),
-                    sourceErrorFolder = connector.sourceErrorFolder?.let { Path.of(it) },
-                    sourceArchiveFolder = connector.sourceArchiveFolder?.let { Path.of(it) },
-                    sourceArchiveEnabled = connector.sourceArchiveEnabled,
-                    docTypeFolders = connector.docTypeFolders.toCdrClientConfig()
-                )
-            }
+            val connectors = config.customer.map { it.toCdrClientConfig() }
 
             val sourceFolders: List<Path> = connectors.flatMap { connector ->
-                connector.getEffectiveSourceFolders().values.flatten().distinct()
+                connector.effectiveSourceFolders.values.flatten().distinct()
             }
 
             val targetFolders: List<Path> = connectors.flatMap { connector ->
-                connector.getEffectiveTargetFolders().values.flatten().distinct()
+                connector.effectiveTargetFolders.values.flatten().distinct()
             }
 
             val errorFolders: List<Path> = connectors.flatMap { connector ->
-                connector.getEffectiveErrorFolders().values.flatten().distinct()
+                connector.effectiveErrorFolders.values.flatten().distinct()
             }
 
             val archiveFolders: List<Path> = connectors.flatMap { connector ->
-                connector.getEffectiveArchiveFolders().values.flatten().distinct()
+                connector.effectiveArchiveFolders.values.flatten().distinct()
             }
 
             val localFolder: List<Path> = listOf(Path.of(config.localFolder))
@@ -660,7 +657,7 @@ internal class ConfigValidationService(
         }
     }
 
-    fun validateCredentialValues(credentials: DTOs.CdrClientConfig.IdpCredentials): ValidationResult {
+    fun validateCredentialValues(credentials: CdrClientConfigDto.IdpCredentials): ValidationResult {
         val validations = mutableListOf<ValidationResult>()
         validateIsNeitherBlankNorPlaceholder(
             value = credentials.clientId,
@@ -699,7 +696,7 @@ internal class ConfigValidationService(
     }
 
     @Suppress("CyclomaticComplexMethod")
-    fun validateConnectorFolders(connector: Connector): ValidationResult {
+    fun validateConnectorFolders(connector: ConnectorDto): ValidationResult {
         val baseValidation = validateIsAbsoluteDirectory(connector.sourceFolder) +
                 validateIsAbsoluteDirectory(connector.targetFolder) +
                 validateDirectoryIsReadWritable(connector.sourceFolder) +
@@ -745,12 +742,12 @@ internal class ConfigValidationService(
             }
         }.fold(initial = ValidationResult.Success) { acc: ValidationResult, result: ValidationResult -> acc + result }
 
-        val allErrorFoldersExist = connector.toCdrClientConfig().getEffectiveErrorFolders().values
+        val allErrorFoldersExist = connector.toCdrClientConfig().effectiveErrorFolders.values
             .flatten()
             .distinct()
             .fold(initial = ValidationResult.Success) { acc: ValidationResult, errorFolder: Path -> acc + checkPathExists(errorFolder) }
 
-        val allArchiveFoldersExist = connector.toCdrClientConfig().getEffectiveArchiveFolders().values
+        val allArchiveFoldersExist = connector.toCdrClientConfig().effectiveArchiveFolders.values
             .flatten()
             .distinct()
             .fold(initial = ValidationResult.Success) { acc: ValidationResult, archiveFolder: Path -> acc + checkPathExists(archiveFolder) }

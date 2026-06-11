@@ -5,6 +5,8 @@ import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSIO
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.getConnectorBySourceFolder
+import com.swisscom.health.des.cdr.client.config.getDailyEffectiveSourceArchiveFolder
+import com.swisscom.health.des.cdr.client.config.getEffectiveSourceErrorFolder
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentResult
 import com.swisscom.health.des.cdr.client.scheduling.BaseUploadScheduler.Companion.EXTENSION_XML
 import com.swisscom.health.des.cdr.client.xml.DocumentMetaData

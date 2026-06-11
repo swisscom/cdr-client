@@ -3,6 +3,8 @@ package com.swisscom.health.des.cdr.client.http
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.Constants.SHUTDOWN_DELAY
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector as ConnectorDto
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.CREDENTIAL_VALIDATION_FAILED
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
 import com.swisscom.health.des.cdr.client.common.DomainObjects
@@ -78,7 +80,7 @@ internal class WebOperations(
 
     @PutMapping("api/validate-connector-mode")
     internal suspend fun validateConnectorMode(
-        @RequestBody connectors: List<DTOs.CdrClientConfig.Connector>,
+        @RequestBody connectors: List<ConnectorDto>,
         @RequestParam(name = "validation") validations: List<DomainObjects.ValidationType>,
     ): ResponseEntity<ValidationResult> = runCatching {
         logger.debug { "validating mode for connectors: '$connectors'" }
@@ -148,7 +150,7 @@ internal class WebOperations(
      */
     @PutMapping("api/validate-directory")
     internal suspend fun validateDirectory(
-        @RequestBody config: DTOs.CdrClientConfig,
+        @RequestBody config: CdrClientConfigDto,
         // don't use java.nio.file.Path here to allow the endpoint to handle invalid paths (e.g., with trailing spaces on Windows) gracefully
         // and return validation errors instead of throwing exceptions
         @RequestParam(name = "dir") directory: String,
@@ -183,7 +185,7 @@ internal class WebOperations(
 
     @PutMapping("api/validate-credentials")
     internal suspend fun validateCredentials(
-        @RequestBody idpCredentials: DTOs.CdrClientConfig.IdpCredentials,
+        @RequestBody idpCredentials: CdrClientConfigDto.IdpCredentials,
     ): ResponseEntity<ValidationResult> = runCatching {
         logger.debug { "validating credentials for tenant id: '${idpCredentials.tenantId}'" }
         retryIOExceptionsAndServerErrors.execute<OAuth2AuthNService.AuthNResponse, Exception> { retry: RetryContext ->
@@ -274,7 +276,7 @@ internal class WebOperations(
      * This endpoint returns the current CDR Client service configuration as a [DTOs.CdrClientConfig] object.
      */
     @GetMapping("api/service-configuration")
-    suspend fun getServiceConfiguration(): ResponseEntity<DTOs.CdrClientConfig> =
+    suspend fun getServiceConfiguration(): ResponseEntity<CdrClientConfigDto> =
         ResponseEntity
             .ok(
                 config.toDto()
@@ -290,8 +292,8 @@ internal class WebOperations(
      */
     @PutMapping("api/service-configuration")
     internal suspend fun updateServiceConfiguration(
-        @RequestBody configDto: DTOs.CdrClientConfig,
-    ): ResponseEntity<DTOs.CdrClientConfig> =
+        @RequestBody configDto: CdrClientConfigDto,
+    ): ResponseEntity<CdrClientConfigDto> =
         runCatching {
             logger.trace { "received DTOs.CdrClientConfig: '$configDto'" }
             configDto.toCdrClientConfig()

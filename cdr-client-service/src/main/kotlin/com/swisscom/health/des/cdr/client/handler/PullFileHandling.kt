@@ -2,6 +2,7 @@ package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.Connector
+import com.swisscom.health.des.cdr.client.config.getEffectiveTargetFolder
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.DownloadDocumentResult
 import com.swisscom.health.des.cdr.client.xml.extractDocumentMetaData
 import io.github.oshai.kotlinlogging.KotlinLogging

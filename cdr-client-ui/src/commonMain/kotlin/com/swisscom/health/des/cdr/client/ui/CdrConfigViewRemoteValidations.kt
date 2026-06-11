@@ -9,6 +9,7 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MO
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.nio.file.Path
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 
 private val logger = KotlinLogging.logger {}
 
@@ -35,7 +36,7 @@ internal class CdrConfigViewRemoteValidations(
 
     internal suspend fun validateConnectorMode(
         connectorId: String,
-        config: DTOs.CdrClientConfig,
+        config: CdrClientConfigDto,
         fieldName: DomainObjects.ConfigurationItem,
     ): DTOs.ValidationResult =
         cdrClientApiClient.validateConnectorMode(
@@ -92,7 +93,7 @@ internal class CdrConfigViewRemoteValidations(
      * @see DomainObjects.ConfigurationItem
      */
     internal suspend fun validateDirectory(
-        config: DTOs.CdrClientConfig,
+        config: CdrClientConfigDto,
         path: String?,
         fieldName: DomainObjects.ConfigurationItem
     ): DTOs.ValidationResult =

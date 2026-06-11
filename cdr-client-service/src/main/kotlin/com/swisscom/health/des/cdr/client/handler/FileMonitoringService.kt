@@ -2,6 +2,7 @@ package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.effectiveErrorFolders
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.TEMP_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.scheduling.BaseUploadScheduler.Companion.EXTENSION_XML
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -68,7 +69,7 @@ internal class FileMonitoringService(
     private fun countErrorFiles(): Int =
         config.customer.map { connector ->
             runCatching {
-                connector.getEffectiveErrorFolders().values
+                connector.effectiveErrorFolders.values
                     .asSequence()
                     .flatten()
                     .distinct() // required because multiple document types might point to the same (default) error directory

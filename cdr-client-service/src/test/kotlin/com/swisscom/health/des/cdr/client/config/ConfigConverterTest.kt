@@ -1,8 +1,7 @@
 package com.swisscom.health.des.cdr.client.config
 
-import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.DomainObjects
-import com.swisscom.health.des.cdr.client.xml.DocumentType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -12,6 +11,7 @@ import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import kotlin.io.path.absolute
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 
 class ConfigConverterTest {
 
@@ -72,7 +72,7 @@ class ConfigConverterTest {
         fileBusyTestInterval = Duration.ofSeconds(1L),
         fileBusyTestTimeout = Duration.ofSeconds(1L),
         fileBusyTestStrategy = FileBusyTestStrategyProperty(CdrClientConfig.FileBusyTestStrategy.NEVER_BUSY),
-        proxyConfig = DTOs.CdrClientConfig.ProxyConfig.EMPTY.toCdrClientConfig(),
+        proxyConfig = CdrClientConfigDto.ProxyConfig.EMPTY.toCdrClientConfig(),
         oldFileThreshold = Duration.ofHours(2L),
         fileSystemCheckInterval = Duration.ofMinutes(5L),
     )
@@ -134,7 +134,7 @@ class ConfigConverterTest {
         fileBusyTestInterval = Duration.ofSeconds(1L),
         fileBusyTestTimeout = Duration.ofSeconds(1L),
         fileBusyTestStrategy = FileBusyTestStrategyProperty(CdrClientConfig.FileBusyTestStrategy.NEVER_BUSY),
-        proxyConfig = DTOs.CdrClientConfig.ProxyConfig.EMPTY.toCdrClientConfig(),
+        proxyConfig = CdrClientConfigDto.ProxyConfig.EMPTY.toCdrClientConfig(),
         oldFileThreshold = Duration.ofHours(2L),
         fileSystemCheckInterval = Duration.ofMinutes(5L),
     )

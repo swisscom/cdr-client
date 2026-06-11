@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.xml
 
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.w3c.dom.Document
 import java.io.InputStream

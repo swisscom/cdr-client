@@ -1,6 +1,8 @@
 package com.swisscom.health.des.cdr.client.ui.data
 
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector as ConnectorDto
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.data.HttpClient.MEDIA_TYPE_APPLICATION_JSON
 import com.swisscom.health.des.cdr.client.ui.data.HttpClient.addQueryParams
@@ -55,9 +57,9 @@ internal class CdrClientApiClient {
      */
     suspend fun validateConnectorMode(
         validations: List<DomainObjects.ValidationType>,
-        connectors: List<DTOs.CdrClientConfig.Connector>,
+        connectors: List<ConnectorDto>,
     ): Result<DTOs.ValidationResult> =
-        putAnything<List<DTOs.CdrClientConfig.Connector>, DTOs.ValidationResult>(
+        putAnything<List<ConnectorDto>, DTOs.ValidationResult>(
             url = CDR_CLIENT_VALIDATE_CONNECTOR_MODE.addQueryParams(
                 *(validations.map { validation -> "validation" to validation.name }.toTypedArray())
             ),
@@ -87,14 +89,14 @@ internal class CdrClientApiClient {
      * @return A [Result] containing a [DTOs.ValidationResult] with the results of the validations.
      */
     suspend fun validateDirectory(
-        config: DTOs.CdrClientConfig,
+        config: CdrClientConfigDto,
         directory: String?,
         validations: List<DomainObjects.ValidationType>,
     ): Result<DTOs.ValidationResult> =
         when (directory) {
             null -> Result.Success(DTOs.ValidationResult.Success)
             else -> {
-                putAnything<DTOs.CdrClientConfig, DTOs.ValidationResult>(
+                putAnything<CdrClientConfigDto, DTOs.ValidationResult>(
                     CDR_CLIENT_VALIDATE_DIRECTORY_URL
                         .addQueryParams("dir" to directory)
                         .addQueryParams(*(validations.map { validation -> "validation" to validation.name }.toTypedArray())),
@@ -127,10 +129,10 @@ internal class CdrClientApiClient {
     /**
      * Retrieves the current client service configuration.
      *
-     * @return A [Result] containing the [DTOs.CdrClientConfig]
+     * @return A [Result] containing the [CdrClientConfigDto]
      */
-    suspend fun getClientServiceConfiguration(): Result<DTOs.CdrClientConfig> =
-        getAnything<DTOs.CdrClientConfig>(CDR_CLIENT_CONFIG_URL, "Get client service configuration")
+    suspend fun getClientServiceConfiguration(): Result<CdrClientConfigDto> =
+        getAnything<CdrClientConfigDto>(CDR_CLIENT_CONFIG_URL, "Get client service configuration")
 
     /**
      * Updates the CDR Client service configuration.
@@ -139,8 +141,8 @@ internal class CdrClientApiClient {
      * @return A [Result] containing that same configuration if it was successfully persisted, or an
      * error if the update failed.
      */
-    suspend fun updateClientServiceConfiguration(config: DTOs.CdrClientConfig): Result<DTOs.CdrClientConfig> =
-        putAnything<DTOs.CdrClientConfig, DTOs.CdrClientConfig>(CDR_CLIENT_CONFIG_URL, config, "Update client service configuration")
+    suspend fun updateClientServiceConfiguration(config: CdrClientConfigDto): Result<CdrClientConfigDto> =
+        putAnything<CdrClientConfigDto, CdrClientConfigDto>(CDR_CLIENT_CONFIG_URL, config, "Update client service configuration")
 
     /**
      * Checks whether the supplied credentials allow a successful login (without persisting the
@@ -149,8 +151,8 @@ internal class CdrClientApiClient {
      * @param idpCredentials The client id and password
      * @return A [Result] carrying the outcome of the login attempt
      */
-    suspend fun checkCredentials(idpCredentials: DTOs.CdrClientConfig.IdpCredentials): Result<DTOs.ValidationResult> =
-        putAnything<DTOs.CdrClientConfig.IdpCredentials, DTOs.ValidationResult>(
+    suspend fun checkCredentials(idpCredentials: CdrClientConfigDto.IdpCredentials): Result<DTOs.ValidationResult> =
+        putAnything<CdrClientConfigDto.IdpCredentials, DTOs.ValidationResult>(
             VALIDATE_CREDENTIALS_URL, idpCredentials, "Check credential values"
         )
 

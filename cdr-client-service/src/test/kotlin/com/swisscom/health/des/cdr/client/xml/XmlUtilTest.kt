@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.xml
 
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow

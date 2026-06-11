@@ -2,10 +2,10 @@ package com.swisscom.health.des.cdr.client.config
 
 import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Mode
 import com.swisscom.health.des.cdr.client.xml.CommunicationType
 import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
-import com.swisscom.health.des.cdr.client.xml.DocumentType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -328,14 +328,14 @@ class ConnectorDirectoriesTest {
         val archiveTogglesAbsolutePathsConnector = allAbsolutePathsConnector.copy(sourceArchiveEnabled = false)
         val archiveTogglesRequestResponseSplitConnector = requestResponseSplitConnector.copy(sourceArchiveEnabled = false)
 
-        assertTrue(archiveTogglesConnector.getEffectiveArchiveFolders().values.flatten().isEmpty())
-        assertTrue(archiveTogglesAbsolutePathsConnector.getEffectiveArchiveFolders().values.flatten().isEmpty())
-        assertTrue(archiveTogglesRequestResponseSplitConnector.getEffectiveArchiveFolders().values.flatten().isEmpty())
+        assertTrue(archiveTogglesConnector.effectiveArchiveFolders.values.flatten().isEmpty())
+        assertTrue(archiveTogglesAbsolutePathsConnector.effectiveArchiveFolders.values.flatten().isEmpty())
+        assertTrue(archiveTogglesRequestResponseSplitConnector.effectiveArchiveFolders.values.flatten().isEmpty())
     }
 
     @Test
     fun `test get all source folders()`() {
-        val requestResponseSplitSourceFolders: Map<DocumentType, List<Path>> = requestResponseSplitConnector.getEffectiveSourceFolders()
+        val requestResponseSplitSourceFolders: Map<DocumentType, List<Path>> = requestResponseSplitConnector.effectiveSourceFolders
 
         // the connector specifies source dirs for INVOICE and MCD document types, all other document types should use the global/default source dir
         assertEquals(listOf(absInvoiceSourceDir), requestResponseSplitSourceFolders[DocumentType.INVOICE])
@@ -352,7 +352,7 @@ class ConnectorDirectoriesTest {
 
     @Test
     fun `test get all target folders()`() {
-        val requestResponseSplitTargetFolders: Map<DocumentType, List<Path>> = requestResponseSplitConnector.getEffectiveTargetFolders()
+        val requestResponseSplitTargetFolders: Map<DocumentType, List<Path>> = requestResponseSplitConnector.effectiveTargetFolders
 
         // the connector specifies target dirs for INVOICE and MCD document types, all other document types should use the global/default target dir
         assertEquals(listOf(absInvoiceTargetDir), requestResponseSplitTargetFolders[DocumentType.INVOICE])
@@ -369,7 +369,7 @@ class ConnectorDirectoriesTest {
 
     @Test
     fun `test get all archive folders`() {
-        val requestResponseSplitArchiveFolders: Map<DocumentType, List<Path>> = requestResponseSplitConnector.getEffectiveArchiveFolders()
+        val requestResponseSplitArchiveFolders: Map<DocumentType, List<Path>> = requestResponseSplitConnector.effectiveArchiveFolders
 
         // the connector specifies archive dirs for INVOICE and MCD document types, all other document types should use the global/default archive dir
         val defaultArchiveDir = listOf(baseSourceDir.resolve(relativeArchiveDir))
@@ -388,7 +388,7 @@ class ConnectorDirectoriesTest {
 
     @Test
     fun `test get all error folders`() {
-        val requestResponseSplitErrorFolders: Map<DocumentType, List<Path>> = requestResponseSplitConnector.getEffectiveErrorFolders()
+        val requestResponseSplitErrorFolders: Map<DocumentType, List<Path>> = requestResponseSplitConnector.effectiveErrorFolders
 
         // the connector specifies archive dirs for INVOICE and MCD document types, all other document types should use the global/default archive dir
         val defaultErrorDir = listOf(baseSourceDir.resolve(relativeErrorDir))

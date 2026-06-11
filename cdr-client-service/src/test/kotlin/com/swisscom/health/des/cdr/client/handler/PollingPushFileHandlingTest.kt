@@ -6,6 +6,7 @@ import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -21,9 +22,11 @@ import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
+import com.swisscom.health.des.cdr.client.config.getEffectiveSourceArchiveFolder
+import com.swisscom.health.des.cdr.client.config.getEffectiveSourceErrorFolder
+import com.swisscom.health.des.cdr.client.config.getEffectiveSourceFolder
 import com.swisscom.health.des.cdr.client.xml.CommunicationType
 import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
-import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.mockk.every
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.Dispatcher

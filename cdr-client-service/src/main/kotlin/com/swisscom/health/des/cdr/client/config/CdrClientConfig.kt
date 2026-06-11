@@ -2,13 +2,9 @@ package com.swisscom.health.des.cdr.client.config
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
-import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Mode
-import com.swisscom.health.des.cdr.client.xml.CommunicationType
-import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
-import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PostConstruct
 import org.springframework.boot.context.properties.ConfigurationProperties
@@ -18,11 +14,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import kotlin.io.path.createDirectories
-import kotlin.io.path.isDirectory
 
 private val logger = KotlinLogging.logger {}
 
@@ -199,274 +191,23 @@ internal data class Connector(
      */
     val docTypeFolders: Map<DocumentType, DocTypeFolders>? = null,
 ) : PropertyNameAware {
-
-    val effectiveDocTypeFolders: Map<DocumentType, DocTypeFolders>
-        @JsonIgnore
-        get() = docTypeFolders ?: emptyMap()
-
     override val propertyName: String
         get() = PROPERTY_NAME
 
-    @JsonIgnore
-    fun getEffectiveSourceFolders(): Map<DocumentType, List<Path>> = DocumentType.entries.associateWith { getEffectiveSourceFolders(it) }
-
-    @JsonIgnore
-    fun getEffectiveSourceFolders(docType: DocumentType): List<Path> =
-        if (effectiveDocTypeFolders[docType]?.requestResponseSplit == true) {
-            CommunicationType.entries
-                .filter { it != CommunicationType.UNKNOWN }
-                .map { getEffectiveSourceFolder(DocumentMetaData(docType, it)) }
-        } else {
-            listOf(getEffectiveSourceFolderNoRequestResponseSplit(docType))
-        }
-
-    @JsonIgnore
-    fun getEffectiveSourceFolder(docMeta: DocumentMetaData): Path =
-        if (effectiveDocTypeFolders[docMeta.documentType]?.requestResponseSplit == true) {
-            when (docMeta.communicationType) {
-                CommunicationType.REQUEST, CommunicationType.UNKNOWN -> effectiveDocTypeFolders[docMeta.documentType]?.sourceFolderReq
-                CommunicationType.RESPONSE -> effectiveDocTypeFolders[docMeta.documentType]?.sourceFolderResp
-            } ?: run {
-                logger.warn {
-                    "Connector '$connectorId' has request/response split active for document type '${docMeta.documentType}', but no source directory " +
-                            "for communication type '${docMeta.communicationType}' is defined; falling back to no-split logic to determine a source directory."
-                }
-                getEffectiveSourceFolderNoRequestResponseSplit(docMeta.documentType)
-            }
-        } else {
-            getEffectiveSourceFolderNoRequestResponseSplit(docMeta.documentType)
-        }
-
-    private fun getEffectiveSourceFolderNoRequestResponseSplit(docType: DocumentType): Path =
-        effectiveDocTypeFolders[docType]?.sourceFolder?.let { docTypeSourceFolder ->
-            when (docTypeSourceFolder.isAbsolute) {
-                true -> docTypeSourceFolder
-                else -> sourceFolder.resolve(docTypeSourceFolder)
-            }
-        } ?: sourceFolder
-
-    @JsonIgnore
-    fun getEffectiveTargetFolders(): Map<DocumentType, List<Path>> = DocumentType.entries.associateWith { getEffectiveTargetFolders(it) }
-
-    @JsonIgnore
-    fun getEffectiveTargetFolders(docType: DocumentType): List<Path> =
-        if (effectiveDocTypeFolders[docType]?.requestResponseSplit == true) {
-            CommunicationType.entries
-                .filter { it != CommunicationType.UNKNOWN }
-                .map { getEffectiveTargetFolder(DocumentMetaData(docType, it)) }
-        } else {
-            listOf(getEffectiveTargetFolderNoRequestResponseSplit(docType))
-        }
-
-    @JsonIgnore
-    fun getEffectiveTargetFolder(docMeta: DocumentMetaData): Path =
-        if (effectiveDocTypeFolders[docMeta.documentType]?.requestResponseSplit == true) {
-            when (docMeta.communicationType) {
-                CommunicationType.REQUEST, CommunicationType.UNKNOWN -> effectiveDocTypeFolders[docMeta.documentType]?.targetFolderReq
-                CommunicationType.RESPONSE -> effectiveDocTypeFolders[docMeta.documentType]?.targetFolderResp
-            } ?: run {
-                logger.warn {
-                    "Connector '$connectorId' has request/response split active for document type '${docMeta.documentType}', but no target directory " +
-                            "for communication type '${docMeta.communicationType}' is defined; falling back to no-split logic to determine a target directory."
-                }
-                getEffectiveTargetFolderNoRequestResponseSplit(docMeta.documentType)
-            }
-        } else {
-            getEffectiveTargetFolderNoRequestResponseSplit(docMeta.documentType)
-        }
-
-    private fun getEffectiveTargetFolderNoRequestResponseSplit(docType: DocumentType): Path =
-        effectiveDocTypeFolders[docType]?.targetFolder?.let { docTypeTargetFolder ->
-            when (docTypeTargetFolder.isAbsolute) {
-                true -> docTypeTargetFolder
-                else -> targetFolder.resolve(docTypeTargetFolder)
-            }
-        } ?: targetFolder
-
-    @JsonIgnore
-    fun getEffectiveArchiveFolders(): Map<DocumentType, List<Path>> = DocumentType.entries.associateWith { docType ->
-        if (sourceArchiveEnabled) {
-            if (effectiveDocTypeFolders[docType]?.requestResponseSplit == true) {
-                CommunicationType.entries
-                    .mapNotNull { comType ->
-                        getEffectiveSourceArchiveFolder(DocumentMetaData(docType, comType))
-                    }
-            } else {
-                listOfNotNull(getEffectiveSourceArchiveFolderNoRequestResponseSplit(docType))
-            }
-        } else {
-            emptyList()
-        }
-    }
-
-    /**
-     * If...
-     * * [sourceArchiveEnabled] is `true` and
-     *   * the doc type specific archive folder is a relative path, then it is resolved against effective doc type specific source folder
-     *   * the doc type specific archive folder is an absolute path, then it is returned as is
-     *   * the doc type specific archive folder is not set, then the base archive folder is returned
-     * * [sourceArchiveEnabled] is `false`, then `null` is returned
-     *
-     * @see sourceArchiveEnabled
-     * @see sourceArchiveFolder
-     * @return the potentially document type specific archive path as an absolute path
-     */
-    @JsonIgnore
-    fun getEffectiveSourceArchiveFolder(docMeta: DocumentMetaData): Path? =
-        if (sourceArchiveEnabled) {
-            if (effectiveDocTypeFolders[docMeta.documentType]?.requestResponseSplit == true) {
-                effectiveDocTypeFolders[docMeta.documentType]?.archiveFolder?.resolve(docMeta.communicationType.name)
-                    ?: run {
-                        logger.warn {
-                            "Connector '$connectorId' has request/response split active for document type '${docMeta.documentType}', but no archive " +
-                                    "directory for communication type '${docMeta.communicationType}' is defined; falling back to no-split logic to " +
-                                    "determine an archive directory."
-                        }
-                        getEffectiveSourceArchiveFolderNoRequestResponseSplit(docMeta.documentType)
-                    }
-            } else {
-                getEffectiveSourceArchiveFolderNoRequestResponseSplit(docMeta.documentType)
-            }
-        } else {
-            null
-        }
-
-    private fun getEffectiveSourceArchiveFolderNoRequestResponseSplit(docType: DocumentType): Path? =
-        if (sourceArchiveEnabled) {
-            when (val docTypeArchiveFolder = effectiveDocTypeFolders[docType]?.archiveFolder) {
-                null -> {
-                    if (getEffectiveSourceFolderNoRequestResponseSplit(docType) == sourceFolder) {
-                        getBaseSourceArchiveFolder() // no doc type specific source dir -> use base archive dir
-                    } else {
-                        getEffectiveSourceFolderNoRequestResponseSplit(docType).resolve(ARCHIVE_DIR_NAME) //
-                    }
-                }
-
-                else -> when (docTypeArchiveFolder.isAbsolute) {
-                    true -> docTypeArchiveFolder
-                    false -> getEffectiveSourceFolderNoRequestResponseSplit(docType).resolve(docTypeArchiveFolder)
-                }
-            } ?: getBaseSourceArchiveFolder()
-        } else {
-            null
-        }
-
-    fun getDailyEffectiveSourceArchiveFolder(docMeta: DocumentMetaData): Path? =
-        getEffectiveSourceArchiveFolder(docMeta)?.let { archiveRootFolder: Path ->
-            runCatching {
-                archiveRootFolder.resolve(getDateNow()).createDirectories()
-            }.getOrElse { t ->
-                logger.warn { "Failed to create daily archive folder ${archiveRootFolder.resolve(getDateNow())}: $t" }
-                archiveRootFolder // fallback to non-daily folder if creation of daily folder fails
-            }
-        }
-
-    /**
-     * Returns the source archive folder as an absolute path; if no explicit archive folder config was set,
-     * the archive folder is created as an [ARCHIVE_DIR_NAME] subdirectory of [sourceFolder].
-     */
-    @JsonIgnore
-    private fun getBaseSourceArchiveFolder(): Path? =
-        if (sourceArchiveEnabled) {
-            when (sourceArchiveFolder) {
-                null -> sourceFolder.resolve(ARCHIVE_DIR_NAME)
-                sourceFolder -> sourceFolder.resolve(ARCHIVE_DIR_NAME)
-                // `Path::resolve` returns `other`, if `other` is an absolute path -> the `else` branch below covers the test
-                // for an absolute archive path, that does not coincide with the absolute source path
-                else -> sourceFolder.resolve(sourceArchiveFolder)
-            }
-        } else {
-            null
-        }
-
-    private fun getDateNow(): String = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
-
-    @JsonIgnore
-    fun getEffectiveErrorFolders(): Map<DocumentType, List<Path>> = DocumentType.entries.associateWith { docType ->
-        if (effectiveDocTypeFolders[docType]?.requestResponseSplit == true) {
-            CommunicationType.entries
-                .map { comType -> getEffectiveSourceErrorFolder(DocumentMetaData(docType, comType)) }
-        } else {
-            listOf(getEffectiveSourceErrorFolderNoRequestResponseSplit(docType))
-        }
-    }
-
-    /**
-     * Returns the effective source error folder.
-     *
-     * If ...
-     * * the doc type specific error folder is a relative path, then it is resolved against the doc type specific source folder;
-     *   if the source folder is not set an exception is raised
-     * * the doc type specific error folder is an absolute path, it is returned as is
-     * * the doc type specific error folder is not set, then the base error folder is returned
-     *
-     * The effective error folder is returned as an absolute path.
-     *
-     * @see sourceErrorFolder
-     * @see sourceFolder
-     *
-     * @return the computed, document type specific error folder as an absolute path
-     */
-    @JsonIgnore
-    fun getEffectiveSourceErrorFolder(docMeta: DocumentMetaData): Path =
-        if (effectiveDocTypeFolders[docMeta.documentType]?.requestResponseSplit == true) {
-            effectiveDocTypeFolders[docMeta.documentType]?.errorFolder?.resolve(docMeta.communicationType.name)
-                ?: run {
-                    logger.warn {
-                        "Connector '$connectorId' has request/response split active for document type '${docMeta.documentType}', but no error " +
-                                "directory for communication type '${docMeta.communicationType}' is defined; falling back to no-split logic to " +
-                                "determine an error directory."
-                    }
-                    getEffectiveSourceErrorFolderNoRequestResponseSplit(docMeta.documentType)
-                }
-        } else {
-            getEffectiveSourceErrorFolderNoRequestResponseSplit(docMeta.documentType)
-        }
-
-    private fun getEffectiveSourceErrorFolderNoRequestResponseSplit(docType: DocumentType): Path =
-        when (val docTypeErrorFolder = effectiveDocTypeFolders[docType]?.errorFolder) {
-            null -> {
-                if (getEffectiveSourceFolderNoRequestResponseSplit(docType) == sourceFolder) {
-                    getBaseSourceErrorFolder() // no doc type specific source dir -> use base error dir
-                } else {
-                    getEffectiveSourceFolderNoRequestResponseSplit(docType).resolve(ERROR_DIR_NAME) //
-                }
-            }
-
-            else -> when (docTypeErrorFolder.isAbsolute) {
-                true -> docTypeErrorFolder
-                false -> getEffectiveSourceFolderNoRequestResponseSplit(docType).resolve(docTypeErrorFolder)
-            }
-        }
-
-    /**
-     * Returns the source error folder as an absolute path; if no explicit error folder config was set,
-     * the default error folder is a subdirectory of [sourceFolder].
-     */
-    @JsonIgnore
-    private fun getBaseSourceErrorFolder(): Path =
-        when (sourceErrorFolder) {
-            null -> sourceFolder.resolve(ERROR_DIR_NAME)
-            sourceFolder -> sourceFolder.resolve(ERROR_DIR_NAME)
-            // `Path::resolve` returns `other`, if `other` is an absolute path -> the `else` branch below covers the test
-            // for an absolute error path, that does not coincide with the absolute source path
-            else -> sourceFolder.resolve(sourceErrorFolder)
-        }
-
     override fun toString(): String {
-        val effectiveSourceFoldersByPath = getEffectiveSourceFolders().flatMap { (docType, paths) -> paths.map { path -> path to docType } }
+        val effectiveSourceFoldersByPath = effectiveSourceFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
             .groupBy(keySelector = { it.first }, valueTransform = { it.second })
-        val effectiveTargetFoldersByPath = getEffectiveTargetFolders().flatMap { (docType, paths) -> paths.map { path -> path to docType } }
+        val effectiveTargetFoldersByPath = effectiveTargetFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
             .groupBy(keySelector = { it.first }, valueTransform = { it.second })
-        val effectiveArchiveFoldersByPath = getEffectiveArchiveFolders().flatMap { (docType, paths) -> paths.map { path -> path to docType } }
+        val effectiveArchiveFoldersByPath = effectiveArchiveFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
             .groupBy(keySelector = { it.first }, valueTransform = { it.second })
-        val effectiveErrorFoldersByPath = getEffectiveErrorFolders().flatMap { (docType, paths) -> paths.map { path -> path to docType } }
+        val effectiveErrorFoldersByPath = effectiveErrorFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
             .groupBy(keySelector = { it.first }, valueTransform = { it.second })
         return "Connector(connectorId='$connectorId', baseTargetFolder=$targetFolder, baseSourceFolder=$sourceFolder, " +
                 "sourceFolders=${effectiveSourceFoldersByPath}, targetFolders=${effectiveTargetFoldersByPath}, " +
                 "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
-                "baseSourceArchiveFolder=${getBaseSourceArchiveFolder()}, archiveFolders=${effectiveArchiveFoldersByPath}, " +
-                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${getBaseSourceErrorFolder()}, errorFolders=${effectiveErrorFoldersByPath}, " +
+                "baseSourceArchiveFolder=${baseSourceArchiveFolder}, archiveFolders=${effectiveArchiveFoldersByPath}, " +
+                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${baseSourceErrorFolder}, errorFolders=${effectiveErrorFoldersByPath}, " +
                 "mode=$mode)"
     }
 
@@ -930,11 +671,3 @@ private const val MASKED_VALUE = "*********"
 private const val MASK_CHAR = '*'
 
 private fun String.isAllAsterisks(): Boolean = isNotEmpty() && all { it == MASK_CHAR }
-
-internal fun List<Connector>.getConnectorBySourceFolder(file: Path, docMetaData: DocumentMetaData): Connector =
-    when (file.isDirectory()) {
-        true -> file
-        false -> file.parent
-    }.let { dir: Path ->
-        this.first { it.getEffectiveSourceFolders(docMetaData.documentType).contains(dir) }
-    }

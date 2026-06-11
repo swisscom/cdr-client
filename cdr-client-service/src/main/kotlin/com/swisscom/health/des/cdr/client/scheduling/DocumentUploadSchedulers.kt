@@ -8,6 +8,7 @@ import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSIO
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.FileBusyTester
 import com.swisscom.health.des.cdr.client.config.getConnectorBySourceFolder
+import com.swisscom.health.des.cdr.client.config.effectiveSourceFolders
 import com.swisscom.health.des.cdr.client.handler.RetryUploadFileHandling
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
@@ -106,7 +107,7 @@ internal class EventTriggerUploadScheduler(
 
         logger.info { "Renaming '.$RESTART_FILE_EXTENSION' files to '.xml' in source directories..." }
         config.customer.forEach { connector ->
-            val allSourceFolders: Collection<Path> = connector.getEffectiveSourceFolders().values.flatten().distinct()
+            val allSourceFolders: Collection<Path> = connector.effectiveSourceFolders.values.flatten().distinct()
             allSourceFolders.forEach { dir ->
                 if (Files.exists(dir) && Files.isDirectory(dir)) {
                     dir.listDirectoryEntries("*.$RESTART_FILE_EXTENSION").forEach { file ->
@@ -130,7 +131,7 @@ internal class EventTriggerUploadScheduler(
         if (schedulingValidationService.isSchedulingAllowed) {
             logger.info { "Starting file watcher process..." }
             config.customer.forEach { connector ->
-                logger.info { "Watching source directories for connector '${connector.connectorId}': '${connector.getEffectiveSourceFolders()}'" }
+                logger.info { "Watching source directories for connector '${connector.connectorId}': '${connector.effectiveSourceFolders}'" }
             }
 
             coroutineScope {
@@ -156,7 +157,7 @@ internal class EventTriggerUploadScheduler(
     )
 
     private suspend fun watchForNewFilesToUpload(watcher: KfsDirectoryWatcher): Flow<Pair<Path, Span>> {
-        val sourceDirectories: List<Path> = config.customer.flatMap { it.getEffectiveSourceFolders().values.flatten().distinct() }
+        val sourceDirectories: List<Path> = config.customer.flatMap { it.effectiveSourceFolders.values.flatten().distinct() }
 
         addWatchedPaths(watcher, sourceDirectories)
 
@@ -264,7 +265,7 @@ internal class PollingUploadScheduler(
                 config.customer.forEach { connector ->
                     logger.info {
                         "Polling source directory every '$humanReadableDelay' for connector " +
-                                "'${connector.connectorId}': '${connector.getEffectiveSourceFolders().values.flatten().distinct()}'"
+                                "'${connector.connectorId}': '${connector.effectiveSourceFolders.values.flatten().distinct()}'"
                     }
                 }
             }
@@ -298,12 +299,12 @@ internal class PollingUploadScheduler(
                     .asSequence()
                     .map { connector ->
                         startSpan(tracer, "poll directory ${connector.sourceFolder}") {
-                            logger.debug { "Polling source directories for files: ${connector.getEffectiveSourceFolders().values.flatten().distinct()}" }
+                            logger.debug { "Polling source directories for files: ${connector.effectiveSourceFolders.values.flatten().distinct()}" }
                             connector
                         }
                     }
                     .flatMap { (connector, span) ->
-                        connector.getEffectiveSourceFolders().values
+                        connector.effectiveSourceFolders.values
                             .flatten()
                             .distinct()
                             .flatMap { dir ->
