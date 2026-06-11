@@ -39,7 +39,7 @@ These paths must be configured in the `JavaArguments` setting. See [CONFIG_EXAMP
   "ServiceExecutionMode": "Jar",
   "ServiceJarPath": "..\\..\\lib\\cdr-client-service.jar",
   "JavaExecutablePath": "..\\..\\jre\\bin\\java.exe",
-  "JavaArguments": "-Xmx512m -Dspring.config.additional-location=C:/ProgramData/CDRClient/application-customer.yaml -Dlogging.config=C:/ProgramData/CDRClient/logback-service.xml -Dcdr.client.log.directory=C:/ProgramData/CDRClient/logs",
+  "JavaArguments": "-Xmx512m -Dspring.config.additional-location=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/conf/application-customer.yaml -Dlogging.config=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/conf/logback-service.xml -Dcdr.client.log.directory=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/logs",
   "RestartDelaySeconds": 5,
   "HealthCheckIntervalSeconds": 30,
   "MaxConsecutiveFailures": 5

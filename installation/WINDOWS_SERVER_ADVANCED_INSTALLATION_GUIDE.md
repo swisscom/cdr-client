@@ -39,8 +39,8 @@ From the GitHub release, download these files:
 Create the base installation directory structure:
 
 ```cmd
-mkdir "C:\Program Files\curaLINE Client"
-cd "C:\Program Files\curaLINE Client"
+mkdir "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient"
+cd "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient"
 mkdir bin
 mkdir bin\watchdog
 mkdir bin\updateservice
@@ -52,11 +52,11 @@ mkdir logs
 
 ### 2. Install Java Runtime
 
-Copy your JRE installation to `C:\Program Files\curaLINE Client\jre\`
+Copy your JRE installation to `C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\jre\`
 
 The structure should be:
 ```
-C:\Program Files\curaLINE Client\jre\
+C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\jre\
   └── bin\
       └── java.exe
 ```
@@ -65,20 +65,20 @@ C:\Program Files\curaLINE Client\jre\
 
 Copy the service JAR:
 ```cmd
-copy cdr-client-service-{version}.jar "C:\Program Files\curaLINE Client\lib\cdr-client-service.jar"
+copy cdr-client-service-{version}.jar "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\lib\cdr-client-service.jar"
 ```
 
 ### 3.5. Configure Application Settings
 
 The curaLINE Client service requires configuration files for application settings and logging.
 
-⚠️ **IMPORTANT:** Configuration files MUST be placed in `C:\ProgramData\curaLINEClient\`, NOT in `C:\Program Files\curaLINE Client\` due to Windows permissions. Services cannot reliably write to Program Files.
+⚠️ **IMPORTANT:** Configuration files MUST be placed in `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\`, NOT in `C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\` due to Windows permissions. Services cannot reliably write to Program Files.
 
 1. **Create Configuration Directory**:
    ```cmd
-   mkdir "C:\ProgramData\curaLINEClient"
-   mkdir "C:\ProgramData\curaLINEClient\logs"
-   mkdir "C:\ProgramData\curaLINEClient\conf"
+   mkdir "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient"
+   mkdir "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\logs"
+   mkdir "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf"
    ```
 
 2. **Create Application Configuration** (`application-customer.yaml`):
@@ -87,7 +87,7 @@ The curaLINE Client service requires configuration files for application setting
    
    Download the default template from the GitHub repository:
    - Navigate to `cdr-client-service/conf/default-application-customer.yaml` in the repository
-   - Copy the contents to `C:\ProgramData\curaLINEClient\conf\application-customer.yaml`
+   - Copy the contents to `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\application-customer.yaml`
    - Customize the values for your environment
 
 3. **Create Logging Configuration** (`logback-service.xml`):
@@ -96,19 +96,19 @@ The curaLINE Client service requires configuration files for application setting
    
    Download the default template from the GitHub repository:
    - Navigate to `cdr-client-service/conf/logback-service.xml` in the repository
-   - Copy the contents to `C:\ProgramData\curaLINEClient\conf\logback-service.xml`
-   - Adjust log paths if needed (LOG_DIR should point to C:/ProgramData/curaLINEClient/logs (forward slash are on purpose))
+   - Copy the contents to `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\logback-service.xml`
+   - Adjust log paths if needed (LOG_DIR should point to C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/logs (forward slash are on purpose))
    
    **Option B - Create Basic Configuration:**
    
-   Create `C:\ProgramData\curaLINEClient\conf\logback-service.xml`:
+   Create `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\logback-service.xml`:
    ```xml
    <?xml version="1.0" encoding="UTF-8"?>
    <configuration>
        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-           <file>C:/ProgramData/curaLINEClient/logs/cdr-client-service.log</file>
+           <file>C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/logs/cdr-client-service.log</file>
            <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-               <fileNamePattern>C:/ProgramData/curaLINEClient/logs/cdr-client-service.%d{yyyy-MM-dd}.log</fileNamePattern>
+               <fileNamePattern>C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/logs/cdr-client-service.%d{yyyy-MM-dd}.log</fileNamePattern>
                <maxHistory>30</maxHistory>
            </rollingPolicy>
            <encoder>
@@ -126,7 +126,7 @@ The curaLINE Client service requires configuration files for application setting
    
    Ensure the service account can read/write to these directories:
    ```cmd
-   icacls "C:\ProgramData\curaLINEClient" /grant "NT AUTHORITY\LOCAL SERVICE:(OI)(CI)F" /T
+   icacls "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient" /grant "NT AUTHORITY\LOCAL SERVICE:(OI)(CI)F" /T
    ```
    
    Or if running as a specific user, grant permissions accordingly.
@@ -143,12 +143,12 @@ These paths are configured in the Watchdog's `JavaArguments` setting (see next s
 1. **Extract the ZIP**:
    ```cmd
    cd "%USERPROFILE%\Downloads"
-   tar -xf CdrClientWatchdog-{version}.zip -C "C:\Program Files\curaLINE Client\bin\watchdog"
+   tar -xf CdrClientWatchdog-{version}.zip -C "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\bin\watchdog"
    ```
 
 2. **Configure the Watchdog**:
    
-   Verify the paths defined in `C:\Program Files\curaLINE Client\bin\watchdog\appsettings.json`
+   Verify the paths defined in `C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\bin\watchdog\appsettings.json`
    
    **JavaArguments Explained:**
    - `-Xmx512m`: Maximum heap size for Java (adjust based on your requirements)
@@ -163,7 +163,7 @@ These paths are configured in the Watchdog's `JavaArguments` setting (see next s
    
 3. **Install as Windows Service**: Run in Windows Terminal, as Admin
    ```cmd
-   cd "C:\Program Files\curaLINE Client\bin\watchdog"
+   cd "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\bin\watchdog"
    install-service.bat
    ```
 
@@ -172,18 +172,18 @@ These paths are configured in the Watchdog's `JavaArguments` setting (see next s
 1. **Extract the ZIP**:
    ```cmd
    cd "%USERPROFILE%\Downloads"
-   tar -xf curaLINEClient-updateservice-{version}.zip -C "C:\Program Files\curaLINE Client\bin\updateservice"
+   tar -xf curaLINEClient-updateservice-{version}.zip -C "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\bin\updateservice"
    ```
 
 2. **Configure the Update Service**:
    
-   Verify paths defined in `C:\Program Files\curaLINE Client\bin\updateservice\appsettings.json`
+   Verify paths defined in `C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\bin\updateservice\appsettings.json`
    ```json
    {
      "UpdateCheckIntervalHours": 2,
      "GitHubRepository": "owner/cdr-client",
      "WatchdogServiceName": "CDRClientWatchdog",
-     "InstallationPath": "C:\\Program Files\\curaLINE Client",
+     "InstallationPath": "C:\\Program Files\\Swisscom (Schweiz) AG\\curaLINEClient",
      "CurrentVersions": {
        "Service": "1.0.0",
        "Watchdog": "1.0.0"
@@ -204,7 +204,7 @@ These paths are configured in the Watchdog's `JavaArguments` setting (see next s
    
 3. **Install as Windows Service**:
    ```cmd
-   cd "C:\Program Files\curaLINE Client\bin\updateservice"
+   cd "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\bin\updateservice"
    install-service.bat
    ```
 
@@ -266,7 +266,7 @@ Check Event Viewer for update check activity.
 Your installation should look like this:
 
 ```
-C:\Program Files\curaLINE Client\
+C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\
 ├── bin\
 │   ├── watchdog\
 │   │   ├── CdrClientWatchdog.exe
@@ -290,10 +290,11 @@ C:\Program Files\curaLINE Client\
 └── conf\
     └── [optional: alternative location for config files]
 
-C:\ProgramData\curaLINEClient\        (Application configuration)
-├── application-customer.yaml    (Spring Boot configuration)
-├── logback-service.xml          (Logging configuration)
-└── logs\                        (Log file directory)
+C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\        (Application configuration)
+├── conf\
+│   ├── application-customer.yaml    (Spring Boot configuration)
+│   └── logback-service.xml          (Logging configuration)
+└── logs\                            (Log file directory)
     └── cdr-client-service.log
 ```
 
@@ -318,33 +319,33 @@ Once installed:
 2. **Verify paths** in `appsettings.json` files
 3. **Check permissions** - ensure service account can access files
 4. **Verify .NET Runtime** is installed: `dotnet --info`
-5. **Verify Java** is accessible: `C:\Program Files\CDR Client\jre\bin\java.exe -version`
+5. **Verify Java** is accessible: `C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\jre\bin\java.exe -version`
 6. **Verify configuration files exist**:
    ```cmd
-   dir "C:\ProgramData\curaLINEClient\application-customer.yaml"
-   dir "C:\ProgramData\curaLINEClient\logback-service.xml"
+   dir "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\application-customer.yaml"
+   dir "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\logback-service.xml"
    ```
 
 ### Configuration File Issues
 
 **Service starts but fails immediately:**
-- Check that `application-customer.yaml` exists at: `C:\ProgramData\curaLINEClient\application-customer.yaml`
+- Check that `application-customer.yaml` exists at: `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\application-customer.yaml`
 - Verify YAML syntax in `application-customer.yaml` (YAML is strict about indentation)
-- Check initialization log: `C:\ProgramData\curaLINEClient\logs\cdr-service-init.log` for configuration errors
-- Verify the service account has read/write permissions on `C:\ProgramData\curaLINEClient\`
-- **Common mistake:** Verify config paths in watchdog's `appsettings.json` use `C:/ProgramData/curaLINEClient/` NOT `C:/Program Files/`
+- Check initialization log: `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\logs\cdr-service-init.log` for configuration errors
+- Verify the service account has read/write permissions on `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\`
+- **Common mistake:** Verify config paths in watchdog's `appsettings.json` use `C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/` NOT `C:/Program Files/`
 
 **Logs not being created:**
-- Verify the log directory exists: `C:\ProgramData\curaLINEClient\logs\`
+- Verify the log directory exists: `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\logs\`
 - Check that the service account has write permissions:
   ```cmd
-  icacls "C:\ProgramData\curaLINEClient"
+  icacls "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient"
   ```
 - If `logback-service.xml` was manually created, verify it doesn't contain the `@@LOG_DIR@@` placeholder:
   ```cmd
-  type "C:\ProgramData\curaLINEClient\logback-service.xml" | findstr "@@LOG_DIR@@"
+  type "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\logback-service.xml" | findstr "@@LOG_DIR@@"
   ```
-  If found, either delete the file and let the app recreate it, or manually replace `@@LOG_DIR@@` with `C:/ProgramData/curaLINEClient/logs`
+  If found, either delete the file and let the app recreate it, or manually replace `@@LOG_DIR@@` with `C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/logs`
 - Check the watchdog service is running: `sc query CDRClientWatchdog`
 
 ### CDR Service Crashes/Restarts
@@ -377,19 +378,19 @@ To remove CDR Client:
 
 1. **Stop and remove Update Service**:
    ```cmd
-   cd "C:\Program Files\curaLINE Client\bin\updateservice"
+   cd "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\bin\updateservice"
    uninstall-service.bat
    ```
 
 2. **Stop and remove Watchdog** (also stops CDR service):
    ```cmd
-   cd "C:\Program Files\curaLINE Client\bin\watchdog"
+   cd "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\bin\watchdog"
    uninstall-service.bat
    ```
 
 3. **Delete installation directory**:
    ```cmd
-   rmdir /s "C:\Program Files\curaLINE Client"
+   rmdir /s "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient"
    ```
 
 ## Service Management Commands

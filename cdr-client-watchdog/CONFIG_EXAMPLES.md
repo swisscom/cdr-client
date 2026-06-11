@@ -52,7 +52,7 @@ Runs the service as a Java JAR file.
   "ServiceExecutionMode": "Jar",
   "ServiceJarPath": "..\\..\\lib\\cdr-client-service.jar",
   "JavaExecutablePath": "..\\..\\jre\\bin\\java.exe",
-  "JavaArguments": "-Xmx512m -Dspring.main.web-application-type=none -Dspring.config.additional-location=C:/ProgramData/CDRClient/application-customer.yaml -Dlogging.config=C:/ProgramData/CDRClient/logback-service.xml -Dcdr.client.log.directory=C:/ProgramData/CDRClient/logs",
+  "JavaArguments": "-Xmx512m -Dspring.main.web-application-type=none -Dspring.config.additional-location=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/conf/application-customer.yaml -Dlogging.config=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/conf/logback-service.xml -Dcdr.client.log.directory=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/logs",
   "RestartDelaySeconds": 5,
   "HealthCheckIntervalSeconds": 30,
   "MaxConsecutiveFailures": 5
@@ -71,14 +71,14 @@ Runs the service as a Java JAR file.
 **Alternative: Using conf directory under installation:**
 ```json
 {
-  "JavaArguments": "-Xmx512m -Dspring.main.web-application-type=none -Dspring.config.additional-location=C:/Program Files/CDR Client/conf/application-customer.yaml -Dlogging.config=C:/Program Files/CDR Client/conf/logback-service.xml -Dcdr.client.log.directory=C:/Program Files/CDR Client/logs"
+  "JavaArguments": "-Xmx512m -Dspring.main.web-application-type=none -Dspring.config.additional-location=C:/Program Files/Swisscom (Schweiz) AG/curaLINEClient/conf/application-customer.yaml -Dlogging.config=C:/Program Files/Swisscom (Schweiz) AG/curaLINEClient/conf/logback-service.xml -Dcdr.client.log.directory=C:/Program Files/Swisscom (Schweiz) AG/curaLINEClient/logs"
 }
 ```
 
 **Alternative: If you need the web UI accessible (development/testing only):**
 ```json
 {
-  "JavaArguments": "-Xmx512m -Dspring.config.additional-location=C:/ProgramData/CDRClient/application-customer.yaml -Dlogging.config=C:/ProgramData/CDRClient/logback-service.xml -Dcdr.client.log.directory=C:/ProgramData/CDRClient/logs"
+  "JavaArguments": "-Xmx512m -Dspring.config.additional-location=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/conf/application-customer.yaml -Dlogging.config=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/conf/logback-service.xml -Dcdr.client.log.directory=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/logs"
 }
 ```
 This will keep the web server enabled. The application will start with `REACTIVE` web type as configured in `application.yaml`, making the servers available at:
@@ -100,7 +100,7 @@ This will keep the web server enabled. The application will start with `REACTIVE
 ### Absolute Path
 ```json
 {
-  "ServiceExecutablePath": "C:\\Program Files\\CDR Client\\bin\\cdr-client-service.exe"
+  "ServiceExecutablePath": "C:\\Program Files\\Swisscom (Schweiz) AG\\curaLINEClient\\bin\\cdr-client-service.exe"
 }
 ```
 
