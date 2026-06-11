@@ -697,10 +697,8 @@ internal class ConfigValidationService(
 
     @Suppress("CyclomaticComplexMethod")
     fun validateConnectorFolders(connector: ConnectorDto): ValidationResult {
-        val baseValidation = validateIsAbsoluteDirectory(connector.sourceFolder) +
-                validateIsAbsoluteDirectory(connector.targetFolder) +
-                validateDirectoryIsReadWritable(connector.sourceFolder) +
-                validateDirectoryIsReadWritable(connector.targetFolder)
+        val baseValidation = validateReadWritableAbsoluteDirectory(connector.sourceFolder) +
+                validateReadWritableAbsoluteDirectory(connector.targetFolder)
 
         // if archiving is enabled and
         //   - the archive directory is an absolute path -> verify the directory is read/writable
@@ -709,36 +707,30 @@ internal class ConfigValidationService(
         // else we do not care and return `success`
         val archiveValidation: ValidationResult =
             if (connector.sourceArchiveEnabled) {
-                validateReadWritableIfAbsolutePath(connector.sourceArchiveFolder)
+                validateReadWritableIfAbsoluteDirectory(connector.sourceArchiveFolder)
             } else {
                 ValidationResult.Success
             }
 
         // if the error directory is an absolute path -> verify the directory is read/writable
         // else -> return `success` as the relative path will be resolved against the source dir, which we already checked above
-        val errorValidation = validateReadWritableIfAbsolutePath(connector.sourceErrorFolder)
+        val errorValidation = validateReadWritableIfAbsoluteDirectory(connector.sourceErrorFolder)
 
         // if request-response-split is enabled, then all document type specific directories become mandatory,
         // and they all have to be absolute directories
         val docTypeValidation = connector.docTypeFolders.map { (_, docTypeFolder) ->
             if (docTypeFolder.requestResponseSplit) {
-                validateIsAbsoluteDirectory(docTypeFolder.sourceFolderResp ?: "") +
-                        validateIsAbsoluteDirectory(docTypeFolder.sourceFolderReq ?: "") +
-                        validateIsAbsoluteDirectory(docTypeFolder.targetFolderResp ?: "") +
-                        validateIsAbsoluteDirectory(docTypeFolder.targetFolderReq ?: "") +
-                        validateIsAbsoluteDirectory(docTypeFolder.errorFolder ?: "") +
-                        validateIsAbsoluteDirectory(docTypeFolder.archiveFolder ?: "") +
-                        validateDirectoryIsReadWritable(docTypeFolder.sourceFolderResp ?: "") +
-                        validateDirectoryIsReadWritable(docTypeFolder.sourceFolderReq ?: "") +
-                        validateDirectoryIsReadWritable(docTypeFolder.targetFolderResp ?: "") +
-                        validateDirectoryIsReadWritable(docTypeFolder.targetFolderReq ?: "") +
-                        validateDirectoryIsReadWritable(docTypeFolder.errorFolder ?: "") +
-                        validateDirectoryIsReadWritable(docTypeFolder.archiveFolder ?: "")
+                validateReadWritableAbsoluteDirectory(docTypeFolder.sourceFolderResp) +
+                        validateReadWritableAbsoluteDirectory(docTypeFolder.sourceFolderReq) +
+                        validateReadWritableAbsoluteDirectory(docTypeFolder.targetFolderResp) +
+                        validateReadWritableAbsoluteDirectory(docTypeFolder.targetFolderReq) +
+                        validateReadWritableAbsoluteDirectory(docTypeFolder.errorFolder) +
+                        validateReadWritableAbsoluteDirectory(docTypeFolder.archiveFolder)
             } else {
-                validateReadWritableIfAbsolutePath(docTypeFolder.sourceFolder) +
-                        validateReadWritableIfAbsolutePath(docTypeFolder.targetFolder) +
-                        validateReadWritableIfAbsolutePath(docTypeFolder.archiveFolder) +
-                        validateReadWritableIfAbsolutePath(docTypeFolder.errorFolder)
+                validateReadWritableIfAbsoluteDirectory(docTypeFolder.sourceFolder) +
+                        validateReadWritableIfAbsoluteDirectory(docTypeFolder.targetFolder) +
+                        validateReadWritableIfAbsoluteDirectory(docTypeFolder.archiveFolder) +
+                        validateReadWritableIfAbsoluteDirectory(docTypeFolder.errorFolder)
             }
         }.fold(initial = ValidationResult.Success) { acc: ValidationResult, result: ValidationResult -> acc + result }
 
@@ -755,33 +747,90 @@ internal class ConfigValidationService(
         return baseValidation + archiveValidation + errorValidation + docTypeValidation + allErrorFoldersExist + allArchiveFoldersExist
     }
 
+    /**
+     * Returns [ValidationResult.Success] if the provided path is
+     * * not null
+     * * absolute
+     * * a directory
+     *
+     * Otherwise returns [ValidationResult.Failure]
+     *
+     * @param path Path string to test
+     * @return [ValidationResult.Success] if the path is absolute and points to a directory
+     */
     @Suppress("NestedBlockDepth")
-    fun validateIsAbsoluteDirectory(path: String): ValidationResult =
-        validatePathString(path).let { pathStringValidation ->
-            when (pathStringValidation) {
-                ValidationResult.Success -> path.let { path: String ->
-                    if (Path.of(path).isAbsolute) {
-                        ValidationResult.Success
-                    } else {
-                        ValidationResult.Failure(
-                            listOf(
-                                ValidationDetail.PathDetail(path = path, messageKey = DIRECTORY_NEEDS_ABSOLUTE_PATH)
-                            )
-                        )
+    fun validateIsAbsoluteDirectory(path: String?): ValidationResult {
+        fun validationError(msgKey: DTOs.ValidationMessageKey) = ValidationResult.Failure(
+            listOf(
+                ValidationDetail.PathDetail(path = path ?: "", messageKey = msgKey)
+            )
+        )
+
+        return when (path) {
+            null -> validationError(NOT_A_DIRECTORY)
+            else ->
+                when (val pathStringValidation = validatePathString(path)) {
+                    is ValidationResult.Success -> {
+                        with(Path.of(path)) {
+                            when (isAbsolute) {
+                                false -> validationError(DIRECTORY_NEEDS_ABSOLUTE_PATH)
+                                true -> when (isDirectory()) {
+                                    false -> validationError(NOT_A_DIRECTORY)
+                                    true -> ValidationResult.Success
+                                }
+                            }
+                        }
                     }
+
+                    is ValidationResult.Failure -> pathStringValidation
                 }
+        }
+    }
 
-                else -> pathStringValidation
-            }
+    /**
+     * Returns [ValidationResult.Success] if the provided path is
+     * * not null
+     * * absolute
+     * * a directory
+     * * read-writable
+     *
+     * Otherwise returns [ValidationResult.Failure]
+     *
+     * @param path Path string to test
+     * @return [ValidationResult.Success] if the path is absolute, points to a directory, which is read-writable
+     * @see validateIsAbsoluteDirectory
+     * @see validateDirectoryIsReadWritable
+     * @see validateReadWritableIfAbsoluteDirectory
+     */
+    fun validateReadWritableAbsoluteDirectory(path: String?): ValidationResult =
+        when (val result = validateIsAbsoluteDirectory(path)) {
+            is ValidationResult.Failure -> result
+            is ValidationResult.Success -> validateDirectoryIsReadWritable(path!!)
         }
 
-    private fun validateReadWritableIfAbsolutePath(path: String?): ValidationResult = path?.let { path: String ->
-        if (validateIsAbsoluteDirectory(path) == ValidationResult.Success) {
-            validateDirectoryIsReadWritable(path)
-        } else {
-            ValidationResult.Success
+    /**
+     * Returns [ValidationResult.Success] if the provided path is either
+     * * null
+     *
+     * or
+     * * not null
+     * * absolute
+     * * a directory
+     * * read-writable
+     *
+     * Otherwise returns [ValidationResult.Failure]
+     *
+     * @param path Path string to test
+     * @return [ValidationResult.Success] if the path is absolute, points to a directory, which is read-writable
+     * @see validateIsAbsoluteDirectory
+     * @see validateDirectoryIsReadWritable
+     * @see validateReadWritableAbsoluteDirectory
+     */
+    fun validateReadWritableIfAbsoluteDirectory(path: String?): ValidationResult =
+        when (validateIsAbsoluteDirectory(path)) {
+            is ValidationResult.Failure -> ValidationResult.Success // Not a path at all or a relative path -> treat as success
+            is ValidationResult.Success -> validateDirectoryIsReadWritable(path!!)
         }
-    } ?: ValidationResult.Success
 
     companion object {
         private const val PLACEHOLDER_VALUE = "value-required"
