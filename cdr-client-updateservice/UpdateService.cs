@@ -37,6 +37,7 @@ public class UpdateService : BackgroundService
     private readonly string _watchdogServiceName;
     private readonly string _installationPath;
     private readonly string _javaExecutablePath;
+    private readonly string _serviceName;
     private readonly string? _pinnedVersion;
     private readonly int _maxBackupsToKeep;
 
@@ -96,7 +97,8 @@ public class UpdateService : BackgroundService
         _currentVersions = _configuration.GetSection("CurrentVersions").Get<Dictionary<string, string>>()
             ?? new Dictionary<string, string> { { "Service", "1.0.0" }, { "Watchdog", "1.0.0" } };
         var serviceVersion = _currentVersions.GetValueOrDefault("UpdateService", "1.0.0");
-        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("curaLINEClientUpdateService", serviceVersion));
+        _serviceName = _configuration["ServiceName"] ?? "curaLINEClientUpdateService";
+        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(_serviceName, serviceVersion));
         _updateCheckInterval = TimeSpan.FromHours(_configuration.GetValue<int>("UpdateCheckIntervalHours", 2));
         _watchdogServiceName = _configuration["WatchdogServiceName"] ?? "CDRClientWatchdog";
         _installationPath = ResolveInstallationPath(_configuration["InstallationPath"]);
@@ -107,8 +109,8 @@ public class UpdateService : BackgroundService
         _artifacts = _configuration.GetSection("Artifacts").Get<Dictionary<string, ArtifactConfig>>()
             ?? new Dictionary<string, ArtifactConfig>();
 
-        _logger.LogInformation("curaLINEClientUpdateService initialized. Installation path: {InstallationPath}, Service version: {Version}, Update URL: {UpdateUrl}",
-            _installationPath, _currentVersions.GetValueOrDefault("Service", "unknown"), UpdateBaseUrl);
+        _logger.LogInformation("{ServiceName} initialized. Installation path: {InstallationPath}, Service version: {Version}, Update URL: {UpdateUrl}",
+            _serviceName, _installationPath, _currentVersions.GetValueOrDefault("Service", "unknown"), UpdateBaseUrl);
 
         _logger.LogInformation("HttpClient configured with system proxy and default network credentials");
 
@@ -124,7 +126,7 @@ public class UpdateService : BackgroundService
     {
         try
         {
-            _logger.LogInformation("curaLINEClientUpdateService started. Check interval: {Interval} hours", _updateCheckInterval.TotalHours);
+            _logger.LogInformation("{ServiceName} started. Check interval: {Interval} hours", _serviceName, _updateCheckInterval.TotalHours);
 
             // Perform first update check at startup
             _logger.LogInformation("Performing initial update check at startup...");
@@ -141,7 +143,7 @@ public class UpdateService : BackgroundService
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
             // Graceful shutdown requested — this is expected, do not log as error
-            _logger.LogInformation("curaLINEClientUpdateService shutting down gracefully");
+            _logger.LogInformation("{ServiceName} shutting down gracefully", _serviceName);
         }
         catch (Exception ex)
         {
@@ -154,10 +156,10 @@ public class UpdateService : BackgroundService
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("curaLINEClientUpdateService stopping");
+        _logger.LogInformation("{ServiceName} stopping", _serviceName);
         await base.StopAsync(cancellationToken);
         _httpClient.Dispose();
-        _logger.LogInformation("curaLINEClientUpdateService stopped");
+        _logger.LogInformation("{ServiceName} stopped", _serviceName);
     }
 
     #endregion

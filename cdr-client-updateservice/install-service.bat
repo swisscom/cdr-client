@@ -19,7 +19,7 @@ sc delete "!SERVICE_NAME!" >nul 2>&1
 
 REM Create the service
 sc create "!SERVICE_NAME!" ^
-    binPath= "\"%~dp0CuraLineClientUpdateService.exe\" --service-name !SERVICE_NAME!" ^
+    binPath= "\"%~dp0CuraLineClientUpdateService.exe\" --serviceName !SERVICE_NAME!" ^
     start= auto ^
     DisplayName= "!DISPLAY_NAME!"
 

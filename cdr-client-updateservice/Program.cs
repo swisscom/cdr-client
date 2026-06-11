@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.EventLog;
+using System.Collections.Generic;
 using System;
 using System.Threading.Tasks;
 
@@ -26,6 +27,10 @@ public class Program
 
         builder.Configuration.SetBasePath(AppContext.BaseDirectory);
         builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ServiceName"] = serviceName
+        });
 
         builder.Services.AddSingleton<UpdateService>();
         builder.Services.AddHostedService<UpdateService>(provider => provider.GetService<UpdateService>()!);
