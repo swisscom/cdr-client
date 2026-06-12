@@ -8,10 +8,11 @@ import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSIO
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.FileBusyTester
 import com.swisscom.health.des.cdr.client.config.getConnectorBySourceFolder
+import com.swisscom.health.des.cdr.client.config.effectiveSourceFolders
 import com.swisscom.health.des.cdr.client.handler.RetryUploadFileHandling
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
-import com.swisscom.health.des.cdr.client.xml.DocumentType
-import com.swisscom.health.des.cdr.client.xml.extractDocumentType
+import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
+import com.swisscom.health.des.cdr.client.xml.extractDocumentMetaData
 import io.github.irgaly.kfswatch.KfsDirectoryWatcher
 import io.github.irgaly.kfswatch.KfsDirectoryWatcherEvent
 import io.github.irgaly.kfswatch.KfsEvent
@@ -106,7 +107,7 @@ internal class EventTriggerUploadScheduler(
 
         logger.info { "Renaming '.$RESTART_FILE_EXTENSION' files to '.xml' in source directories..." }
         config.customer.forEach { connector ->
-            val allSourceFolders: Collection<Path> = connector.getEffectiveSourceFolders().values.distinct()
+            val allSourceFolders: Collection<Path> = connector.effectiveSourceFolders.values.flatten().distinct()
             allSourceFolders.forEach { dir ->
                 if (Files.exists(dir) && Files.isDirectory(dir)) {
                     dir.listDirectoryEntries("*.$RESTART_FILE_EXTENSION").forEach { file ->
@@ -130,7 +131,7 @@ internal class EventTriggerUploadScheduler(
         if (schedulingValidationService.isSchedulingAllowed) {
             logger.info { "Starting file watcher process..." }
             config.customer.forEach { connector ->
-                logger.info { "Watching source directories for connector '${connector.connectorId}': '${connector.getEffectiveSourceFolders()}'" }
+                logger.info { "Watching source directories for connector '${connector.connectorId}': '${connector.effectiveSourceFolders}'" }
             }
 
             coroutineScope {
@@ -156,7 +157,7 @@ internal class EventTriggerUploadScheduler(
     )
 
     private suspend fun watchForNewFilesToUpload(watcher: KfsDirectoryWatcher): Flow<Pair<Path, Span>> {
-        val sourceDirectories: List<Path> = config.customer.flatMap { it.getEffectiveSourceFolders().values.distinct() }
+        val sourceDirectories: List<Path> = config.customer.flatMap { it.effectiveSourceFolders.values.flatten().distinct() }
 
         addWatchedPaths(watcher, sourceDirectories)
 
@@ -264,7 +265,7 @@ internal class PollingUploadScheduler(
                 config.customer.forEach { connector ->
                     logger.info {
                         "Polling source directory every '$humanReadableDelay' for connector " +
-                                "'${connector.connectorId}': '${connector.getEffectiveSourceFolders()}'"
+                                "'${connector.connectorId}': '${connector.effectiveSourceFolders.values.flatten().distinct()}'"
                     }
                 }
             }
@@ -298,12 +299,14 @@ internal class PollingUploadScheduler(
                     .asSequence()
                     .map { connector ->
                         startSpan(tracer, "poll directory ${connector.sourceFolder}") {
-                            logger.debug { "Polling source directories for files: ${connector.getEffectiveSourceFolders().values.distinct()}" }
+                            logger.debug { "Polling source directories for files: ${connector.effectiveSourceFolders.values.flatten().distinct()}" }
                             connector
                         }
                     }
                     .flatMap { (connector, span) ->
-                        connector.getEffectiveSourceFolders().values.distinct()
+                        connector.effectiveSourceFolders.values
+                            .flatten()
+                            .distinct()
                             .flatMap { dir ->
                                 dir.listDirectoryEntries()
                                     .asSequence()
@@ -391,7 +394,7 @@ internal abstract class BaseUploadScheduler(
                     logger.info { "queuing '${file}' for upload" }
                     launch(SpanContextElement(span, tracer)) {
                         runCatching {
-                            dispatchForUpload(file, file.extractDocumentType())
+                            dispatchForUpload(file, file.extractDocumentMetaData())
                         }.fold(
                             onSuccess = { uploaded -> logger.info { "'$file' ${if (uploaded) "uploaded or error handled" else "not uploaded"}" } },
                             onFailure = { t: Throwable ->
@@ -425,12 +428,12 @@ internal abstract class BaseUploadScheduler(
             .collect()
     }
 
-    private suspend fun dispatchForUpload(file: Path, docType: DocumentType): Boolean =
-        config.customer.getConnectorBySourceFolder(file, docType).let { connector ->
+    private suspend fun dispatchForUpload(file: Path, docMetaData: DocumentMetaData): Boolean =
+        config.customer.getConnectorBySourceFolder(file, docMetaData).let { connector ->
             if (!file.isBusy()) {
                 // limit parallelism of uploads; cdrUploadsDispatcher is defined as a limited parallelism IO dispatcher
                 withContext(cdrUploadsDispatcher) {
-                    retryUploadFileHandling.uploadRetrying(file, docType, connector)
+                    retryUploadFileHandling.uploadRetrying(file, docMetaData, connector)
                 }
                 true
             } else {

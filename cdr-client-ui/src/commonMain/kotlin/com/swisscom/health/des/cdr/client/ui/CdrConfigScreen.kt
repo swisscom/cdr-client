@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_RGB_Colour_icon
@@ -77,7 +78,7 @@ internal fun CdrConfigScreen(
     var canEdit: Boolean by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.clientServiceConfig, uiState.clientServiceStatus) {
-        initialConfigLoaded = uiState.clientServiceConfig !== DTOs.CdrClientConfig.EMPTY
+        initialConfigLoaded = uiState.clientServiceConfig !== CdrClientConfigDto.EMPTY
         canEdit = initialConfigLoaded && uiState.clientServiceStatus.isOnlineCategory
     }
 

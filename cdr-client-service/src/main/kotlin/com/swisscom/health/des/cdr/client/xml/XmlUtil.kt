@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.xml
 
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.w3c.dom.Document
 import java.io.InputStream
@@ -10,17 +11,24 @@ import kotlin.io.path.inputStream
 
 private val logger = KotlinLogging.logger {}
 
-internal fun Path.extractDocumentType(): DocumentType = runCatching {
+internal fun Path.extractDocumentMetaData(): DocumentMetaData = runCatching {
     // TODO: use StAX parser instead of DOM parser to avoid loading the entire file into memory just to determine the document type
-    this@extractDocumentType.inputStream().use { it.toDom().fdDocType }
+    this@extractDocumentMetaData.inputStream().use { inputStream -> with(inputStream.toDom()) { DocumentMetaData(fdDocType, communicationType) } }
 }.fold(
     onSuccess = { it },
     onFailure = { e ->
         logger.error { "Failed to determine document type of file '$this': ${e.message}" }
-        DocumentType.UNDEFINED
+        DocumentMetaData.UNKNOWN
     }
 )
 
+internal val Document.communicationType: CommunicationType
+    get() =
+        when (this.documentElement.localName) {
+            "request", "notification" -> CommunicationType.REQUEST
+            "response" -> CommunicationType.RESPONSE
+            else -> CommunicationType.UNKNOWN
+        }
 
 internal val Document.fdDocType: DocumentType
     get() {
@@ -44,7 +52,7 @@ internal val Document.fdDocType: DocumentType
             namespaceDeclarationElements.any { namespace -> namespace.startsWith(pc.uri) }
         }
 
-        return find ?: DocumentType.UNDEFINED
+        return find ?: DocumentType.UNKNOWN
     }
 
 internal fun InputStream.toDom(): Document =

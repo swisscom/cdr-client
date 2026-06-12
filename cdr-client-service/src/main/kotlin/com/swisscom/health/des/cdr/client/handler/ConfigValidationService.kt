@@ -3,7 +3,6 @@ package com.swisscom.health.des.cdr.client.handler
 import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationDetail
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.DIRECTORY_NEEDS_ABSOLUTE_PATH
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.DIRECTORY_NOT_FOUND
@@ -23,6 +22,11 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem.CONNECTOR_MODE
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ConfigurationItem.FILE_BUSY_TEST_TIMEOUT
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.Connector
+import com.swisscom.health.des.cdr.client.config.effectiveArchiveFolders
+import com.swisscom.health.des.cdr.client.config.effectiveErrorFolders
+import com.swisscom.health.des.cdr.client.config.effectiveSourceFolders
+import com.swisscom.health.des.cdr.client.config.effectiveTargetFolders
 import com.swisscom.health.des.cdr.client.config.toCdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -37,6 +41,8 @@ import kotlin.io.path.isDirectory
 import kotlin.io.path.isReadable
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.isWritable
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector as ConnectorDto
 
 private val logger = KotlinLogging.logger {}
 
@@ -47,6 +53,10 @@ internal class ConfigValidationService(
 ) {
 
     val isConfigValid: Boolean by lazy { validateAllConfigurationItems(config) is ValidationResult.Success }
+
+    @Suppress("UnusedPrivateMember")
+    @PostConstruct
+    private fun createErrorAndArchiveFolders() = createErrorAndArchiveFolders(config)
 
     /**
      * Actually, we should only attempt to create error and archive folders that are configured
@@ -61,9 +71,7 @@ internal class ConfigValidationService(
      *   Using Posix permissions this is straight forward on Linux/macOS; not so much
      *   on Windows.
      */
-    @Suppress("UnusedPrivateMember")
-    @PostConstruct
-    private fun createErrorAndArchiveFolders() {
+    fun createErrorAndArchiveFolders(config: CdrClientConfig) {
         fun createFolderIfMissing(path: Path, type: String) {
             runCatching {
                 if (!path.exists()) {
@@ -78,11 +86,11 @@ internal class ConfigValidationService(
             }
         }
 
-        config.customer.flatMap { connector -> connector.getEffectiveErrorFolders().values }.distinct().forEach { errorFolder ->
+        config.customer.flatMap { connector -> connector.effectiveErrorFolders.values.flatten() }.distinct().forEach { errorFolder ->
             createFolderIfMissing(errorFolder, "error")
         }
 
-        config.customer.flatMap { connector -> connector.getEffectiveArchiveFolders().values.filterNotNull() }.distinct().forEach { archiveFolder ->
+        config.customer.flatMap { connector -> connector.effectiveArchiveFolders.values.flatten() }.distinct().forEach { archiveFolder ->
             createFolderIfMissing(archiveFolder, "archive")
         }
     }
@@ -136,7 +144,7 @@ internal class ConfigValidationService(
     }
 
     @Suppress("CyclomaticComplexMethod")
-    fun validateCdrApiEndpoint(cdrApiEndpoint: DomainObjects.ApiEndpoint, idpCredentials: DTOs.CdrClientConfig.IdpCredentials): ValidationResult {
+    fun validateCdrApiEndpoint(cdrApiEndpoint: DomainObjects.ApiEndpoint, idpCredentials: CdrClientConfigDto.IdpCredentials): ValidationResult {
         fun failure(messageKey: DTOs.ValidationMessageKey) = ValidationResult.Failure(
             listOf(
                 ValidationDetail.ConfigItemDetail(
@@ -192,7 +200,7 @@ internal class ConfigValidationService(
         }
     }
 
-    fun validateConnectorIsPresent(customer: List<Connector>?): ValidationResult =
+    fun validateConnectorIsPresent(customer: List<ConnectorDto>?): ValidationResult =
         if (customer.isNullOrEmpty()) {
             ValidationResult.Failure(
                 listOf(
@@ -206,7 +214,7 @@ internal class ConfigValidationService(
             ValidationResult.Success
         }
 
-    fun validateConnectorIdIsPresent(customer: List<Connector>?): ValidationResult =
+    fun validateConnectorIdIsPresent(customer: List<ConnectorDto>?): ValidationResult =
         if (customer != null && customer.any { it.connectorId.isBlank() }) {
             ValidationResult.Failure(
                 listOf(
@@ -234,13 +242,13 @@ internal class ConfigValidationService(
             ValidationResult.Success
         }
 
-    fun validateModeValue(connectors: List<Connector>): ValidationResult =
+    fun validateModeValue(connectors: List<ConnectorDto>): ValidationResult =
         connectors.fold(
             initial = ValidationResult.Success,
-            operation = { acc: ValidationResult, connector: Connector ->
+            operation = { acc: ValidationResult, connector: ConnectorDto ->
                 when (connector.mode) {
-                    DTOs.CdrClientConfig.Mode.TEST, DTOs.CdrClientConfig.Mode.PRODUCTION -> acc
-                    DTOs.CdrClientConfig.Mode.NONE -> {
+                    CdrClientConfigDto.Mode.TEST, CdrClientConfigDto.Mode.PRODUCTION -> acc
+                    CdrClientConfigDto.Mode.NONE -> {
                         acc + ValidationResult.Failure(
                             listOf(
                                 ValidationDetail.ConnectorDetail(
@@ -255,11 +263,11 @@ internal class ConfigValidationService(
             }
         )
 
-    fun validateModeOverlap(connectors: List<Connector>): ValidationResult =
+    fun validateModeOverlap(connectors: List<ConnectorDto>): ValidationResult =
         connectors
             .groupBy { it.connectorId }
             .filter { cd -> cd.value.size > 1 }
-            .map { (connectorId: String, connectors: List<Connector>) ->
+            .map { (connectorId: String, connectors: List<ConnectorDto>) ->
                 if (connectors.groupingBy { connector -> connector.mode }.eachCount().any { it.value > 1 }) {
                     ValidationResult.Failure(
                         listOf(
@@ -433,10 +441,10 @@ internal class ConfigValidationService(
         }
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
-    fun validateDirectoryOverlap(config: DTOs.CdrClientConfig): ValidationResult {
+    fun validateDirectoryOverlap(config: CdrClientConfigDto): ValidationResult {
         val pathStringValidation = config.customer.fold(
             initial = ValidationResult.Success,
-            operation = { acc: ValidationResult, connector: Connector ->
+            operation = { acc: ValidationResult, connector: ConnectorDto ->
                 acc +
                         validatePathString(connector.sourceFolder) +
                         validatePathString(connector.targetFolder) +
@@ -444,12 +452,16 @@ internal class ConfigValidationService(
                         validatePathString(connector.sourceArchiveFolder ?: "") +
                         connector.docTypeFolders.values.fold(
                             initial = ValidationResult.Success,
-                            operation = { docTypeAcc: ValidationResult, docTypeFolder: Connector.DocTypeFolders ->
+                            operation = { docTypeAcc: ValidationResult, docTypeFolder: ConnectorDto.DocTypeFolders ->
                                 docTypeAcc +
                                         validatePathString(docTypeFolder.sourceFolder ?: "") +
+                                        validatePathString(docTypeFolder.sourceFolderResp ?: "") +
+                                        validatePathString(docTypeFolder.sourceFolderReq ?: "") +
                                         validatePathString(docTypeFolder.errorFolder ?: "") +
                                         validatePathString(docTypeFolder.archiveFolder ?: "") +
-                                        validatePathString(docTypeFolder.targetFolder ?: "")
+                                        validatePathString(docTypeFolder.targetFolder ?: "") +
+                                        validatePathString(docTypeFolder.targetFolderResp ?: "") +
+                                        validatePathString(docTypeFolder.targetFolderReq ?: "")
                             }
                         )
             }
@@ -459,31 +471,22 @@ internal class ConfigValidationService(
         return if (pathStringValidation == ValidationResult.Failure) {
             pathStringValidation
         } else {
-            val connectors = config.customer.map { connector ->
-                com.swisscom.health.des.cdr.client.config.Connector.EMPTY.copy(
-                    sourceFolder = Path.of(connector.sourceFolder),
-                    targetFolder = Path.of(connector.targetFolder),
-                    sourceErrorFolder = connector.sourceErrorFolder?.let { Path.of(it) },
-                    sourceArchiveFolder = connector.sourceArchiveFolder?.let { Path.of(it) },
-                    sourceArchiveEnabled = connector.sourceArchiveEnabled,
-                    docTypeFolders = connector.docTypeFolders.toCdrClientConfig()
-                )
-            }
+            val connectors = config.customer.map { it.toCdrClientConfig() }
 
             val sourceFolders: List<Path> = connectors.flatMap { connector ->
-                connector.getEffectiveSourceFolders().values.distinct()
+                connector.effectiveSourceFolders.values.flatten().distinct()
             }
 
             val targetFolders: List<Path> = connectors.flatMap { connector ->
-                connector.getEffectiveTargetFolders().values.distinct()
+                connector.effectiveTargetFolders.values.flatten().distinct()
             }
 
             val errorFolders: List<Path> = connectors.flatMap { connector ->
-                connector.getEffectiveErrorFolders().values.distinct()
+                connector.effectiveErrorFolders.values.flatten().distinct()
             }
 
             val archiveFolders: List<Path> = connectors.flatMap { connector ->
-                connector.getEffectiveArchiveFolders().values.filterNotNull().distinct()
+                connector.effectiveArchiveFolders.values.flatten().distinct()
             }
 
             val localFolder: List<Path> = listOf(Path.of(config.localFolder))
@@ -654,7 +657,7 @@ internal class ConfigValidationService(
         }
     }
 
-    fun validateCredentialValues(credentials: DTOs.CdrClientConfig.IdpCredentials): ValidationResult {
+    fun validateCredentialValues(credentials: CdrClientConfigDto.IdpCredentials): ValidationResult {
         val validations = mutableListOf<ValidationResult>()
         validateIsNeitherBlankNorPlaceholder(
             value = credentials.clientId,
@@ -673,7 +676,7 @@ internal class ConfigValidationService(
         )
     }
 
-    fun validateProxySetting(proxyUrl: String): ValidationResult {
+    fun validateProxyUrl(proxyUrl: String): ValidationResult {
         return if (proxyUrl.isNotBlank()) {
             if (!proxyUrl.startsWith("http://") && !proxyUrl.startsWith("https://")) {
                 ValidationResult.Failure(
@@ -692,75 +695,142 @@ internal class ConfigValidationService(
         }
     }
 
-    fun validateConnectorFolders(connector: Connector): ValidationResult {
-        val baseValidation = validateIsAbsoluteDirectory(connector.sourceFolder) +
-                validateIsAbsoluteDirectory(connector.targetFolder) +
-                validateDirectoryIsReadWritable(connector.sourceFolder) +
-                validateDirectoryIsReadWritable(connector.targetFolder)
+    @Suppress("CyclomaticComplexMethod")
+    fun validateConnectorFolders(connector: ConnectorDto): ValidationResult {
+        val baseValidation = validateReadWritableAbsoluteDirectory(connector.sourceFolder) +
+                validateReadWritableAbsoluteDirectory(connector.targetFolder)
 
         // if archiving is enabled and
         //   - the archive directory is an absolute path -> verify the directory is read/writable
-        //   - the archive directory is an absolute path -> return `success` as the relative path will be resolved against the source dir,
+        //   - the archive directory is a relative path -> return `success` as the relative path will be resolved against the source dir,
         //     which we already checked above
         // else we do not care and return `success`
         val archiveValidation: ValidationResult =
             if (connector.sourceArchiveEnabled) {
-                validateReadWritableIfAbsolutePath(connector.sourceArchiveFolder)
+                validateReadWritableIfAbsoluteDirectory(connector.sourceArchiveFolder)
             } else {
                 ValidationResult.Success
             }
 
         // if the error directory is an absolute path -> verify the directory is read/writable
         // else -> return `success` as the relative path will be resolved against the source dir, which we already checked above
-        val errorValidation = validateReadWritableIfAbsolutePath(connector.sourceErrorFolder)
+        val errorValidation = validateReadWritableIfAbsoluteDirectory(connector.sourceErrorFolder)
 
-
+        // if request-response-split is enabled, then all document type specific directories become mandatory,
+        // and they all have to be absolute directories
         val docTypeValidation = connector.docTypeFolders.map { (_, docTypeFolder) ->
-            validateReadWritableIfAbsolutePath(docTypeFolder.sourceFolder) +
-                    validateReadWritableIfAbsolutePath(docTypeFolder.targetFolder) +
-                    validateReadWritableIfAbsolutePath(docTypeFolder.archiveFolder) +
-                    validateReadWritableIfAbsolutePath(docTypeFolder.errorFolder)
+            if (docTypeFolder.requestResponseSplit) {
+                validateReadWritableAbsoluteDirectory(docTypeFolder.sourceFolderResp) +
+                        validateReadWritableAbsoluteDirectory(docTypeFolder.sourceFolderReq) +
+                        validateReadWritableAbsoluteDirectory(docTypeFolder.targetFolderResp) +
+                        validateReadWritableAbsoluteDirectory(docTypeFolder.targetFolderReq) +
+                        validateReadWritableAbsoluteDirectory(docTypeFolder.errorFolder) +
+                        validateReadWritableAbsoluteDirectory(docTypeFolder.archiveFolder)
+            } else {
+                validateReadWritableIfAbsoluteDirectory(docTypeFolder.sourceFolder) +
+                        validateReadWritableIfAbsoluteDirectory(docTypeFolder.targetFolder) +
+                        validateReadWritableIfAbsoluteDirectory(docTypeFolder.archiveFolder) +
+                        validateReadWritableIfAbsoluteDirectory(docTypeFolder.errorFolder)
+            }
         }.fold(initial = ValidationResult.Success) { acc: ValidationResult, result: ValidationResult -> acc + result }
 
-        val allErrorFoldersExist = connector.toCdrClientConfig().getEffectiveErrorFolders().values
+        val allErrorFoldersExist = connector.toCdrClientConfig().effectiveErrorFolders.values
+            .flatten()
             .distinct()
             .fold(initial = ValidationResult.Success) { acc: ValidationResult, errorFolder: Path -> acc + checkPathExists(errorFolder) }
 
-        val allArchiveFoldersExist = connector.toCdrClientConfig().getEffectiveArchiveFolders().values
-            .filterNotNull()
+        val allArchiveFoldersExist = connector.toCdrClientConfig().effectiveArchiveFolders.values
+            .flatten()
             .distinct()
             .fold(initial = ValidationResult.Success) { acc: ValidationResult, archiveFolder: Path -> acc + checkPathExists(archiveFolder) }
 
         return baseValidation + archiveValidation + errorValidation + docTypeValidation + allErrorFoldersExist + allArchiveFoldersExist
     }
 
+    /**
+     * Returns [ValidationResult.Success] if the provided path is
+     * * not null
+     * * absolute
+     * * a directory
+     *
+     * Otherwise returns [ValidationResult.Failure]
+     *
+     * @param path Path string to test
+     * @return [ValidationResult.Success] if the path is absolute and points to a directory
+     */
     @Suppress("NestedBlockDepth")
-    fun validateIsAbsoluteDirectory(path: String): ValidationResult =
-        validatePathString(path).let { pathStringValidation ->
-            when (pathStringValidation) {
-                ValidationResult.Success -> path.let { path: String ->
-                    if (Path.of(path).isAbsolute) {
-                        ValidationResult.Success
-                    } else {
-                        ValidationResult.Failure(
-                            listOf(
-                                ValidationDetail.PathDetail(path = path, messageKey = DIRECTORY_NEEDS_ABSOLUTE_PATH)
-                            )
-                        )
+    fun validateIsAbsoluteDirectory(path: String?): ValidationResult {
+        fun validationError(msgKey: DTOs.ValidationMessageKey) = ValidationResult.Failure(
+            listOf(
+                ValidationDetail.PathDetail(path = path ?: "", messageKey = msgKey)
+            )
+        )
+
+        return when (path) {
+            null -> validationError(NOT_A_DIRECTORY)
+            else ->
+                when (val pathStringValidation = validatePathString(path)) {
+                    is ValidationResult.Success -> {
+                        with(Path.of(path)) {
+                            when (isAbsolute) {
+                                false -> validationError(DIRECTORY_NEEDS_ABSOLUTE_PATH)
+                                true -> when (isDirectory()) {
+                                    false -> validationError(NOT_A_DIRECTORY)
+                                    true -> ValidationResult.Success
+                                }
+                            }
+                        }
                     }
+
+                    is ValidationResult.Failure -> pathStringValidation
                 }
+        }
+    }
 
-                else -> pathStringValidation
-            }
+    /**
+     * Returns [ValidationResult.Success] if the provided path is
+     * * not null
+     * * absolute
+     * * a directory
+     * * read-writable
+     *
+     * Otherwise returns [ValidationResult.Failure]
+     *
+     * @param path Path string to test
+     * @return [ValidationResult.Success] if the path is absolute, points to a directory, which is read-writable
+     * @see validateIsAbsoluteDirectory
+     * @see validateDirectoryIsReadWritable
+     * @see validateReadWritableIfAbsoluteDirectory
+     */
+    fun validateReadWritableAbsoluteDirectory(path: String?): ValidationResult =
+        when (val result = validateIsAbsoluteDirectory(path)) {
+            is ValidationResult.Failure -> result
+            is ValidationResult.Success -> validateDirectoryIsReadWritable(path!!)
         }
 
-    private fun validateReadWritableIfAbsolutePath(path: String?): ValidationResult = path?.let { path: String ->
-        if (validateIsAbsoluteDirectory(path) == ValidationResult.Success) {
-            validateDirectoryIsReadWritable(path)
-        } else {
-            ValidationResult.Success
+    /**
+     * Returns [ValidationResult.Success] if the provided path is either
+     * * null
+     *
+     * or
+     * * not null
+     * * absolute
+     * * a directory
+     * * read-writable
+     *
+     * Otherwise returns [ValidationResult.Failure]
+     *
+     * @param path Path string to test
+     * @return [ValidationResult.Success] if the path is absolute, points to a directory, which is read-writable
+     * @see validateIsAbsoluteDirectory
+     * @see validateDirectoryIsReadWritable
+     * @see validateReadWritableAbsoluteDirectory
+     */
+    fun validateReadWritableIfAbsoluteDirectory(path: String?): ValidationResult =
+        when (validateIsAbsoluteDirectory(path)) {
+            is ValidationResult.Failure -> ValidationResult.Success // Not a path at all or a relative path -> treat as success
+            is ValidationResult.Success -> validateDirectoryIsReadWritable(path!!)
         }
-    } ?: ValidationResult.Success
 
     companion object {
         private const val PLACEHOLDER_VALUE = "value-required"

@@ -1,6 +1,8 @@
 package com.swisscom.health.des.cdr.client.ui
 
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector as ConnectorDto
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
@@ -52,7 +54,7 @@ class CdrConfigViewRemoteValidationsTest {
             )
         } returns CdrClientApiClient.Result.Success<DTOs.ValidationResult>(DTOs.ValidationResult.Success)
 
-        val config = DTOs.CdrClientConfig.EMPTY
+        val config = CdrClientConfigDto.EMPTY
         val result = sut.validateDirectory(config, "/tmp/somewhere", DomainObjects.ConfigurationItem.LOCAL_DIRECTORY)
 
         assertEquals(DTOs.ValidationResult.Success, result)
@@ -70,7 +72,7 @@ class CdrConfigViewRemoteValidationsTest {
             )
         } returns CdrClientApiClient.Result.Success<DTOs.ValidationResult>(DTOs.ValidationResult.Failure(listOf(detail)))
 
-        val config = DTOs.CdrClientConfig.EMPTY
+        val config = CdrClientConfigDto.EMPTY
         val result = sut.validateDirectory(config, path, DomainObjects.ConfigurationItem.LOCAL_DIRECTORY)
 
         assertEquals(DTOs.ValidationResult.Failure(listOf(detail)), result)
@@ -89,7 +91,7 @@ class CdrConfigViewRemoteValidationsTest {
             )
         } returns CdrClientApiClient.Result.Success<DTOs.ValidationResult>(DTOs.ValidationResult.Failure(listOf(detail)))
 
-        val config = DTOs.CdrClientConfig.EMPTY
+        val config = CdrClientConfigDto.EMPTY
         val result = sut.validateDirectory(config, path, DomainObjects.ConfigurationItem.LOCAL_DIRECTORY)
 
         assertEquals(DTOs.ValidationResult.Success, result)
@@ -110,7 +112,7 @@ class CdrConfigViewRemoteValidationsTest {
             )
         } returns CdrClientApiClient.Result.Success<DTOs.ValidationResult>(DTOs.ValidationResult.Failure(listOf(connectorDetail)))
 
-        val config = DTOs.CdrClientConfig.EMPTY.copy(customer = listOf(DTOs.CdrClientConfig.Connector.EMPTY.copy(connectorId = connectorId)))
+        val config = CdrClientConfigDto.EMPTY.copy(customer = listOf(ConnectorDto.EMPTY.copy(connectorId = connectorId)))
 
         val result = sut.validateConnectorMode(connectorId, config, DomainObjects.ConfigurationItem.CONNECTOR_MODE)
 
@@ -133,7 +135,7 @@ class CdrConfigViewRemoteValidationsTest {
             )
         } returns CdrClientApiClient.Result.Success<DTOs.ValidationResult>(DTOs.ValidationResult.Failure(listOf(connectorDetail)))
 
-        val config = DTOs.CdrClientConfig.EMPTY.copy(customer = listOf(DTOs.CdrClientConfig.Connector.EMPTY.copy(connectorId = connectorId)))
+        val config = CdrClientConfigDto.EMPTY.copy(customer = listOf(ConnectorDto.EMPTY.copy(connectorId = connectorId)))
 
         val result = sut.validateConnectorMode(connectorId, config, DomainObjects.ConfigurationItem.CONNECTOR_MODE)
 
@@ -142,10 +144,10 @@ class CdrConfigViewRemoteValidationsTest {
 
     @Test
     fun `validateProxyUrl returns Success when API returns Success`() = runBlocking {
-        coEvery { apiClient.validateProxy(any(), any()) } returns CdrClientApiClient.Result.Success<DTOs.ValidationResult>(DTOs.ValidationResult.Success)
+        coEvery { apiClient.validateProxyUrl(any<String>()) } returns CdrClientApiClient.Result.Success<DTOs.ValidationResult>(DTOs.ValidationResult.Success)
 
-        val config = DTOs.CdrClientConfig.EMPTY
-        val result = sut.validateProxyUrl(config)
+        val config = CdrClientConfigDto.EMPTY
+        val result = sut.validateProxyUrl(config.proxyConfig.url)
 
         assertEquals(DTOs.ValidationResult.Success, result)
     }
@@ -156,7 +158,7 @@ class CdrConfigViewRemoteValidationsTest {
             configItem = DomainObjects.ConfigurationItem.PROXY_URL,
             messageKey = ValidationMessageKey.PROXY_URL_INVALID_FORMAT
         )
-        coEvery { apiClient.validateProxy(any(), any()) } returns CdrClientApiClient.Result.Success<DTOs.ValidationResult>(
+        coEvery { apiClient.validateProxyUrl(any<String>()) } returns CdrClientApiClient.Result.Success<DTOs.ValidationResult>(
             DTOs.ValidationResult.Failure(
                 listOf(
                     detail
@@ -164,8 +166,8 @@ class CdrConfigViewRemoteValidationsTest {
             )
         )
 
-        val config = DTOs.CdrClientConfig.EMPTY
-        val result = sut.validateProxyUrl(config)
+        val config = CdrClientConfigDto.EMPTY
+        val result = sut.validateProxyUrl(config.proxyConfig.url)
 
         assertEquals(DTOs.ValidationResult.Failure(listOf(detail)), result)
     }

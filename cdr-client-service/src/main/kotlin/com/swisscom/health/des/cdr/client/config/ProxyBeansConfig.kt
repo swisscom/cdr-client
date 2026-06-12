@@ -47,7 +47,7 @@ internal class ProxyBeansConfig {
                 logger.debug { "Proxy URL is blank in configuration" }
                 null
             }
-            configValidationService.validateProxySetting(proxyConfig.url.value) is DTOs.ValidationResult.Failure -> {
+            configValidationService.validateProxyUrl(proxyConfig.url.value) is DTOs.ValidationResult.Failure -> {
                 val safe = sanitizeUrlForLogging(proxyConfig.url.value)
                 logger.error { "Invalid proxy URL '$safe': must start with http:// or https://" }
                 null

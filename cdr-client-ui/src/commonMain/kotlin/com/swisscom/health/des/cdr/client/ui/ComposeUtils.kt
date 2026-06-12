@@ -30,6 +30,7 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -129,7 +130,7 @@ internal fun NamedSectionDivider(
     text: String,
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.titleSmall,
-    fontWeight: FontWeight = FontWeight.Bold,
+    fontWeight: FontWeight = FontWeight.Normal,
 ) {
     Text(
         text = text,
@@ -273,6 +274,8 @@ internal fun CollapsibleGroup(
     containerColor: Color = MaterialTheme.colorScheme.background,
     modifier: Modifier,
     title: String,
+    style: TextStyle = MaterialTheme.typography.titleMedium,
+    fontWeight: FontWeight = FontWeight.Normal,
     initiallyExpanded: Boolean = false,
     content: @Composable (containerColor: Color) -> Unit,
 ) {
@@ -284,7 +287,11 @@ internal fun CollapsibleGroup(
             Res.drawable.arrow_drop_down_24dp_000000_FILL0_wght400_GRAD0_opsz24
 
     Row(modifier = modifier.padding(16.dp)) {
-        Text(text = title, fontWeight = FontWeight.Bold)
+        Text(
+            text = title,
+            fontWeight = fontWeight,
+            style = style,
+        )
         Spacer(Modifier.weight(1f))
         Icon(
             painter = painterResource(icon),
@@ -339,6 +346,36 @@ internal fun ValidatedTextField(
 }
 
 @Composable
+internal fun AsyncValidatedTextField(
+    modifier: Modifier,
+    name: DomainObjects.ConfigurationItem,
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: @Composable (() -> Unit)? = null,
+    placeHolder: @Composable (() -> Unit)? = null,
+    asyncValidation: suspend () -> DTOs.ValidationResult,
+    revalidationKey: Any?,
+    enabled: Boolean,
+) {
+    var validationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
+
+    LaunchedEffect(revalidationKey) {
+        validationResult = asyncValidation.invoke()
+    }
+
+    ValidatedTextField(
+        name = name,
+        modifier = modifier,
+        validatable = { validationResult },
+        label = label,
+        value = value,
+        placeHolder = placeHolder,
+        onValueChange = onValueChange,
+        enabled = enabled,
+    )
+}
+
+@Composable
 internal fun DisabledTextField(
     name: DomainObjects.ConfigurationItem,
     modifier: Modifier,
@@ -358,7 +395,6 @@ internal fun DisabledTextField(
         logger.trace { "text field has been (re-)composed - field '$name'" }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

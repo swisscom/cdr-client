@@ -5,6 +5,8 @@ package com.swisscom.health.des.cdr.client.handler
 import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ApiEndpoint
 import com.swisscom.health.des.cdr.client.config.CdrApi
@@ -29,7 +31,6 @@ import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.config.toDto
-import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
@@ -491,8 +492,8 @@ internal class ConfigValidationServiceTest {
     @Test
     fun `validateModeValue should return Success when all connectors have valid modes`() {
         val connectors = listOf(
-            createConnector("connector1", DTOs.CdrClientConfig.Mode.TEST),
-            createConnector("connector2", DTOs.CdrClientConfig.Mode.PRODUCTION)
+            createConnector("connector1", CdrClientConfigDto.Mode.TEST),
+            createConnector("connector2", CdrClientConfigDto.Mode.PRODUCTION)
         )
 
         val result = configValidationService.validateModeValue(connectors)
@@ -502,8 +503,8 @@ internal class ConfigValidationServiceTest {
     @Test
     fun `validateModeValue should return Failure when at least one connector has invalid mode`() {
         val connectors = listOf(
-            createConnector("connector1", DTOs.CdrClientConfig.Mode.TEST),
-            createConnector("connector2", DTOs.CdrClientConfig.Mode.NONE)
+            createConnector("connector1", CdrClientConfigDto.Mode.TEST),
+            createConnector("connector2", CdrClientConfigDto.Mode.NONE)
         )
 
         val result = configValidationService.validateModeValue(connectors)
@@ -631,7 +632,7 @@ internal class ConfigValidationServiceTest {
         Files.createDirectories(absInvoiceArchiveDir, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("r-x------")))
         Files.createDirectories(absInvoiceErrorDir, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("r-x------")))
 
-        val connector = DTOs.CdrClientConfig.Connector(
+        val connector = CdrClientConfigDto.Connector(
             connectorId = "connectorId",
             targetFolder = absTargetDir.toString(),
             sourceFolder = absSourceDir.toString(),
@@ -639,9 +640,9 @@ internal class ConfigValidationServiceTest {
             sourceArchiveEnabled = true,
             sourceArchiveFolder = absArchiveDir.toString(),
             sourceErrorFolder = absErrorDir.toString(),
-            mode = DTOs.CdrClientConfig.Mode.TEST,
+            mode = CdrClientConfigDto.Mode.TEST,
             docTypeFolders = mapOf(
-                DTOs.CdrClientConfig.DocumentType.INVOICE to DTOs.CdrClientConfig.Connector.DocTypeFolders(
+                DocumentType.INVOICE to CdrClientConfigDto.Connector.DocTypeFolders(
                     sourceFolder = absInvoiceSourceDir.toString(),
                     targetFolder = absInvoiceTargetDir.toString(),
                     archiveFolder = absInvoiceArchiveDir.toString(),
@@ -748,7 +749,7 @@ internal class ConfigValidationServiceTest {
         val tempTargetDir = Files.createTempDirectory("testTargetDir")
         try {
             // Create connector with valid paths
-            val connector: DTOs.CdrClientConfig.Connector = Connector(
+            val connector: CdrClientConfigDto.Connector = Connector(
                 connectorId = ConnectorId("test-connector"),
                 sourceFolder = tempSourceDir,
                 targetFolder = tempTargetDir,
@@ -961,8 +962,8 @@ internal class ConfigValidationServiceTest {
         )
     }
 
-    private fun createConnector(connectorId: String, mode: DTOs.CdrClientConfig.Mode = DTOs.CdrClientConfig.Mode.TEST): DTOs.CdrClientConfig.Connector =
-        DTOs.CdrClientConfig.Connector(
+    private fun createConnector(connectorId: String, mode: CdrClientConfigDto.Mode = CdrClientConfigDto.Mode.TEST): CdrClientConfigDto.Connector =
+        CdrClientConfigDto.Connector(
             connectorId = connectorId,
             sourceFolder = "/path/to/source",
             targetFolder = "/path/to/target",

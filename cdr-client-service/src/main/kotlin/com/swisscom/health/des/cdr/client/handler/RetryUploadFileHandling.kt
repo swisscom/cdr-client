@@ -5,9 +5,11 @@ import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSIO
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.getConnectorBySourceFolder
+import com.swisscom.health.des.cdr.client.config.getDailyEffectiveSourceArchiveFolder
+import com.swisscom.health.des.cdr.client.config.getEffectiveSourceErrorFolder
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentResult
 import com.swisscom.health.des.cdr.client.scheduling.BaseUploadScheduler.Companion.EXTENSION_XML
-import com.swisscom.health.des.cdr.client.xml.DocumentType
+import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Tracer
 import kotlinx.coroutines.CancellationException
@@ -48,7 +50,7 @@ internal class RetryUploadFileHandling(
      * Retries the upload of a file until it is successful or a 4xx error occurred.
      */
     @Suppress("NestedBlockDepth", "LongMethod", "CyclomaticComplexMethod")
-    suspend fun uploadRetrying(file: Path, docType: DocumentType, connector: Connector) {
+    suspend fun uploadRetrying(file: Path, docMeta: DocumentMetaData, connector: Connector) {
         logger.debug { "Uploading file '$file'" }
         var retryCount = 0
         var retryNeeded: Boolean
@@ -74,7 +76,7 @@ internal class RetryUploadFileHandling(
                 retryNeeded = when (response) {
                     is UploadDocumentResult.Success -> {
                         logger.debug { "File '${uploadFile.fileName}' successfully synchronized." }
-                        deleteOrArchiveFile(uploadFile, docType)
+                        deleteOrArchiveFile(uploadFile, docMeta)
                         false
                     }
 
@@ -100,7 +102,7 @@ internal class RetryUploadFileHandling(
                             "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
                                     "No retry will be attempted and the file will be moved to the error directory due to client-side issue."
                         }
-                        renameFileToErrorAndCreateLogFile(uploadFile, docType, response.responseBody)
+                        renameFileToErrorAndCreateLogFile(uploadFile, docMeta, response.responseBody)
                         false
                     }
 
@@ -158,7 +160,7 @@ internal class RetryUploadFileHandling(
         )
     }
 
-    private fun deleteOrArchiveFile(file: Path, docType: DocumentType): Unit = runCatching {
+    private fun deleteOrArchiveFile(file: Path, docType: DocumentMetaData): Unit = runCatching {
         cdrClientConfig.customer.getConnectorBySourceFolder(file, docType).let { connector ->
             connector.getDailyEffectiveSourceArchiveFolder(docType)?.let { archiveDir ->
                 file.moveTo(
@@ -187,9 +189,9 @@ internal class RetryUploadFileHandling(
      * For an error case, adds a UUID to the filename and creates a file with the response body with file extension '.response'.
      * If the filename already contains at least two UUIDs, replaces all but the first UUID with a new one to prevent excessively long filenames.
      */
-    private fun renameFileToErrorAndCreateLogFile(file: Path, docType: DocumentType, responseBody: String): Unit = runCatching {
+    private fun renameFileToErrorAndCreateLogFile(file: Path, docMeta: DocumentMetaData, responseBody: String): Unit = runCatching {
         val newBaseName = getBaseNameWithSingleOrNewUuid(file.nameWithoutExtension)
-        val errorFolder = cdrClientConfig.customer.getConnectorBySourceFolder(file, docType).getEffectiveSourceErrorFolder(docType)
+        val errorFolder = cdrClientConfig.customer.getConnectorBySourceFolder(file, docMeta).getEffectiveSourceErrorFolder(docMeta)
         val errorFile = errorFolder.resolve("$newBaseName.$EXTENSION_XML")
         val logFile = errorFolder.resolve("$newBaseName.response")
         file.moveTo(errorFile)

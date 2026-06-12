@@ -2,12 +2,11 @@ package com.swisscom.health.des.cdr.client.config
 
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
-import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Mode
-import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.annotation.PostConstruct
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.util.unit.DataSize
 import java.net.URL
@@ -15,12 +14,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import kotlin.io.path.absolute
-import kotlin.io.path.createDirectories
-import kotlin.io.path.isDirectory
 
 private val logger = KotlinLogging.logger {}
 
@@ -96,6 +90,12 @@ internal data class CdrClientConfig(
 
     private companion object {
         private const val PROPERTY_NAME = "client"
+    }
+
+    @Suppress("UnusedPrivateMember")
+    @PostConstruct
+    private fun logConfig() {
+        logger.info { "$this" }
     }
 
     data class RetryTemplateConfig(
@@ -191,160 +191,23 @@ internal data class Connector(
      */
     val docTypeFolders: Map<DocumentType, DocTypeFolders>? = null,
 ) : PropertyNameAware {
-
-    val effectiveDocTypeFolders: Map<DocumentType, DocTypeFolders>
-        @JsonIgnore
-        get() = docTypeFolders ?: emptyMap()
-
     override val propertyName: String
         get() = PROPERTY_NAME
 
-    @JsonIgnore
-    fun getEffectiveSourceFolders(): Map<DocumentType, Path> = DocumentType.entries.associateWith { getEffectiveSourceFolder(it) }
-
-    @JsonIgnore
-    fun getEffectiveSourceFolder(docType: DocumentType): Path =
-        effectiveDocTypeFolders[docType]?.sourceFolder?.let { docTypeSourceFolder ->
-            when (docTypeSourceFolder.isAbsolute) {
-                true -> docTypeSourceFolder
-                else -> sourceFolder.resolve(docTypeSourceFolder)
-            }
-        }
-            ?: sourceFolder
-
-    @JsonIgnore
-    fun getEffectiveTargetFolders(): Map<DocumentType, Path> = DocumentType.entries.associateWith { getEffectiveTargetFolder(it) }
-
-    @JsonIgnore
-    fun getEffectiveTargetFolder(docType: DocumentType): Path =
-        effectiveDocTypeFolders[docType]?.targetFolder?.let { docTypeTargetFolder ->
-            when (docTypeTargetFolder.isAbsolute) {
-                true -> docTypeTargetFolder
-                else -> targetFolder.resolve(docTypeTargetFolder)
-            }
-        }
-            ?: targetFolder
-
-    @JsonIgnore
-    fun getEffectiveArchiveFolders(): Map<DocumentType, Path?> = DocumentType.entries.associateWith { getEffectiveSourceArchiveFolder(it) }
-
-    /**
-     * If...
-     * * [sourceArchiveEnabled] is `true` and
-     *   * the doc type specific archive folder is a relative path, then it is resolved against effective doc type specific source folder
-     *   * the doc type specific archive folder is an absolute path, then it is returned as is
-     *   * the doc type specific archive folder is not set, then the base archive folder is returned
-     * * [sourceArchiveEnabled] is `false`, then `null` is returned
-     *
-     * @see sourceArchiveEnabled
-     * @see sourceArchiveFolder
-     * @return the potentially document type specific archive path as an absolute path
-     */
-    @JsonIgnore
-    fun getEffectiveSourceArchiveFolder(docType: DocumentType): Path? =
-        if (sourceArchiveEnabled) {
-            when (val docTypeArchiveFolder = effectiveDocTypeFolders[docType]?.archiveFolder) {
-                null -> {
-                    if (getEffectiveSourceFolder(docType) == sourceFolder) {
-                        getBaseSourceArchiveFolder() // no doc type specific source dir -> use base archive dir
-                    } else {
-                        getEffectiveSourceFolder(docType).resolve(ARCHIVE_DIR_NAME) //
-                    }
-                }
-
-                else -> when (docTypeArchiveFolder.isAbsolute) {
-                    true -> docTypeArchiveFolder
-                    false -> getEffectiveSourceFolder(docType).resolve(docTypeArchiveFolder)
-                }
-            } ?: getBaseSourceArchiveFolder()
-        } else {
-            null
-        }
-
-    fun getDailyEffectiveSourceArchiveFolder(docType: DocumentType): Path? =
-        getEffectiveSourceArchiveFolder(docType)?.let { archiveRootFolder: Path ->
-            runCatching {
-                archiveRootFolder.resolve(getDateNow()).createDirectories()
-            }.getOrElse { t ->
-                logger.warn { "Failed to create daily archive folder ${archiveRootFolder.resolve(getDateNow())}: $t" }
-                archiveRootFolder // fallback to non-daily folder if creation of daily folder fails
-            }
-        }
-
-    /**
-     * Returns the source archive folder as an absolute path; if no explicit archive folder config was set,
-     * the archive folder is created as a [ARCHIVE_DIR_NAME] subdirectory of [sourceFolder].
-     */
-    @JsonIgnore
-    private fun getBaseSourceArchiveFolder(): Path? =
-        if (sourceArchiveEnabled) {
-            when (sourceArchiveFolder) {
-                null -> sourceFolder.resolve(ARCHIVE_DIR_NAME)
-                sourceFolder -> sourceFolder.resolve(ARCHIVE_DIR_NAME)
-                else -> sourceFolder.resolve(sourceArchiveFolder)
-            }.absolute()
-        } else {
-            null
-        }
-
-    private fun getDateNow(): String = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
-
-    @JsonIgnore
-    fun getEffectiveErrorFolders(): Map<DocumentType, Path> = DocumentType.entries.associateWith { getEffectiveSourceErrorFolder(it) }
-
-    /**
-     * Returns the effective source error folder.
-     *
-     * If ...
-     * * the doc type specific error folder is a relative path, then it is resolved against the doc type specific source folder;
-     *   if the source folder is not set an exception is raised
-     * * the doc type specific error folder is an absolute path, it is returned as is
-     * * the doc type specific error folder is not set, then the base error folder is returned
-     *
-     * The effective error folder is returned as an absolute path.
-     *
-     * @see sourceErrorFolder
-     * @see sourceFolder
-     *
-     * @return the computed, document type specific error folder as an absolute path
-     */
-    @JsonIgnore
-    fun getEffectiveSourceErrorFolder(docType: DocumentType): Path =
-        when (val docTypeErrorFolder = effectiveDocTypeFolders[docType]?.errorFolder) {
-            null -> {
-                if (getEffectiveSourceFolder(docType) == sourceFolder) {
-                    getBaseSourceErrorFolder() // no doc type specific source dir -> use base errir dir
-                } else {
-                    getEffectiveSourceFolder(docType).resolve(ERROR_DIR_NAME) //
-                }
-            }
-
-            else -> when (docTypeErrorFolder.isAbsolute) {
-                true -> docTypeErrorFolder
-                false -> getEffectiveSourceFolder(docType).resolve(docTypeErrorFolder)
-            }
-        }
-
-    /**
-     * Returns the source error folder as an absolute path; if no explicit error folder config was set,
-     * the default error folder is a subdirectory of [sourceFolder].
-     */
-    @JsonIgnore
-    private fun getBaseSourceErrorFolder(): Path =
-        when (sourceErrorFolder) {
-            null -> sourceFolder.resolve(ERROR_DIR_NAME)
-            sourceFolder -> sourceFolder.resolve(ERROR_DIR_NAME)
-            else -> sourceFolder.resolve(sourceErrorFolder)
-        }.absolute()
-
     override fun toString(): String {
+        val effectiveSourceFoldersByPath = effectiveSourceFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
+            .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+        val effectiveTargetFoldersByPath = effectiveTargetFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
+            .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+        val effectiveArchiveFoldersByPath = effectiveArchiveFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
+            .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+        val effectiveErrorFoldersByPath = effectiveErrorFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
+            .groupBy(keySelector = { it.first }, valueTransform = { it.second })
         return "Connector(connectorId='$connectorId', baseTargetFolder=$targetFolder, baseSourceFolder=$sourceFolder, " +
-                "sourceFolders=${getEffectiveSourceFolders()}, " +
-                "targetFolders=${getEffectiveTargetFolders()}" +
+                "sourceFolders=${effectiveSourceFoldersByPath}, targetFolders=${effectiveTargetFoldersByPath}, " +
                 "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
-                "baseSourceArchiveFolder=${getBaseSourceArchiveFolder()}, " +
-                "archiveFolders=${getEffectiveArchiveFolders()}" +
-                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${getBaseSourceErrorFolder()}, errorFolders=${getEffectiveErrorFolders()} " +
+                "baseSourceArchiveFolder=${baseSourceArchiveFolder}, archiveFolders=${effectiveArchiveFoldersByPath}, " +
+                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${baseSourceErrorFolder}, errorFolders=${effectiveErrorFoldersByPath}, " +
                 "mode=$mode)"
     }
 
@@ -352,13 +215,87 @@ internal data class Connector(
      * Specified directories for a specific document type (e.g., Invoice). Can be absolute or relative (to the [Connector.sourceFolder]) paths.
      */
     data class DocTypeFolders(
+        /** Whether separate source/target (upload/download) directories for request and response documents should be used. */
+        val requestResponseSplit: Boolean = false,
+        /**
+         * Document type specific source (upload) directory to be used if request/response split is not enabled.
+         * The source directory is optional. If not provided the base source directory is used for this document
+         * type. If provided, it may be a relative path and if it is relative, it gets resolved against the base
+         * source directory.
+         */
         val sourceFolder: Path? = null,
-        val archiveFolder: Path? = null,
-        val errorFolder: Path? = null,
+        /**
+         * Document type specific source (upload) directory for request documents to be used if request/response
+         * split is enabled. For request/response split, this source directory is mandatory, and it has to be an
+         * absolute path.
+         *
+         * Technically the distinction of request and response document upload directories is meaningless as the
+         * client uploads any XML document it finds in any source directory. In general, not limited to the
+         * document type specific configuration case, the source could be an arbitrarily long list of directories
+         * that get scanned for XML documents. But right now it is not implemented this way for simplicity/symmetry
+         * reasons.
+         */
+        val sourceFolderReq: Path? = null,
+        /**
+         * Document type specific source (upload) directory for response documents to be used if request/response
+         * split is enabled. For request/response split, this source directory is mandatory, and it has to be an
+         * absolute path.
+         *
+         * Technically the distinction of request and response document upload directories is meaningless as the
+         * client uploads any XML document it finds in any source directory. In general, not limited to the
+         * document type specific configuration case, the source could be an arbitrarily long list of directories
+         * that get scanned for XML documents. But right now it is not implemented this way for simplicity/symmetry
+         * reasons.
+         */
+        val sourceFolderResp: Path? = null,
+        /**
+         * Document type specific target (upload) directory to be used if request/response split is not enabled.
+         * The target directory is optional. If not provided the base target directory is used for this document
+         * type. If provided, it may be a relative path and if it is relative, it gets resolved against the base
+         * target directory.
+         */
         val targetFolder: Path? = null,
+        /**
+         * Document type specific target (upload) directory for request documents to be used if request/response
+         * split is enabled. For request/response split, this target directory is mandatory, and it has to be an
+         * absolute path.
+         */
+        val targetFolderReq: Path? = null,
+        /**
+         * Document type specific target (upload) directory for response documents to be used if request/response
+         * split is enabled. For request/response split, this target directory is mandatory, and it has to be an
+         * absolute path.
+         */
+        val targetFolderResp: Path? = null,
+        /**
+         * Document type specific archive directory. Successfully uploaded documents are moved there.
+         *
+         * If request/response split is not enabled, providing it is optional. If not provided the base archive
+         * directory is used for this document type. If provided, it may be a relative path and if it is relative,
+         * it gets resolved against the base source directory.
+         *
+         * If request/response split is enabled, then this archive directory is mandatory, and it has to be an
+         * absolute path.
+         */
+        val archiveFolder: Path? = null,
+        /**
+         * Document type specific error directory. Documents that failed to upload are moved there.
+         *
+         * If request/response split is not enabled, providing it is optional. If not provided the base error
+         * directory is used for this document type. If provided, it may be a relative path and if it is relative,
+         * it gets resolved against the base source directory.
+         *
+         * If request/response split is enabled, then this archive directory is mandatory, and it has to be an
+         * absolute path.
+         */
+        val errorFolder: Path? = null,
     )
 
     companion object {
+        // blank on purpose; the connector instances are contained in a list and are addressed
+        // by their index in the list, not by a property name; at the same time the class has
+        // to implement the `PropertyNameAware` interface so the `ConfigurationWriter` keeps
+        // traversing the object tree contained in the connector instances
         private const val PROPERTY_NAME = ""
 
         @JvmStatic
@@ -401,7 +338,7 @@ internal interface Endpoint {
     val basePath: String
 }
 
-// Spring fails to assign the endpoint instances with an "object is not of declared type" error if the classes are declared inside the Endpoint interface
+// Spring fails to assign instances with an "object is not of declared type" error if the classes are declared inside an interface
 internal data class CdrApi(
     override val scheme: String,
     override val host: Host,
@@ -416,6 +353,7 @@ internal data class CdrApi(
     }
 }
 
+// Spring fails to assign instances with an "object is not of declared type" error if the classes are declared inside an interface
 internal data class CredentialApi(
     override val scheme: String,
     override val host: Host,
@@ -445,11 +383,6 @@ internal data class ProxyConfig(
         private const val PROPERTY_NAME = "proxy-config"
     }
 }
-
-internal data class ProxyCredentials(
-    val username: ProxyUsername,
-    val password: ProxyPassword,
-)
 
 @Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
 internal data class Customer(
@@ -738,11 +671,3 @@ private const val MASKED_VALUE = "*********"
 private const val MASK_CHAR = '*'
 
 private fun String.isAllAsterisks(): Boolean = isNotEmpty() && all { it == MASK_CHAR }
-
-internal fun List<Connector>.getConnectorBySourceFolder(file: Path, docType: DocumentType): Connector =
-    when (file.isDirectory()) {
-        true -> file
-        false -> file.parent
-    }.let { dir ->
-        this.first { it.getEffectiveSourceFolder(docType) == dir }
-    }

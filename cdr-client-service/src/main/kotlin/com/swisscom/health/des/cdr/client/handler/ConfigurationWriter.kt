@@ -116,7 +116,7 @@ internal class ConfigurationWriter(
      */
     fun updateClientServiceConfiguration(newConfig: CdrClientConfig): UpdateResult = runCatching {
         logger.trace { "New CDR client config: '$newConfig'" }
-
+        configValidationService.createErrorAndArchiveFolders(newConfig)
         validate(newConfig).let { validationErrors: Map<String, Any> ->
             if (validationErrors.isNotEmpty()) {
                 UpdateResult.Failure(validationErrors)
