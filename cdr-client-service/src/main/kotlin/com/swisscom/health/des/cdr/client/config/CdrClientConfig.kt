@@ -114,7 +114,8 @@ internal data class CdrClientConfig(
 
     enum class Mode(val value: String) {
         TEST("test"),
-        PRODUCTION("production")
+        PRODUCTION("production"),
+        NONE("none")
     }
 
     enum class FileBusyTestStrategy {
