@@ -17,6 +17,7 @@ import java.nio.file.StandardOpenOption.WRITE
 import java.time.Duration
 import kotlin.io.path.createFile
 import kotlin.io.path.writeText
+import kotlin.time.Duration.Companion.milliseconds
 
 internal class FileBusyTesterTest {
 
@@ -39,16 +40,16 @@ internal class FileBusyTesterTest {
         val writeFileJob = launch {
             while (true) {
                 file.writeText("a", UTF_8, WRITE, APPEND)
-                delay(10L)
+                delay(10L.milliseconds)
             }
         }
 
         assertTrue(tester.isBusy(file))
-        delay(100L)
+        delay(100L.milliseconds)
         assertTrue(tester.isBusy(file))
-        delay(100L)
+        delay(100L.milliseconds)
         assertTrue(tester.isBusy(file))
-        delay(100L)
+        delay(100L.milliseconds)
         assertTrue(tester.isBusy(file))
 
         writeFileJob.cancelAndJoin()

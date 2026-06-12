@@ -89,7 +89,7 @@ internal class EventTriggerUploadScheduler(
 ) {
 
     @PostConstruct
-    @Suppress("unused", "NestedBlockDepth", "TooGenericExceptionCaught")
+    @Suppress("UnusedPrivateMember", "NestedBlockDepth", "TooGenericExceptionCaught")
     private fun failIfTelemetrySamplingIsEnabled() {
         if (samplerProbability > ZERO_SAMPLING_THRESHOLD) {
             logger.error {
@@ -243,7 +243,7 @@ internal class PollingUploadScheduler(
 ) {
 
     @PostConstruct
-    @Suppress("unused")
+    @Suppress("UnusedPrivateMember")
     private fun failIfTelemetrySamplingIsEnabled() {
         if (samplerProbability > ZERO_SAMPLING_THRESHOLD) {
             logger.error {

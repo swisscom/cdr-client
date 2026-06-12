@@ -32,7 +32,7 @@ internal class ClientSecretRenewalScheduler(
     private val tracer: Tracer,
 ) {
 
-    @Suppress("unused")
+    @Suppress("UnusedPrivateMember")
     @PostConstruct
     private fun reportIn() = logger.info { "Automatic client secret renewal is active!" }
 

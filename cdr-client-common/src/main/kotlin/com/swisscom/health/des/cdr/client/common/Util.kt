@@ -25,10 +25,10 @@ tailrec fun escalatingFind(fileName: String, startDir: Path): List<Path> {
             startDir.walk().filter { it.name == fileName }.toList()
 
         }
-    if (found.isNotEmpty()) {
-        return found
+    return if (found.isNotEmpty()) {
+        found
     } else {
-        return escalatingFind(fileName, startDir.parent)
+        escalatingFind(fileName, startDir.parent)
     }
 }
 

@@ -195,19 +195,14 @@ internal data class Connector(
         get() = PROPERTY_NAME
 
     override fun toString(): String {
-        val effectiveSourceFoldersByPath = effectiveSourceFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
-            .groupBy(keySelector = { it.first }, valueTransform = { it.second })
-        val effectiveTargetFoldersByPath = effectiveTargetFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
-            .groupBy(keySelector = { it.first }, valueTransform = { it.second })
-        val effectiveArchiveFoldersByPath = effectiveArchiveFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
-            .groupBy(keySelector = { it.first }, valueTransform = { it.second })
-        val effectiveErrorFoldersByPath = effectiveErrorFolders.flatMap { (docType, paths) -> paths.map { path -> path to docType } }
+        fun invert(inMap: Map<DocumentType, List<Path>>): Map<Path, List<DocumentType>> = inMap
+            .flatMap { (docType, paths) -> paths.map { path -> path to docType } }
             .groupBy(keySelector = { it.first }, valueTransform = { it.second })
         return "Connector(connectorId='$connectorId', baseTargetFolder=$targetFolder, baseSourceFolder=$sourceFolder, " +
-                "sourceFolders=${effectiveSourceFoldersByPath}, targetFolders=${effectiveTargetFoldersByPath}, " +
+                "sourceFolders=${invert(effectiveSourceFolders)}, targetFolders=${invert(effectiveTargetFolders)}, " +
                 "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
-                "baseSourceArchiveFolder=${baseSourceArchiveFolder}, archiveFolders=${effectiveArchiveFoldersByPath}, " +
-                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${baseSourceErrorFolder}, errorFolders=${effectiveErrorFoldersByPath}, " +
+                "baseSourceArchiveFolder=${baseSourceArchiveFolder}, archiveFolders=${invert(effectiveArchiveFolders)}, " +
+                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${baseSourceErrorFolder}, errorFolders=${ invert(effectiveErrorFolders)}, " +
                 "mode=$mode)"
     }
 
@@ -297,19 +292,6 @@ internal data class Connector(
         // to implement the `PropertyNameAware` interface so the `ConfigurationWriter` keeps
         // traversing the object tree contained in the connector instances
         private const val PROPERTY_NAME = ""
-
-        @JvmStatic
-        val EMPTY = Connector(
-            connectorId = ConnectorId(EMPTY_STRING),
-            targetFolder = Paths.get(EMPTY_STRING),
-            sourceFolder = Paths.get(EMPTY_STRING),
-            contentType = EMPTY_STRING,
-            sourceArchiveEnabled = false,
-            sourceArchiveFolder = null,
-            sourceErrorFolder = null,
-            mode = Mode.TEST,
-            docTypeFolders = emptyMap(),
-        )
     }
 }
 
