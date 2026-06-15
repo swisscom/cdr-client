@@ -56,11 +56,28 @@ steps:
       fi
     displayName: 'Download and Extract Conveyor'
 
+  - script: |
+      echo "binSwisscomUsername=$(gradle-username)" >> $(System.DefaultWorkingDirectory)/gradle.properties
+      echo "binSwisscomPassword=$(gradle-password)" >> $(System.DefaultWorkingDirectory)/gradle.properties
+      echo "binSwisscomSnapshotsUsername=$(gradle-username)" >> $(System.DefaultWorkingDirectory)/gradle.properties
+      echo "binSwisscomSnapshotsPassword=$(gradle-password)" >> $(System.DefaultWorkingDirectory)/gradle.properties
+      echo "binSwisscomReleaseUsername=$(gradle-username)" >> $(System.DefaultWorkingDirectory)/gradle.properties
+      echo "binSwisscomReleasePassword=$(gradle-password)" >> $(System.DefaultWorkingDirectory)/gradle.properties
+    displayName: 'Write Artifactory username and password to gradle.properties'
+
   - task: Gradle@3
     displayName: 'build application'
     inputs:
       gradleWrapperFile: 'gradlew'
       tasks: 'cleanAll buildAll -x test'
+      publishJUnitResults: false
+      javaHomeOption: 'JDKVersion'
+
+  - task: Gradle@3
+    displayName: 'publish cdr-client-service uber-jar to Maven repository'
+    inputs:
+      gradleWrapperFile: 'gradlew'
+      tasks: ':cdr-client-service:publish'
       publishJUnitResults: false
       javaHomeOption: 'JDKVersion'
 
@@ -282,4 +299,3 @@ steps:
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: 'az storage blob upload-batch -s output --account-name ${{ parameters.uploadStorageName }} -d $(containerName) --auth-mode login --overwrite'
-
