@@ -9,6 +9,7 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MO
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.nio.file.Path
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 
 private val logger = KotlinLogging.logger {}
 
@@ -35,7 +36,7 @@ internal class CdrConfigViewRemoteValidations(
 
     internal suspend fun validateConnectorMode(
         connectorId: String,
-        config: DTOs.CdrClientConfig,
+        config: CdrClientConfigDto,
         fieldName: DomainObjects.ConfigurationItem,
     ): DTOs.ValidationResult =
         cdrClientApiClient.validateConnectorMode(
@@ -92,7 +93,7 @@ internal class CdrConfigViewRemoteValidations(
      * @see DomainObjects.ConfigurationItem
      */
     internal suspend fun validateDirectory(
-        config: DTOs.CdrClientConfig,
+        config: CdrClientConfigDto,
         path: String?,
         fieldName: DomainObjects.ConfigurationItem
     ): DTOs.ValidationResult =
@@ -124,13 +125,12 @@ internal class CdrConfigViewRemoteValidations(
     /**
      * Validates that the given proxy URL is either empty or a valid HTTP/HTTPS URL format.
      *
-     * @param config the proxy URL to validate
+     * @param url the proxy URL to validate
      * @return a [DTOs.ValidationResult] indicating success or failure
      */
-    internal suspend fun validateProxyUrl(config: DTOs.CdrClientConfig): DTOs.ValidationResult =
-        cdrClientApiClient.validateProxy(
-            config = config,
-            url = config.proxyConfig.url,
+    internal suspend fun validateProxyUrl(url: String): DTOs.ValidationResult =
+        cdrClientApiClient.validateProxyUrl(
+            url = url,
         ).handle(
             configurationItem = DomainObjects.ConfigurationItem.PROXY_URL,
             onSuccess = { validationResult: DTOs.ValidationResult, _ -> validationResult }

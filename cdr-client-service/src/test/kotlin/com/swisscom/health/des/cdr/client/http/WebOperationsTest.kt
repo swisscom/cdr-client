@@ -3,6 +3,7 @@ package com.swisscom.health.des.cdr.client.http
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -105,12 +106,10 @@ internal class WebOperationsTest {
     fun setUp() {
         webOperationsAdvice = WebOperationsAdvice()
 
-        every { fileMonitoringService.monitoringStatus } returns mockk {
-            every { value } returns DTOs.FileMonitoringStatusResponse(
-                errorFileCount = 0,
-                oldTempFileCount = 0
-            )
-        }
+        every { fileMonitoringService.monitoringStatus } returns DTOs.FileMonitoringStatusResponse(
+            errorFileCount = 0,
+            oldTempFileCount = 0
+        )
         coEvery { fileMonitoringService.checkFileStatus() } returns Unit
 
         webOperations = WebOperations(
@@ -279,7 +278,7 @@ internal class WebOperationsTest {
             fileMonitoringService = fileMonitoringService
         )
 
-        val idpCredentials = DTOs.CdrClientConfig.IdpCredentials(
+        val idpCredentials = CdrClientConfigDto.IdpCredentials(
             tenantId = DomainObjects.TenantId.LOCALHOST,
             clientId = "test-client-id",
             clientSecret = "test-client-secret",
@@ -319,7 +318,7 @@ internal class WebOperationsTest {
             fileMonitoringService = fileMonitoringService
         )
 
-        val idpCredentials = DTOs.CdrClientConfig.IdpCredentials(
+        val idpCredentials = CdrClientConfigDto.IdpCredentials(
             tenantId = DomainObjects.TenantId.LOCALHOST,
             clientId = "test-client-id",
             clientSecret = "test-client-secret",
@@ -354,7 +353,7 @@ internal class WebOperationsTest {
             fileMonitoringService = fileMonitoringService
         )
 
-        val idpCredentialsWithMaskedSecret = DTOs.CdrClientConfig.IdpCredentials(
+        val idpCredentialsWithMaskedSecret = CdrClientConfigDto.IdpCredentials(
             tenantId = DomainObjects.TenantId.fromTenantId(DEFAULT_CDR_CONFIG.idpCredentials.tenantId.id),
             clientId = DEFAULT_CDR_CONFIG.idpCredentials.clientId.id,
             clientSecret = ClientSecret.MASKED_SECRET.value,
@@ -387,7 +386,7 @@ internal class WebOperationsTest {
             fileMonitoringService = fileMonitoringService
         )
 
-        val idpCredentialsWithAnyMaskedSecret = DTOs.CdrClientConfig.IdpCredentials(
+        val idpCredentialsWithAnyMaskedSecret = CdrClientConfigDto.IdpCredentials(
             tenantId = DomainObjects.TenantId.fromTenantId(DEFAULT_CDR_CONFIG.idpCredentials.tenantId.id),
             clientId = DEFAULT_CDR_CONFIG.idpCredentials.clientId.id,
             clientSecret = "**", // only 2 asterisks — still all-asterisk
@@ -421,7 +420,7 @@ internal class WebOperationsTest {
         )
 
         val newSecret = "brand-new-secret-entered-by-user"
-        val idpCredentialsWithRealSecret = DTOs.CdrClientConfig.IdpCredentials(
+        val idpCredentialsWithRealSecret = CdrClientConfigDto.IdpCredentials(
             tenantId = DomainObjects.TenantId.fromTenantId(DEFAULT_CDR_CONFIG.idpCredentials.tenantId.id),
             clientId = DEFAULT_CDR_CONFIG.idpCredentials.clientId.id,
             clientSecret = newSecret,
@@ -464,7 +463,7 @@ internal class WebOperationsTest {
             fileMonitoringService = fileMonitoringService
         )
 
-        val idpCredentials = DTOs.CdrClientConfig.IdpCredentials(
+        val idpCredentials = CdrClientConfigDto.IdpCredentials(
             tenantId = DomainObjects.TenantId.STAGING,
             clientId = "test-client-id",
             clientSecret = "test-client-secret",

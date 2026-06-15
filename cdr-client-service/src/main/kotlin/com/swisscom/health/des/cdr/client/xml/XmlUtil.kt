@@ -1,17 +1,39 @@
 package com.swisscom.health.des.cdr.client.xml
 
-import org.springframework.stereotype.Service
+import com.swisscom.health.des.cdr.client.common.DocumentType
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.w3c.dom.Document
 import java.io.InputStream
+import java.nio.file.Path
 import javax.xml.XMLConstants
 import javax.xml.parsers.DocumentBuilderFactory
+import kotlin.io.path.inputStream
 
-@Service
-internal class XmlUtil {
+private val logger = KotlinLogging.logger {}
 
-    fun findSchemaDefinition(doc: Document): DocumentType {
+internal fun Path.extractDocumentMetaData(): DocumentMetaData = runCatching {
+    // TODO: use StAX parser instead of DOM parser to avoid loading the entire file into memory just to determine the document type
+    this@extractDocumentMetaData.inputStream().use { inputStream -> with(inputStream.toDom()) { DocumentMetaData(fdDocType, communicationType) } }
+}.fold(
+    onSuccess = { it },
+    onFailure = { e ->
+        logger.error { "Failed to determine document type of file '$this': ${e.message}" }
+        DocumentMetaData.UNKNOWN
+    }
+)
+
+internal val Document.communicationType: CommunicationType
+    get() =
+        when (this.documentElement.localName) {
+            "request", "notification" -> CommunicationType.REQUEST
+            "response" -> CommunicationType.RESPONSE
+            else -> CommunicationType.UNKNOWN
+        }
+
+internal val Document.fdDocType: DocumentType
+    get() {
         fun isEven(value: Int) = value % 2 == 0
-        val namespaceDeclarationElements = doc.documentElement.attributes
+        val namespaceDeclarationElements = this.documentElement.attributes
             .getNamedItemNS("http://www.w3.org/2001/XMLSchema-instance", "schemaLocation")
             // attribute node value is a string, but might be null
             ?.nodeValue
@@ -27,15 +49,16 @@ internal class XmlUtil {
             ?: emptySet()
 
         val find = DocumentType.entries.find { pc ->
-            namespaceDeclarationElements.any{ namespace -> namespace.startsWith(pc.uri) }
+            namespaceDeclarationElements.any { namespace -> namespace.startsWith(pc.uri) }
         }
 
-        return find ?: DocumentType.UNDEFINED
+        return find ?: DocumentType.UNKNOWN
     }
 
-}
+internal fun InputStream.toDom(): Document =
+    DOCUMENT_BUILDER_FACTORY.newDocumentBuilder().parse(this)
 
-private fun documentBuilderFactory(): DocumentBuilderFactory =
+private val DOCUMENT_BUILDER_FACTORY: DocumentBuilderFactory =
     DocumentBuilderFactory.newInstance().apply {
         isNamespaceAware = true
         // disallow DTDs
@@ -48,6 +71,3 @@ private fun documentBuilderFactory(): DocumentBuilderFactory =
         isXIncludeAware = false
         isExpandEntityReferences = false
     }
-
-internal fun InputStream.toDom(): Document =
-    documentBuilderFactory().newDocumentBuilder().parse(this)

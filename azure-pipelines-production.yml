@@ -1,0 +1,23 @@
+trigger: none
+
+variables:
+  - group: remote-connections
+  - group: conveyor
+  - name: conveyorCachePath
+    value: '$(Agent.ToolsDirectory)'
+  - name: conveyorVersion
+    value: '21.1'
+  - name: conveyorCommand
+    value: 'make site'
+
+pool:
+  name: c4-shared-manageddevopspool01
+  demands:
+    - WorkFolder -equals /mnt/custom-work-folder
+    - ImageOverride -equals ubuntu-22.04
+
+steps:
+  - template: azure-pipelines-template.yml
+    parameters:
+      uploadStorageName: $(uploadStorageName)
+      uploadStorageHostnamePath: $(uploadStorageHostnamePath)

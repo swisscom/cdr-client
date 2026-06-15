@@ -3,10 +3,11 @@
 The Swisscom Health curaLINE Data Routing (CDR) Client.
 
 The project is split into two parts:
+
 1. the client service, which is the actual client that connects to the curaLINE API and
 2. the client UI, which can be used to configure the client service and monitor its status
 
-On a Linux system, the service part runs as a systemd unit. On a Windows system it runs as a Windows service 
+On a Linux system, the service part runs as a systemd unit. On a Windows system it runs as a Windows service
 managed by a dedicated watchdog service.
 
 On macOS, the client UI application starts the client service and shuts it down again when itself is shut down.
@@ -18,24 +19,36 @@ On macOS, the client UI application starts the client service and shuts it down 
 Download the installer from the [download page](https://cdr.health.swisscom.ch/share/downloads/download.html) and follow the instructions.
 Using the download page will give you the latest version of the client.
 
-The installed client will automatically check for updates and install them if available. 
+The installed client will automatically check for updates and install them if available.
 If the UI is running during an update it needs to be restarted manually to reflect the changes.
+
 * **Windows**: Checks for updates every hour. The UI needs to be manually restarted to reflect the changes.
-* **Linux** (Debian): A custom apt repository is added to your system, and the software is installed from it. Updates can be managed through the standard package manager (apt update/upgrade commands).
+* **Linux** (Debian): A custom apt repository is added to your system, and the software is installed from it. Updates can be managed through the standard
+  package manager (apt update/upgrade commands).
 * **MacOS**: Auto updates in the background or during startup. The UI (and therefore the client service) need to be manually restarted to reflect the changes.
 
+#### Windows Server Advanced Installation
+For Windows Server environments (especially 2019 version that don't support MSIX), a dedicated **Update Service** handles automatic updates:
+   * Downloads JAR artifacts from GitHub releases (default: every 2 hours, configurable)
+   * Manages service lifecycle (watchdog + CDR service)
+   * Fully automated - zero manual intervention for monthly updates
+   * See [Advanced Installation Guide](installation/WINDOWS_SERVER_ADVANCED_INSTALLATION_GUIDE.md) for setup instructions
+   * **Note**: Windows Server 2022 and newer should use the default MSIX installer instead
+
 ### Manual Installation - Jar only, no auto update
+
 If you want to run the client service without the UI and without auto updates, you can download the jar file directly.
 
 Pre-Requirements:
+
 * Java 17 (or higher) installed
 
-Go to the [releases](https://github.com/swisscom/cdr-client/releases) github page and click on the maven assets for the newest release:
+Go to the [releases](https://github.com/swisscom/cdr-client/releases) GitHub page and click on the maven assets for the newest release:
 ![releases assets overview](./installation/releases-overview.png)
 Download the jar file:
 ![release jar download](./installation/single-release-overview.png)
 Place a file named application-customer.yaml in the same directory as the jar file. The application-customer.yaml file
-should contain the configuration for the client. An example can be found [here](#application-customer-yaml-example).
+should contain the configuration for the client. An example can be found [here](#configuration).
 
 Open a terminal and navigate to the directory where the jar file is located. Run the following command to start the
 client (check the jar name and replace it in the command or rename the jar itself):
@@ -82,8 +95,8 @@ the CDR website.
 
 For each connector, one file after the other is pulled. Each file is written into a temporary directory defined as
 'local-folder'. The file is named after the received 'cdr-document-uuid' header that is a unique identifier created by
-the CDR API and prefixed with the received 'cdr-document-prefix' header. After saving the file to the temporary folder, 
-a delete request for the given 'cdr-document-uuid' is sent to the CDR API. After successfully deleting the file in 
+the CDR API and prefixed with the received 'cdr-document-prefix' header. After saving the file to the temporary folder,
+a delete request for the given 'cdr-document-uuid' is sent to the CDR API. After successfully deleting the file in
 the CDR API, the file is moved to the connector defined 'target-folder'.
 
 The temporary directories need to be monitored to make sure that no files get stranded there (should only happen if the
@@ -118,7 +131,8 @@ after the client was restarted, assuming the root cause is a misconfiguration th
 ### Client Service Configuration
 
 To test some use cases, there is a [docker-compose.yaml](./docker-compose/docker-compose.yaml) with wiremock that
-simulates the CDR API. Run with 
+simulates the CDR API. Run with
+
 ```
 docker compose down && docker compose up --build
 ```
@@ -148,10 +162,14 @@ The application JRE has to be started with the following system properties:
 You can use [Hydraulic Conveyor](https://conveyor.hydraulic.dev) to build installable artifacts
 
 Run following to build the project and create and install the package on your DEBIAN system:
+
 ```
 ./gradlew cleanAll buildAll -x test && conveyor -f conveyor-dev.conf make site && sudo dpkg -i output/debian/swisscom-schweiz-ag-cdr-client_1.0.0_amd64.deb
-#### or
-./gradlew cleanAll buildAll -x test && conveyor -f conveyor_w2019-dev.conf make site --output-dir=output_w2019
+```
+
+Run the following to build all artifacts for manual installation (placed in the release-artifacts folder):
+```
+./gradlew cleanAll :cdr-client-service:bootJar buildWatchdogRelease buildUpdateService buildManualInstallationArtifacts
 ```
 
 ### Running the Fat-JAR
@@ -168,11 +186,63 @@ SPRING_CONFIG_ADDITIONAL_LOCATION=/path/to/application-customer.yaml"
 LOGGING_FILE_NAME=/path/to/logs/cdr-client.log"
 ```
 
-See [application-customer.yaml](#application-customer-yaml-example) below for an example configuration file.
+See [application-customer.yaml](#configuration) below for an example configuration file.
 
 If you do not provide a value for `LOGGING_FILE_NAME` the log file gets auto created in your current working directory.
 
-## application-customer YAML example
+## Configuration
+
+### Per Connector Directories
+
+At the very least you have to configure a base source (upload) and target (download) directory for each connector:
+
+* `client.customer[n].target-folder`; mandatory, no default
+* `client.customer[n].source-folder`; mandatory, no default
+* `client.customer[n].source-archive-folder`; defaults to the path `archive` relative to `client.customer[n].source-folder`
+* `client.customer[n].source-error-folder`; defaults to the path `error` relative to `client.customer[n].source-folder`
+
+The source and target directories above must be specified as absolute paths. Sort of to anchor a connector configuration in the file system. All other paths may
+be specified as either absolute or relative paths. Absolute paths are recommended as the connector configuration is more explicit that way. Relative paths may
+feel more concise.
+
+#### Per Document Type Directories
+
+Per document type directories are all optional
+
+* `client.customer[n].doc-type-folders[<doc-type>].target-folder`; defaults to `client.customer[n].target-folder`; if relative resolved against
+  `client.customer[n].target-folder`
+* `client.customer[n].doc-type-folders[<doc-type>].source-folder`; defaults to `client.customer[n].source-folder`; if relative resolved against
+  `client.customer[n].source-folder`
+* `client.customer[n].doc-type-folders[<doc-type>].archive-folder`
+    * defaults to
+        * the path `archive` relative to `client.customer[n].doc-type-folders[<doc-type>].source-folder` if
+          that folder is set,
+        * `client.customer[n].source-archive-folder` otherwise;
+    * if the path is relative, then it is resolved against `client.customer[n].doc-type-folders[<doc-type>].source-folder`
+* `client.customer[n].doc-type-folders[<doc-type>].error-folder`
+    * defaults to
+        * the path `error` relative to `client.customer[n].doc-type-folders[<doc-type>].source-folder` if that folder is set
+        * `client.customer[n].source-error-folder` otherwise
+    * if the path is relative, then it is resolved against `client.customer[n].doc-type-folders[<doc-type>].source-folder`
+
+Legal values for `<doc-type>` are:
+
+* `INVOICE`
+* `CREDIT`
+* `HOSPITAL_MCD`
+* `CONTAINER`
+* `NOTIFICATION`
+* `FORM`
+
+#### Per Document Type Directories With Request/Response Split
+
+For all document types it is possible to enable split directories for request and response documents. (Technically there are no response documents for
+the `NOTIFICATION`, `CONTAINER`, and `PUSH_ADMIN_MSG` document types, but the configuration option is still available for all document types for consistency
+reasons.) If the split option is enabled for a document type, then a source and target directory must be provided for both request and response documents. Also,
+providing the archive and error directory becomes mandatory. All directories must be absolute paths. Under the provided archive and error directories the client
+creates two subdirectories named `request` and `response` to which the respective documents are archived or moved in case of an error.
+
+### `application-customer` YAML Example
 
 ```
 client:

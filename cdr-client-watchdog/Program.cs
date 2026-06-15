@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -11,30 +12,42 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
-        var builder = Host.CreateApplicationBuilder(args);
-        
-        builder.Services.AddWindowsService(options =>
+        var serviceName = "CDRClientWatchdog";
+        for (int i = 0; i < args.Length; i++)
         {
-            options.ServiceName = "CDRClientWatchdog";
-        });
-
-        builder.Services.AddLogging(configure =>
-        {
-            configure.AddConsole();
-            if (OperatingSystem.IsWindows())
+            if (args[i].Equals("--serviceName", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
             {
-                configure.AddEventLog(eventLogSettings =>
-                {
-                    eventLogSettings.SourceName = "CDRClientWatchdog";
-                    eventLogSettings.LogName = "Application";
-                });
+                serviceName = args[i + 1];
+                break;
             }
-        });
+        }
+
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.Configuration.SetBasePath(AppContext.BaseDirectory);
+        builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
         builder.Services.AddSingleton<WatchdogService>();
         builder.Services.AddHostedService<WatchdogService>(provider => provider.GetService<WatchdogService>()!);
 
-        var host = builder.Build();
-        await host.RunAsync();
+        builder.Services.AddWindowsService(options =>
+        {
+            options.ServiceName = serviceName;
+        });
+
+        // Configure logging from appsettings.json
+        builder.Logging.ClearProviders();
+        builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"));
+        builder.Logging.AddConsole();
+        if (OperatingSystem.IsWindows())
+        {
+            builder.Logging.AddEventLog(eventLogSettings =>
+            {
+                eventLogSettings.SourceName = serviceName;
+                eventLogSettings.LogName = "Application";
+            });
+        }
+
+        await builder.Build().RunAsync();
     }
 }

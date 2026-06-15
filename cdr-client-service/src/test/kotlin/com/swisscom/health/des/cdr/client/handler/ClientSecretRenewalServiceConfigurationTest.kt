@@ -25,7 +25,7 @@ import java.nio.file.Path
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 internal class ClientSecretRenewalServiceConfigurationTest {
 
-    @Value("\${client.idp-credentials.client-secret}")
+    @Value($$"${client.idp-credentials.client-secret}")
     private lateinit var clientSecret: String
 
     @Autowired

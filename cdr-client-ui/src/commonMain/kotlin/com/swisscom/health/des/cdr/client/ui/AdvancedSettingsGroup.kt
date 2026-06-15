@@ -5,14 +5,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Divider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.swisscom.health.des.cdr.client.common.DTOs
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_advanced_settings
@@ -43,20 +39,15 @@ internal fun AdvancedSettingsGroup(
         initiallyExpanded = false,
     ) { _ ->
         // Proxy URL
-        var proxyValidationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
-        LaunchedEffect(uiState.clientServiceConfig) {
-            proxyValidationResult = remoteViewValidations.validateProxyUrl(uiState.clientServiceConfig)
-        }
-        ValidatedTextField(
-            name = DomainObjects.ConfigurationItem.PROXY_URL,
+        AsyncValidatedTextField(
             modifier = modifier.padding(horizontal = 8.dp, vertical = 0.dp).fillMaxWidth(),
-            validatable = { proxyValidationResult },
-            label = { Text(text = stringResource(Res.string.label_proxy_url)) },
+            name = DomainObjects.ConfigurationItem.PROXY_URL,
             value = uiState.clientServiceConfig.proxyConfig.url,
+            onValueChange = { if (canEdit) viewModel.setProxyUrl(it) },
+            label = { Text(text = stringResource(Res.string.label_proxy_url)) },
             placeHolder = { Text(text = stringResource(Res.string.label_proxy_url_placeholder)) },
-            onValueChange = {
-                if (canEdit) viewModel.setProxyUrl(it)
-            },
+            asyncValidation = suspend { remoteViewValidations.validateProxyUrl(uiState.clientServiceConfig.proxyConfig.url) },
+            revalidationKey = uiState.clientServiceConfig.proxyConfig.url,
             enabled = canEdit,
         )
 
@@ -68,9 +59,7 @@ internal fun AdvancedSettingsGroup(
             label = { Text(text = stringResource(Res.string.label_proxy_username)) },
             value = uiState.clientServiceConfig.proxyConfig.username,
             placeHolder = { Text(text = stringResource(Res.string.label_proxy_username_placeholder)) },
-            onValueChange = {
-                if (canEdit) viewModel.setProxyUsername(it)
-            },
+            onValueChange = { if (canEdit) viewModel.setProxyUsername(it) },
             enabled = canEdit,
         )
 
@@ -82,9 +71,7 @@ internal fun AdvancedSettingsGroup(
             label = { Text(text = stringResource(Res.string.label_proxy_password)) },
             value = uiState.clientServiceConfig.proxyConfig.password,
             placeHolder = { Text(text = stringResource(Res.string.label_proxy_password_placeholder)) },
-            onValueChange = {
-                if (canEdit) viewModel.setProxyPassword(it)
-            },
+            onValueChange = { if (canEdit) viewModel.setProxyPassword(it) },
             enabled = canEdit,
         )
 
@@ -116,7 +103,7 @@ internal fun AdvancedSettingsGroup(
             name = DomainObjects.ConfigurationItem.FILE_BUSY_TEST_STRATEGY,
             modifier = modifier.padding(8.dp).fillMaxWidth(),
             initiallyExpanded = false,
-            options = { DTOs.CdrClientConfig.FileBusyTestStrategy.entries.filter { it != DTOs.CdrClientConfig.FileBusyTestStrategy.ALWAYS_BUSY } },
+            options = { CdrClientConfigDto.FileBusyTestStrategy.entries.filter { it != CdrClientConfigDto.FileBusyTestStrategy.ALWAYS_BUSY } },
             label = { Text(text = stringResource(Res.string.label_client_file_busy_strategy)) },
             placeHolder = { Text(text = stringResource(Res.string.label_client_file_busy_strategy_placeholder)) },
             value = uiState.clientServiceConfig.fileBusyTestStrategy.toString(),
@@ -127,4 +114,3 @@ internal fun AdvancedSettingsGroup(
 
     }
 }
-

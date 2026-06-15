@@ -30,6 +30,7 @@ import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,6 +47,8 @@ import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.archive_folder_name_used
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.archive_folder_overlaps_non_archive
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.arrow_drop_down_24dp_000000_FILL0_wght400_GRAD0_opsz24
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.arrow_drop_up_24dp_000000_FILL0_wght400_GRAD0_opsz24
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.error_directory_not_found
@@ -118,6 +121,8 @@ internal val DTOs.ValidationMessageKey.stringResource: StringResource
             DTOs.ValidationMessageKey.PROXY_URL_INVALID_FORMAT -> Res.string.error_proxy_url_invalid_format
             DTOs.ValidationMessageKey.ILLEGAL_VALUE -> Res.string.error_illegal_value
             DTOs.ValidationMessageKey.ILLEGAL_VALUE_COMBINATION -> Res.string.error_illegal_value_combination
+            DTOs.ValidationMessageKey.ARCHIVE_AS_NON_ARCHIVE_FOLDER_NAME_USED -> Res.string.archive_folder_name_used
+            DTOs.ValidationMessageKey.ARCHIVE_DIR_OVERLAPS_NON_ARCHIVE_DIR -> Res.string.archive_folder_overlaps_non_archive
         }
 
 @Composable
@@ -125,7 +130,7 @@ internal fun NamedSectionDivider(
     text: String,
     modifier: Modifier = Modifier,
     style: TextStyle = MaterialTheme.typography.titleSmall,
-    fontWeight: FontWeight = FontWeight.Bold,
+    fontWeight: FontWeight = FontWeight.Normal,
 ) {
     Text(
         text = text,
@@ -269,6 +274,8 @@ internal fun CollapsibleGroup(
     containerColor: Color = MaterialTheme.colorScheme.background,
     modifier: Modifier,
     title: String,
+    style: TextStyle = MaterialTheme.typography.titleMedium,
+    fontWeight: FontWeight = FontWeight.Normal,
     initiallyExpanded: Boolean = false,
     content: @Composable (containerColor: Color) -> Unit,
 ) {
@@ -280,7 +287,11 @@ internal fun CollapsibleGroup(
             Res.drawable.arrow_drop_down_24dp_000000_FILL0_wght400_GRAD0_opsz24
 
     Row(modifier = modifier.padding(16.dp)) {
-        Text(text = title, fontWeight = FontWeight.Bold)
+        Text(
+            text = title,
+            fontWeight = fontWeight,
+            style = style,
+        )
         Spacer(Modifier.weight(1f))
         Icon(
             painter = painterResource(icon),
@@ -335,6 +346,36 @@ internal fun ValidatedTextField(
 }
 
 @Composable
+internal fun AsyncValidatedTextField(
+    modifier: Modifier,
+    name: DomainObjects.ConfigurationItem,
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: @Composable (() -> Unit)? = null,
+    placeHolder: @Composable (() -> Unit)? = null,
+    asyncValidation: suspend () -> DTOs.ValidationResult,
+    revalidationKey: Any?,
+    enabled: Boolean,
+) {
+    var validationResult: DTOs.ValidationResult by remember { mutableStateOf(DTOs.ValidationResult.Success) }
+
+    LaunchedEffect(revalidationKey) {
+        validationResult = asyncValidation.invoke()
+    }
+
+    ValidatedTextField(
+        name = name,
+        modifier = modifier,
+        validatable = { validationResult },
+        label = label,
+        value = value,
+        placeHolder = placeHolder,
+        onValueChange = onValueChange,
+        enabled = enabled,
+    )
+}
+
+@Composable
 internal fun DisabledTextField(
     name: DomainObjects.ConfigurationItem,
     modifier: Modifier,
@@ -354,7 +395,6 @@ internal fun DisabledTextField(
         logger.trace { "text field has been (re-)composed - field '$name'" }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

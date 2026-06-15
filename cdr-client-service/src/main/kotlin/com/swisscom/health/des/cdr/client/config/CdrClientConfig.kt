@@ -3,10 +3,10 @@ package com.swisscom.health.des.cdr.client.config
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
-import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.Mode
-import com.swisscom.health.des.cdr.client.xml.DocumentType
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.annotation.PostConstruct
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.util.unit.DataSize
 import java.net.URL
@@ -14,11 +14,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.time.Duration
 import java.time.Instant
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-import kotlin.io.path.createDirectories
-
 
 private val logger = KotlinLogging.logger {}
 
@@ -44,7 +40,7 @@ internal data class CdrClientConfig(
     /** Maximum data size of the cache for files in progress. The cache holds filenames, not the files themselves. */
     val filesInProgressCacheSize: DataSize,
 
-    /** Client credentials and tenant info used to authenticate against the OAUth identity provider (credential flow). */
+    /** Client credentials and tenant info used to authenticate against the OAuth identity provider (credential flow). */
     val idpCredentials: IdpCredentials,
 
     /** OAuth IdP URL. */
@@ -96,6 +92,12 @@ internal data class CdrClientConfig(
         private const val PROPERTY_NAME = "client"
     }
 
+    @Suppress("UnusedPrivateMember")
+    @PostConstruct
+    private fun logConfig() {
+        logger.info { "$this" }
+    }
+
     data class RetryTemplateConfig(
         /** The number of retries to attempt (on top of the initial request). */
         val retries: Int,
@@ -112,7 +114,8 @@ internal data class CdrClientConfig(
 
     enum class Mode(val value: String) {
         TEST("test"),
-        PRODUCTION("production")
+        PRODUCTION("production"),
+        NONE("none")
     }
 
     enum class FileBusyTestStrategy {
@@ -134,6 +137,7 @@ internal data class CdrClientConfig(
 /**
  * Clients identified by their customer id
  */
+@Suppress("TooManyFunctions")
 internal data class Connector(
 
     /** Unique identifier for the connector; log into CDR web app to look up your connector ID(s). */
@@ -188,97 +192,18 @@ internal data class Connector(
      */
     val docTypeFolders: Map<DocumentType, DocTypeFolders>? = null,
 ) : PropertyNameAware {
-
-    val effectiveDocTypeFolders: Map<DocumentType, DocTypeFolders>
-        @JsonIgnore
-        get() = docTypeFolders ?: emptyMap()
-
     override val propertyName: String
         get() = PROPERTY_NAME
 
-    companion object {
-        private const val PROPERTY_NAME = ""
-    }
-
-    /**
-     * If [sourceArchiveEnabled] is set to `true` returns the archive directory with a subdirectory for the current date.
-     * The directory will be created if it does not exist.
-     * If [sourceArchiveEnabled] is `false` returns an empty path.
-     *
-     * @see sourceArchiveEnabled
-     * @see sourceArchiveFolder
-     */
-    @JsonIgnore
-    fun getEffectiveSourceArchiveFolder(): Path? =
-        if (sourceArchiveEnabled) {
-            createDirectoryIfMissing(
-                when (sourceArchiveFolder) {
-                    null -> sourceFolder.resolve("archive")
-                    sourceFolder -> sourceFolder.resolve("archive")
-                    else -> sourceArchiveFolder
-                }.resolve(getDateNow())
-            )
-        } else {
-            null
-        }
-
-    /**
-     * Returns all source directories for all document types of this connector. If a [DocTypeFolders.sourceFolder] is not set, the entry is omitted.
-     */
-    @JsonIgnore
-    fun getAllSourceDocTypeFolders(): List<Path> = this.effectiveDocTypeFolders.values.mapNotNull { this.effectiveSourceFolder(it) }
-
-    /**
-     * Returns the effective source directory for a given [DocTypeFolders] instance. If the [DocTypeFolders.sourceFolder] is not set, returns `null`.
-     * @see DocTypeFolders
-     */
-    @JsonIgnore
-    fun effectiveSourceFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.sourceFolder?.let { this.sourceFolder.resolve(it) }
-
-    /**
-     * Returns the effective target directory for a given [DocTypeFolders] instance. If the [DocTypeFolders.targetFolder] is not set, returns `null`.
-     * @see DocTypeFolders
-     */
-    @JsonIgnore
-    fun effectiveTargetFolder(docTypeFolders: DocTypeFolders): Path? = docTypeFolders.targetFolder?.let { this.targetFolder.resolve(it) }
-
-    @Suppress("TooGenericExceptionCaught")
-    private fun createDirectoryIfMissing(path: Path): Path = try {
-        path.createDirectories()
-    } catch (t: Throwable) {
-        logger.error { "Failed to create directory '$path' for connector '$connectorId': $t" }
-        throw t
-    }
-
-    private fun getDateNow(): String = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
-
-
-    /**
-     * Returns the effective source error folder path. The directory will be created if it does not exist.
-     *
-     * @see sourceErrorFolder
-     * @see sourceFolder
-     */
-    @JsonIgnore
-    fun getEffectiveSourceErrorFolder(): Path =
-        when (sourceErrorFolder) {
-            null -> sourceFolder.resolve(ERROR_DIR_NAME)
-            sourceFolder -> sourceFolder.resolve(ERROR_DIR_NAME)
-            else -> sourceErrorFolder
-        }.let { createDirectoryIfMissing(it) }
-
     override fun toString(): String {
-        return "Connector(connectorId='$connectorId', targetFolder=$targetFolder, sourceFolder=$sourceFolder, " +
-                if (effectiveDocTypeFolders.isNotEmpty())
-                    "additionalDocTypeFolders=[${
-                        effectiveDocTypeFolders.entries.joinToString("; ") { "${it.key}=source=${it.value.sourceFolder},target=${it.value.targetFolder}" }
-                    }], "
-                else {
-                    EMPTY_STRING
-                } +
+        fun invert(inMap: Map<DocumentType, List<Path>>): Map<Path, List<DocumentType>> = inMap
+            .flatMap { (docType, paths) -> paths.map { path -> path to docType } }
+            .groupBy(keySelector = { it.first }, valueTransform = { it.second })
+        return "Connector(connectorId='$connectorId', baseTargetFolder=$targetFolder, baseSourceFolder=$sourceFolder, " +
+                "sourceFolders=${invert(effectiveSourceFolders)}, targetFolders=${invert(effectiveTargetFolders)}, " +
                 "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
-                "effectiveSourceArchiveFolder=${getEffectiveSourceArchiveFolder()}, " +
-                "sourceErrorFolder=$sourceErrorFolder, effectiveSourceErrorFolder=${getEffectiveSourceErrorFolder()} " +
+                "baseSourceArchiveFolder=${baseSourceArchiveFolder}, archiveFolders=${invert(effectiveArchiveFolders)}, " +
+                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${baseSourceErrorFolder}, errorFolders=${ invert(effectiveErrorFolders)}, " +
                 "mode=$mode)"
     }
 
@@ -286,9 +211,89 @@ internal data class Connector(
      * Specified directories for a specific document type (e.g., Invoice). Can be absolute or relative (to the [Connector.sourceFolder]) paths.
      */
     data class DocTypeFolders(
+        /** Whether separate source/target (upload/download) directories for request and response documents should be used. */
+        val requestResponseSplit: Boolean = false,
+        /**
+         * Document type specific source (upload) directory to be used if request/response split is not enabled.
+         * The source directory is optional. If not provided the base source directory is used for this document
+         * type. If provided, it may be a relative path and if it is relative, it gets resolved against the base
+         * source directory.
+         */
         val sourceFolder: Path? = null,
+        /**
+         * Document type specific source (upload) directory for request documents to be used if request/response
+         * split is enabled. For request/response split, this source directory is mandatory, and it has to be an
+         * absolute path.
+         *
+         * Technically the distinction of request and response document upload directories is meaningless as the
+         * client uploads any XML document it finds in any source directory. In general, not limited to the
+         * document type specific configuration case, the source could be an arbitrarily long list of directories
+         * that get scanned for XML documents. But right now it is not implemented this way for simplicity/symmetry
+         * reasons.
+         */
+        val sourceFolderReq: Path? = null,
+        /**
+         * Document type specific source (upload) directory for response documents to be used if request/response
+         * split is enabled. For request/response split, this source directory is mandatory, and it has to be an
+         * absolute path.
+         *
+         * Technically the distinction of request and response document upload directories is meaningless as the
+         * client uploads any XML document it finds in any source directory. In general, not limited to the
+         * document type specific configuration case, the source could be an arbitrarily long list of directories
+         * that get scanned for XML documents. But right now it is not implemented this way for simplicity/symmetry
+         * reasons.
+         */
+        val sourceFolderResp: Path? = null,
+        /**
+         * Document type specific target (upload) directory to be used if request/response split is not enabled.
+         * The target directory is optional. If not provided the base target directory is used for this document
+         * type. If provided, it may be a relative path and if it is relative, it gets resolved against the base
+         * target directory.
+         */
         val targetFolder: Path? = null,
+        /**
+         * Document type specific target (upload) directory for request documents to be used if request/response
+         * split is enabled. For request/response split, this target directory is mandatory, and it has to be an
+         * absolute path.
+         */
+        val targetFolderReq: Path? = null,
+        /**
+         * Document type specific target (upload) directory for response documents to be used if request/response
+         * split is enabled. For request/response split, this target directory is mandatory, and it has to be an
+         * absolute path.
+         */
+        val targetFolderResp: Path? = null,
+        /**
+         * Document type specific archive directory. Successfully uploaded documents are moved there.
+         *
+         * If request/response split is not enabled, providing it is optional. If not provided the base archive
+         * directory is used for this document type. If provided, it may be a relative path and if it is relative,
+         * it gets resolved against the base source directory.
+         *
+         * If request/response split is enabled, then this archive directory is mandatory, and it has to be an
+         * absolute path.
+         */
+        val archiveFolder: Path? = null,
+        /**
+         * Document type specific error directory. Documents that failed to upload are moved there.
+         *
+         * If request/response split is not enabled, providing it is optional. If not provided the base error
+         * directory is used for this document type. If provided, it may be a relative path and if it is relative,
+         * it gets resolved against the base source directory.
+         *
+         * If request/response split is enabled, then this archive directory is mandatory, and it has to be an
+         * absolute path.
+         */
+        val errorFolder: Path? = null,
     )
+
+    companion object {
+        // blank on purpose; the connector instances are contained in a list and are addressed
+        // by their index in the list, not by a property name; at the same time the class has
+        // to implement the `PropertyNameAware` interface so the `ConfigurationWriter` keeps
+        // traversing the object tree contained in the connector instances
+        private const val PROPERTY_NAME = ""
+    }
 }
 
 @JvmInline
@@ -316,7 +321,7 @@ internal interface Endpoint {
     val basePath: String
 }
 
-// Spring fails to assign the endpoint instances with an "object is not of declared type" error if the classes are declared inside the Endpoint interface
+// Spring fails to assign instances with an "object is not of declared type" error if the classes are declared inside an interface
 internal data class CdrApi(
     override val scheme: String,
     override val host: Host,
@@ -331,6 +336,7 @@ internal data class CdrApi(
     }
 }
 
+// Spring fails to assign instances with an "object is not of declared type" error if the classes are declared inside an interface
 internal data class CredentialApi(
     override val scheme: String,
     override val host: Host,
@@ -360,11 +366,6 @@ internal data class ProxyConfig(
         private const val PROPERTY_NAME = "proxy-config"
     }
 }
-
-internal data class ProxyCredentials(
-    val username: ProxyUsername,
-    val password: ProxyPassword,
-)
 
 @Suppress("JavaDefaultMethodsNotOverriddenByDelegation")
 internal data class Customer(
@@ -546,10 +547,6 @@ internal value class ClientSecret private constructor(val value: String) : Prope
     companion object {
         private const val PROPERTY_NAME = "client-secret"
 
-        private const val MASKED_VALUE = "*********"
-
-        private const val MASK_CHAR = '*'
-
         @JvmStatic
         val NO_SECRET = ClientSecret(value = EMPTY_STRING)
 
@@ -562,8 +559,6 @@ internal value class ClientSecret private constructor(val value: String) : Prope
                 value.isAllAsterisks() -> MASKED_SECRET
                 else -> ClientSecret(value)
             }
-
-        private fun String.isAllAsterisks(): Boolean = isNotEmpty() && all { it == MASK_CHAR }
     }
 }
 
@@ -627,14 +622,27 @@ internal value class ProxyUsername(val value: String) : PropertyNameAware {
 }
 
 @JvmInline
-internal value class ProxyPassword(val value: String) : PropertyNameAware {
+internal value class ProxyPassword private constructor(val value: String) : PropertyNameAware {
     override val propertyName: String
         get() = PROPERTY_NAME
 
-    override fun toString(): String = "********"
+    override fun toString(): String = MASKED_VALUE
 
     companion object {
         private const val PROPERTY_NAME = "password"
+
+        @JvmStatic
+        val NO_PASSWORD = ProxyPassword(value = EMPTY_STRING)
+
+        @JvmStatic
+        val MASKED_PASSWORD = ProxyPassword(value = MASKED_VALUE)
+
+        operator fun invoke(value: String): ProxyPassword =
+            when {
+                value.isBlank() -> NO_PASSWORD
+                value.isAllAsterisks() -> MASKED_PASSWORD
+                else -> ProxyPassword(value)
+            }
     }
 }
 
@@ -642,6 +650,7 @@ internal value class ProxyPassword(val value: String) : PropertyNameAware {
 // END - Value classes for ProxyConfig properties
 //
 
+private const val MASKED_VALUE = "*********"
+private const val MASK_CHAR = '*'
 
-internal fun List<Connector>.getConnectorForSourceFile(file: Path): Connector =
-    this.first { it.sourceFolder == file.parent || it.getAllSourceDocTypeFolders().contains(file.parent) }
+private fun String.isAllAsterisks(): Boolean = isNotEmpty() && all { it == MASK_CHAR }

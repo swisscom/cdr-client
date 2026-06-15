@@ -3,7 +3,7 @@ import org.gradle.kotlin.dsl.withType
 import org.gradle.api.GradleException
 
 allprojects {
-    version = "5.3.0"
+    version = "6.0.0"
 }
 
 plugins {
@@ -62,10 +62,10 @@ tasks.updateDaemonJvm {
 }
 
 // =============================================================================
-// .NET 8 SDK Management and Watchdog Build Tasks
+// .NET 10 SDK Management and Watchdog Build Tasks
 // =============================================================================
 
-val dotnetVersion = "8.0.413"
+val dotnetVersion = "10.0.200"
 val dotnetInstallDir = layout.buildDirectory.dir("dotnet-sdk").get().asFile
 val dotnetExecutable = if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
     File(dotnetInstallDir, "dotnet.exe")
@@ -74,7 +74,7 @@ val dotnetExecutable = if (org.gradle.internal.os.OperatingSystem.current().isWi
 }
 
 /**
- * Checks if .NET 8 SDK is available on the system or in our local installation
+ * Checks if .NET 10 SDK is available on the system or in our local installation
  */
 fun isDotnetAvailable(): Boolean {
     return try {
@@ -86,7 +86,7 @@ fun isDotnetAvailable(): Boolean {
         if (systemCheck.exitValue() == 0) {
             val version = systemCheck.inputStream.bufferedReader().readText().trim()
             logger.info("Found system .NET SDK version: $version")
-            return version.startsWith("8.")
+            return version.startsWith("10.")
         }
         false
     } catch (_: Exception) {
@@ -100,7 +100,7 @@ fun isDotnetAvailable(): Boolean {
                 if (localCheck.exitValue() == 0) {
                     val version = localCheck.inputStream.bufferedReader().readText().trim()
                     logger.info("Found local .NET SDK version: $version")
-                    return version.startsWith("8.")
+                    return version.startsWith("10.")
                 }
             } catch (localE: Exception) {
                 logger.debug("Local .NET check failed: ${localE.message}")
@@ -111,21 +111,21 @@ fun isDotnetAvailable(): Boolean {
 }
 
 /**
- * Downloads and installs .NET 8 SDK if not available
+ * Downloads and installs .NET 10 SDK if not available
  */
 tasks.register("ensureDotnetSdk") {
     group = "dotnet"
-    description = "Ensures .NET 8 SDK is available, downloads if necessary"
-    
+    description = "Ensures .NET 10 SDK is available, downloads if necessary"
+
     outputs.file(dotnetExecutable)
     
     doLast {
         if (isDotnetAvailable()) {
-            logger.info(".NET 8 SDK is already available")
+            logger.info(".NET 10 SDK is already available")
             return@doLast
         }
         
-        logger.info("Downloading .NET 8 SDK...")
+        logger.info("Downloading .NET 10 SDK...")
         dotnetInstallDir.mkdirs()
         
         val os = org.gradle.internal.os.OperatingSystem.current()
@@ -135,7 +135,6 @@ tasks.register("ensureDotnetSdk") {
             os.isLinux -> "https://builds.dotnet.microsoft.com/dotnet/Sdk/$dotnetVersion/dotnet-sdk-$dotnetVersion-linux-x64.tar.gz"
             else -> {
                 logger.error("Unsupported operating system: ${os.name}. Supported platforms: Windows, macOS, Linux")
-                throw GradleException("Unsupported operating system for automatic .NET SDK download: ${os.name}. Please install .NET 8 SDK manually.")
             }
         }
         
@@ -178,7 +177,7 @@ tasks.register("ensureDotnetSdk") {
                 .waitFor()
         }
         
-        logger.info(".NET 8 SDK installed successfully at: ${dotnetInstallDir.absolutePath}")
+        logger.info(".NET 10 SDK installed successfully at: ${dotnetInstallDir.absolutePath}")
     }
 }
 
@@ -195,7 +194,7 @@ fun getDotnetCommand(): String {
             localCheck.waitFor()
             if (localCheck.exitValue() == 0) {
                 val version = localCheck.inputStream.bufferedReader().readText().trim()
-                if (version.startsWith("8.")) {
+                if (version.startsWith("10.")) {
                     logger.info("Using local .NET SDK: $version at ${dotnetExecutable.absolutePath}")
                     return dotnetExecutable.absolutePath
                 }
@@ -211,12 +210,12 @@ fun getDotnetCommand(): String {
         systemCheck.waitFor()
         if (systemCheck.exitValue() == 0) {
             val version = systemCheck.inputStream.bufferedReader().readText().trim()
-            if (version.startsWith("8.")) {
+            if (version.startsWith("10.")) {
                 logger.info("Using system .NET SDK: $version")
                 return "dotnet"
             }
         }
-        // If system version is not .NET 8, still prefer our local installation
+        // If system version is not .NET 10, still prefer our local installation
         dotnetExecutable.absolutePath
     } catch (_: Exception) {
         dotnetExecutable.absolutePath
@@ -224,22 +223,40 @@ fun getDotnetCommand(): String {
 }
 
 /**
- * Restores NuGet packages for the watchdog project
+ * Builds the CDR Client Watchdog service
  */
-tasks.register("dotnetRestore") {
+tasks.register("buildWatchdog") {
     group = "dotnet"
-    description = "Restores NuGet packages for the CDR Client Watchdog"
-    
+    description = "Builds the CDR Client Watchdog Windows service"
+
+    // Ensure .NET SDK is available if not present on system
     dependsOn("ensureDotnetSdk")
-    
-    inputs.file("cdr-client-watchdog/CdrClientWatchdog.csproj")
-    outputs.file("cdr-client-watchdog/obj/project.assets.json")
+    mustRunAfter("cleanAll", "cleanWatchdog") // Ensure clean tasks complete before building
+
+    inputs.files(fileTree("cdr-client-watchdog") {
+        include("**/*.cs", "**/*.csproj", "**/*.json")
+    })
+    outputs.dir("cdr-client-watchdog/publish")
     
     doLast {
+        logger.info("Building CDR Client Watchdog (self-contained for Conveyor/MSIX packaging)")
+
+        // Clean previous publish directory
+        delete("cdr-client-watchdog/publish")
+
         val dotnetCmd = getDotnetCommand()
         logger.info("Using dotnet command: $dotnetCmd")
-        
-        val processBuilder = ProcessBuilder(dotnetCmd, "restore")
+
+        // Build as self-contained for Conveyor/MSIX packaging
+        // This is used by conveyor.conf to include in the MSIX package
+        val processBuilder = ProcessBuilder(
+            dotnetCmd,
+            "publish",
+            "-c", "Release",
+            "-r", "win-x64",
+            "--self-contained", "true",  // Watchdog includes runtime
+            "-o", "publish"
+        )
             .directory(file("cdr-client-watchdog"))
             .inheritIO()
         
@@ -250,50 +267,267 @@ tasks.register("dotnetRestore") {
                 put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
             }
         }
-        
+
         val process = processBuilder.start()
         val exitCode = process.waitFor()
         if (exitCode != 0) {
-            throw GradleException("dotnet restore failed with exit code $exitCode")
+            throw GradleException("Watchdog build failed with exit code $exitCode")
         }
+        
+        // Copy installation and management scripts to publish folder
+        logger.info("Copying installation scripts to publish folder")
+        copy {
+            from("cdr-client-watchdog") {
+                include("install-service.bat")
+                include("uninstall-service.bat")
+                include("register-eventlog.bat")
+                include("register-eventlog.ps1")
+                include("cleanup-on-uninstall.bat")
+                include("cleanup-service.ps1")
+                include("troubleshoot.bat")
+            }
+            into("cdr-client-watchdog/publish")
+        }
+
+        logger.info("CDR Client Watchdog built (self-contained) and published successfully")
     }
 }
 
 /**
- * Builds the CDR Client Watchdog service
+ * Builds a framework-dependent version of the Watchdog for GitHub release artifacts
+ * (Windows Server 2019 deployment)
  */
-tasks.register("buildWatchdog") {
+tasks.register("buildWatchdogRelease") {
     group = "dotnet"
-    description = "Builds the CDR Client Watchdog Windows service"
-    
-    // Ensure .NET SDK is available if not present on system
+    description = "Builds the CDR Client Watchdog Windows service (framework-dependent for GitHub releases)"
+
     dependsOn("ensureDotnetSdk")
-    
+    mustRunAfter("buildWatchdog", "cleanAll", "cleanWatchdog") // Ensure proper task ordering when both are run
+
     inputs.files(fileTree("cdr-client-watchdog") {
-        include("**/*.cs", "**/*.csproj", "**/*.json", "build.sh", "build.bat")
+        include("**/*.cs", "**/*.csproj", "**/*.json")
     })
-    outputs.dir("cdr-client-watchdog/publish")
-    
+    outputs.dir("cdr-client-watchdog/publish-release")
+
     doLast {
-        logger.info("Building CDR Client Watchdog using build.sh script")
-        
-        val buildScript = if (System.getProperty("os.name").lowercase().contains("windows")) {
-            "build.bat" // Use batch script on Windows
-        } else {
-            "./build.sh" // Use shell script on Linux/WSL
-        }
-        
-        val processBuilder = ProcessBuilder(buildScript, "true") // Pass "true" for self-contained
+        logger.info("Building CDR Client Watchdog (framework-dependent for GitHub release artifacts)")
+
+        // Clean previous publish directory
+        delete("cdr-client-watchdog/publish-release")
+
+        val dotnetCmd = getDotnetCommand()
+        logger.info("Using dotnet command: $dotnetCmd")
+
+        // Build as framework-dependent for Windows Server 2019 release artifacts
+        val processBuilder = ProcessBuilder(
+            dotnetCmd,
+            "publish",
+            "-c", "Release",
+            "-r", "win-x64",
+            "--self-contained", "false",  // Framework-dependent for release artifacts
+            "-o", "publish-release"
+        )
             .directory(file("cdr-client-watchdog"))
             .inheritIO()
-        
+
+        // Set DOTNET_ROOT if we're using our local installation
+        if (dotnetCmd == dotnetExecutable.absolutePath) {
+            processBuilder.environment().apply {
+                put("DOTNET_ROOT", dotnetInstallDir.absolutePath)
+                put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
+            }
+        }
+
         val process = processBuilder.start()
         val exitCode = process.waitFor()
         if (exitCode != 0) {
-            throw GradleException("Watchdog build script failed with exit code $exitCode")
+            throw GradleException("Watchdog release build failed with exit code $exitCode")
         }
-        
-        logger.info("CDR Client Watchdog built and published successfully")
+
+        // Replace the appsettings.json with the release-specific version
+        logger.info("Copying release-specific appsettings.json")
+        copy {
+            from("cdr-client-watchdog/appsettings.release.json")
+            into("cdr-client-watchdog/publish-release")
+            rename("appsettings.release.json", "appsettings.json")
+        }
+
+        // Copy installation and management scripts to publish-release folder
+        logger.info("Copying installation scripts to publish-release folder")
+        copy {
+            from("cdr-client-watchdog") {
+                include("install-service.bat")
+                include("uninstall-service.bat")
+                include("cleanup-on-uninstall.bat")
+                include("cleanup-service.ps1")
+                include("troubleshoot.bat")
+            }
+            into("cdr-client-watchdog/publish-release")
+        }
+
+        logger.info("CDR Client Watchdog built (framework-dependent) for release artifacts successfully")
+    }
+}
+
+/**
+ * Runs the CDR Client Update Service tests
+ */
+tasks.register("testUpdateService") {
+    group = "dotnet"
+    description = "Runs the CDR Client Update Service tests"
+
+    dependsOn("ensureDotnetSdk")
+    mustRunAfter("cleanAll", "cleanUpdateService", "buildWatchdog", "buildWatchdogRelease")
+
+    inputs.files(fileTree("cdr-client-updateservice") {
+        include("**/*.cs", "**/*.csproj", "**/*.json")
+    })
+
+    doLast {
+        val dotnetCmd = getDotnetCommand()
+        logger.info("Using dotnet command: $dotnetCmd")
+
+        // Explicit restore to ensure all packages (including xunit, Moq) are available
+        // doesn't really work, build fails (like every 3rd) when doing "gradlew cleanAll buildUpdateService"
+        logger.info("Restoring UpdateService test packages...")
+        val restoreProcessBuilder = ProcessBuilder(
+            dotnetCmd,
+            "restore",
+            "CuraLineClientUpdateService.Tests.csproj"
+        )
+            .directory(file("cdr-client-updateservice"))
+            .redirectErrorStream(true)
+
+        if (dotnetCmd == dotnetExecutable.absolutePath) {
+            restoreProcessBuilder.environment().apply {
+                put("DOTNET_ROOT", dotnetInstallDir.absolutePath)
+                put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
+            }
+        }
+
+        val restoreProcess = restoreProcessBuilder.start()
+        restoreProcess.inputStream.bufferedReader().readText()
+        val restoreExitCode = restoreProcess.waitFor()
+        if (restoreExitCode != 0) {
+            throw GradleException("UpdateService test restore failed with exit code $restoreExitCode")
+        }
+
+        // Run tests (skip restore since we just did it explicitly)
+        logger.info("Running UpdateService tests...")
+        val testProcessBuilder = ProcessBuilder(
+            dotnetCmd,
+            "test",
+            "CuraLineClientUpdateService.Tests.csproj",
+            "--no-restore",
+            "--verbosity", "normal",
+            "-p:UseSharedCompilation=false"
+        )
+            .directory(file("cdr-client-updateservice"))
+            .redirectErrorStream(true)
+
+        if (dotnetCmd == dotnetExecutable.absolutePath) {
+            testProcessBuilder.environment().apply {
+                put("DOTNET_ROOT", dotnetInstallDir.absolutePath)
+                put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
+            }
+        }
+
+        val testOutput = StringBuilder()
+        val testProcess = testProcessBuilder.start()
+        testProcess.inputStream.bufferedReader().forEachLine { line ->
+            testOutput.appendLine(line)
+            if (line.contains("Passed") || line.contains("Failed") || line.contains("Total tests") ||
+                line.contains("error") || line.contains("Error")) {
+                logger.lifecycle(line)
+            }
+        }
+        val testExitCode = testProcess.waitFor()
+        if (testExitCode != 0) {
+            logger.error("=== FULL TEST OUTPUT (exitCode=$testExitCode) ===")
+            logger.error(testOutput.toString())
+            logger.error("=============================================")
+            throw GradleException("UpdateService tests failed with exit code $testExitCode. See full output above.")
+        }
+        logger.lifecycle("UpdateService tests passed")
+    }
+}
+
+/**
+ * Builds the CDR Client Update Service (Windows Server 2019 only)
+ */
+tasks.register("buildUpdateService") {
+    group = "dotnet"
+    description = "Builds the CDR Client Update Service for Windows Server 2019"
+
+    dependsOn("ensureDotnetSdk", "testUpdateService")
+    mustRunAfter("cleanAll", "cleanUpdateService", "buildWatchdog", "buildWatchdogRelease")
+
+    inputs.files(fileTree("cdr-client-updateservice") {
+        include("**/*.cs", "**/*.csproj", "**/*.json")
+    })
+    outputs.dir("cdr-client-updateservice/publish")
+
+    doLast {
+        logger.info("Building CDR Client Update Service (Windows-only, cross-platform build)")
+
+        // Clean previous publish directory
+        delete("cdr-client-updateservice/publish")
+
+        val dotnetCmd = getDotnetCommand()
+        logger.info("Using dotnet command: $dotnetCmd")
+
+        // Build using dotnet directly (works on all platforms)
+        val processBuilder = ProcessBuilder(
+            dotnetCmd,
+            "publish",
+            "CuraLineClientUpdateService.csproj",
+            "-c", "Release",
+            "-r", "win-x64",
+            "--self-contained", "false",
+            "-o", "publish"
+        )
+            .directory(file("cdr-client-updateservice"))
+            .inheritIO()
+
+        // Set DOTNET_ROOT if we're using our local installation
+        if (dotnetCmd == dotnetExecutable.absolutePath) {
+            processBuilder.environment().apply {
+                put("DOTNET_ROOT", dotnetInstallDir.absolutePath)
+                put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
+            }
+        }
+
+        val process = processBuilder.start()
+        val exitCode = process.waitFor()
+        if (exitCode != 0) {
+            throw GradleException("Update Service build failed with exit code $exitCode")
+        }
+
+        // Copy installation and management scripts to publish folder
+        logger.info("Copying installation scripts to publish folder")
+        copy {
+            from("cdr-client-updateservice") {
+                include("install-service.bat")
+                include("uninstall-service.bat")
+            }
+            into("cdr-client-updateservice/publish")
+        }
+
+        // Update the appsettings.json with current version
+        logger.info("Updating appsettings.json with current version")
+        val appsettingsFile = file("cdr-client-updateservice/publish/appsettings.json")
+        if (appsettingsFile.exists()) {
+            val currentVersion = project.version.toString()
+            val appsettingsContent = appsettingsFile.readText()
+            val updatedContent = appsettingsContent.replace(
+                """"1.0.0"""",
+                """"$currentVersion""""
+            )
+            appsettingsFile.writeText(updatedContent)
+            logger.info("Updated Service version to: $currentVersion")
+        }
+
+        logger.info("CDR Client Update Service built and published successfully")
     }
 }
 
@@ -305,22 +539,95 @@ tasks.register("cleanWatchdog") {
     description = "Cleans CDR Client Watchdog build artifacts"
     
     doLast {
-        delete("cdr-client-watchdog/bin", "cdr-client-watchdog/obj", "cdr-client-watchdog/publish")
+        delete("cdr-client-watchdog/bin", "cdr-client-watchdog/obj", "cdr-client-watchdog/publish", "cdr-client-watchdog/publish-release")
+    }
+}
+
+/**
+ * Cleans the update service build artifacts
+ */
+tasks.register("cleanUpdateService") {
+    group = "dotnet"
+    description = "Cleans CDR Client Update Service build artifacts"
+
+    doLast {
+        delete("cdr-client-updateservice/bin", "cdr-client-updateservice/obj", "cdr-client-updateservice/publish")
     }
 }
 
 // Create a comprehensive build task that includes watchdog
 tasks.register("buildAll") {
     group = "build"
-    description = "Builds all projects including the CDR Client Watchdog"
-    dependsOn("buildWatchdog")
+    description = "Builds all projects including the CDR Client Watchdog and curaLINE Client updateservice"
+    dependsOn("buildWatchdog", "buildUpdateService")
     dependsOn(subprojects.map { "${it.path}:build" })
+}
+
+/**
+ * Builds all artifacts for manual Windows Server installation and prepares them for release
+ */
+tasks.register("buildManualInstallationArtifacts") {
+    group = "release"
+    description = "Builds all artifacts for manual Windows Server installation (service JAR, watchdog, updateservice)"
+
+    // Only depend on service JAR - watchdog and updateservice are built conditionally by the pipeline
+    dependsOn(":cdr-client-service:bootJar")
+    mustRunAfter("cleanAll", "buildWatchdogRelease", "buildUpdateService") // Ensure artifacts exist before packaging
+
+    doLast {
+        val version = project.version.toString()
+        val releaseDir = file("release-artifacts")
+
+        // Clean and create release directory
+        delete(releaseDir)
+        releaseDir.mkdirs()
+
+        logger.info("Preparing manual installation artifacts for version $version...")
+
+        logger.info("Copying service JAR...")
+        copy {
+            from("cdr-client-service/build/libs")
+            include("cdr-client-service-*.jar")
+            into(releaseDir)
+        }
+
+        // Copy watchdog ZIP (only if it was built - buildWatchdogRelease creates publish-release/)
+        val watchdogPublishDir = file("cdr-client-watchdog/publish-release")
+        if (watchdogPublishDir.exists() && watchdogPublishDir.listFiles()?.isNotEmpty() == true) {
+            logger.info("Packaging watchdog...")
+            val watchdogZip = file("$releaseDir/CdrClientWatchdog-${version}.zip")
+            ant.invokeMethod("zip", mapOf(
+                "destfile" to watchdogZip,
+                "basedir" to watchdogPublishDir
+            ))
+            logger.info("Created: ${watchdogZip.name}")
+        } else {
+            logger.warn("Watchdog publish-release directory not found or empty - skipping watchdog artifact")
+        }
+
+        val updateServicePublishDir = file("cdr-client-updateservice/publish")
+        if (updateServicePublishDir.exists() && updateServicePublishDir.listFiles()?.isNotEmpty() == true) {
+            logger.info("Packaging update service...")
+            val updateServiceZip = file("$releaseDir/curaLINEClient-updateservice-${version}.zip")
+            ant.invokeMethod("zip", mapOf(
+                "destfile" to updateServiceZip,
+                "basedir" to updateServicePublishDir
+            ))
+            logger.info("Created: ${updateServiceZip.name}")
+        } else {
+            logger.warn("UpdateService publish directory not found or empty - skipping updateservice artifact")
+        }
+
+        logger.info("Manual installation artifacts prepared in: ${releaseDir.absolutePath}")
+        logger.info("Contents:")
+        releaseDir.listFiles()?.forEach { logger.info("  - ${it.name}") }
+    }
 }
 
 // Create a comprehensive clean task that includes watchdog
 tasks.register("cleanAll") {
     group = "build"
-    description = "Cleans all projects including the CDR Client Watchdog"
-    dependsOn("cleanWatchdog")
+    description = "Cleans all projects including the CDR Client Watchdog and curaLINE Client updateservice"
+    dependsOn("cleanWatchdog", "cleanUpdateService")
     dependsOn(subprojects.map { "${it.path}:clean" })
 }

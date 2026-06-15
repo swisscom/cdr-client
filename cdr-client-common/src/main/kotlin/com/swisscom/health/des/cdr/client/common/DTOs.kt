@@ -2,6 +2,7 @@
 
 package com.swisscom.health.des.cdr.client.common
 
+import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonSubTypes
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
@@ -129,6 +130,8 @@ class DTOs {
         CREDENTIAL_VALIDATION_FAILED,
         ERROR_AS_NON_ERROR_FOLDER_NAME_USED,
         ERROR_DIR_OVERLAPS_NON_ERROR_DIR,
+        ARCHIVE_AS_NON_ARCHIVE_FOLDER_NAME_USED,
+        ARCHIVE_DIR_OVERLAPS_NON_ARCHIVE_DIR,
         DIRECTORY_NEEDS_ABSOLUTE_PATH,
         PROXY_URL_MUST_START_WITH_HTTP_OR_HTTPS,
         PROXY_URL_INVALID_FORMAT
@@ -267,15 +270,19 @@ class DTOs {
 
             @Serializable
             data class DocTypeFolders(
+                val requestResponseSplit: Boolean = false,
                 val sourceFolder: String? = null,
+                val sourceFolderReq: String? = null,
+                val sourceFolderResp: String? = null,
                 val targetFolder: String? = null,
+                val targetFolderReq: String? = null,
+                val targetFolderResp: String? = null,
+                val archiveFolder: String? = null,
+                val errorFolder: String? = null,
             ) {
                 companion object {
                     @JvmStatic
-                    val EMPTY = DocTypeFolders(
-                        sourceFolder = null,
-                        targetFolder = null
-                    )
+                    val EMPTY = DocTypeFolders()
                 }
             }
 
@@ -320,16 +327,6 @@ class DTOs {
             }
         }
 
-        enum class DocumentType {
-            UNDEFINED,
-            CONTAINER,
-            CREDIT,
-            FORM,
-            HOSPITAL_MCD,
-            INVOICE,
-            NOTIFICATION;
-        }
-
         @Serializable
         data class RetryTemplateConfig(
             val retries: Int,
@@ -368,6 +365,32 @@ class DTOs {
             ALWAYS_BUSY,
         }
 
+    }
+
+}
+
+/**
+ * Forum Datenaustausch namespaces with their "canonical" prefixes.
+ *
+ * @param uri The namespace URI.
+ * @param prefix The 'canonical' prefix of the namespace.
+ */
+enum class DocumentType(val uri: String, val prefix: String) {
+    UNKNOWN("UNDEFINED", EMPTY_STRING),
+    CONTAINER("http://www.forum-datenaustausch.ch/container", "container"),
+    CREDIT("http://sumex1.net/gcr generalCreditRequest", "gcr"),
+    FORM("http://www.forum-datenaustausch.ch/form", "form"),
+    HOSPITAL_MCD("http://www.forum-datenaustausch.ch/mcd", "mcd"),
+    INVOICE("http://www.forum-datenaustausch.ch/invoice", "invoice"),
+    NOTIFICATION("http://www.forum-datenaustausch.ch/notification", "notification"),
+    PUSH_ADMIN_MSG("http://www.forum-datenaustausch.ch/pam", "pam");
+
+    companion object {
+        @JsonCreator
+        @JvmStatic
+        fun fromName(value: String): DocumentType {
+            return entries.firstOrNull { it.name.equals(value, ignoreCase = true) } ?: UNKNOWN
+        }
     }
 
 }

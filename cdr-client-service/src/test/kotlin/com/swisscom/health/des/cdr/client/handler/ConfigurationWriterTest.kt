@@ -31,7 +31,9 @@ import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
 import io.mockk.junit5.MockKExtension.CheckUnnecessaryStub
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.runs
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Disabled
@@ -138,6 +140,7 @@ class ConfigurationWriterTest {
         )
 
         every { configValidationService.validateAllConfigurationItems(any()) } returns ValidationResult.Success
+        every { configValidationService.createErrorAndArchiveFolders(any()) } just runs
 
         configurationWriter = ConfigurationWriter(
             currentConfig = config,

@@ -1,0 +1,7 @@
+<Project>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'CuraLineClientUpdateService.Tests'">
+    <BaseIntermediateOutputPath>obj/tests/</BaseIntermediateOutputPath>
+    <MSBuildProjectExtensionsPath>$(BaseIntermediateOutputPath)</MSBuildProjectExtensionsPath>
+    <BaseOutputPath>bin/tests/</BaseOutputPath>
+  </PropertyGroup>
+</Project>

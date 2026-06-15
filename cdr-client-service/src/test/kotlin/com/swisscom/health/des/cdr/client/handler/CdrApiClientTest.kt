@@ -378,7 +378,6 @@ internal class CdrApiClientTest {
 
         @TempDir(factory = AlwaysSameTempDirFactory::class)
         @JvmStatic
-        @Suppress("unused")
         private lateinit var inflightDirInApplicationTestYaml: Path
 
         @JvmStatic

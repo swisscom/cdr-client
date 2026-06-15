@@ -1,0 +1,279 @@
+parameters:
+  - name: uploadStorageName
+    type: string
+  - name: uploadStorageHostnamePath
+    type: string
+
+steps:
+  - task: AzureCLI@2
+    displayName: 'Download JDK 21'
+    inputs:
+      azureSubscription: 'azdo-des-sp-CDR'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        az storage blob download \
+        -f $(Agent.BuildDirectory)/microsoft-jdk-21.0.8-linux-x64.tar.gz \
+        --blob-url https://$(storageName)/build-agent-files/microsoft-jdk-21.0.8-linux-x64.tar.gz
+
+  - task: JavaToolInstaller@0
+    displayName: 'Install JDK 21'
+    inputs:
+      versionSpec: "21"
+      jdkArchitectureOption: x64
+      jdkSourceOption: LocalDirectory
+      jdkFile: "$(Agent.BuildDirectory)/microsoft-jdk-21.0.8-linux-x64.tar.gz"
+      jdkDestinationDirectory: "$(agent.toolsDirectory)/jdk21"
+      cleanDestinationDirectory: true
+  - script: |
+      which java
+    displayName: 'Show Java Release Number'
+
+  - task: UseDotNet@2
+    displayName: 'Install .NET 10 SDK'
+    inputs:
+      version: '10.0.x'
+
+  - script: |
+      INSTALL_DIR="${{ variables.conveyorCachePath }}/install/conveyor-${{ variables.conveyorVersion }}"
+      
+      if [ ! -d "$INSTALL_DIR" ]; then
+        echo "##vso[task.setvariable variable=ConveyorDownloaded;isOutput=true]true"
+        echo "Downloading and extracting Conveyor version ${{ variables.conveyorVersion }}..."
+        wget https://$(storageName)/build-agent-files/conveyor-${{ variables.conveyorVersion }}-linux-amd64.tar.gz
+        mkdir -p "${{ variables.conveyorCachePath }}/install"
+      
+        tar xzvf conveyor-${{ variables.conveyorVersion }}-linux-amd64.tar.gz -C "${{ variables.conveyorCachePath }}/install"
+        echo "Conveyor downloaded and extracted to $INSTALL_DIR"
+      else
+        echo "Conveyor version ${{ variables.conveyorVersion }} already exists at $INSTALL_DIR. Skipping download."
+      fi
+    displayName: 'Download and Extract Conveyor'
+
+  - task: Gradle@3
+    displayName: 'build application'
+    inputs:
+      gradleWrapperFile: 'gradlew'
+      tasks: 'cleanAll buildAll -x test'
+      publishJUnitResults: false
+      javaHomeOption: 'JDKVersion'
+
+  # =============================================================================
+  # Manual Installation Artifacts for Windows Server
+  # =============================================================================
+
+  - script: |
+      echo "Detecting changes since last release..."
+      
+      # Get the previous release tag (look for tags matching version pattern)
+      PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+      
+      if [ -z "$PREV_TAG" ]; then
+        echo "No previous release found, building all components"
+        echo "##vso[task.setvariable variable=watchdogChanged]true"
+        echo "##vso[task.setvariable variable=updateserviceChanged]true"
+        echo "##vso[task.setvariable variable=serviceChanged]true"
+      else
+        echo "Previous release: $PREV_TAG"
+        
+        # Check if watchdog files changed
+        if git diff --name-only $PREV_TAG HEAD | grep -q "^cdr-client-watchdog/"; then
+          echo "Watchdog files changed"
+          echo "##vso[task.setvariable variable=watchdogChanged]true"
+        else
+          echo "No watchdog changes"
+          echo "##vso[task.setvariable variable=watchdogChanged]false"
+        fi
+        
+        # Check if updateservice files changed
+        if git diff --name-only $PREV_TAG HEAD | grep -q "^cdr-client-updateservice/"; then
+          echo "UpdateService files changed"
+          echo "##vso[task.setvariable variable=updateserviceChanged]true"
+        else
+          echo "No updateservice changes"
+          echo "##vso[task.setvariable variable=updateserviceChanged]false"
+        fi
+      fi
+    displayName: 'Detect Component Changes'
+
+  - script: |
+      echo "Building manual installation artifacts for Windows Server..."
+      
+      # Get version from gradle
+      VERSION=$(./gradlew -q properties | grep "^version:" | awk '{print $2}')
+      echo "Version: $VERSION"
+      echo "##vso[task.setvariable variable=releaseVersion]$VERSION"
+      
+      # Build only changed components
+      GRADLE_TASKS=":cdr-client-service:bootJar"
+      
+      if [ "$(watchdogChanged)" = "true" ]; then
+        echo "Building watchdog (changes detected)..."
+        GRADLE_TASKS="$GRADLE_TASKS buildWatchdogRelease"
+      else
+        echo "Skipping watchdog build (no changes)"
+      fi
+      
+      if [ "$(updateserviceChanged)" = "true" ]; then
+        echo "Building update service (changes detected)..."
+        GRADLE_TASKS="$GRADLE_TASKS buildUpdateService"
+      else
+        echo "Skipping update service build (no changes)"
+      fi
+      
+      # Run the Gradle tasks
+      ./gradlew $GRADLE_TASKS
+      
+      # Package artifacts using our comprehensive task
+      ./gradlew buildManualInstallationArtifacts
+    displayName: 'Build Manual Installation Artifacts'
+
+  - script: |
+      VERSION="$(releaseVersion)"
+      BASE_URL="https://${{ parameters.uploadStorageHostnamePath }}/$(containerName)/$(containerManualInstName)"
+      MANIFEST_DIR="release-artifacts"
+      
+      echo "Generating manifest.json for version $VERSION..."
+      
+      # Start with basic structure
+      cat > "$MANIFEST_DIR/manifest.json" << EOF
+      {
+        "version": "$VERSION",
+        "releaseDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+        "artifacts": []
+      }
+      EOF
+      
+      # Add service JAR (always present)
+      SERVICE_FILE="cdr-client-service-${VERSION}.jar"
+      SERVICE_SHA=$(sha256sum "$MANIFEST_DIR/$SERVICE_FILE" | awk '{print $1}')
+      echo "Adding Service JAR: $SERVICE_FILE (sha256: ${SERVICE_SHA:0:16}...)"
+      
+      jq --arg name "Service" \
+         --arg file "$SERVICE_FILE" \
+         --arg url "$BASE_URL/$VERSION/$SERVICE_FILE" \
+         --arg checksum "sha256:$SERVICE_SHA" \
+         '.artifacts += [{"name": $name, "fileName": $file, "url": $url, "checksum": $checksum}]' \
+         "$MANIFEST_DIR/manifest.json" > "$MANIFEST_DIR/manifest.tmp.json"
+      mv "$MANIFEST_DIR/manifest.tmp.json" "$MANIFEST_DIR/manifest.json"
+      
+      # Conditionally add watchdog if it was built
+      WATCHDOG_FILE="CdrClientWatchdog-${VERSION}.zip"
+      if [ -f "$MANIFEST_DIR/$WATCHDOG_FILE" ]; then
+        WATCHDOG_SHA=$(sha256sum "$MANIFEST_DIR/$WATCHDOG_FILE" | awk '{print $1}')
+        echo "Adding Watchdog: $WATCHDOG_FILE (sha256: ${WATCHDOG_SHA:0:16}...)"
+        
+        jq --arg name "Watchdog" \
+           --arg file "$WATCHDOG_FILE" \
+           --arg url "$BASE_URL/$VERSION/$WATCHDOG_FILE" \
+           --arg checksum "sha256:$WATCHDOG_SHA" \
+           '.artifacts += [{"name": $name, "fileName": $file, "url": $url, "checksum": $checksum}]' \
+           "$MANIFEST_DIR/manifest.json" > "$MANIFEST_DIR/manifest.tmp.json"
+        mv "$MANIFEST_DIR/manifest.tmp.json" "$MANIFEST_DIR/manifest.json"
+      else
+        echo "Watchdog artifact not found, skipping"
+      fi
+      
+      # Conditionally add updateservice if it was built
+      UPDATESERVICE_FILE="curaLINEClient-updateservice-${VERSION}.zip"
+      if [ -f "$MANIFEST_DIR/$UPDATESERVICE_FILE" ]; then
+        UPDATESERVICE_SHA=$(sha256sum "$MANIFEST_DIR/$UPDATESERVICE_FILE" | awk '{print $1}')
+        echo "Adding UpdateService: $UPDATESERVICE_FILE (sha256: ${UPDATESERVICE_SHA:0:16}...)"
+        
+        jq --arg name "UpdateService" \
+           --arg file "$UPDATESERVICE_FILE" \
+           --arg url "$BASE_URL/$VERSION/$UPDATESERVICE_FILE" \
+           --arg checksum "sha256:$UPDATESERVICE_SHA" \
+           '.artifacts += [{"name": $name, "fileName": $file, "url": $url, "checksum": $checksum}]' \
+           "$MANIFEST_DIR/manifest.json" > "$MANIFEST_DIR/manifest.tmp.json"
+        mv "$MANIFEST_DIR/manifest.tmp.json" "$MANIFEST_DIR/manifest.json"
+      else
+        echo "UpdateService artifact not found, skipping"
+      fi
+      
+      echo ""
+      echo "Generated manifest.json:"
+      cat "$MANIFEST_DIR/manifest.json" | jq '.'
+    displayName: 'Generate Manifest'
+
+  - task: AzureCLI@2
+    displayName: 'Upload Manual Installation Artifacts to Azure Storage'
+    inputs:
+      azureSubscription: 'azdo-des-sp-CDR'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        VERSION="$(releaseVersion)"
+        
+        echo "Uploading artifacts for version $VERSION to Azure Storage..."
+        az storage blob upload-batch \
+          -s release-artifacts \
+          --account-name ${{ parameters.uploadStorageName }} \
+          -d $(containerName)/$(containerManualInstName)/$VERSION \
+          --auth-mode login \
+          --overwrite
+        
+        echo "Upload complete. Verifying..."
+        
+        # Verify manifest.json is accessible
+        MANIFEST_URL="https://${{ parameters.uploadStorageHostnamePath }}/$(containerName)/$(containerManualInstName)/$VERSION/manifest.json"
+        echo "Checking: $MANIFEST_URL"
+        
+        if curl --head --fail "$MANIFEST_URL" > /dev/null 2>&1; then
+          echo "Manifest verified at $MANIFEST_URL"
+          
+          # Update latest.json to activate this release
+          echo "Updating latest.json to activate release $VERSION..."
+          echo "{\"version\":\"$VERSION\",\"manifestUrl\":\"$MANIFEST_URL\"}" > latest.json
+          
+          az storage blob upload \
+            -f latest.json \
+            --account-name ${{ parameters.uploadStorageName }} \
+            -c $(containerName) \
+            -n $(containerManualInstName)/latest.json \
+            --auth-mode login \
+            --overwrite
+          
+          echo "  Release $VERSION activated!"
+          echo "  Latest: https://${{ parameters.uploadStorageHostnamePath }}/$(containerName)/$(containerManualInstName)/latest.json"
+        else
+          echo "  ERROR: Manifest not accessible at $MANIFEST_URL"
+          echo "  NOT updating latest.json - release NOT activated"
+          exit 1
+        fi
+
+  # =============================================================================
+  # Conveyor Build (MSIX/Installers)
+  # =============================================================================
+
+  - task: AzureCLI@2
+    name: GetAccessToken
+    displayName: Get access token
+    inputs:
+      azureSubscription: 'azdo-des-sp-CDR'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        TOKEN="$(az account get-access-token --resource https://vault.azure.net --query accessToken --output tsv)"
+        echo "##vso[task.setvariable variable=kvToken;isOutput=true]$TOKEN"
+
+  - script: |
+      export PATH="$PATH:${{ variables.conveyorCachePath }}/install/conveyor-${{ variables.conveyorVersion }}/bin"
+      
+      export AZURE_API_ACCESS_TOKEN="$(GetAccessToken.kvToken)"
+      export CONTACT_EMAIL="$(contactEmail)"
+      export CONVEYOR_AGREE_TO_LICENSE="1"
+      export KEY_VAULT_NAME="$(keyVaultName)"
+      export SIGNING_KEY_ALIAS="$(signingKeyAlias)"
+      echo "Running Conveyor command: ${{ variables.conveyorCommand }}"
+      conveyor --cache-dir="${{ variables.conveyorCachePath }}/cache" -Kapp.signing-key="$(signingKey)" -Kapp.site.base-url="${{ parameters.uploadStorageHostnamePath }}/$(containerName)" ${{ variables.conveyorCommand }}
+    displayName: 'Run Conveyor Command'
+
+  - task: AzureCLI@2
+    displayName: 'Upload Conveyor outputs to storage account'
+    inputs:
+      azureSubscription: 'azdo-des-sp-CDR'
+      scriptType: 'bash'
+      scriptLocation: 'inlineScript'
+      inlineScript: 'az storage blob upload-batch -s output --account-name ${{ parameters.uploadStorageName }} -d $(containerName) --auth-mode login --overwrite'
+

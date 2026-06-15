@@ -59,7 +59,6 @@ internal class CdrClientApplicationTest {
     private companion object {
         @TempDir(factory = AlwaysSameTempDirFactory::class)
         @JvmStatic
-        @Suppress("unused")
         private lateinit var inflightDirInApplicationTestYaml: Path
 
         @JvmStatic
@@ -92,4 +91,3 @@ internal class CdrClientApplicationTest {
     }
 
 }
-

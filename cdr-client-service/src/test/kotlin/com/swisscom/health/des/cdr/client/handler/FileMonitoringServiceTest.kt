@@ -75,7 +75,7 @@ internal class FileMonitoringServiceTest {
     fun `should report no issues when all directories are empty`() = runTest {
         fileMonitoringService.checkFileStatus()
 
-        val status = fileMonitoringService.monitoringStatus.value
+        val status = fileMonitoringService.monitoringStatus
 
         assertEquals(0, status.errorFileCount)
         assertEquals(0, status.oldTempFileCount)
@@ -89,7 +89,7 @@ internal class FileMonitoringServiceTest {
 
         fileMonitoringService.checkFileStatus()
 
-        val status = fileMonitoringService.monitoringStatus.value
+        val status = fileMonitoringService.monitoringStatus
         assertEquals(3, status.errorFileCount)
     }
 
@@ -102,7 +102,7 @@ internal class FileMonitoringServiceTest {
 
         fileMonitoringService.checkFileStatus()
 
-        val status = fileMonitoringService.monitoringStatus.value
+        val status = fileMonitoringService.monitoringStatus
         assertEquals(2, status.errorFileCount)
     }
 
@@ -118,7 +118,7 @@ internal class FileMonitoringServiceTest {
 
         fileMonitoringService.checkFileStatus()
 
-        val status = fileMonitoringService.monitoringStatus.value
+        val status = fileMonitoringService.monitoringStatus
         assertEquals(2, status.oldTempFileCount)
     }
 
@@ -132,7 +132,7 @@ internal class FileMonitoringServiceTest {
 
         fileMonitoringService.checkFileStatus()
 
-        val status = fileMonitoringService.monitoringStatus.value
+        val status = fileMonitoringService.monitoringStatus
         assertEquals(1, status.oldTempFileCount)
     }
 
@@ -145,7 +145,7 @@ internal class FileMonitoringServiceTest {
 
         fileMonitoringService.checkFileStatus()
 
-        val status = fileMonitoringService.monitoringStatus.value
+        val status = fileMonitoringService.monitoringStatus
         assertEquals(0, status.oldTempFileCount)
     }
 
@@ -157,7 +157,7 @@ internal class FileMonitoringServiceTest {
 
         fileMonitoringService.checkFileStatus()
 
-        val status = fileMonitoringService.monitoringStatus.value
+        val status = fileMonitoringService.monitoringStatus
         assertEquals(2, status.errorFileCount)
     }
 
@@ -171,7 +171,7 @@ internal class FileMonitoringServiceTest {
 
         fileMonitoringService.checkFileStatus()
 
-        val status = fileMonitoringService.monitoringStatus.value
+        val status = fileMonitoringService.monitoringStatus
         assertEquals(2, status.errorFileCount)
         assertEquals(1, status.oldTempFileCount)
     }
@@ -192,7 +192,7 @@ internal class FileMonitoringServiceTest {
 
         service.checkFileStatus()
 
-        val status = fileMonitoringService.monitoringStatus.value
+        val status = fileMonitoringService.monitoringStatus
         assertEquals(0, status.errorFileCount)
     }
 
@@ -200,26 +200,26 @@ internal class FileMonitoringServiceTest {
     fun `should update status on subsequent checks`() = runTest {
         fileMonitoringService.checkFileStatus()
 
-        var status = fileMonitoringService.monitoringStatus.value
+        var status = fileMonitoringService.monitoringStatus
         assertEquals(0, status.errorFileCount)
 
         createErrorFile(errorDir1, "error1.xml")
         createErrorFile(errorDir1, "error2.xml")
         fileMonitoringService.checkFileStatus()
 
-        status = fileMonitoringService.monitoringStatus.value
+        status = fileMonitoringService.monitoringStatus
         assertEquals(2, status.errorFileCount)
 
         errorDir1.resolve("error1.xml").toFile().delete()
         fileMonitoringService.checkFileStatus()
 
-        status = fileMonitoringService.monitoringStatus.value
+        status = fileMonitoringService.monitoringStatus
         assertEquals(1, status.errorFileCount)
 
         errorDir1.resolve("error2.xml").toFile().delete()
         fileMonitoringService.checkFileStatus()
 
-        status = fileMonitoringService.monitoringStatus.value
+        status = fileMonitoringService.monitoringStatus
         assertEquals(0, status.errorFileCount)
     }
 
@@ -233,7 +233,7 @@ internal class FileMonitoringServiceTest {
 
         fileMonitoringService.checkFileStatus()
 
-        val status = fileMonitoringService.monitoringStatus.value
+        val status = fileMonitoringService.monitoringStatus
         assertEquals(1, status.oldTempFileCount)
     }
 
@@ -264,7 +264,7 @@ internal class FileMonitoringServiceTest {
 
         service.checkFileStatus()
 
-        val status = service.monitoringStatus.value
+        val status = service.monitoringStatus
         assertEquals(3, status.errorFileCount)
     }
 

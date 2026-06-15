@@ -14,7 +14,7 @@ import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientSecret
 import com.swisscom.health.des.cdr.client.config.PropertyNameAware
-import com.swisscom.health.des.cdr.client.config.toDto
+import com.swisscom.health.des.cdr.client.config.ProxyPassword
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.boot.origin.Origin
 import org.springframework.boot.origin.OriginLookup
@@ -116,7 +116,7 @@ internal class ConfigurationWriter(
      */
     fun updateClientServiceConfiguration(newConfig: CdrClientConfig): UpdateResult = runCatching {
         logger.trace { "New CDR client config: '$newConfig'" }
-
+        configValidationService.createErrorAndArchiveFolders(newConfig)
         validate(newConfig).let { validationErrors: Map<String, Any> ->
             if (validationErrors.isNotEmpty()) {
                 UpdateResult.Failure(validationErrors)
@@ -128,8 +128,9 @@ internal class ConfigurationWriter(
                     .filter { updatableConfigItem ->
                         updatableConfigItem.newValue != updatableConfigItem.currentValue &&
                                 // ignore masked values; the mask must not be written back to the configuration;
-                                // right now the only masked value is the OAuth client secret
-                                updatableConfigItem.newValue != ClientSecret.MASKED_SECRET
+                                // right now the only masked values are the OAuth client secret and the proxy password
+                                updatableConfigItem.newValue != ClientSecret.MASKED_SECRET &&
+                                updatableConfigItem.newValue != ProxyPassword.MASKED_PASSWORD
                     }.filter { changedConfigItem ->
                         (changedConfigItem is UpdatableConfigurationItem.WritableSource)
                             .also { isWritable ->
@@ -419,7 +420,7 @@ internal class ConfigurationWriter(
 
     private fun validate(config: CdrClientConfig): Map<String, ValidationMessageKey> {
         logger.debug { "config to validate: '$config'" }
-        return when (val validateAllConfigurationItems: ValidationResult = configValidationService.validateAllConfigurationItems(config.toDto())) {
+        return when (val validateAllConfigurationItems: ValidationResult = configValidationService.validateAllConfigurationItems(config)) {
             is ValidationResult.Success -> emptyMap()
             is ValidationResult.Failure -> validateAllConfigurationItems.validationDetails.associate { detail ->
                 when (detail) {

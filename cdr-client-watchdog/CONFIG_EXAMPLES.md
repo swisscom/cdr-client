@@ -2,7 +2,90 @@
 
 This file contains different configuration examples for different installation scenarios.
 
-## Standard Installation (Recommended)
+## Configuration Files
+
+This directory contains two appsettings files:
+
+- **`appsettings.json`**: For Conveyor/MSIX packaging (includes Conveyor-specific paths)
+- **`appsettings.release.json`**: For manual installation/GitHub releases (generic paths)
+
+When building:
+- `./gradlew buildWatchdog` → Uses `appsettings.json` → Output: `publish/` (self-contained)
+- `./gradlew buildWatchdogRelease` → Uses `appsettings.release.json` → Output: `publish-release/` (framework-dependent)
+
+## Execution Modes
+
+The watchdog supports two execution modes:
+
+### 1. Executable Mode (Windows 10/11 via Conveyor/MSIX)
+Runs the service as a native Windows executable.
+
+```json
+{
+  "ServiceExecutionMode": "Executable",
+  "ServiceExecutablePath": "cdr-client-service.exe",
+  "RestartDelaySeconds": 2,
+  "HealthCheckIntervalSeconds": 30,
+  "MaxConsecutiveFailures": 5
+}
+```
+
+### 2. JAR Mode (Windows Server Advanced Installation)
+Runs the service as a Java JAR file.
+
+**Basic Configuration:**
+```json
+{
+  "ServiceExecutionMode": "Jar",
+  "ServiceJarPath": "..\\..\\lib\\cdr-client-service.jar",
+  "JavaExecutablePath": "..\\..\\jre\\bin\\java.exe",
+  "JavaArguments": "-Xmx512m",
+  "RestartDelaySeconds": 5,
+  "HealthCheckIntervalSeconds": 30,
+  "MaxConsecutiveFailures": 5
+}
+```
+
+**Production Configuration (Recommended):**
+```json
+{
+  "ServiceExecutionMode": "Jar",
+  "ServiceJarPath": "..\\..\\lib\\cdr-client-service.jar",
+  "JavaExecutablePath": "..\\..\\jre\\bin\\java.exe",
+  "JavaArguments": "-Xmx512m -Dspring.main.web-application-type=none -Dspring.config.additional-location=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/conf/application-customer.yaml -Dlogging.config=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/conf/logback-service.xml -Dcdr.client.log.directory=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/logs",
+  "RestartDelaySeconds": 5,
+  "HealthCheckIntervalSeconds": 30,
+  "MaxConsecutiveFailures": 5
+}
+```
+
+**JavaArguments Explained:**
+- `-Xmx512m`: Maximum heap size (adjust based on your requirements)
+- `-Dspring.main.web-application-type=none`: Disables the web server completely (not needed for headless service)
+- `-Dspring.config.additional-location`: Path to Spring Boot application YAML configuration
+- `-Dlogging.config`: Path to Logback XML logging configuration
+- `-Dcdr.client.log.directory`: Directory where log files will be written
+
+**Note**: When running as a Windows service (JAR mode), the web server is disabled since there's no UI to access it. This also disables the management/actuator endpoints.
+
+**Alternative: Using conf directory under installation:**
+```json
+{
+  "JavaArguments": "-Xmx512m -Dspring.main.web-application-type=none -Dspring.config.additional-location=C:/Program Files/Swisscom (Schweiz) AG/curaLINEClient/conf/application-customer.yaml -Dlogging.config=C:/Program Files/Swisscom (Schweiz) AG/curaLINEClient/conf/logback-service.xml -Dcdr.client.log.directory=C:/Program Files/Swisscom (Schweiz) AG/curaLINEClient/logs"
+}
+```
+
+**Alternative: If you need the web UI accessible (development/testing only):**
+```json
+{
+  "JavaArguments": "-Xmx512m -Dspring.config.additional-location=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/conf/application-customer.yaml -Dlogging.config=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/conf/logback-service.xml -Dcdr.client.log.directory=C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/logs"
+}
+```
+This will keep the web server enabled. The application will start with `REACTIVE` web type as configured in `application.yaml`, making the servers available at:
+- Main server: `http://localhost:8191`
+- Management/health: `http://localhost:8193/actuator/health`
+
+## Standard Installation (Executable Mode - Recommended for Conveyor/MSIX)
 ```json
 {
   "ServiceExecutablePath": "cdr-client-service.exe",
@@ -17,7 +100,7 @@ This file contains different configuration examples for different installation s
 ### Absolute Path
 ```json
 {
-  "ServiceExecutablePath": "C:\\Program Files\\CDR Client\\bin\\cdr-client-service.exe"
+  "ServiceExecutablePath": "C:\\Program Files\\Swisscom (Schweiz) AG\\curaLINEClient\\bin\\cdr-client-service.exe"
 }
 ```
 
