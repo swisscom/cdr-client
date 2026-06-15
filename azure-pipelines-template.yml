@@ -9,6 +9,10 @@ parameters:
     type: string
   - name: conveyorCommand
     type: string
+  - name: gradle-username
+    type: string
+  - name: gradle-password
+    type: string
 
 steps:
   - task: AzureCLI@2

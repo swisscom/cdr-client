@@ -25,3 +25,5 @@ steps:
       conveyorCachePath: $(conveyorCachePath)
       conveyorVersion: $(conveyorVersion)
       conveyorCommand: $(conveyorCommand)
+      gradle-username: $(gradle-username)
+      gradle-password: $(gradle-password)
