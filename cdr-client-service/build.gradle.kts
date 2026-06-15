@@ -204,20 +204,22 @@ tasks.register("publishVersion") {
     })
 }
 
-
 publishing {
     publications {
         create<MavenPublication>("bootJava") {
             artifact(tasks.named("bootJar"))
         }
     }
+
     repositories {
         maven {
-            name = "GitHubPackages"
-            url = URI("https://maven.pkg.github.com/swisscom/cdr-client")
-            credentials {
-                username = System.getenv("GITHUB_ACTOR")
-                password = System.getenv("GITHUB_TOKEN")
+            credentials(PasswordCredentials::class)
+            if (version.toString().endsWith("SNAPSHOT")) {
+                name = "binSwisscomSnapshots"
+                url = URI("https://bin.swisscom.com/artifactory/swisscomhealth-maven-snapshots")
+            } else {
+                name = "binSwisscomReleases"
+                url = URI("https://bin.swisscom.com/artifactory/swisscomhealth-maven-releases")
             }
         }
     }
