@@ -65,8 +65,8 @@ steps:
       echo "binSwisscomPassword=$(gradle-password)" >> $(System.DefaultWorkingDirectory)/gradle.properties
       echo "binSwisscomSnapshotsUsername=$(gradle-username)" >> $(System.DefaultWorkingDirectory)/gradle.properties
       echo "binSwisscomSnapshotsPassword=$(gradle-password)" >> $(System.DefaultWorkingDirectory)/gradle.properties
-      echo "binSwisscomReleaseUsername=$(gradle-username)" >> $(System.DefaultWorkingDirectory)/gradle.properties
-      echo "binSwisscomReleasePassword=$(gradle-password)" >> $(System.DefaultWorkingDirectory)/gradle.properties
+      echo "binSwisscomReleasesUsername=$(gradle-username)" >> $(System.DefaultWorkingDirectory)/gradle.properties
+      echo "binSwisscomReleasesPassword=$(gradle-password)" >> $(System.DefaultWorkingDirectory)/gradle.properties
     displayName: 'Write Artifactory username and password to gradle.properties'
 
   - task: Gradle@3
