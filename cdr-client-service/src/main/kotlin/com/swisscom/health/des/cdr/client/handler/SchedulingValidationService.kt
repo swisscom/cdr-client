@@ -17,7 +17,6 @@ internal class SchedulingValidationService(
     val isSchedulingAllowed: Boolean by lazy { isConfigSourceUnambiguous && configValidationService.isConfigValid }
     val isConfigSourceUnambiguous: Boolean by lazy { isConfigFromOneSource() }
 
-    @Suppress("unused")
     @PostConstruct
     private fun isConfigFromOneSource(): Boolean {
         val activeProfiles = environment.activeProfiles.toList()

@@ -364,7 +364,7 @@ internal class ConfigValidationService(
                             ValidationResult.Success
                         },
                         onFailure = { accessException ->
-                            logger.info { "Path access attempt failed: [${path}], error: ${accessException::class.simpleName}: ${accessException.message}" }
+                            logger.debug { "Path access attempt failed: [${path}], error: ${accessException::class.simpleName}: ${accessException.message}" }
                             ValidationResult.Failure(
                                 listOf(ValidationDetail.PathDetail(path = path.toString(), messageKey = DIRECTORY_NOT_FOUND))
                             )
@@ -442,7 +442,7 @@ internal class ConfigValidationService(
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     fun validateDirectoryOverlap(config: CdrClientConfigDto): ValidationResult {
-        val pathStringValidation = config.customer.fold(
+        val pathStringValidation: ValidationResult = config.customer.fold(
             initial = ValidationResult.Success,
             operation = { acc: ValidationResult, connector: ConnectorDto ->
                 acc +
@@ -468,7 +468,7 @@ internal class ConfigValidationService(
         ) +
                 validatePathString(config.localFolder)
 
-        return if (pathStringValidation == ValidationResult.Failure) {
+        return if (pathStringValidation != ValidationResult.Success) {
             pathStringValidation
         } else {
             val connectors = config.customer.map { it.toCdrClientConfig() }

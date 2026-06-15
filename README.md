@@ -35,7 +35,7 @@ Pre-Requirements:
 
 * Java 17 (or higher) installed
 
-Go to the [releases](https://github.com/swisscom/cdr-client/releases) github page and click on the maven assets for the newest release:
+Go to the [releases](https://github.com/swisscom/cdr-client/releases) GitHub page and click on the maven assets for the newest release:
 ![releases assets overview](./installation/releases-overview.png)
 Download the jar file:
 ![release jar download](./installation/single-release-overview.png)

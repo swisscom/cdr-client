@@ -30,7 +30,7 @@ import kotlin.math.min
 private val logger = KotlinLogging.logger {}
 
 /**
- * 4xx errors are not retried, the xml is rewritten to `<filename>.error` and a `<filename>.response` file is created with the response body.
+ * 4xx errors are not retried, the XML is rewritten to `<filename>.error` and a `<filename>.response` file is created with the response body.
  * Other non-2xx responses are retried with a delay.
  * Deletes the local file after successful upload.
  *
