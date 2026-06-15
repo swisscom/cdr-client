@@ -25,7 +25,11 @@ public class WatchdogService : BackgroundService
     private readonly IConfiguration _configuration;
     private readonly IHostApplicationLifetime _hostLifetime;
     
+    private readonly string _serviceExecutionMode;
     private string _serviceExecutablePath;
+    private readonly string _serviceJarPath;
+    private readonly string _javaExecutablePath;
+    private readonly string _javaArguments;
     private readonly TimeSpan _restartDelay;
     private readonly TimeSpan _healthCheckInterval;
     private readonly int _maxConsecutiveFailures;
@@ -43,10 +47,16 @@ public class WatchdogService : BackgroundService
         _configuration = configuration;
         _hostLifetime = hostLifetime;
         
+        _serviceExecutionMode = _configuration["ServiceExecutionMode"] ?? "Executable";
         _serviceExecutablePath = ResolvePath(_configuration["ServiceExecutablePath"] ?? "cdr-client-service.exe");
+        _serviceJarPath = ResolvePath(_configuration["ServiceJarPath"] ?? "../lib/cdr-client-service.jar");
+        _javaExecutablePath = ResolvePath(_configuration["JavaExecutablePath"] ?? "java");
+        _javaArguments = _configuration["JavaArguments"] ?? "";
         _restartDelay = TimeSpan.FromSeconds(_configuration.GetValue<int>("RestartDelaySeconds", 2));
         _healthCheckInterval = TimeSpan.FromSeconds(_configuration.GetValue<int>("HealthCheckIntervalSeconds", 30));
         _maxConsecutiveFailures = _configuration.GetValue<int>("MaxConsecutiveFailures", 5);
+
+        _logger.LogInformation("Watchdog initialized in {Mode} mode", _serviceExecutionMode);
     }
 
     #region Path Resolution Methods
@@ -279,8 +289,18 @@ public class WatchdogService : BackgroundService
 
     private void LogServiceStartup()
     {
-        _logger.LogInformation("CDRClientWatchdog Service started. Monitoring: {ExecutablePath}, Health check: {Interval}s, Restart delay: {Delay}s, Max failures: {MaxFailures}", 
-            _serviceExecutablePath, _healthCheckInterval.TotalSeconds, _restartDelay.TotalSeconds, _maxConsecutiveFailures);
+        if (_serviceExecutionMode.Equals("Jar", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogInformation(
+                "CDRClientWatchdog Service started in JAR mode. Monitoring: Java={JavaPath}, JAR={JarPath}, Arguments={Arguments}, Health check: {Interval}s, Restart delay: {Delay}s, Max failures: {MaxFailures}",
+                _javaExecutablePath, _serviceJarPath, _javaArguments, _healthCheckInterval.TotalSeconds, _restartDelay.TotalSeconds, _maxConsecutiveFailures);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "CDRClientWatchdog Service started in Executable mode. Monitoring: {ExecutablePath}, Health check: {Interval}s, Restart delay: {Delay}s, Max failures: {MaxFailures}",
+                _serviceExecutablePath, _healthCheckInterval.TotalSeconds, _restartDelay.TotalSeconds, _maxConsecutiveFailures);
+        }
     }
 
     private async Task WaitForNextHealthCheck(CancellationToken cancellationToken)
@@ -499,40 +519,177 @@ public class WatchdogService : BackgroundService
 
     private bool ValidateServiceExecutable()
     {
-        if (File.Exists(_serviceExecutablePath))
+        if (_serviceExecutionMode.Equals("Jar", StringComparison.OrdinalIgnoreCase))
         {
+            // Validate JAR mode requirements
+            if (!File.Exists(_javaExecutablePath))
+            {
+                _logger.LogError(
+                    "Java executable not found at configured path: {Path}. " +
+                    "Please verify the JavaExecutablePath configuration in appsettings.json. " +
+                    "Stopping watchdog service due to configuration error.",
+                    _javaExecutablePath);
+                _hostLifetime.StopApplication();
+                return false;
+            }
+
+            if (!File.Exists(_serviceJarPath))
+            {
+                _logger.LogError(
+                    "Service JAR not found at configured path: {Path}. " +
+                    "Please verify the ServiceJarPath configuration in appsettings.json. " +
+                    "Stopping watchdog service due to configuration error.",
+                    _serviceJarPath);
+                _hostLifetime.StopApplication();
+                return false;
+            }
+
             return true;
         }
+        else
+        {
+            // Validate Executable mode requirements
+            if (File.Exists(_serviceExecutablePath))
+            {
+                return true;
+            }
 
-        _logger.LogError(
-            "Service executable not found at configured path: {Path}. " +
-            "Please verify the ServiceExecutablePath configuration in appsettings.json. " +
-            "Current working directory: {WorkingDirectory}. " +
-            "Watchdog executable location: {WatchdogPath}. " +
-            "Stopping watchdog service due to configuration error. Fix the ServiceExecutablePath and restart the service.",
-            _serviceExecutablePath, Environment.CurrentDirectory, Environment.ProcessPath);
+            _logger.LogError(
+                "Service executable not found at configured path: {Path}. " +
+                "Please verify the ServiceExecutablePath configuration in appsettings.json. " +
+                "Current working directory: {WorkingDirectory}. " +
+                "Watchdog executable location: {WatchdogPath}. " +
+                "Stopping watchdog service due to configuration error. Fix the ServiceExecutablePath and restart the service.",
+                _serviceExecutablePath, Environment.CurrentDirectory, Environment.ProcessPath);
 
-        // This is a configuration error, not a runtime failure - stop the watchdog service
-        _hostLifetime.StopApplication();
-        return false;
+            // This is a configuration error, not a runtime failure - stop the watchdog service
+            _hostLifetime.StopApplication();
+            return false;
+        }
     }
 
     private ProcessStartInfo CreateProcessStartInfo()
     {
-        var workingDirectory = Path.GetDirectoryName(_serviceExecutablePath) ?? Environment.CurrentDirectory;
-        
-        _logger.LogInformation("Starting CDR Client service: {Path} from working directory: {WorkingDirectory}", 
-            _serviceExecutablePath, workingDirectory);
+        ProcessStartInfo startInfo;
 
-        return new ProcessStartInfo
+        if (_serviceExecutionMode.Equals("Jar", StringComparison.OrdinalIgnoreCase))
         {
-            FileName = _serviceExecutablePath,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardOutput = false,
-            RedirectStandardError = false,
-            WorkingDirectory = workingDirectory
-        };
+            // Running as JAR with Java - use JAR directory as working directory
+            var workingDirectory = Path.GetDirectoryName(_serviceJarPath) ?? Environment.CurrentDirectory;
+
+            startInfo = new ProcessStartInfo
+            {
+                FileName = _javaExecutablePath,
+                WorkingDirectory = workingDirectory,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            // Use ArgumentList instead of Arguments string for proper quoting
+            // Parse JavaArguments and add each argument separately
+            if (!string.IsNullOrWhiteSpace(_javaArguments))
+            {
+                foreach (var arg in ParseJavaArguments(_javaArguments))
+                {
+                    startInfo.ArgumentList.Add(arg);
+                    _logger.LogDebug("Added argument: {Arg}", arg);
+                }
+            }
+
+            // Add the JAR file argument
+            startInfo.ArgumentList.Add("-jar");
+            startInfo.ArgumentList.Add(_serviceJarPath);
+
+            _logger.LogInformation("Starting CDR Client service in JAR mode with {Count} arguments from working directory: {WorkingDirectory}",
+                startInfo.ArgumentList.Count, workingDirectory);
+            _logger.LogDebug("Full command: {Command} {Arguments}",
+                _javaExecutablePath,
+                string.Join(" ", startInfo.ArgumentList.Select(a => a.Contains(" ") ? $"\"{a}\"" : a)));
+        }
+        else
+        {
+            // Running as executable - use executable directory as working directory
+            var workingDirectory = Path.GetDirectoryName(_serviceExecutablePath) ?? Environment.CurrentDirectory;
+
+            _logger.LogInformation("Starting CDR Client service in Executable mode: {Path} from working directory: {WorkingDirectory}",
+                _serviceExecutablePath, workingDirectory);
+
+            startInfo = new ProcessStartInfo
+            {
+                FileName = _serviceExecutablePath,
+                Arguments = string.Empty,
+                WorkingDirectory = workingDirectory,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+        }
+
+        return startInfo;
+    }
+
+    /// <summary>
+    /// Parses Java arguments from the configuration string.
+    /// Specially handles -D system properties to keep -Dkey=value together even when value contains spaces.
+    /// This is critical for paths like "C:\Program Files\..." which would otherwise be split incorrectly.
+    /// </summary>
+    private IEnumerable<string> ParseJavaArguments(string arguments)
+    {
+        if (string.IsNullOrWhiteSpace(arguments))
+            yield break;
+
+        var tokens = System.Text.RegularExpressions.Regex.Split(arguments, @"\s+");
+
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            var token = tokens[i].Trim();
+            if (string.IsNullOrEmpty(token))
+                continue;
+
+            // Check if this is a -D property with an = sign
+            if (token.StartsWith("-D") && token.Contains('='))
+            {
+                // This is a -D property. The value part might be split across multiple tokens if it has spaces.
+                // We need to re-assemble it.
+
+                var equalsIndex = token.IndexOf('=');
+                var key = token.Substring(0, equalsIndex + 1); // Include the =
+                var valuePart = token.Substring(equalsIndex + 1);
+
+                // If the value part looks like a path (contains : or \) and doesn't end properly,
+                // it might be incomplete due to space splitting
+                if ((valuePart.Contains('\\') || valuePart.Contains('/') || valuePart.Contains(':')) &&
+                    i + 1 < tokens.Length)
+                {
+                    // Reconstruct the complete value by consuming tokens until we hit the next argument (starts with -)
+                    var completeValue = new System.Text.StringBuilder(valuePart);
+
+                    while (i + 1 < tokens.Length && !tokens[i + 1].StartsWith("-"))
+                    {
+                        i++;
+                        completeValue.Append(' ');
+                        completeValue.Append(tokens[i]);
+                    }
+
+                    yield return key + completeValue.ToString();
+                }
+                else
+                {
+                    yield return token;
+                }
+            }
+            else
+            {
+                // Handle quoted arguments
+                if (token.StartsWith("\"") && token.EndsWith("\""))
+                {
+                    yield return token.Substring(1, token.Length - 2);
+                }
+                else
+                {
+                    yield return token;
+                }
+            }
+        }
     }
 
     private Process? StartServiceProcess(ProcessStartInfo startInfo)

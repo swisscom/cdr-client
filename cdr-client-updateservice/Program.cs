@@ -3,16 +3,17 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.EventLog;
+using System.Collections.Generic;
 using System;
 using System.Threading.Tasks;
 
-namespace CdrClientWatchdog;
+namespace CuraLineClientUpdateService;
 
 public class Program
 {
     public static async Task Main(string[] args)
     {
-        var serviceName = "CDRClientWatchdog";
+        var serviceName = "curaLINEClientUpdateService";
         for (int i = 0; i < args.Length; i++)
         {
             if (args[i].Equals("--serviceName", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
@@ -26,9 +27,13 @@ public class Program
 
         builder.Configuration.SetBasePath(AppContext.BaseDirectory);
         builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ServiceName"] = serviceName
+        });
 
-        builder.Services.AddSingleton<WatchdogService>();
-        builder.Services.AddHostedService<WatchdogService>(provider => provider.GetService<WatchdogService>()!);
+        builder.Services.AddSingleton<UpdateService>();
+        builder.Services.AddHostedService<UpdateService>(provider => provider.GetService<UpdateService>()!);
 
         builder.Services.AddWindowsService(options =>
         {

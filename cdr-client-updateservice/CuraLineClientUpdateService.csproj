@@ -1,4 +1,4 @@
- <Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -6,10 +6,10 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <UseWindowsForms>false</UseWindowsForms>
     <UseWPF>false</UseWPF>
-    <AssemblyTitle>CDR Client Watchdog Service</AssemblyTitle>
-    <AssemblyDescription>Windows service that monitors and restarts CDR Client service</AssemblyDescription>
+    <AssemblyTitle>curaLINE Client updateservice</AssemblyTitle>
+    <AssemblyDescription>Windows service that manages automatic updates for curaLINE Client on Windows Server (advanced installation)</AssemblyDescription>
     <AssemblyCompany>Swisscom (Schweiz) AG</AssemblyCompany>
-    <AssemblyProduct>CDR Client Watchdog</AssemblyProduct>
+    <AssemblyProduct>curaLINE Client updateservice</AssemblyProduct>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <AssemblyFileVersion>1.0.0.0</AssemblyFileVersion>
     <Copyright>Copyright © Swisscom (Schweiz) AG</Copyright>
@@ -25,9 +25,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="UpdateServiceTests.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 
 </Project>
+

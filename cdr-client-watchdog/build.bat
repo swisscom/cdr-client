@@ -1,15 +1,15 @@
 @echo off
 REM Build script for CDR Client Watchdog Service
 REM Usage: build.bat [SELF_CONTAINED] [CONFIGURATION] [RUNTIME]
-REM   SELF_CONTAINED: true/false (default: true)
-REM   CONFIGURATION: Release/Debug (default: Release)  
+REM   SELF_CONTAINED: true/false (default: false - framework-dependent)
+REM   CONFIGURATION: Release/Debug (default: Release)
 REM   RUNTIME: win-x64/win-x86 (default: win-x64)
 
 set "SELF_CONTAINED=%~1"
 set "CONFIGURATION=%~2"
 set "RUNTIME=%~3"
 
-if "%SELF_CONTAINED%"=="" set "SELF_CONTAINED=true"
+if "%SELF_CONTAINED%"=="" set "SELF_CONTAINED=false"
 if "%CONFIGURATION%"=="" set "CONFIGURATION=Release"
 if "%RUNTIME%"=="" set "RUNTIME=win-x64"
 
