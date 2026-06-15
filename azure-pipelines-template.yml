@@ -3,6 +3,12 @@ parameters:
     type: string
   - name: uploadStorageHostnamePath
     type: string
+  - name: conveyorCachePath
+    type: string
+  - name: conveyorVersion
+    type: string
+  - name: conveyorCommand
+    type: string
 
 steps:
   - task: AzureCLI@2
@@ -35,18 +41,18 @@ steps:
       version: '10.0.x'
 
   - script: |
-      INSTALL_DIR="${{ variables.conveyorCachePath }}/install/conveyor-${{ variables.conveyorVersion }}"
+      INSTALL_DIR="${{ parameters.conveyorCachePath }}/install/conveyor-${{ parameters.conveyorVersion }}"
       
       if [ ! -d "$INSTALL_DIR" ]; then
         echo "##vso[task.setvariable variable=ConveyorDownloaded;isOutput=true]true"
-        echo "Downloading and extracting Conveyor version ${{ variables.conveyorVersion }}..."
-        wget https://$(storageName)/build-agent-files/conveyor-${{ variables.conveyorVersion }}-linux-amd64.tar.gz
-        mkdir -p "${{ variables.conveyorCachePath }}/install"
+        echo "Downloading and extracting Conveyor version ${{ parameters.conveyorVersion }}..."
+        wget https://$(storageName)/build-agent-files/conveyor-${{ parameters.conveyorVersion }}-linux-amd64.tar.gz
+        mkdir -p "${{ parameters.conveyorCachePath }}/install"
       
-        tar xzvf conveyor-${{ variables.conveyorVersion }}-linux-amd64.tar.gz -C "${{ variables.conveyorCachePath }}/install"
+        tar xzvf conveyor-${{ parameters.conveyorVersion }}-linux-amd64.tar.gz -C "${{ parameters.conveyorCachePath }}/install"
         echo "Conveyor downloaded and extracted to $INSTALL_DIR"
       else
-        echo "Conveyor version ${{ variables.conveyorVersion }} already exists at $INSTALL_DIR. Skipping download."
+        echo "Conveyor version ${{ parameters.conveyorVersion }} already exists at $INSTALL_DIR. Skipping download."
       fi
     displayName: 'Download and Extract Conveyor'
 
@@ -258,15 +264,15 @@ steps:
         echo "##vso[task.setvariable variable=kvToken;isOutput=true]$TOKEN"
 
   - script: |
-      export PATH="$PATH:${{ variables.conveyorCachePath }}/install/conveyor-${{ variables.conveyorVersion }}/bin"
+      export PATH="$PATH:${{ parameters.conveyorCachePath }}/install/conveyor-${{ parameters.conveyorVersion }}/bin"
       
       export AZURE_API_ACCESS_TOKEN="$(GetAccessToken.kvToken)"
       export CONTACT_EMAIL="$(contactEmail)"
       export CONVEYOR_AGREE_TO_LICENSE="1"
       export KEY_VAULT_NAME="$(keyVaultName)"
       export SIGNING_KEY_ALIAS="$(signingKeyAlias)"
-      echo "Running Conveyor command: ${{ variables.conveyorCommand }}"
-      conveyor --cache-dir="${{ variables.conveyorCachePath }}/cache" -Kapp.signing-key="$(signingKey)" -Kapp.site.base-url="${{ parameters.uploadStorageHostnamePath }}/$(containerName)" ${{ variables.conveyorCommand }}
+      echo "Running Conveyor command: ${{ parameters.conveyorCommand }}"
+      conveyor --cache-dir="${{ parameters.conveyorCachePath }}/cache" -Kapp.signing-key="$(signingKey)" -Kapp.site.base-url="${{ parameters.uploadStorageHostnamePath }}/$(containerName)" ${{ parameters.conveyorCommand }}
     displayName: 'Run Conveyor Command'
 
   - task: AzureCLI@2

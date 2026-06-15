@@ -21,3 +21,6 @@ steps:
     parameters:
       uploadStorageName: $(uploadStorageName)
       uploadStorageHostnamePath: $(uploadStorageHostnamePath)
+      conveyorCachePath: $(conveyorCachePath)
+      conveyorVersion: $(conveyorVersion)
+      conveyorCommand: $(conveyorCommand)
