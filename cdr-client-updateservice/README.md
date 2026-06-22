@@ -69,6 +69,7 @@ Edit `appsettings.json` to customize behavior:
 ```json
 {
   "UpdateCheckIntervalHours": 2,
+  "UpdateBaseUrl": "",
   "WatchdogServiceName": "CDRClientWatchdog",
   "InstallationPath": "",
   "PinnedVersion": "",
@@ -95,6 +96,7 @@ Edit `appsettings.json` to customize behavior:
 ### Configuration Parameters
 
 - **UpdateCheckIntervalHours**: How often to check for updates (default: 2 hours)
+- **UpdateBaseUrl**: Base URL for the update site (empty = production `https://cdr.health.swisscom.ch/share/downloads/manualInstallation`; only `https://stg.cdr.health.swisscom.ch/share/downloads/manualInstallation` is accepted as an alternative)
 - **WatchdogServiceName**: Name of the watchdog Windows service
 - **InstallationPath**: Root installation path (auto-detected if empty)
 - **PinnedVersion**: Pin to a specific curaLINE client version (empty = auto-update, "5.3.0" = stay on that version, watchdog won't be auto-updated either)
@@ -107,7 +109,7 @@ Edit `appsettings.json` to customize behavior:
 
 ### Security Features
 
-- **Hardcoded Update URL**: The update site URL (`https://cdr.health.swisscom.ch/share/downloads/manualInstallation`) is hardcoded in the service binary to prevent tampering via configuration files
+- **Restricted Update URL**: The update site URL defaults to `https://cdr.health.swisscom.ch/share/downloads/manualInstallation` and can only be configured to point to the staging environment (`https://stg.cdr.health.swisscom.ch/share/downloads/manualInstallation`). Any other value is rejected at startup to prevent tampering.
 - **System Proxy Support**: Automatically uses Windows system proxy settings with default network credentials for corporate environments
 
 ## Update Process
