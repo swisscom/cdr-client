@@ -80,11 +80,11 @@ Edit `appsettings.json` to customize behavior:
   },
   "Artifacts": {
     "Service": {
-      "FileName": "cdr-client-service-{version}.jar",
+      "FileName": "cdr-client-service.jar",
       "TargetPath": "lib/cdr-client-service.jar"
     },
     "Watchdog": {
-      "FileName": "CdrClientWatchdog-{version}.zip",
+      "FileName": "CdrClientWatchdog.zip",
       "TargetPath": "bin/watchdog/"
     }
   },
@@ -101,7 +101,7 @@ Edit `appsettings.json` to customize behavior:
 - **MaxBackupsToKeep**: Number of backups to retain (default: 3)
 - **CurrentVersions**: Current installed versions (updated automatically after each update)
 - **Artifacts**: Configuration for each updateable component
-  - **FileName**: Template for artifact name (use `{version}` placeholder)
+  - **FileName**: Informational artifact name from packaging defaults
   - **TargetPath**: Where to install the artifact (relative to installation path)
 - **JavaExecutablePath**: Path to Java executable for running JARs
 
@@ -197,7 +197,8 @@ For automatic updates to work, artifacts are published to the update site with t
 
 ```
 downloads/manualInstallation/
-├── latest.json                          # Points to current version
+├── latest.json                                      # Points to current version + docs link
+├── WINDOWS_SERVER_ADVANCED_INSTALLATION_GUIDE.md    # Installation guide for manual setup
 ├── 5.3.0/
 │   ├── manifest.json                    # Describes available artifacts
 │   ├── cdr-client-service-5.3.0.jar    # Service JAR (always included)
@@ -214,7 +215,8 @@ Root has a `latest.json`:
 ```json
 {
   "version": "5.3.1",
-  "url": "https://cdr.health.swisscom.ch/share/downloads/manualInstallation/5.3.1/"
+  "manifestUrl": "https://cdr.health.swisscom.ch/share/downloads/manualInstallation/5.3.1/manifest.json",
+  "installationGuideUrl": "https://cdr.health.swisscom.ch/share/downloads/manualInstallation/WINDOWS_SERVER_ADVANCED_INSTALLATION_GUIDE.md"
 }
 ```
 

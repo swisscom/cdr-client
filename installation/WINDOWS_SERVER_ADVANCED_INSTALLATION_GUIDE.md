@@ -45,7 +45,6 @@ mkdir bin
 mkdir bin\watchdog
 mkdir bin\updateservice
 mkdir lib
-mkdir conf
 mkdir jre
 mkdir logs
 ```
@@ -190,17 +189,18 @@ These paths are configured in the Watchdog's `JavaArguments` setting (see next s
      },
      "Artifacts": {
        "Service": {
-         "FileName": "cdr-client-service-{version}.jar",
+         "FileName": "cdr-client-service.jar",
          "TargetPath": "lib/cdr-client-service.jar"
        },
        "Watchdog": {
-         "FileName": "CdrClientWatchdog-{version}.zip",
+         "FileName": "CdrClientWatchdog.zip",
          "TargetPath": "bin/watchdog/"
        }
      },
      "JavaExecutablePath": "jre/bin/java.exe"
    }
    ```
+   Ensure that `WatchdogServiceName` matches any modifications made in the watchdog service installation step (`install-service.bat`) under [4. Install Watchdog Service step 3](#4-install-watchdog-service).
    
 3. **Install as Windows Service**:
    ```cmd
@@ -212,9 +212,6 @@ These paths are configured in the Watchdog's `JavaArguments` setting (see next s
    ```cmd
    sc query curaLINEClientUpdateService
    ```
-   
-5. **Permissions**:
-> ⚠️ **IMPORTANT**: Ensure that the appsettings.json for the UpdateService can't be edited by everyone, as there are files directly downloaded from the Github repository that is defined in this file.
 
 ### 6. Start Services
 
