@@ -33,7 +33,10 @@ public class UpdateService : BackgroundService
     private readonly HttpClient _httpClient;
 
     private readonly TimeSpan _updateCheckInterval;
-    private const string UpdateBaseUrl = "https://cdr.health.swisscom.ch/share/downloads/manualInstallation";
+    private const string DefaultUpdateBaseUrl = "https://cdr.health.swisscom.ch/share/downloads/manualInstallation";
+    private const string StagingUpdateBaseUrl = "https://stg.cdr.health.swisscom.ch/share/downloads/manualInstallation";
+    private static readonly HashSet<string> AllowedUpdateBaseUrls = new(StringComparer.OrdinalIgnoreCase) { DefaultUpdateBaseUrl, StagingUpdateBaseUrl };
+    private readonly string _updateBaseUrl;
     private readonly string _watchdogServiceName;
     private readonly string _installationPath;
     private readonly string _javaExecutablePath;
@@ -100,6 +103,7 @@ public class UpdateService : BackgroundService
         _serviceName = _configuration["ServiceName"] ?? "curaLINEClientUpdateService";
         _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(_serviceName, serviceVersion));
         _updateCheckInterval = TimeSpan.FromHours(_configuration.GetValue<int>("UpdateCheckIntervalHours", 2));
+        _updateBaseUrl = ResolveUpdateBaseUrl(_configuration["UpdateBaseUrl"]);
         _watchdogServiceName = _configuration["WatchdogServiceName"] ?? "CDRClientWatchdog";
         _installationPath = ResolveInstallationPath(_configuration["InstallationPath"]);
         _javaExecutablePath = _configuration["JavaExecutablePath"] ?? "bin/jre/bin/java.exe";
@@ -110,7 +114,7 @@ public class UpdateService : BackgroundService
             ?? new Dictionary<string, ArtifactConfig>();
 
         _logger.LogInformation("{ServiceName} initialized. Installation path: {InstallationPath}, Service version: {Version}, Update URL: {UpdateUrl}",
-            _serviceName, _installationPath, _currentVersions.GetValueOrDefault("Service", "unknown"), UpdateBaseUrl);
+            _serviceName, _installationPath, _currentVersions.GetValueOrDefault("Service", "unknown"), _updateBaseUrl);
 
         _logger.LogInformation("HttpClient configured with system proxy and default network credentials");
 
@@ -252,7 +256,7 @@ public class UpdateService : BackgroundService
         try
         {
             // Step 1: Fetch latest.json to get the current version
-            var latestUrl = $"{UpdateBaseUrl}/latest.json";
+            var latestUrl = $"{_updateBaseUrl}/latest.json";
             _logger.LogDebug("Fetching latest version info from: {Url}", latestUrl);
 
             var response = await _httpClient.GetAsync(latestUrl, cancellationToken);
@@ -1112,6 +1116,24 @@ public class UpdateService : BackgroundService
     #endregion
 
     #region Configuration Management
+
+    private string ResolveUpdateBaseUrl(string? configuredUrl)
+    {
+        if (string.IsNullOrWhiteSpace(configuredUrl))
+        {
+            return DefaultUpdateBaseUrl;
+        }
+
+        var trimmed = configuredUrl.TrimEnd('/');
+        if (!AllowedUpdateBaseUrls.Contains(trimmed))
+        {
+            _logger.LogWarning("Invalid UpdateBaseUrl '{ConfiguredUrl}'. Allowed values are: {AllowedValues}. Falling back to default: {Default}",
+                configuredUrl, string.Join(", ", AllowedUpdateBaseUrls), DefaultUpdateBaseUrl);
+            return DefaultUpdateBaseUrl;
+        }
+
+        return trimmed;
+    }
 
     private string ResolveInstallationPath(string? configuredPath)
     {
