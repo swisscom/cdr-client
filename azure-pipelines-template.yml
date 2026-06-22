@@ -231,6 +231,8 @@ steps:
       scriptLocation: 'inlineScript'
       inlineScript: |
         VERSION="$(releaseVersion)"
+        INSTALLATION_GUIDE_FILE="installation/WINDOWS_SERVER_ADVANCED_INSTALLATION_GUIDE.md"
+        INSTALLATION_GUIDE_NAME="WINDOWS_SERVER_ADVANCED_INSTALLATION_GUIDE.md"
         
         echo "Uploading artifacts for version $VERSION to Azure Storage..."
         az storage blob upload-batch \
@@ -248,10 +250,38 @@ steps:
         
         if curl --head --fail "$MANIFEST_URL" > /dev/null 2>&1; then
           echo "Manifest verified at $MANIFEST_URL"
+
+          # Upload installation guide as a sibling of latest.json
+          if [ ! -f "$INSTALLATION_GUIDE_FILE" ]; then
+            echo "  ERROR: Installation guide not found: $INSTALLATION_GUIDE_FILE"
+            exit 1
+          fi
+
+          INSTALLATION_GUIDE_URL="https://${{ parameters.uploadStorageHostnamePath }}/$(containerName)/$(containerManualInstName)/$INSTALLATION_GUIDE_NAME"
+          echo "Uploading installation guide to: $INSTALLATION_GUIDE_URL"
+          az storage blob upload \
+            -f "$INSTALLATION_GUIDE_FILE" \
+            --account-name ${{ parameters.uploadStorageName }} \
+            -c $(containerName) \
+            -n $(containerManualInstName)/$INSTALLATION_GUIDE_NAME \
+            --auth-mode login \
+            --overwrite
+
+          if curl --head --fail "$INSTALLATION_GUIDE_URL" > /dev/null 2>&1; then
+            echo "Installation guide verified at $INSTALLATION_GUIDE_URL"
+          else
+            echo "  ERROR: Installation guide not accessible at $INSTALLATION_GUIDE_URL"
+            echo "  NOT updating latest.json - release NOT activated"
+            exit 1
+          fi
           
           # Update latest.json to activate this release
           echo "Updating latest.json to activate release $VERSION..."
-          echo "{\"version\":\"$VERSION\",\"manifestUrl\":\"$MANIFEST_URL\"}" > latest.json
+          jq -n \
+            --arg version "$VERSION" \
+            --arg manifestUrl "$MANIFEST_URL" \
+            --arg installationGuideUrl "$INSTALLATION_GUIDE_URL" \
+            '{version: $version, manifestUrl: $manifestUrl, installationGuideUrl: $installationGuideUrl}' > latest.json
           
           az storage blob upload \
             -f latest.json \
@@ -263,6 +293,7 @@ steps:
           
           echo "  Release $VERSION activated!"
           echo "  Latest: https://${{ parameters.uploadStorageHostnamePath }}/$(containerName)/$(containerManualInstName)/latest.json"
+          echo "  Installation guide: $INSTALLATION_GUIDE_URL"
         else
           echo "  ERROR: Manifest not accessible at $MANIFEST_URL"
           echo "  NOT updating latest.json - release NOT activated"

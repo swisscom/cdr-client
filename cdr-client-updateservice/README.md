@@ -69,6 +69,7 @@ Edit `appsettings.json` to customize behavior:
 ```json
 {
   "UpdateCheckIntervalHours": 2,
+  "UpdateBaseUrl": "",
   "WatchdogServiceName": "CDRClientWatchdog",
   "InstallationPath": "",
   "PinnedVersion": "",
@@ -80,11 +81,11 @@ Edit `appsettings.json` to customize behavior:
   },
   "Artifacts": {
     "Service": {
-      "FileName": "cdr-client-service-{version}.jar",
+      "FileName": "cdr-client-service.jar",
       "TargetPath": "lib/cdr-client-service.jar"
     },
     "Watchdog": {
-      "FileName": "CdrClientWatchdog-{version}.zip",
+      "FileName": "CdrClientWatchdog.zip",
       "TargetPath": "bin/watchdog/"
     }
   },
@@ -95,19 +96,20 @@ Edit `appsettings.json` to customize behavior:
 ### Configuration Parameters
 
 - **UpdateCheckIntervalHours**: How often to check for updates (default: 2 hours)
+- **UpdateBaseUrl**: Base URL for the update site (empty = production `https://cdr.health.swisscom.ch/share/downloads/manualInstallation`; only `https://stg.cdr.health.swisscom.ch/share/downloads/manualInstallation` is accepted as an alternative)
 - **WatchdogServiceName**: Name of the watchdog Windows service
 - **InstallationPath**: Root installation path (auto-detected if empty)
 - **PinnedVersion**: Pin to a specific curaLINE client version (empty = auto-update, "5.3.0" = stay on that version, watchdog won't be auto-updated either)
 - **MaxBackupsToKeep**: Number of backups to retain (default: 3)
 - **CurrentVersions**: Current installed versions (updated automatically after each update)
 - **Artifacts**: Configuration for each updateable component
-  - **FileName**: Template for artifact name (use `{version}` placeholder)
+  - **FileName**: Informational artifact name from packaging defaults
   - **TargetPath**: Where to install the artifact (relative to installation path)
 - **JavaExecutablePath**: Path to Java executable for running JARs
 
 ### Security Features
 
-- **Hardcoded Update URL**: The update site URL (`https://cdr.health.swisscom.ch/share/downloads/manualInstallation`) is hardcoded in the service binary to prevent tampering via configuration files
+- **Restricted Update URL**: The update site URL defaults to `https://cdr.health.swisscom.ch/share/downloads/manualInstallation` and can only be configured to point to the staging environment (`https://stg.cdr.health.swisscom.ch/share/downloads/manualInstallation`). Any other value is rejected at startup to prevent tampering.
 - **System Proxy Support**: Automatically uses Windows system proxy settings with default network credentials for corporate environments
 
 ## Update Process
@@ -197,7 +199,8 @@ For automatic updates to work, artifacts are published to the update site with t
 
 ```
 downloads/manualInstallation/
-├── latest.json                          # Points to current version
+├── latest.json                                      # Points to current version + docs link
+├── WINDOWS_SERVER_ADVANCED_INSTALLATION_GUIDE.md    # Installation guide for manual setup
 ├── 5.3.0/
 │   ├── manifest.json                    # Describes available artifacts
 │   ├── cdr-client-service-5.3.0.jar    # Service JAR (always included)
@@ -214,7 +217,8 @@ Root has a `latest.json`:
 ```json
 {
   "version": "5.3.1",
-  "url": "https://cdr.health.swisscom.ch/share/downloads/manualInstallation/5.3.1/"
+  "manifestUrl": "https://cdr.health.swisscom.ch/share/downloads/manualInstallation/5.3.1/manifest.json",
+  "installationGuideUrl": "https://cdr.health.swisscom.ch/share/downloads/manualInstallation/WINDOWS_SERVER_ADVANCED_INSTALLATION_GUIDE.md"
 }
 ```
 
