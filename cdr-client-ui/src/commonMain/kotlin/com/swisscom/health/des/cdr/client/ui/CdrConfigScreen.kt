@@ -124,7 +124,8 @@ internal fun CdrConfigScreen(
             if (uiState.fileMonitoringStatus.errorFileCount > 0 || uiState.fileMonitoringStatus.oldTempFileCount > 0) {
                 FileMonitoringWarningBanner(
                     modifier = horizontalPaddingModifier,
-                    fileMonitoringStatus = uiState.fileMonitoringStatus
+                    fileMonitoringStatus = uiState.fileMonitoringStatus,
+                    onRefreshClick = { viewModel.refreshFileMonitoringStatus() }
                 )
             }
 
