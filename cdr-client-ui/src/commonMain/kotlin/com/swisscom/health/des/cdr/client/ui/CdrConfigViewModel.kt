@@ -748,6 +748,20 @@ internal class CdrConfigViewModel(
         }
 
     /**
+     * Triggers an immediate file monitoring refresh on the CDR Client service and updates the UI state
+     * with the result. This is intended for use when the user has resolved filesystem issues and wants
+     * to see the updated status without waiting for the next scheduled check.
+     */
+    fun refreshFileMonitoringStatus(): Job =
+        viewModelScope.launch {
+            cdrClientApiClient.refreshFileMonitoringStatus().handle { response: DTOs.FileMonitoringStatusResponse ->
+                _uiState.update {
+                    it.copy(fileMonitoringStatus = response)
+                }
+            }
+        }
+
+    /**
      * Instructs the CDR Client service process to shut itself down. The received
      * [DTOs.ShutdownResponse] contains the time when the shutdown is scheduled for. We delay until
      * that time and then update the UI state and set the service status to

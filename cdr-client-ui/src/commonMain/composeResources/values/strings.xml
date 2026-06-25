@@ -81,6 +81,7 @@
     <string name="label_file_monitoring_warnings">File System Warnings</string>
     <string name="label_file_monitoring_error_files">%1$d file(s) in ERROR directories need attention</string>
     <string name="label_file_monitoring_old_temp_files">%1$d old file(s) in temporary directory (check if they have been imported and can be deleted)</string>
+    <string name="label_file_monitoring_refresh">Recheck now</string>
 
     <!-- Enumerations -->
     <string name="status_broken">broken - contact support or re-install</string>

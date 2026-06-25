@@ -377,6 +377,25 @@ internal class WebOperations(
     }
 
     /**
+     * Triggers an immediate file monitoring check and returns the updated status.
+     * This endpoint is intended for use by the UI when the user wants to refresh
+     * the file monitoring status after resolving local filesystem issues.
+     *
+     * @return the updated [DTOs.FileMonitoringStatusResponse] after performing the check
+     */
+    @PutMapping("api/file-monitoring/refresh")
+    internal suspend fun refreshFileMonitoringStatus(): ResponseEntity<DTOs.FileMonitoringStatusResponse> = runCatching {
+        logger.debug { "Manual file monitoring refresh triggered" }
+        fileMonitoringService.checkFileStatus()
+        ResponseEntity.ok(fileMonitoringService.monitoringStatus)
+    }.getOrElse { error: Throwable ->
+        when (error) {
+            is WebOperationsAdvice.ServerError, is WebOperationsAdvice.BadRequest -> throw error
+            else -> throw WebOperationsAdvice.ServerError("Failed to refresh file monitoring status: $error", error)
+        }
+    }
+
+    /**
      * This endpoint essentially does the same thing as the `shutdown` actuator, only it derives
      * an exit code from the reason provided in the query parameter.
      *
