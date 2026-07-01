@@ -66,7 +66,9 @@ object ConfigUpgrade {
                         acc + configUpgradeStep.upgrade(
                             configRoot = if (acc.isEmpty()) {
                                 // read original configuration file from disk
-                                YAML_MAPPER.readTree(configLocation.inputStream(StandardOpenOption.READ)) as ObjectNode
+                                configLocation.inputStream(StandardOpenOption.READ).use {
+                                    YAML_MAPPER.readTree(it) as ObjectNode
+                                }
                             } else {
                                 // use version of the configuration containing changes from previous migration steps
                                 acc.last().configRoot
@@ -93,9 +95,11 @@ object ConfigUpgrade {
         }
     }
 
-    private fun persistConfig(configLocation: Path, configRoot: ObjectNode) {
-        YAML_MAPPER.writeValue(configLocation.outputStream().writer(), configRoot)
-    }
+    private fun persistConfig(configLocation: Path, configRoot: ObjectNode) =
+        configLocation.outputStream().use { os ->
+            YAML_MAPPER.writeValue(os.writer(), configRoot)
+        }
+
 }
 
 sealed class UpgradeResult {
