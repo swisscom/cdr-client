@@ -74,9 +74,16 @@ internal class FileMonitoringService(
                     .flatten()
                     .distinct() // required because multiple document types might point to the same (default) error directory
                     .filter { errorFolder: Path -> errorFolder.exists() && errorFolder.isDirectory() }
-                    .flatMap { errorFolder: Path -> Files.walk(errorFolder).asSequence() }
-                    .count { file: Path -> file.isRegularFile() && file.extension.lowercase() == EXTENSION_XML }
-                    .also { errorCount -> logger.debug { "Found '$errorCount' error file(s) for connector '${connector.connectorId}'" } }
+                    .map { errorFolder: Path ->
+                        Files.walk(errorFolder).use { files ->
+                            files
+                                .asSequence()
+                                .count { file: Path -> file.isRegularFile() && file.extension.lowercase() == EXTENSION_XML }
+                                .also { errorCount ->
+                                    logger.debug { "Found '$errorCount' error file(s) in folder '$errorFolder' for connector '${connector.connectorId}'" }
+                                }
+                        }
+                    }.sumOf { it }
             }.getOrElse { t: Throwable ->
                 logger.warn { "Failed to check error folder for connector '${connector.connectorId}': ${t.message}" }
                 0
@@ -92,13 +99,14 @@ internal class FileMonitoringService(
             val count = if (tempFolder.exists() && tempFolder.isDirectory()) {
                 val threshold = Instant.now().minus(config.oldFileThreshold)
 
-                Files.list(tempFolder)
-                    .asSequence()
-                    .filter { it.isRegularFile() && it.extension.lowercase() == TEMP_FILE_EXTENSION }
-                    .count { file ->
-                        val lastModified = Files.getLastModifiedTime(file).toInstant()
-                        lastModified.isBefore(threshold)
-                    }
+                Files.list(tempFolder).use { files ->
+                    files.asSequence()
+                        .filter { it.isRegularFile() && it.extension.lowercase() == TEMP_FILE_EXTENSION }
+                        .count { file ->
+                            val lastModified = Files.getLastModifiedTime(file).toInstant()
+                            lastModified.isBefore(threshold)
+                        }
+                }
             } else {
                 0
             }

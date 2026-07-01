@@ -254,7 +254,9 @@ internal class ConfigurationWriter(
             }
 
             // persist the updated YAML file
-            writeValue(changedConfigItem.writableResource.outputStream.writer(), yamlNode)
+            changedConfigItem.writableResource.outputStream.use { os ->
+                writeValue(os.writer(), yamlNode)
+            }
         }
 
     // the trick to search the unboxing method on Java class was stolen from com.fasterxml.jackson.module.kotlin.ValueClassUnboxSerializer.serialize
