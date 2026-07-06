@@ -754,7 +754,7 @@ internal class CdrConfigViewModel(
      */
     fun refreshFileMonitoringStatus(): Job =
         viewModelScope.launch {
-            cdrClientApiClient.refreshFileMonitoringStatus().handle { response: DTOs.FileMonitoringStatusResponse ->
+            cdrClientApiClient.getFileMonitoringStatus().handle { response: DTOs.FileMonitoringStatusResponse ->
                 _uiState.update {
                     it.copy(fileMonitoringStatus = response)
                 }

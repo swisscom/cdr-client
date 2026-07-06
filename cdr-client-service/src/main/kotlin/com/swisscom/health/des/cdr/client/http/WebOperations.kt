@@ -383,8 +383,8 @@ internal class WebOperations(
      *
      * @return the updated [DTOs.FileMonitoringStatusResponse] after performing the check
      */
-    @PutMapping("api/file-monitoring/refresh")
-    internal suspend fun refreshFileMonitoringStatus(): ResponseEntity<DTOs.FileMonitoringStatusResponse> = runCatching {
+    @GetMapping("api/file-monitoring/status")
+    internal suspend fun getCurrentFileMonitoringStatus(): ResponseEntity<DTOs.FileMonitoringStatusResponse> = runCatching {
         logger.debug { "Manual file monitoring refresh triggered" }
         fileMonitoringService.checkFileStatus()
         ResponseEntity.ok(fileMonitoringService.monitoringStatus)

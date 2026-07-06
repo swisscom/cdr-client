@@ -216,39 +216,8 @@ internal class CdrClientApiClient {
      *
      * @return A [Result] containing the updated [DTOs.FileMonitoringStatusResponse].
      */
-    suspend fun refreshFileMonitoringStatus(): Result<DTOs.FileMonitoringStatusResponse> = withContext(Dispatchers.IO) {
-        logger.info { "BEGIN - Refresh file monitoring status" }
-        runCatching {
-            HttpClient
-                .INSTANCE
-                .newCall(
-                    HttpClient.put(FILE_MONITORING_REFRESH_URL, "", MEDIA_TYPE_APPLICATION_JSON)
-                )
-                .execute()
-                .use { response: Response ->
-                    val responseString: String = response.body
-                        .use { body ->
-                            body.string()
-                        }.also {
-                            logger.trace { "Response body: '$it'" }
-                        }
-
-                    if (response.isSuccessful) {
-                        val result = JSON.decodeFromString<DTOs.FileMonitoringStatusResponse>(responseString)
-                        logger.info { "END success - Refresh file monitoring status" }
-                        Result.Success(result)
-                    } else {
-                        logger.info {
-                            "END failed - Refresh file monitoring status; code: '${response.code}'; body: '$responseString'"
-                        }
-                        Result.ServiceError(mapOf("statusCode" to response.code, "body" to responseString))
-                    }
-                }
-        }.getOrElse { error ->
-            logger.info { "END failed - Refresh file monitoring status; error: '$error'" }
-            Result.IOError(mapOf("exception" to error))
-        }
-    }
+    suspend fun getFileMonitoringStatus(): Result<DTOs.FileMonitoringStatusResponse> =
+        getAnything(FILE_MONITORING_STATUS_URL, "Get file monitoring status")
 
     /**
      * Generic method to perform a GET request to the CDR Client service API.
@@ -431,7 +400,7 @@ internal class CdrClientApiClient {
         private val CDR_CLIENT_VALIDATE_PROXY_URL = "$CDR_CLIENT_BASE_URL/validate-proxy".toHttpUrl()
 
         @JvmStatic
-        private val FILE_MONITORING_REFRESH_URL = "$CDR_CLIENT_BASE_URL/file-monitoring/refresh".toHttpUrl()
+        private val FILE_MONITORING_STATUS_URL = "$CDR_CLIENT_BASE_URL/file-monitoring/status".toHttpUrl()
 
         @JvmStatic
         private val JSON = Json {}

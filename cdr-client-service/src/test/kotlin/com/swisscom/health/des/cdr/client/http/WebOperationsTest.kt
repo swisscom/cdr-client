@@ -260,12 +260,12 @@ internal class WebOperationsTest {
     }
 
     @Test
-    fun `test refreshFileMonitoringStatus - returns updated status`() = runTest {
+    fun `test getFileMonitoringStatus - returns updated status`() = runTest {
         val expectedStatus = DTOs.FileMonitoringStatusResponse(errorFileCount = 3, oldTempFileCount = 1)
         coEvery { fileMonitoringService.checkFileStatus() } returns Unit
         every { fileMonitoringService.monitoringStatus } returns expectedStatus
 
-        val response = webOperations.refreshFileMonitoringStatus()
+        val response = webOperations.getCurrentFileMonitoringStatus()
 
         assertEquals(HttpStatus.OK, response.statusCode)
         val body = assertInstanceOf<DTOs.FileMonitoringStatusResponse>(response.body)
@@ -274,10 +274,10 @@ internal class WebOperationsTest {
     }
 
     @Test
-    fun `test refreshFileMonitoringStatus - exception is wrapped in ServerError`() = runTest {
+    fun `test getFileMonitoringStatus - exception is wrapped in ServerError`() = runTest {
         coEvery { fileMonitoringService.checkFileStatus() } throws IllegalStateException("disk error")
 
-        val exception = assertThrows<WebOperationsAdvice.ServerError> { webOperations.refreshFileMonitoringStatus() }
+        val exception = assertThrows<WebOperationsAdvice.ServerError> { webOperations.getCurrentFileMonitoringStatus() }
         val probDetail = webOperationsAdvice.handleError(exception)
 
         assertEquals("Failed to refresh file monitoring status: java.lang.IllegalStateException: disk error", probDetail.detail)
