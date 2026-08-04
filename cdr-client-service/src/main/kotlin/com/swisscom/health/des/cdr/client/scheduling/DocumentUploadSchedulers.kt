@@ -4,7 +4,6 @@ import com.mayakapps.kache.ObjectKache
 import com.swisscom.health.des.cdr.client.SpanContextElement
 import com.swisscom.health.des.cdr.client.TraceSupport.continueSpan
 import com.swisscom.health.des.cdr.client.TraceSupport.startSpan
-import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.FileBusyTester
 import com.swisscom.health.des.cdr.client.config.getConnectorBySourceFolder
@@ -19,7 +18,6 @@ import io.github.irgaly.kfswatch.KfsEvent
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.micrometer.tracing.Span
 import io.micrometer.tracing.Tracer
-import jakarta.annotation.PostConstruct
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,8 +39,8 @@ import kotlinx.coroutines.time.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.context.annotation.DependsOn
 import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
@@ -59,12 +57,12 @@ import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
-import kotlin.io.path.nameWithoutExtension
 import kotlin.time.Duration.Companion.milliseconds
 
 private val logger = KotlinLogging.logger {}
 
 @Service
+@DependsOn("uploadStartupPreparation")
 @Profile("!noEventTriggerUploadScheduler")
 @ConditionalOnProperty(prefix = "client", name = ["file-synchronization-enabled"])
 @Suppress("LongParameterList")
@@ -72,8 +70,6 @@ internal class EventTriggerUploadScheduler(
     private val config: CdrClientConfig,
     private val schedulingValidationService: SchedulingValidationService,
     private val tracer: Tracer,
-    @param:Value($$"${management.tracing.sampling.probability:0.0}")
-    private val samplerProbability: Double,
     @Qualifier("limitedParallelismCdrUploadsDispatcher")
     cdrUploadsDispatcher: CoroutineDispatcher,
     retryUploadFileHandling: RetryUploadFileHandling,
@@ -87,42 +83,6 @@ internal class EventTriggerUploadScheduler(
     tracer = tracer,
     fileBusyTester = fileBusyTester,
 ) {
-
-    @PostConstruct
-    @Suppress("UnusedPrivateMember", "NestedBlockDepth", "TooGenericExceptionCaught")
-    private fun failIfTelemetrySamplingIsEnabled() {
-        if (samplerProbability > ZERO_SAMPLING_THRESHOLD) {
-            logger.error {
-                "Telemetry sampling is enabled (sampling probability is set to $samplerProbability). Currently we cannot support telemetry " +
-                        "sampling without introducing a memory leak due to the lack of framework integration of micrometer/open-telemetry with Kotlin " +
-                        "coroutines/asynchronous flows. You need to disable telemetry sampling."
-            }
-            error("Telemetry sampling is enabled. Please set the configuration property `management.tracing.sampling.probability` to 0.0")
-        }
-
-        if (!schedulingValidationService.isSchedulingAllowed) {
-            logger.info { "Scheduling is not allowed. Skipping renaming of '.$RESTART_FILE_EXTENSION' files." }
-            return
-        }
-
-        logger.info { "Renaming '.$RESTART_FILE_EXTENSION' files to '.xml' in source directories..." }
-        config.customer.forEach { connector ->
-            val allSourceFolders: Collection<Path> = connector.effectiveSourceFolders.values.flatten().distinct()
-            allSourceFolders.forEach { dir ->
-                if (Files.exists(dir) && Files.isDirectory(dir)) {
-                    dir.listDirectoryEntries("*.$RESTART_FILE_EXTENSION").forEach { file ->
-                        val newFile = file.resolveSibling("${file.nameWithoutExtension}.xml")
-                        try {
-                            Files.move(file, newFile)
-                            logger.info { "Renamed file '${file.absolutePathString()}' to '${newFile.absolutePathString()}'" }
-                        } catch (e: Exception) {
-                            logger.error { "Failed to rename file '${file.absolutePathString()}': ${e.message}" }
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     // NOTE: The scheduled tasks are racing the SpringBoot/integration tests; we need to give the tests enough time to update the client configuration
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
@@ -219,6 +179,7 @@ internal class EventTriggerUploadScheduler(
 }
 
 @Service
+@DependsOn("uploadStartupPreparation")
 @Profile("!noPollingUploadScheduler")
 @ConditionalOnProperty(prefix = "client", name = ["file-synchronization-enabled"])
 @Suppress("LongParameterList")
@@ -228,8 +189,6 @@ internal class PollingUploadScheduler(
     private val tracer: Tracer,
     @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
     private val cdrUploadsDispatcher: CoroutineDispatcher,
-    @param:Value($$"${management.tracing.sampling.probability:1.0}")
-    private val samplerProbability: Double,
     retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
     fileBusyTester: FileBusyTester,
@@ -242,18 +201,6 @@ internal class PollingUploadScheduler(
     fileBusyTester = fileBusyTester,
 ) {
 
-    @PostConstruct
-    @Suppress("UnusedPrivateMember")
-    private fun failIfTelemetrySamplingIsEnabled() {
-        if (samplerProbability > ZERO_SAMPLING_THRESHOLD) {
-            logger.error {
-                "Telemetry sampling is enabled (sampling probability is set to $samplerProbability). Currently we cannot support telemetry " +
-                        "sampling without introducing a memory leak due to the lack of framework integration of micrometer/open-telemetry with Kotlin " +
-                        "coroutines/asynchronous flows. You need to disable telemetry sampling."
-            }
-            error("Telemetry sampling is enabled. Please set the configuration property `management.tracing.sampling.probability` to 0.0")
-        }
-    }
 
     // NOTE: The scheduled tasks are racing the SpringBoot/integration tests; we need to give the tests enough time to update the client configuration
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
