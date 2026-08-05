@@ -1,6 +1,9 @@
 {
   "mappings": [
     {
+      "scenarioName": "push-files-404-429-alternating",
+      "requiredScenarioState": "Started",
+      "newScenarioState": "RETURN_429",
       "request": {
         "method": "POST",
         "url": "/documents",
@@ -16,6 +19,27 @@
           "Content-Type": "application/problem+json; charset=utf-8"
         },
         "body": "{\"type\":\"about:blank\",\"title\":\"Not Found\",\"status\":404,\"detail\":\"Resource not found.\"}"
+      }
+    },
+    {
+      "scenarioName": "push-files-404-429-alternating",
+      "requiredScenarioState": "RETURN_429",
+      "newScenarioState": "Started",
+      "request": {
+        "method": "POST",
+        "url": "/documents",
+        "headers": {
+          "cdr-connector-id": {
+            "equalTo": "404"
+          }
+        }
+      },
+      "response": {
+        "status": 429,
+        "headers": {
+          "Content-Type": "application/problem+json; charset=utf-8"
+        },
+        "body": "{\"type\":\"about:blank\",\"title\":\"Too Many Requests\",\"status\":429,\"detail\":\"Too many requests.\"}"
       }
     }
   ]

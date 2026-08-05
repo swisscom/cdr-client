@@ -2,6 +2,7 @@ package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
+import com.swisscom.health.des.cdr.client.common.Constants.UPLOAD_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.getConnectorBySourceFolder
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
+import java.nio.file.FileAlreadyExistsException
 import java.util.UUID
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
@@ -55,13 +57,13 @@ internal class RetryUploadFileHandling(
         var retryCount = 0
         var retryNeeded: Boolean
 
-        val uploadFile: Path = file.resolveSibling("${file.nameWithoutExtension}.upload")
+        // a successful rename of the file to upload should guarantee that we can also delete it after a successful upload,
+        // and thus prevent duplicate uploads of a file if we fail to delete or archive it after a successful upload.
+        // Any exception here propagates to the caller before runCatching is entered; the source file stays in place.
+        val uploadFile: Path = moveFileToUploadFile(file)
 
         runCatching {
             uploadGuard.acquire()
-            // a successful rename of the file to upload should guarantee that we can also delete it after a successful upload,
-            // and thus prevent duplicate uploads of a file if we fail to delete or archive it after a successful upload
-            file.moveTo(uploadFile)
             do {
                 val retryIndex = min(retryCount, cdrClientConfig.retryDelay.size - 1)
 
@@ -158,6 +160,28 @@ internal class RetryUploadFileHandling(
                 }
             }
         )
+    }
+
+    private fun moveFileToUploadFile(file: Path): Path {
+        val uploadFile = file.resolveSibling("${file.nameWithoutExtension}.$UPLOAD_FILE_EXTENSION")
+
+        return runCatching {
+            file.moveTo(uploadFile)
+            uploadFile
+        }.recoverCatching { t ->
+            when (t) {
+                is FileAlreadyExistsException -> {
+                    val fallbackUploadFile = file.resolveSibling("${file.nameWithoutExtension}_${UUID.randomUUID()}.$UPLOAD_FILE_EXTENSION")
+                    logger.warn {
+                        "Upload target '$uploadFile' already exists; renaming '$file' to '$fallbackUploadFile' instead."
+                    }
+                    file.moveTo(fallbackUploadFile)
+                    fallbackUploadFile
+                }
+
+                else -> throw t
+            }
+        }.getOrThrow()
     }
 
     private fun deleteOrArchiveFile(file: Path, docType: DocumentMetaData): Unit = runCatching {
