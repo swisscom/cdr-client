@@ -212,6 +212,14 @@ internal class CdrClientApiClient {
     }
 
     /**
+     * Triggers an immediate file monitoring refresh on the CDR Client service and returns the updated status.
+     *
+     * @return A [Result] containing the updated [DTOs.FileMonitoringStatusResponse].
+     */
+    suspend fun getFileMonitoringStatus(): Result<DTOs.FileMonitoringStatusResponse> =
+        getAnything(FILE_MONITORING_STATUS_URL, "Get file monitoring status")
+
+    /**
      * Generic method to perform a GET request to the CDR Client service API.
      *
      * @param url The URL to send the request to.
@@ -390,6 +398,9 @@ internal class CdrClientApiClient {
 
         @JvmStatic
         private val CDR_CLIENT_VALIDATE_PROXY_URL = "$CDR_CLIENT_BASE_URL/validate-proxy".toHttpUrl()
+
+        @JvmStatic
+        private val FILE_MONITORING_STATUS_URL = "$CDR_CLIENT_BASE_URL/file-monitoring/status".toHttpUrl()
 
         @JvmStatic
         private val JSON = Json {}

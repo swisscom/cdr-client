@@ -5,6 +5,7 @@ import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
+import com.swisscom.health.des.cdr.client.common.Constants.UPLOAD_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
@@ -223,13 +224,17 @@ internal class EventPushFileHandlingTest {
         payload2.outputStream().use { it.write("Hello 2".toByteArray()) }
         val payload3 = sourceDir.resolve("dummy-3.log")
         payload3.outputStream().use { it.write("Hello 3".toByteArray()) }
+        val payload4 = sourceDir.resolve("dummy-4.$UPLOAD_FILE_EXTENSION")
+        payload4.outputStream().use { it.write("Hello 4".toByteArray()) }
 
-        assertEquals(3, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
+        assertEquals(4, sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size)
 
         // polling process must leave non-xml files where they are
-        await().during(1000L, TimeUnit.MILLISECONDS).until { sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size == 3 }
+        await().during(1000L, TimeUnit.MILLISECONDS).until { sourceDir.listDirectoryEntries().filter { it.isRegularFile() }.size == 4 }
 
         assertEquals(0, cdrServiceMock.requestCount)
+
+        assertEquals(1, sourceDir.listDirectoryEntries("*.$UPLOAD_FILE_EXTENSION").size)
 
         // ignored files don't get processed and thus are not supposed to be in the processing cache
         await().during(100L, TimeUnit.MILLISECONDS).until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
