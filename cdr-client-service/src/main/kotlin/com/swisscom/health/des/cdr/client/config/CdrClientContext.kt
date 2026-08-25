@@ -6,16 +6,24 @@ import com.mayakapps.kache.ObjectKache
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.time.delay
+import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpStatus
 import org.springframework.retry.support.RetryTemplate
 import java.io.IOException
 import java.net.Authenticator
@@ -107,17 +115,9 @@ internal class CdrClientContext {
                 oAuth2AuthNService.getAccessToken()
                     .let { authNResponse ->
                         when (authNResponse) {
-                            is AuthNResponse.Success -> {
-                                chain
-                                    .request()
-                                    .newBuilder()
-                                    .run {
-                                        header("Authorization", "Bearer ${authNResponse.response.tokens.accessToken.value}")
-                                        build()
-                                    }.let { authenticatedRequest ->
-                                        chain.proceed(authenticatedRequest)
-                                    }
-                            }
+                            is AuthNResponse.Success -> successProceeding(chain, authNResponse.response.tokens.accessToken.value)
+
+                            is AuthNResponse.Reauthenticating -> temporaryServiceUnavailableResponse(chain)
 
                             else -> chain.proceed(chain.request()) // unauthenticated call; will probably fail with 401/403
                                 .also { _ ->
@@ -142,6 +142,34 @@ internal class CdrClientContext {
             }
             .build()
 
+    private fun successProceeding(chain: Interceptor.Chain, accessToken: String): Response {
+        return chain
+            .request()
+            .newBuilder()
+            .run {
+                header("Authorization", "Bearer $accessToken")
+                build()
+            }.let { authenticatedRequest ->
+                chain.proceed(authenticatedRequest)
+            }
+    }
+
+    private fun temporaryServiceUnavailableResponse(chain: Interceptor.Chain): Response {
+        return Response.Builder()
+            .request(chain.request())
+            .protocol(Protocol.HTTP_1_1)
+            .code(HttpStatus.SERVICE_UNAVAILABLE.value())
+            .message("Authentication re-establishment in progress")
+            .body(
+                "Authentication is being re-established."
+                    .toResponseBody("text/plain".toMediaType())
+            )
+            .build()
+            .also {
+                logger.warn { "Authentication is currently re-establishing; returning temporary 503 response." }
+            }
+    }
+
     /**
      * Creates and returns an instance of the OkHttpClient.Builder if one does not already exist.
      *
@@ -152,6 +180,10 @@ internal class CdrClientContext {
     fun okHttpClientBuilder(): OkHttpClient.Builder? {
         return OkHttpClient.Builder()
     }
+
+    @Bean(name = ["applicationCoroutineScope"], destroyMethod = "close")
+    fun applicationCoroutineScope(): ManagedCoroutineScope =
+        ManagedCoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Creates a coroutine dispatcher for blocking I/O operations with limited parallelism.
@@ -261,8 +293,6 @@ internal class CdrClientContext {
 
 }
 
-
-
 internal class HttpServerErrorException(message: String, val statusCode: Int, val responseBody: String) : RuntimeException(message, null, false, false) {
     override fun toString(): String {
         return "HttpServerErrorException(statusCode='$statusCode', responseBody='$responseBody', message='${message}')"
@@ -270,6 +300,14 @@ internal class HttpServerErrorException(message: String, val statusCode: Int, va
 }
 
 internal class WrongCredentialsException(message: String) : RuntimeException(message, null, false, false)
+
+internal class ManagedCoroutineScope(
+    override val coroutineContext: kotlin.coroutines.CoroutineContext
+) : CoroutineScope, AutoCloseable {
+    override fun close() {
+        coroutineContext.cancel()
+    }
+}
 
 sealed interface FileBusyTester {
     suspend fun isBusy(file: Path): Boolean

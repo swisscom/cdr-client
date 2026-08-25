@@ -46,6 +46,15 @@ internal data class CdrClientConfig(
     /** OAuth IdP URL. */
     val idpEndpoint: URL,
 
+    /** Number of background retries after an authentication deny before hardening to denied state. */
+    val denyRetryAttempts: Int,
+
+    /** Initial delay before first background retry after an authentication deny. */
+    val denyRetryInitialDelay: Duration,
+
+    /** Exponential backoff multiplier for deny retries. */
+    val denyRetryBackoffMultiplier: Double,
+
     /** Directory to temporarily store downloaded documents that are pending download acknowledgement. */
     val localFolder: TempDownloadDir,
 

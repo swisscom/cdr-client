@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertNull
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.http.MediaType
 import java.nio.file.Path
@@ -403,6 +404,22 @@ class ConnectorDirectoriesTest {
             .forEach { docType ->
                 assertEquals(defaultErrorDir, requestResponseSplitErrorFolders[docType])
             }
+    }
+
+    @Test
+    fun `test get connector by source folder provides contextual error`() {
+        val file = baseSourceDir.resolve("credit").resolve("sample.xml")
+
+        val exception = assertThrows<NoSuchElementException> {
+            listOf(allRelativePathsConnector).getConnectorBySourceFolder(
+                file = file,
+                docMetaData = DocumentMetaData(DocumentType.CREDIT, CommunicationType.REQUEST)
+            )
+        }
+
+        assertTrue(exception.message!!.contains("No connector source folder match for file"))
+        assertTrue(exception.message!!.contains("documentType='CREDIT'"))
+        assertTrue(exception.message!!.contains("lookup dir '${file.parent}'"))
     }
 
 }

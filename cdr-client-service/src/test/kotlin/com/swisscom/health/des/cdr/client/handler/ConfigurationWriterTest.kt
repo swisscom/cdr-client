@@ -137,6 +137,9 @@ class ConfigurationWriterTest {
             ),
             oldFileThreshold = Duration.ofHours(2L),
             fileSystemCheckInterval = Duration.ofMinutes(5L),
+            denyRetryAttempts = 5,
+            denyRetryInitialDelay = Duration.ofSeconds(1L),
+            denyRetryBackoffMultiplier = 2.0,
         )
 
         every { configValidationService.validateAllConfigurationItems(any()) } returns ValidationResult.Success

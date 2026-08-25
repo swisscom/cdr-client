@@ -36,6 +36,7 @@ import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_COMMUNICATION_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_DENIED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_REAUTHENTICATING
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNKNOWN_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_BROKEN
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_ERROR
@@ -205,6 +206,7 @@ internal class WebOperationsTest {
         "ERROR, ERROR",
         "BROKEN, BROKEN",
         "DENIED, AUTHN_DENIED",
+        "REAUTHENTICATING, AUTHN_REAUTHENTICATING",
         "AUTHN_FAILED_RETRY, AUTHN_ERROR",
         "AUTHN_FAILED_PERMANENT, AUTHN_ERROR",
         "FOO, UNKNOWN"
@@ -222,6 +224,7 @@ internal class WebOperationsTest {
         }
         val authNStatus = when (healthStatusString) {
             "DENIED" -> AUTHN_DENIED
+            "REAUTHENTICATING" -> AUTHN_REAUTHENTICATING
             "AUTHN_COMMUNICATION_ERROR" -> AUTHN_COMMUNICATION_ERROR
             "AUTHN_UNKNOWN_ERROR" -> AUTHN_UNKNOWN_ERROR
             else -> AUTHN_AUTHENTICATED
@@ -231,6 +234,7 @@ internal class WebOperationsTest {
             "DISABLED" -> DTOs.StatusResponse.StatusCode.DISABLED
             "BROKEN" -> DTOs.StatusResponse.StatusCode.BROKEN
             "ERROR" -> DTOs.StatusResponse.StatusCode.ERROR
+            "AUTHN_REAUTHENTICATING" -> DTOs.StatusResponse.StatusCode.AUTHN_REAUTHENTICATING
             "AUTHN_COMMUNICATION_ERROR" -> DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR
             "AUTHN_UNKNOWN_ERROR" -> DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR
             "AUTHN_DENIED" -> DTOs.StatusResponse.StatusCode.AUTHN_DENIED
@@ -574,6 +578,9 @@ internal class WebOperationsTest {
             ),
             oldFileThreshold = Duration.ofHours(2L),
             fileSystemCheckInterval = Duration.ofMinutes(5L),
+            denyRetryAttempts = 5,
+            denyRetryInitialDelay = Duration.ofSeconds(1L),
+            denyRetryBackoffMultiplier = 2.0,
         )
     }
 }

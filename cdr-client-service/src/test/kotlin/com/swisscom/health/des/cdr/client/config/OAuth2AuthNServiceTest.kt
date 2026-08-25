@@ -6,6 +6,8 @@ import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import java.net.URI
 import java.time.Duration
 import java.time.Instant
@@ -24,6 +26,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.extension.ExtendWith
@@ -68,6 +71,7 @@ class OAuth2AuthNServiceTest {
             config = config,
             retryIoErrors = retryIoExceptionsTwice,
             proxy = null,
+            applicationScope = CoroutineScope(Dispatchers.Default),
         )
     }
 
@@ -137,6 +141,7 @@ class OAuth2AuthNServiceTest {
             clock = constantTimeClock,
             retryIoErrors = retryIoExceptionsTwice,
             proxy = null,
+            applicationScope = CoroutineScope(Dispatchers.Default),
         )
 
         val authNResponse1: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
@@ -181,6 +186,7 @@ class OAuth2AuthNServiceTest {
             clock = constantTimeClock,
             retryIoErrors = retryIoExceptionsTwice,
             proxy = null,
+            applicationScope = CoroutineScope(Dispatchers.Default),
         )
 
         val authNResponse1: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
@@ -199,7 +205,12 @@ class OAuth2AuthNServiceTest {
     }
 
     @Test
-    fun `idp error response - authN denied`() {
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    fun `idp error response - transitions via reauthenticating to denied`() {
+        every { config.denyRetryAttempts } returns 1
+        every { config.denyRetryInitialDelay } returns Duration.ZERO
+        every { config.denyRetryBackoffMultiplier } returns 2.0
+
         val mockResponse = MockResponse.Builder()
             .code(HttpStatus.BAD_REQUEST.value())
             .headers(
@@ -210,19 +221,150 @@ class OAuth2AuthNServiceTest {
             .body(ERROR_TOKEN_RESPONSE)
             .build()
         idpMock.enqueue(mockResponse)
+        idpMock.enqueue(mockResponse)
 
         assertEquals(OAuth2AuthNService.AuthNState.UNKNOWN, authNService.currentAuthNStateNonBlocking())
 
+        authNService = OAuth2AuthNService(
+            config = config,
+            retryIoErrors = retryIoExceptionsTwice,
+            proxy = null,
+            applicationScope = CoroutineScope(Dispatchers.Default),
+        )
         val authNResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
-        val serverSideRequest: RecordedRequest = requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
+        waitForAuthState(OAuth2AuthNService.AuthNState.DENIED)
+        val firstServerRequest: RecordedRequest = requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
+        requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No retry request received" }
+
+        assertEquals(2, idpMock.requestCount)
+        assertEquals("/fake-tenant-id/oauth2/v2.0/token", firstServerRequest.target)
+        assertInstanceOf<AuthNResponse.Reauthenticating>(authNResponse)
+        assertEquals(OAuth2AuthNService.AuthNState.DENIED, authNService.currentAuthNStateNonBlocking())
+    }
+
+    @Test
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    fun `idp deny then retry success - transitions to authenticated`() {
+        every { config.denyRetryAttempts } returns 1
+        every { config.denyRetryInitialDelay } returns Duration.ZERO
+        every { config.denyRetryBackoffMultiplier } returns 2.0
+
+        val errorResponse = MockResponse.Builder()
+            .code(HttpStatus.BAD_REQUEST.value())
+            .headers(
+                Headers.Builder()
+                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
+                    .build()
+            )
+            .body(ERROR_TOKEN_RESPONSE)
+            .build()
+        val successResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(
+                Headers.Builder()
+                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
+                    .build()
+            )
+            .body(SUCCESS_TOKEN_RESPONSE)
+            .build()
+        idpMock.enqueue(errorResponse)
+        idpMock.enqueue(successResponse)
+
+        authNService = OAuth2AuthNService(
+            config = config,
+            retryIoErrors = retryIoExceptionsTwice,
+            proxy = null,
+            applicationScope = CoroutineScope(Dispatchers.Default),
+        )
+
+        val firstResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
+        waitForAuthState(OAuth2AuthNService.AuthNState.AUTHENTICATED)
+        requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No initial deny request received" }
+        requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No retry success request received" }
+
+        assertEquals(2, idpMock.requestCount)
+        assertInstanceOf<AuthNResponse.Reauthenticating>(firstResponse)
+        assertEquals(OAuth2AuthNService.AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
+    }
+
+    @Test
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    fun `idp deny - retries configured number of attempts before denied`() {
+        every { config.denyRetryAttempts } returns 3
+        every { config.denyRetryInitialDelay } returns Duration.ZERO
+        every { config.denyRetryBackoffMultiplier } returns 2.0
+
+        val denyResponse = MockResponse.Builder()
+            .code(HttpStatus.BAD_REQUEST.value())
+            .headers(
+                Headers.Builder()
+                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
+                    .build()
+            )
+            .body(ERROR_TOKEN_RESPONSE)
+            .build()
+        repeat(4) {
+            idpMock.enqueue(denyResponse)
+        }
+
+        authNService = OAuth2AuthNService(
+            config = config,
+            retryIoErrors = retryIoExceptionsTwice,
+            proxy = null,
+            applicationScope = CoroutineScope(Dispatchers.Default),
+        )
+
+        val firstResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
+        waitForAuthState(OAuth2AuthNService.AuthNState.DENIED)
+
+        repeat(4) {
+            requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "Expected request #${it + 1} was not sent" }
+        }
+
+        assertEquals(4, idpMock.requestCount)
+        assertInstanceOf<AuthNResponse.Reauthenticating>(firstResponse)
+        assertEquals(OAuth2AuthNService.AuthNState.DENIED, authNService.currentAuthNStateNonBlocking())
+    }
+
+    @Test
+    @Timeout(value = 1, unit = TimeUnit.SECONDS)
+    fun `idp deny - retries disabled keeps denied without launching reauth`() {
+        every { config.denyRetryAttempts } returns 0
+
+        val denyResponse = MockResponse.Builder()
+            .code(HttpStatus.BAD_REQUEST.value())
+            .headers(
+                Headers.Builder()
+                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
+                    .build()
+            )
+            .body(ERROR_TOKEN_RESPONSE)
+            .build()
+        idpMock.enqueue(denyResponse)
+
+        authNService = OAuth2AuthNService(
+            config = config,
+            retryIoErrors = retryIoExceptionsTwice,
+            proxy = null,
+            applicationScope = CoroutineScope(Dispatchers.Default),
+        )
+
+        val firstResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
+        requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "Expected initial deny request was not sent" }
 
         assertEquals(1, idpMock.requestCount)
-        assertEquals("/fake-tenant-id/oauth2/v2.0/token", serverSideRequest.target)
-        assertInstanceOf<AuthNResponse.Deny>(authNResponse)
-        val wrappedException: WrongCredentialsException = authNResponse.error
-        assertTrue(wrappedException.message!!.startsWith("Failed to login; client id: 'ClientId(id=fake-client-id)'"))
-
+        assertInstanceOf<AuthNResponse.Deny>(firstResponse)
         assertEquals(OAuth2AuthNService.AuthNState.DENIED, authNService.currentAuthNStateNonBlocking())
+    }
+
+    private fun waitForAuthState(targetState: OAuth2AuthNService.AuthNState, maxWaitMillis: Long = 250L) {
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(maxWaitMillis)
+        var state = authNService.currentAuthNStateNonBlocking()
+        while (state != targetState && System.nanoTime() < deadlineNanos) {
+            Thread.sleep(1)
+            state = authNService.currentAuthNStateNonBlocking()
+        }
+        assertEquals(targetState, state)
     }
 
     @Test

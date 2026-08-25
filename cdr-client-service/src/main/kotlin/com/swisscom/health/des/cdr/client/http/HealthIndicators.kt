@@ -5,6 +5,7 @@ import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.AUTHENTICATED
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.DENIED
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.FAILED
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.REAUTHENTICATING
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.RETRYABLE_FAILURE
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.UNAUTHENTICATED
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.UNKNOWN
@@ -62,6 +63,7 @@ internal class HealthIndicators(
             when (authNService.currentAuthNStateNonBlocking()) {
                 UNAUTHENTICATED -> Health.status(AUTHN_UNAUTHENTICATED).withDetail("authNState", "no login attempted").build()
                 AUTHENTICATED -> Health.status(AUTHN_AUTHENTICATED).withDetail("authNState", "JWT obtained").build()
+                REAUTHENTICATING -> Health.status(AUTHN_REAUTHENTICATING).withDetail("authNState", "authentication retry in progress").build()
                 DENIED -> Health.status(AUTHN_DENIED).withDetail("authNState", "wrong credentials or IdP coordinates").build()
                 RETRYABLE_FAILURE -> Health.status(AUTHN_COMMUNICATION_ERROR).withDetail("authNState", "io error (recoverable)").build()
                 FAILED -> Health.status(AUTHN_UNKNOWN_ERROR).withDetail("authNState", "unrecoverable error").build()
@@ -80,6 +82,7 @@ internal class HealthIndicators(
         const val AUTHN_INDICATOR_NAME = "authN"
         const val AUTHN_AUTHENTICATED = "AUTHENTICATED"
         const val AUTHN_UNAUTHENTICATED = "UNAUTHENTICATED"
+        const val AUTHN_REAUTHENTICATING = "REAUTHENTICATING"
         const val AUTHN_DENIED = "DENIED"
         const val AUTHN_COMMUNICATION_ERROR = "COMMUNICATION_ERROR"
         const val AUTHN_UNKNOWN_ERROR = "UNKNOWN_ERROR"

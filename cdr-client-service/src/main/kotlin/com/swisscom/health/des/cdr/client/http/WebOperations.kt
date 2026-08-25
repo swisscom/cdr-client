@@ -27,6 +27,7 @@ import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_COMMUNICATION_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_DENIED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_INDICATOR_NAME
+import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_REAUTHENTICATING
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNAUTHENTICATED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.AUTHN_UNKNOWN_ERROR
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG_BROKEN
@@ -349,6 +350,7 @@ internal class WebOperations(
             } else if (!authNStatus.isNullOrBlank() && !(authNStatus == AUTHN_AUTHENTICATED || authNStatus == AUTHN_UNAUTHENTICATED)) {
                 when (authNStatus) {
                     AUTHN_DENIED -> DTOs.StatusResponse.StatusCode.AUTHN_DENIED
+                    AUTHN_REAUTHENTICATING -> DTOs.StatusResponse.StatusCode.AUTHN_REAUTHENTICATING
                     AUTHN_COMMUNICATION_ERROR -> DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR
                     AUTHN_UNKNOWN_ERROR -> DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR
                     else -> DTOs.StatusResponse.StatusCode.UNKNOWN
