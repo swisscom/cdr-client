@@ -1,19 +1,14 @@
 package com.swisscom.health.des.cdr.client.config
 
 import com.nimbusds.oauth2.sdk.AccessTokenResponse
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthNState
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
-import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import java.net.URI
-import java.time.Duration
-import java.time.Instant
-import java.util.concurrent.TimeUnit
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.cancel
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.RecordedRequest
@@ -23,8 +18,8 @@ import okhttp3.Headers
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.assertDoesNotThrow
@@ -34,18 +29,13 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.retry.support.RetryTemplate
 import java.io.IOException
+import java.net.URI
+import java.time.Duration
+import java.time.Instant
+import java.util.concurrent.TimeUnit
 
 @ExtendWith(MockKExtension::class)
-@MockKExtension.CheckUnnecessaryStub
 class OAuth2AuthNServiceTest {
-
-    private lateinit var authNService: OAuth2AuthNService
-
-    private val retryIoExceptionsTwice = RetryTemplate.builder()
-        .maxAttempts(MAX_ATTEMPTS)
-        .fixedBackoff(Duration.ofMillis(10))
-        .retryOn(IOException::class.java)
-        .build()
 
     @MockK
     private lateinit var config: CdrClientConfig
@@ -53,9 +43,17 @@ class OAuth2AuthNServiceTest {
     @StartStop
     private val idpMock = MockWebServer()
 
-    @OptIn(ExperimentalTime::class)
+    private val retryIoExceptionsTwice = RetryTemplate.builder()
+        .maxAttempts(MAX_ATTEMPTS)
+        .fixedBackoff(Duration.ofMillis(10))
+        .retryOn(IOException::class.java)
+        .build()
+
+    private val testScopes = mutableListOf<CoroutineScope>()
+
     @BeforeEach
     fun setUp() {
+        every { config.fileSynchronizationEnabled } returns FileSynchronization.ENABLED
         every { config.idpCredentials } returns IdpCredentials(
             tenantId = TenantId("fake-tenant-id"),
             clientId = ClientId("fake-client-id"),
@@ -66,272 +64,279 @@ class OAuth2AuthNServiceTest {
             lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
         )
         every { config.idpEndpoint } returns URI("http://${idpMock.hostName}:${idpMock.port}/${config.idpCredentials.tenantId.id}/oauth2/v2.0/token").toURL()
-
-        authNService = OAuth2AuthNService(
-            config = config,
-            retryIoErrors = retryIoExceptionsTwice,
-            proxy = null,
-            applicationScope = CoroutineScope(Dispatchers.Default),
+        every { config.denyRetryAttempts } returns 1
+        every { config.authRefreshBeforeExpiry } returns Duration.ofSeconds(1)
+        every { config.authRetry } returns CdrClientConfig.RetryPolicy(
+            initialDelay = Duration.ofMillis(10),
+            backoffMultiplier = 2.0,
+            maxDelay = Duration.ofSeconds(1),
         )
     }
 
+    @AfterEach
+    fun tearDown() {
+        testScopes.forEach { it.cancel() }
+        testScopes.clear()
+    }
+
     @Test
-    fun `no token in cache - get new token`() {
-        val mockResponse = MockResponse.Builder()
-            .code(HttpStatus.OK.value())
-            .headers(
-                Headers.Builder()
-                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
-                    .build()
-            )
-            .body(SUCCESS_TOKEN_RESPONSE)
-            .build()
-        idpMock.enqueue(mockResponse)
+    fun `getAccessToken is pure reader when file synchronization is disabled`() {
+        every { config.fileSynchronizationEnabled } returns FileSynchronization.DISABLED
+        val authNService = newService()
 
-        assertEquals(OAuth2AuthNService.AuthNState.UNKNOWN, authNService.currentAuthNStateNonBlocking())
+        val authNResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
 
+        assertInstanceOf<AuthNResponse.NotAuthenticated>(authNResponse)
+        assertEquals(0, idpMock.requestCount)
+        assertEquals(AuthNState.UNAUTHENTICATED, authNService.currentAuthNStateNonBlocking())
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    fun `auth manager starts eagerly and acquires token before readers ask for it`() {
+        idpMock.enqueue(successTokenResponse(expiresAtEpochSecond = Instant.now().epochSecond + 120))
+
+        val authNService = newService()
+
+        waitForAuthState(authNService, AuthNState.AUTHENTICATED)
         val authNResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
         val serverSideRequest: RecordedRequest = requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
 
         assertEquals(1, idpMock.requestCount)
         assertEquals("/fake-tenant-id/oauth2/v2.0/token", serverSideRequest.target)
         assertInstanceOf<AuthNResponse.Success>(authNResponse)
-        val accessTokenResponse: AccessTokenResponse = authNResponse.response
-        assertTrue(accessTokenResponse.indicatesSuccess())
-        assertEquals(ACCESS_TOKEN, accessTokenResponse.tokens.accessToken.value)
-
-        assertEquals(OAuth2AuthNService.AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
     }
 
-    @OptIn(ExperimentalTime::class)
     @Test
-    fun `token in cache and token has not expired - use cached token`() {
-        // first request to get a token into the cache
-        MockResponse.Builder()
-            .code(HttpStatus.OK.value())
-            .headers(
-                Headers.Builder()
-                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
-                    .build()
-            )
-            .body(SUCCESS_TOKEN_RESPONSE)
-            .build().also {
-                idpMock.enqueue(it)
-            }
-        // a second call should never be made by the test, i.e. this error should never be returned
-        MockResponse.Builder()
-            .code(HttpStatus.BAD_REQUEST.value())
-            .headers(
-                Headers.Builder()
-                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
-                    .build()
-            )
-            .body(ERROR_TOKEN_RESPONSE)
-            .build().also {
-                idpMock.enqueue(it)
-            }
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    fun `cached token readers do not trigger additional token requests`() {
+        idpMock.enqueue(successTokenResponse(expiresAtEpochSecond = Instant.now().epochSecond + 120))
+        idpMock.enqueue(denyTokenResponse())
 
-        val constantTimeClock = mockk<Clock>()
-        every { constantTimeClock.now().epochSeconds } returns 1760437304L // IdP response `expires_on` - 1
-
-        assertEquals(OAuth2AuthNService.AuthNState.UNKNOWN, authNService.currentAuthNStateNonBlocking())
-
-        authNService = OAuth2AuthNService(
-            config = config,
-            clock = constantTimeClock,
-            retryIoErrors = retryIoExceptionsTwice,
-            proxy = null,
-            applicationScope = CoroutineScope(Dispatchers.Default),
-        )
+        val authNService = newService()
+        waitForAuthState(authNService, AuthNState.AUTHENTICATED)
 
         val authNResponse1: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
         val authNResponse2: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
-        val serverSideRequest: RecordedRequest = requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
+        requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
 
         assertEquals(1, idpMock.requestCount)
-        assertEquals("/fake-tenant-id/oauth2/v2.0/token", serverSideRequest.target)
         assertTrue(authNResponse1 === authNResponse2)
         assertInstanceOf<AuthNResponse.Success>(authNResponse1)
         val accessTokenResponse: AccessTokenResponse = authNResponse1.response
         assertTrue(accessTokenResponse.indicatesSuccess())
         assertEquals(ACCESS_TOKEN, accessTokenResponse.tokens.accessToken.value)
-
-        assertEquals(OAuth2AuthNService.AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
-    }
-
-    @OptIn(ExperimentalTime::class)
-    @Test
-    fun `health graph token in cache but token has expired - renew token`() {
-        // first request to get a token into the cache
-        MockResponse.Builder()
-            .code(HttpStatus.OK.value())
-            .headers(
-                Headers.Builder()
-                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
-                    .build()
-            )
-            .body(SUCCESS_TOKEN_RESPONSE)
-            .build().also {
-                idpMock.enqueue(it) // initial response
-                idpMock.enqueue(it) // "renewal" response
-            }
-
-        val constantTimeClock = mockk<Clock>()
-        every { constantTimeClock.now().epochSeconds } returns 1760437306L // IdP response `expires_on` + 1
-
-        assertEquals(OAuth2AuthNService.AuthNState.UNKNOWN, authNService.currentAuthNStateNonBlocking())
-
-        authNService = OAuth2AuthNService(
-            config = config,
-            clock = constantTimeClock,
-            retryIoErrors = retryIoExceptionsTwice,
-            proxy = null,
-            applicationScope = CoroutineScope(Dispatchers.Default),
-        )
-
-        val authNResponse1: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
-        val authNResponse2: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
-        val serverSideRequest: RecordedRequest = requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
-
-        assertEquals(2, idpMock.requestCount)
-        assertEquals("/fake-tenant-id/oauth2/v2.0/token", serverSideRequest.target)
-        assertFalse(authNResponse1 === authNResponse2)
-        assertInstanceOf<AuthNResponse.Success>(authNResponse2)
-        val accessTokenResponse: AccessTokenResponse = authNResponse2.response
-        assertTrue(accessTokenResponse.indicatesSuccess())
-        assertEquals(ACCESS_TOKEN, accessTokenResponse.tokens.accessToken.value)
-
-        assertEquals(OAuth2AuthNService.AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
     }
 
     @Test
-    @Timeout(value = 1, unit = TimeUnit.SECONDS)
-    fun `idp error response - transitions via reauthenticating to denied`() {
-        every { config.denyRetryAttempts } returns 1
-        every { config.denyRetryInitialDelay } returns Duration.ZERO
-        every { config.denyRetryBackoffMultiplier } returns 2.0
+    @Timeout(value = 4, unit = TimeUnit.SECONDS)
+    fun `auth manager refreshes token before expiry without request trigger`() {
+        idpMock.enqueue(successTokenResponse(expiresAtEpochSecond = Instant.now().epochSecond + 2, accessToken = "first-token"))
+        idpMock.enqueue(successTokenResponse(expiresAtEpochSecond = Instant.now().epochSecond + 120, accessToken = "second-token"))
 
-        val mockResponse = MockResponse.Builder()
-            .code(HttpStatus.BAD_REQUEST.value())
-            .headers(
-                Headers.Builder()
-                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
-                    .build()
-            )
-            .body(ERROR_TOKEN_RESPONSE)
-            .build()
-        idpMock.enqueue(mockResponse)
-        idpMock.enqueue(mockResponse)
+        val authNService = newService()
 
-        assertEquals(OAuth2AuthNService.AuthNState.UNKNOWN, authNService.currentAuthNStateNonBlocking())
-
-        authNService = OAuth2AuthNService(
-            config = config,
-            retryIoErrors = retryIoExceptionsTwice,
-            proxy = null,
-            applicationScope = CoroutineScope(Dispatchers.Default),
-        )
+        waitForRequestCount(2)
         val authNResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
-        waitForAuthState(OAuth2AuthNService.AuthNState.DENIED)
-        val firstServerRequest: RecordedRequest = requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No request received" }
-        requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No retry request received" }
 
-        assertEquals(2, idpMock.requestCount)
-        assertEquals("/fake-tenant-id/oauth2/v2.0/token", firstServerRequest.target)
-        assertInstanceOf<AuthNResponse.Reauthenticating>(authNResponse)
-        assertEquals(OAuth2AuthNService.AuthNState.DENIED, authNService.currentAuthNStateNonBlocking())
+        assertEquals(AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
+        val successResponse = assertInstanceOf<AuthNResponse.Success>(authNResponse)
+        assertEquals("second-token", successResponse.response.tokens.accessToken.value)
     }
 
     @Test
-    @Timeout(value = 1, unit = TimeUnit.SECONDS)
-    fun `idp deny then retry success - transitions to authenticated`() {
-        every { config.denyRetryAttempts } returns 1
-        every { config.denyRetryInitialDelay } returns Duration.ZERO
-        every { config.denyRetryBackoffMultiplier } returns 2.0
-
-        val errorResponse = MockResponse.Builder()
-            .code(HttpStatus.BAD_REQUEST.value())
-            .headers(
-                Headers.Builder()
-                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
-                    .build()
-            )
-            .body(ERROR_TOKEN_RESPONSE)
-            .build()
-        val successResponse = MockResponse.Builder()
-            .code(HttpStatus.OK.value())
-            .headers(
-                Headers.Builder()
-                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
-                    .build()
-            )
-            .body(SUCCESS_TOKEN_RESPONSE)
-            .build()
-        idpMock.enqueue(errorResponse)
-        idpMock.enqueue(successResponse)
-
-        authNService = OAuth2AuthNService(
-            config = config,
-            retryIoErrors = retryIoExceptionsTwice,
-            proxy = null,
-            applicationScope = CoroutineScope(Dispatchers.Default),
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    fun `auth manager resolves expiry from ext_expires_in when expires_on is absent`() {
+        val extExpiresIn = 60L
+        idpMock.enqueue(
+            MockResponse.Builder()
+                .code(HttpStatus.OK.value())
+                .headers(
+                    Headers.Builder()
+                        .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
+                        .build()
+                )
+                .body(
+                    successTokenBody(
+                        expiresAtEpochSecond = null,
+                        accessToken = "ext-token",
+                        expiresIn = extExpiresIn,
+                        extExpiresIn = extExpiresIn,
+                    )
+                )
+                .build()
         )
 
-        val firstResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
-        waitForAuthState(OAuth2AuthNService.AuthNState.AUTHENTICATED)
-        requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No initial deny request received" }
-        requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "No retry success request received" }
+        val authNService = newService()
 
-        assertEquals(2, idpMock.requestCount)
-        assertInstanceOf<AuthNResponse.Reauthenticating>(firstResponse)
-        assertEquals(OAuth2AuthNService.AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
+        waitForAuthState(authNService, AuthNState.AUTHENTICATED)
+        val successResponse = assertInstanceOf<AuthNResponse.Success>(authNService.getAccessToken())
+        assertEquals("ext-token", successResponse.response.tokens.accessToken.value)
+        assertTrue(successResponse.expiresAtEpochSecond != null)
+        assertTrue(successResponse.expiresAtEpochSecond!! > Instant.now().epochSecond)
     }
 
     @Test
-    @Timeout(value = 1, unit = TimeUnit.SECONDS)
-    fun `idp deny - retries configured number of attempts before denied`() {
-        every { config.denyRetryAttempts } returns 3
-        every { config.denyRetryInitialDelay } returns Duration.ZERO
-        every { config.denyRetryBackoffMultiplier } returns 2.0
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    fun `idp deny response transitions via reauthenticating to denied`() {
+        every { config.denyRetryAttempts } returns 1
+        every { config.authRetry } returns CdrClientConfig.RetryPolicy(
+            initialDelay = Duration.ZERO,
+            backoffMultiplier = 2.0,
+            maxDelay = Duration.ofSeconds(1),
+        )
 
-        val denyResponse = MockResponse.Builder()
-            .code(HttpStatus.BAD_REQUEST.value())
-            .headers(
-                Headers.Builder()
-                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
-                    .build()
-            )
-            .body(ERROR_TOKEN_RESPONSE)
-            .build()
+        idpMock.enqueue(denyTokenResponse())
+        idpMock.enqueue(denyTokenResponse())
+
+        val authNService = newService()
+
+        waitForAuthState(authNService, AuthNState.DENIED)
+        val authNResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
+
+        assertEquals(2, idpMock.requestCount)
+        assertInstanceOf<AuthNResponse.Deny>(authNResponse)
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    fun `idp deny then retry success transitions to authenticated`() {
+        every { config.denyRetryAttempts } returns 1
+        every { config.authRetry } returns CdrClientConfig.RetryPolicy(
+            initialDelay = Duration.ZERO,
+            backoffMultiplier = 2.0,
+            maxDelay = Duration.ofSeconds(1),
+        )
+
+        idpMock.enqueue(denyTokenResponse())
+        idpMock.enqueue(successTokenResponse(expiresAtEpochSecond = Instant.now().epochSecond + 120))
+
+        val authNService = newService()
+
+        waitForAuthState(authNService, AuthNState.AUTHENTICATED)
+        val authNResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
+
+        assertEquals(2, idpMock.requestCount)
+        assertInstanceOf<AuthNResponse.Success>(authNResponse)
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    fun `idp deny retries configured number of attempts before denied`() {
+        every { config.denyRetryAttempts } returns 3
+        every { config.authRetry } returns CdrClientConfig.RetryPolicy(
+            initialDelay = Duration.ZERO,
+            backoffMultiplier = 2.0,
+            maxDelay = Duration.ofSeconds(1),
+        )
+
         repeat(4) {
-            idpMock.enqueue(denyResponse)
+            idpMock.enqueue(denyTokenResponse())
         }
 
-        authNService = OAuth2AuthNService(
-            config = config,
-            retryIoErrors = retryIoExceptionsTwice,
-            proxy = null,
-            applicationScope = CoroutineScope(Dispatchers.Default),
-        )
+        val authNService = newService()
 
-        val firstResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
-        waitForAuthState(OAuth2AuthNService.AuthNState.DENIED)
+        waitForAuthState(authNService, AuthNState.DENIED)
 
         repeat(4) {
             requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "Expected request #${it + 1} was not sent" }
         }
 
         assertEquals(4, idpMock.requestCount)
-        assertInstanceOf<AuthNResponse.Reauthenticating>(firstResponse)
-        assertEquals(OAuth2AuthNService.AuthNState.DENIED, authNService.currentAuthNStateNonBlocking())
+        assertInstanceOf<AuthNResponse.Deny>(authNService.getAccessToken())
     }
 
     @Test
-    @Timeout(value = 1, unit = TimeUnit.SECONDS)
-    fun `idp deny - retries disabled keeps denied without launching reauth`() {
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    fun `idp deny retries disabled keeps denied without launching extra reauth request`() {
         every { config.denyRetryAttempts } returns 0
 
-        val denyResponse = MockResponse.Builder()
+        idpMock.enqueue(denyTokenResponse())
+
+        val authNService = newService()
+
+        waitForAuthState(authNService, AuthNState.DENIED)
+
+        assertEquals(1, idpMock.requestCount)
+        assertInstanceOf<AuthNResponse.Deny>(authNService.getAccessToken())
+    }
+
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    fun `retryable startup failure remains reauthenticating until background retry succeeds`() {
+        every { config.authRetry } returns CdrClientConfig.RetryPolicy(
+            initialDelay = Duration.ZERO,
+            backoffMultiplier = 2.0,
+            maxDelay = Duration.ofSeconds(1),
+        )
+
+        idpMock.enqueue(
+            MockResponse.Builder()
+                .code(HttpStatus.OK.value())
+                .headers(
+                    Headers.Builder()
+                        .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
+                        .build()
+                )
+                .body(successTokenBody(expiresAtEpochSecond = Instant.now().epochSecond + 120))
+                .onRequestStart(SocketEffect.CloseSocket())
+                .build()
+        )
+        idpMock.enqueue(successTokenResponse(expiresAtEpochSecond = Instant.now().epochSecond + 120))
+
+        val authNService = newService()
+
+        waitForAuthState(authNService, AuthNState.AUTHENTICATED)
+        assertEquals(AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
+        assertFalse(authNService.getAccessToken() is AuthNResponse.Reauthenticating)
+    }
+
+
+    private fun newService(): OAuth2AuthNService =
+        CoroutineScope(Dispatchers.Default).also { scope ->
+            testScopes += scope
+        }.let { scope ->
+            OAuth2AuthNService(
+                config = config,
+                retryIoErrors = retryIoExceptionsTwice,
+                proxy = null,
+                applicationScope = scope,
+            )
+        }
+
+    private fun successTokenResponse(expiresAtEpochSecond: Long, accessToken: String = ACCESS_TOKEN): MockResponse =
+        MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(
+                Headers.Builder()
+                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
+                    .build()
+            )
+            .body(successTokenBody(expiresAtEpochSecond, accessToken))
+            .build()
+
+    private fun successTokenBody(
+        expiresAtEpochSecond: Long?,
+        accessToken: String = ACCESS_TOKEN,
+        expiresIn: Long? = null,
+        extExpiresIn: Long? = null,
+    ): String {
+        val resolvedExpiresIn = expiresIn ?: expiresAtEpochSecond?.let { (it - Instant.now().epochSecond).coerceAtLeast(1) } ?: 60L
+        val resolvedExtExpiresIn = extExpiresIn ?: resolvedExpiresIn
+        return """
+            {
+                "access_token": "$accessToken",
+                "token_type": "Bearer",
+                "not_before": 1760436404,
+                "expires_in": $resolvedExpiresIn,
+                "ext_expires_in": $resolvedExtExpiresIn,
+                "resource": "f1eb5a11-b12c-413c-82a4-2fabcb08480a"
+            }
+        """.trimIndent()
+    }
+
+    private fun denyTokenResponse(): MockResponse =
+        MockResponse.Builder()
             .code(HttpStatus.BAD_REQUEST.value())
             .headers(
                 Headers.Builder()
@@ -340,95 +345,36 @@ class OAuth2AuthNServiceTest {
             )
             .body(ERROR_TOKEN_RESPONSE)
             .build()
-        idpMock.enqueue(denyResponse)
 
-        authNService = OAuth2AuthNService(
-            config = config,
-            retryIoErrors = retryIoExceptionsTwice,
-            proxy = null,
-            applicationScope = CoroutineScope(Dispatchers.Default),
-        )
-
-        val firstResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
-        requireNotNull(idpMock.takeRequest(1, TimeUnit.SECONDS)) { "Expected initial deny request was not sent" }
-
-        assertEquals(1, idpMock.requestCount)
-        assertInstanceOf<AuthNResponse.Deny>(firstResponse)
-        assertEquals(OAuth2AuthNService.AuthNState.DENIED, authNService.currentAuthNStateNonBlocking())
-    }
-
-    private fun waitForAuthState(targetState: OAuth2AuthNService.AuthNState, maxWaitMillis: Long = 250L) {
+    private fun waitForAuthState(
+        authNService: OAuth2AuthNService,
+        targetState: AuthNState,
+        maxWaitMillis: Long = 1500L,
+    ) {
         val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(maxWaitMillis)
         var state = authNService.currentAuthNStateNonBlocking()
         while (state != targetState && System.nanoTime() < deadlineNanos) {
-            Thread.sleep(1)
+            Thread.sleep(10)
             state = authNService.currentAuthNStateNonBlocking()
         }
         assertEquals(targetState, state)
     }
 
-    @Test
-    @Disabled("Flaky test - sometimes runs forever when running in gradle test suite")
-    fun `io exception - authN retryable`() {
-        val mockResponse = MockResponse.Builder()
-            .code(HttpStatus.OK.value())
-            .headers(
-                Headers.Builder()
-                    .add(HttpHeaders.CONTENT_TYPE, "application/json;charset=UTF-8")
-                    .build()
-            )
-            .body(SUCCESS_TOKEN_RESPONSE)
-            .onRequestStart(SocketEffect.CloseSocket()) // makes request fail with an IOException
-            .build()
-        idpMock.enqueue(mockResponse)
-        idpMock.enqueue(mockResponse)
-        idpMock.enqueue(mockResponse)
-        idpMock.enqueue(mockResponse)
-        idpMock.enqueue(mockResponse)
-        idpMock.enqueue(mockResponse)
-
-        assertEquals(OAuth2AuthNService.AuthNState.UNKNOWN, authNService.currentAuthNStateNonBlocking())
-
-        val authNResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
-
-        // we have to compare MAX_ATTEMPTS * 2 because nimbus makes two requests per failed attempt: the original request, and
-        // then they try to retrieve the response code in a best-effort way, which makes MockWebServer count another request
-        assertEquals(MAX_ATTEMPTS * 2, idpMock.requestCount)
-        assertInstanceOf<AuthNResponse.RetryableFailure>(authNResponse)
-        assertInstanceOf<IOException>(authNResponse.error)
-
-        assertEquals(OAuth2AuthNService.AuthNState.RETRYABLE_FAILURE, authNService.currentAuthNStateNonBlocking())
+    private fun waitForRequestCount(expectedRequestCount: Int, maxWaitMillis: Long = 3000L) {
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(maxWaitMillis)
+        while (idpMock.requestCount < expectedRequestCount && System.nanoTime() < deadlineNanos) {
+            Thread.sleep(10)
+        }
+        assertEquals(expectedRequestCount, idpMock.requestCount)
     }
 
     private companion object {
         const val MAX_ATTEMPTS = 3
-
-        const val ACCESS_TOKEN =
-            "eyJhbGciOiJSUzI1NiIsImtpZCI6IkhlLWxhOHVrRVNtLVhOZmxDeEFGb3BCbnVMQ1pheXBBODRQLTVaV0ljT1kiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJmMWViNWExMS1iMTJj" +
-                    "LTQxM2MtODJhNC0yZmFiY2IwODQ4MGEiLCJpc3MiOiJodHRwczovL2Rldi5pZGVudGl0eS5oZWFsdGguc3dpc3Njb20uY2gvZjVhOTlmOGQtZGNhNi00MTNjLWJhMz" +
-                    "YtOWUyM2I0NzIwOTMwL3YyLjAvIiwiZXhwIjoxNzYwNDM3MzA0LCJuYmYiOjE3NjA0MzY0MDQsInN1YiI6ImI5ZjFhYzA0LTFiMzMtNDIxNC1iNzgxLTE1OGVlMzgyZ" +
-                    "TAwOCIsInRpZCI6ImY1YTk5ZjhkLWRjYTYtNDEzYy1iYTM2LTllMjNiNDcyMDkzMCIsInRmcCI6IkIyQ18xQV9IZWFsdGhHcmFwaCIsImNvcnJlbGF0aW9uSWQiOiIzZ" +
-                    "mUyYjYyYi1kNDBlLTQ2NmItOTYxMS1jZjllYmE0ODgxZjIiLCJzY3AiOiJIZWFsdGhHcmFwaC5SZWFkLkFsbCIsImF6cGFjciI6IjEiLCJvaWQiOiI3Mjk2NGFkNy05Y" +
-                    "2ExLTQ4YzgtOGEyNi1iMTQ3YTNkM2E2ZDQiLCJ2ZXIiOiIyLjAiLCJhenAiOiJiOWYxYWMwNC0xYjMzLTQyMTQtYjc4MS0xNThlZTM4MmUwMDgiLCJpYXQiOjE3NjA0Mz" +
-                    "Y0MDR9.bwaRRjanFfNHT5FJQV-POnc-wOW5SxLRqivjLiyW-GOFx0YgV9PwGR7j0d_QdkVTf-MGvqXUNeY6miy70s959P1l52qa4H4QXNM4trK8DaPr1-pqPRIV_xEStR" +
-                    "_0FS-45Btd6TdOjjqKDZSU3Y9Xc0SQSYCbWFzf4YFqC2TRUlUI_ZdB_g8PdOZkyJeh3feJI9vn0vZZR4sj8aoD4xGcKMOAI1shFMxNU4pKFFRMIqwkGuvxcUAKu-qwdsV" +
-                    "b68X4NierOCWqaNACB2OWA29tJahOhOk_LhNlxB4kMoPWNf3XqFCN5bKPle_psheNaiL-4bZ_UAQnctgARzj7KDIG2A"
-        const val SUCCESS_TOKEN_RESPONSE = """
-            {
-                "access_token": "$ACCESS_TOKEN",
-                "token_type": "Bearer",
-                "not_before": 1760436404,
-                "expires_in": 900,
-                "expires_on": 1760437304,
-                "resource": "f1eb5a11-b12c-413c-82a4-2fabcb08480a"
-            }
-        """
-
-        // delivered with HTTP 400 Bad Request
+        const val ACCESS_TOKEN = "test-access-token"
         const val ERROR_TOKEN_RESPONSE = """
             {
                 "error": "invalid_client",
-                "error_description": "AADB2C90081: The specified client_secret does not match the expected value for this client. Please correct the client_secret and try again.\r\nCorrelation ID: 4e846c10-2005-4d0c-b1b3-468f3862dd06\r\nTimestamp: 2025-10-14 10:08:00Z\r\n"
+                "error_description": "AADB2C90081: The specified client_secret does not match the expected value for this client."
             }
         """
     }

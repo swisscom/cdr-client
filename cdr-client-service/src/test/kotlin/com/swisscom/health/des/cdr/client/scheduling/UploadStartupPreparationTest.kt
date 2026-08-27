@@ -6,7 +6,6 @@ import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.Customer
-import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
@@ -32,9 +31,6 @@ internal class UploadStartupPreparationTest {
     @MockK
     private lateinit var config: CdrClientConfig
 
-    @MockK
-    private lateinit var schedulingValidationService: SchedulingValidationService
-
     @TempDir
     private lateinit var tmpDir: Path
 
@@ -55,10 +51,9 @@ internal class UploadStartupPreparationTest {
 
     @Test
     fun `renames restart files when scheduling is allowed`() {
-        every { schedulingValidationService.isSchedulingAllowed } returns true
         val restartFile = sourceDir.resolve("document.$RESTART_FILE_EXTENSION").also { it.writeText("payload") }
 
-        UploadStartupPreparation(config, schedulingValidationService, 0.0).prepareUploadStartupState()
+        UploadStartupPreparation(config, 0.0).prepareUploadStartupState()
 
         val xmlFile = sourceDir.resolve("document.xml")
         assertFalse(restartFile.exists())
@@ -67,22 +62,10 @@ internal class UploadStartupPreparationTest {
     }
 
     @Test
-    fun `leaves restart files untouched when scheduling is not allowed`() {
-        every { schedulingValidationService.isSchedulingAllowed } returns false
-        val restartFile = sourceDir.resolve("document.$RESTART_FILE_EXTENSION").also { it.writeText("payload") }
-
-        UploadStartupPreparation(config, schedulingValidationService, 0.0).prepareUploadStartupState()
-
-        assertTrue(restartFile.exists())
-        assertFalse(sourceDir.resolve("document.xml").exists())
-    }
-
-    @Test
     fun `leaves upload files untouched`() {
-        every { schedulingValidationService.isSchedulingAllowed } returns true
         val uploadFile = sourceDir.resolve("document.$UPLOAD_FILE_EXTENSION").also { it.writeText("payload") }
 
-        UploadStartupPreparation(config, schedulingValidationService, 0.0).prepareUploadStartupState()
+        UploadStartupPreparation(config, 0.0).prepareUploadStartupState()
 
         assertTrue(uploadFile.exists())
         assertEquals("payload", uploadFile.toFile().readText())
@@ -95,7 +78,7 @@ internal class UploadStartupPreparationTest {
 
     @Test
     fun `fails when telemetry sampling is enabled`() {
-        val startupPreparation = UploadStartupPreparation(config, schedulingValidationService, 0.1)
+        val startupPreparation = UploadStartupPreparation(config, 0.1)
 
         assertThrows<IllegalStateException> {
             startupPreparation.prepareUploadStartupState()

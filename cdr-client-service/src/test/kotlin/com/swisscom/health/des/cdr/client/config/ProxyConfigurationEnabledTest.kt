@@ -291,7 +291,7 @@ internal class ProxyConfigurationEnabledTest {
             "access_token": "test-access-token",
             "token_type": "Bearer",
             "expires_in": 3600,
-            "expires_on": 9999999999
+            "ext_expires_in": 9999999999
         }"""
 
         private const val RENEW_SECRET_RESPONSE = """{

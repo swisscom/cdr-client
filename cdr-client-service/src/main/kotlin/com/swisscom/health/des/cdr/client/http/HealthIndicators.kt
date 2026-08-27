@@ -1,14 +1,14 @@
 package com.swisscom.health.des.cdr.client.http
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.auth.AuthNState.AUTHENTICATED
+import com.swisscom.health.des.cdr.client.config.auth.AuthNState.DENIED
+import com.swisscom.health.des.cdr.client.config.auth.AuthNState.FAILED
+import com.swisscom.health.des.cdr.client.config.auth.AuthNState.REAUTHENTICATING
+import com.swisscom.health.des.cdr.client.config.auth.AuthNState.RETRYABLE_FAILURE
+import com.swisscom.health.des.cdr.client.config.auth.AuthNState.UNAUTHENTICATED
+import com.swisscom.health.des.cdr.client.config.auth.AuthNState.UNKNOWN
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.AUTHENTICATED
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.DENIED
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.FAILED
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.REAUTHENTICATING
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.RETRYABLE_FAILURE
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.UNAUTHENTICATED
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNState.UNKNOWN
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import org.springframework.boot.actuate.health.Health

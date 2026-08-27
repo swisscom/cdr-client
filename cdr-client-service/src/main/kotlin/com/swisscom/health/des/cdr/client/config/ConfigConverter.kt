@@ -29,8 +29,8 @@ internal fun CdrClientConfig.toDto(): CdrClientConfigDto {
         idpCredentials = idpCredentials.toDto(),
         idpEndpoint = idpEndpoint,
         denyRetryAttempts = denyRetryAttempts,
-        denyRetryInitialDelay = denyRetryInitialDelay,
-        denyRetryBackoffMultiplier = denyRetryBackoffMultiplier,
+        authRefreshBeforeExpiry = authRefreshBeforeExpiry,
+        authRetry = authRetry.toDto(),
         localFolder = localFolder.path.absolutePathString(),
         pullThreadPoolSize = pullThreadPoolSize,
         pushThreadPoolSize = pushThreadPoolSize,
@@ -96,6 +96,13 @@ internal fun IdpCredentials.toDto(): CdrClientConfigDto.IdpCredentials =
         lastCredentialRenewalTime = lastCredentialRenewalTime.instant,
     )
 
+internal fun CdrClientConfig.RetryPolicy.toDto(): CdrClientConfigDto.RetryPolicy =
+    CdrClientConfigDto.RetryPolicy(
+        initialDelay = initialDelay,
+        backoffMultiplier = backoffMultiplier,
+        maxDelay = maxDelay,
+    )
+
 internal fun RetryTemplateConfig.toDto(): CdrClientConfigDto.RetryTemplateConfig =
     CdrClientConfigDto.RetryTemplateConfig(
         retries = retries,
@@ -122,8 +129,8 @@ internal fun CdrClientConfigDto.toCdrClientConfig(): CdrClientConfig {
         idpCredentials = idpCredentials.toCdrClientConfig(),
         idpEndpoint = idpEndpoint,
         denyRetryAttempts = denyRetryAttempts,
-        denyRetryInitialDelay = denyRetryInitialDelay,
-        denyRetryBackoffMultiplier = denyRetryBackoffMultiplier,
+        authRefreshBeforeExpiry = authRefreshBeforeExpiry,
+        authRetry = authRetry.toCdrClientConfig(),
         localFolder = TempDownloadDir(localFolder),
         pullThreadPoolSize = pullThreadPoolSize,
         pushThreadPoolSize = pushThreadPoolSize,
@@ -140,6 +147,13 @@ internal fun CdrClientConfigDto.toCdrClientConfig(): CdrClientConfig {
         fileSystemCheckInterval = fileSystemCheckInterval,
     )
 }
+
+internal fun CdrClientConfigDto.RetryPolicy.toCdrClientConfig(): CdrClientConfig.RetryPolicy =
+    CdrClientConfig.RetryPolicy(
+        initialDelay = initialDelay,
+        backoffMultiplier = backoffMultiplier,
+        maxDelay = maxDelay,
+    )
 
 internal fun CdrClientConfigDto.ProxyConfig.toCdrClientConfig(): ProxyConfig {
     return if (url.isBlank()) {

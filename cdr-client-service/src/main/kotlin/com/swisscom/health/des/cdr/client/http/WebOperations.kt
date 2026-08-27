@@ -16,6 +16,7 @@ import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientSecret
 import com.swisscom.health.des.cdr.client.config.ClientSecret.Companion.MASKED_SECRET
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
 import com.swisscom.health.des.cdr.client.config.toCdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
@@ -189,7 +190,7 @@ internal class WebOperations(
         @RequestBody idpCredentials: CdrClientConfigDto.IdpCredentials,
     ): ResponseEntity<ValidationResult> = runCatching {
         logger.debug { "validating credentials for tenant id: '${idpCredentials.tenantId}'" }
-        retryIOExceptionsAndServerErrors.execute<OAuth2AuthNService.AuthNResponse, Exception> { retry: RetryContext ->
+        retryIOExceptionsAndServerErrors.execute<AuthNResponse, Exception> { retry: RetryContext ->
             val idpEndpoint = config.idpEndpoint.toString()
             val correctedIdpEndpoint = if (config.idpCredentials.tenantId.id == idpCredentials.tenantId.tenantId)
                 idpEndpoint
@@ -224,10 +225,10 @@ internal class WebOperations(
             authService.getNewAccessToken(effectiveCredentials.toCdrClientConfig(), URI(correctedIdpEndpoint).toURL(), false)
         }
     }.fold(
-        onSuccess = { authNResponse: OAuth2AuthNService.AuthNResponse ->
+        onSuccess = { authNResponse: AuthNResponse ->
             var validationResult: ValidationResult = ValidationResult.Success
             when (authNResponse) {
-                is OAuth2AuthNService.AuthNResponse.Success -> {
+                is AuthNResponse.Success -> {
 
                 }
 

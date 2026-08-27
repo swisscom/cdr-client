@@ -3,7 +3,7 @@ package com.swisscom.health.des.cdr.client.config
 import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy
 import com.mayakapps.kache.ObjectKache
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope

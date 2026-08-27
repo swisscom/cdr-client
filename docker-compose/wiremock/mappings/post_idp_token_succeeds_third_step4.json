@@ -15,7 +15,7 @@
       "token_type": "Bearer",
       "not_before": 1760436404,
       "expires_in": 900,
-      "expires_on": 4102444800,
+      "ext_expires_in": 4102444800,
       "resource": "wiremock-resource"
     }
   }

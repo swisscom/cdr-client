@@ -8,6 +8,8 @@ import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSIO
 import com.swisscom.health.des.cdr.client.common.Constants.UPLOAD_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
 import com.swisscom.health.des.cdr.client.config.Connector
@@ -76,6 +78,9 @@ internal class EventPushFileHandlingTest {
 
     @SpykBean
     private lateinit var config: CdrClientConfig
+
+    @SpykBean
+    private lateinit var authNService: OAuth2AuthNService
 
     @SpykBean
     private lateinit var schedulingValidationService: SchedulingValidationService
@@ -161,6 +166,9 @@ internal class EventPushFileHandlingTest {
             // give the event watcher task some time to start up
             Thread.sleep(1_000L)
         }
+
+        // Keep these filesystem tests deterministic: the auth race is not what we are exercising here.
+        every { authNService.getAccessToken() } returns AuthNResponse.NotAuthenticated
     }
 
     @OptIn(ExperimentalPathApi::class)

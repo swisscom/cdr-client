@@ -6,6 +6,7 @@ import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
@@ -317,7 +318,7 @@ internal class WebOperationsTest {
         )
 
 
-        every { authNService.getNewAccessToken(any(), any(), false) } returns OAuth2AuthNService.AuthNResponse.Success(mockk())
+        every { authNService.getNewAccessToken(any(), any(), false) } returns AuthNResponse.Success(mockk())
 
         val response = webOperationsWithRealRetry.validateCredentials(idpCredentials)
 
@@ -356,7 +357,7 @@ internal class WebOperationsTest {
             lastCredentialRenewalTime = Instant.now()
         )
 
-        every { authNService.getNewAccessToken(any(), any(), false) } returns OAuth2AuthNService.AuthNResponse.Failed(mockk())
+        every { authNService.getNewAccessToken(any(), any(), false) } returns AuthNResponse.Failed(mockk())
 
         val response = webOperationsWithRealRetry.validateCredentials(idpCredentials)
 
@@ -392,7 +393,7 @@ internal class WebOperationsTest {
         )
 
         val capturedCredentials = slot<IdpCredentials>()
-        every { authNService.getNewAccessToken(capture(capturedCredentials), any(), false) } returns OAuth2AuthNService.AuthNResponse.Success(mockk())
+        every { authNService.getNewAccessToken(capture(capturedCredentials), any(), false) } returns AuthNResponse.Success(mockk())
 
         webOperationsWithRealRetry.validateCredentials(idpCredentialsWithMaskedSecret)
 
@@ -425,7 +426,7 @@ internal class WebOperationsTest {
         )
 
         val capturedCredentials = slot<IdpCredentials>()
-        every { authNService.getNewAccessToken(capture(capturedCredentials), any(), false) } returns OAuth2AuthNService.AuthNResponse.Success(mockk())
+        every { authNService.getNewAccessToken(capture(capturedCredentials), any(), false) } returns AuthNResponse.Success(mockk())
 
         webOperationsWithRealRetry.validateCredentials(idpCredentialsWithAnyMaskedSecret)
 
@@ -459,7 +460,7 @@ internal class WebOperationsTest {
         )
 
         val capturedCredentials = slot<IdpCredentials>()
-        every { authNService.getNewAccessToken(capture(capturedCredentials), any(), false) } returns OAuth2AuthNService.AuthNResponse.Success(mockk())
+        every { authNService.getNewAccessToken(capture(capturedCredentials), any(), false) } returns AuthNResponse.Success(mockk())
 
         webOperationsWithRealRetry.validateCredentials(idpCredentialsWithRealSecret)
 
@@ -502,7 +503,7 @@ internal class WebOperationsTest {
         )
 
         val idpEndpointSlot = slot<URL>()
-        every { authNService.getNewAccessToken(any(), capture(idpEndpointSlot), false) } returns OAuth2AuthNService.AuthNResponse.Success(mockk())
+        every { authNService.getNewAccessToken(any(), capture(idpEndpointSlot), false) } returns AuthNResponse.Success(mockk())
 
         val response = webOperationsWithRealRetry.validateCredentials(idpCredentials)
 
@@ -579,8 +580,12 @@ internal class WebOperationsTest {
             oldFileThreshold = Duration.ofHours(2L),
             fileSystemCheckInterval = Duration.ofMinutes(5L),
             denyRetryAttempts = 5,
-            denyRetryInitialDelay = Duration.ofSeconds(1L),
-            denyRetryBackoffMultiplier = 2.0,
+            authRefreshBeforeExpiry = Duration.ofSeconds(60),
+            authRetry = CdrClientConfig.RetryPolicy(
+                initialDelay = Duration.ofSeconds(1L),
+                backoffMultiplier = 2.0,
+                maxDelay = Duration.ofMinutes(5L),
+            ),
         )
     }
 }

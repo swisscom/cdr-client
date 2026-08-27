@@ -1,6 +1,6 @@
 package com.swisscom.health.des.cdr.client.config
 
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
