@@ -356,7 +356,7 @@ internal class FileMonitoringServiceTest {
             ),
             oldFileThreshold = Duration.ofHours(2L),
             fileSystemCheckInterval = Duration.ofMinutes(5L),
-            denyRetryAttempts = 5,
+            maxDenyRetries = 5,
             authRefreshBeforeExpiry = Duration.ofSeconds(60),
             authRetry = CdrClientConfig.RetryPolicy(
                 initialDelay = Duration.ofSeconds(1L),

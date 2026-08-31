@@ -1,6 +1,6 @@
 client:
   idp-endpoint: http://localhost:80/idp-wiremock/succeeds-third/oauth2/v2.0/token
-  deny-retry-attempts: 3
+  max-deny-retries: 3
   auth-retry:
     initial-delay: 1s
     backoff-multiplier: 2.0

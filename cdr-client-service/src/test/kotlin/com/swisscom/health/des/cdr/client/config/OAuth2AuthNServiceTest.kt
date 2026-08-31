@@ -64,7 +64,7 @@ class OAuth2AuthNServiceTest {
             lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
         )
         every { config.idpEndpoint } returns URI("http://${idpMock.hostName}:${idpMock.port}/${config.idpCredentials.tenantId.id}/oauth2/v2.0/token").toURL()
-        every { config.denyRetryAttempts } returns 1
+        every { config.maxDenyRetries } returns 1
         every { config.authRefreshBeforeExpiry } returns Duration.ofSeconds(1)
         every { config.authRetry } returns CdrClientConfig.RetryPolicy(
             initialDelay = Duration.ofMillis(10),
@@ -180,7 +180,7 @@ class OAuth2AuthNServiceTest {
     @Test
     @Timeout(value = 2, unit = TimeUnit.SECONDS)
     fun `idp deny response transitions via reauthenticating to denied`() {
-        every { config.denyRetryAttempts } returns 1
+        every { config.maxDenyRetries } returns 1
         every { config.authRetry } returns CdrClientConfig.RetryPolicy(
             initialDelay = Duration.ZERO,
             backoffMultiplier = 2.0,
@@ -202,7 +202,7 @@ class OAuth2AuthNServiceTest {
     @Test
     @Timeout(value = 2, unit = TimeUnit.SECONDS)
     fun `idp deny then retry success transitions to authenticated`() {
-        every { config.denyRetryAttempts } returns 1
+        every { config.maxDenyRetries } returns 1
         every { config.authRetry } returns CdrClientConfig.RetryPolicy(
             initialDelay = Duration.ZERO,
             backoffMultiplier = 2.0,
@@ -224,7 +224,7 @@ class OAuth2AuthNServiceTest {
     @Test
     @Timeout(value = 2, unit = TimeUnit.SECONDS)
     fun `idp deny retries configured number of attempts before denied`() {
-        every { config.denyRetryAttempts } returns 3
+        every { config.maxDenyRetries } returns 3
         every { config.authRetry } returns CdrClientConfig.RetryPolicy(
             initialDelay = Duration.ZERO,
             backoffMultiplier = 2.0,
@@ -250,7 +250,7 @@ class OAuth2AuthNServiceTest {
     @Test
     @Timeout(value = 2, unit = TimeUnit.SECONDS)
     fun `idp deny retries disabled keeps denied without launching extra reauth request`() {
-        every { config.denyRetryAttempts } returns 0
+        every { config.maxDenyRetries } returns 0
 
         idpMock.enqueue(denyTokenResponse())
 

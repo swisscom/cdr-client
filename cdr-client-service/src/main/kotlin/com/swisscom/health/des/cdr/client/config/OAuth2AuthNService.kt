@@ -150,10 +150,10 @@ internal class OAuth2AuthNService(
         )
         logger.warn {
             "IdP denied OAuth token acquisition; retrying in $denyRetryDelay " +
-                "(attempt=$nextDenyRetryAttempt/${config.denyRetryAttempts})"
+                "(attempt=$nextDenyRetryAttempt/${config.maxDenyRetries})"
         }
         updateAuthNResponse(AuthNResponse.Authenticating)
-        return if (nextDenyRetryAttempt > config.denyRetryAttempts) {
+        return if (nextDenyRetryAttempt > config.maxDenyRetries) {
             stopWith(tokenResponse)
         } else {
             AuthLoopResult.Continue(

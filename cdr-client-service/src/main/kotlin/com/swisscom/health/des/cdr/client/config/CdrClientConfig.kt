@@ -47,7 +47,7 @@ internal data class CdrClientConfig(
     val idpEndpoint: URL,
 
     /** Number of background retries after an authentication failure before transitioning to denied state. */
-    val denyRetryAttempts: Int,
+    val maxDenyRetries: Int,
 
     /** How long before token expiry the background auth manager should start refreshing the token. */
     val authRefreshBeforeExpiry: Duration,
