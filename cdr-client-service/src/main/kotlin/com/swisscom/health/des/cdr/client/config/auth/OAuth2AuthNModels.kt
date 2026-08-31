@@ -27,11 +27,10 @@ internal sealed interface AuthNResponse {
     data class Success(
         val response: AccessTokenResponse,
         /**
-         * Unix epoch second at which the access token expires, or `null` when expiry metadata is
-         * unavailable (e.g. in tests that do not care about caching behaviour).
-         * Production code is expected to always provide a non-null value; a `null` is treated as "already expired".
+         * Unix epoch second at which the access token expires.
+         * Defaults to `0` when expiry metadata is unavailable, which is treated as "already expired".
          */
-        val expiresAtEpochSecond: Long? = null,
+        val expiresAtEpochSecond: Long = 0,
     ) : AuthNResponse
 
     data class Deny(val error: WrongCredentialsException) : AuthNResponse

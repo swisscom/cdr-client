@@ -5,14 +5,19 @@ import com.swisscom.health.des.cdr.client.config.auth.AuthLoopState
 import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.auth.AuthNState
 import com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot
-import com.swisscom.health.des.cdr.client.config.auth.OAuth2AuthTiming
+import com.swisscom.health.des.cdr.client.config.auth.OAuth2AuthNTiming
 import com.swisscom.health.des.cdr.client.config.auth.OAuth2TokenClient
 import com.swisscom.health.des.cdr.client.config.auth.toAuthNState
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.annotation.PreDestroy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.time.delay
 import org.springframework.context.annotation.DependsOn
 import org.springframework.retry.support.RetryTemplate
@@ -23,7 +28,6 @@ import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
-
 private val logger = KotlinLogging.logger {}
 
 @Service
@@ -33,15 +37,20 @@ internal class OAuth2AuthNService(
     private val config: CdrClientConfig,
     retryIoErrors: RetryTemplate,
     proxy: Proxy?,
-    private val applicationScope: CoroutineScope,
     clock: Clock = Clock.System,
 ) {
     private val authStateRef = AtomicReference(AuthStateSnapshot())
-    private val authTiming = OAuth2AuthTiming(config, clock)
+    private val authTiming = OAuth2AuthNTiming(config, clock)
     private val tokenClient = OAuth2TokenClient(retryIoErrors, proxy, authTiming)
+    private val authManagerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {
         startAuthManager()
+    }
+
+    @PreDestroy
+    fun cleanup() {
+        authManagerScope.cancel()
     }
 
     internal fun startAuthManager() {
@@ -50,8 +59,10 @@ internal class OAuth2AuthNService(
             return
         }
 
-        val job = applicationScope.launch(start = CoroutineStart.LAZY) {
-            runAuthManagerLoop(config.idpCredentials, config.idpEndpoint)
+        val job = authManagerScope.launch(start = CoroutineStart.LAZY) {
+            supervisorScope {
+                runAuthManagerLoop(config.idpCredentials, config.idpEndpoint)
+            }
         }
 
         val didStart = startAuthManagerJob(job)
@@ -95,7 +106,7 @@ internal class OAuth2AuthNService(
     }
 
     private suspend fun prepareForNextAttempt(nextDelay: Duration): AuthNResponse.Success? {
-        if (!nextDelay.isZero && !nextDelay.isNegative) {
+        if (nextDelay > Duration.ZERO) {
             delay(nextDelay)
         }
 
@@ -268,3 +279,4 @@ internal class OAuth2AuthNService(
     internal fun getNewAccessToken(idpCredentials: IdpCredentials, idpEndpoint: URL, shouldRetry: Boolean = true): AuthNResponse =
         tokenClient.getNewAccessToken(idpCredentials, idpEndpoint, shouldRetry)
 }
+

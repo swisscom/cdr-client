@@ -235,7 +235,7 @@ internal class WebOperationsTest {
             "DISABLED" -> DTOs.StatusResponse.StatusCode.DISABLED
             "BROKEN" -> DTOs.StatusResponse.StatusCode.BROKEN
             "ERROR" -> DTOs.StatusResponse.StatusCode.ERROR
-            "AUTHN_REAUTHENTICATING" -> DTOs.StatusResponse.StatusCode.AUTHN_REAUTHENTICATING
+            "AUTHN_REAUTHENTICATING" -> DTOs.StatusResponse.StatusCode.AUTHN_AUTHENTICATING
             "AUTHN_COMMUNICATION_ERROR" -> DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR
             "AUTHN_UNKNOWN_ERROR" -> DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR
             "AUTHN_DENIED" -> DTOs.StatusResponse.StatusCode.AUTHN_DENIED

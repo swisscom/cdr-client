@@ -50,6 +50,7 @@ class OAuth2AuthNServiceTest {
         .build()
 
     private val testScopes = mutableListOf<CoroutineScope>()
+    private val testServices = mutableListOf<OAuth2AuthNService>()
 
     @BeforeEach
     fun setUp() {
@@ -75,6 +76,8 @@ class OAuth2AuthNServiceTest {
 
     @AfterEach
     fun tearDown() {
+        testServices.forEach { it.cleanup() }
+        testServices.clear()
         testScopes.forEach { it.cancel() }
         testScopes.clear()
     }
@@ -172,8 +175,7 @@ class OAuth2AuthNServiceTest {
         waitForAuthState(authNService, AuthNState.AUTHENTICATED)
         val successResponse = assertInstanceOf<AuthNResponse.Success>(authNService.getAccessToken())
         assertEquals("ext-token", successResponse.response.tokens.accessToken.value)
-        assertTrue(successResponse.expiresAtEpochSecond != null)
-        assertTrue(successResponse.expiresAtEpochSecond!! > Instant.now().epochSecond)
+        assertTrue(successResponse.expiresAtEpochSecond > Instant.now().epochSecond)
     }
 
     @Test
@@ -293,16 +295,11 @@ class OAuth2AuthNServiceTest {
 
 
     private fun newService(): OAuth2AuthNService =
-        CoroutineScope(Dispatchers.Default).also { scope ->
-            testScopes += scope
-        }.let { scope ->
-            OAuth2AuthNService(
-                config = config,
-                retryIoErrors = retryIoExceptionsTwice,
-                proxy = null,
-                applicationScope = scope,
-            )
-        }
+        OAuth2AuthNService(
+            config = config,
+            retryIoErrors = retryIoExceptionsTwice,
+            proxy = null,
+        ).also { testServices += it }
 
     private fun successTokenResponse(expiresAtEpochSecond: Long, accessToken: String = ACCESS_TOKEN): MockResponse =
         MockResponse.Builder()

@@ -351,7 +351,7 @@ internal class WebOperations(
             } else if (!authNStatus.isNullOrBlank() && !(authNStatus == AUTHN_AUTHENTICATED || authNStatus == AUTHN_UNAUTHENTICATED)) {
                 when (authNStatus) {
                     AUTHN_DENIED -> DTOs.StatusResponse.StatusCode.AUTHN_DENIED
-                    AUTHN_REAUTHENTICATING -> DTOs.StatusResponse.StatusCode.AUTHN_REAUTHENTICATING
+                    AUTHN_REAUTHENTICATING -> DTOs.StatusResponse.StatusCode.AUTHN_AUTHENTICATING
                     AUTHN_COMMUNICATION_ERROR -> DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR
                     AUTHN_UNKNOWN_ERROR -> DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR
                     else -> DTOs.StatusResponse.StatusCode.UNKNOWN

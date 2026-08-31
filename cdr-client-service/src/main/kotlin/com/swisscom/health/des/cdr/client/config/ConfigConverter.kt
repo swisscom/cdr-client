@@ -234,8 +234,8 @@ internal fun CdrClientConfigDto.IdpCredentials.toCdrClientConfig(): IdpCredentia
 internal fun CdrClientConfigDto.RetryTemplateConfig.toCdrClientConfig(): RetryTemplateConfig =
     RetryTemplateConfig(
         retries = retries,
-        initialDelay = java.time.Duration.ofMillis(initialDelay.toMillis()),
-        maxDelay = java.time.Duration.ofMillis(maxDelay.toMillis()),
+        initialDelay = initialDelay,
+        maxDelay = maxDelay,
         multiplier = multiplier
     )
 

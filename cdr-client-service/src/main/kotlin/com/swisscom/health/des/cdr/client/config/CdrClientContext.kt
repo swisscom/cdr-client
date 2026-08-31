@@ -6,11 +6,8 @@ import com.mayakapps.kache.ObjectKache
 import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.time.delay
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -159,14 +156,14 @@ internal class CdrClientContext {
             .request(chain.request())
             .protocol(Protocol.HTTP_1_1)
             .code(HttpStatus.SERVICE_UNAVAILABLE.value())
-            .message("Authentication re-establishment in progress")
+            .message("Authentication in progress")
             .body(
-                "Authentication is being re-established."
+                "Authentication in progress."
                     .toResponseBody("text/plain".toMediaType())
             )
             .build()
             .also {
-                logger.warn { "Authentication is currently re-establishing; returning temporary 503 response." }
+                logger.warn { "Authentication is currently in progress; returning temporary 503 response." }
             }
     }
 
@@ -181,9 +178,6 @@ internal class CdrClientContext {
         return OkHttpClient.Builder()
     }
 
-    @Bean(name = ["applicationCoroutineScope"], destroyMethod = "close")
-    fun applicationCoroutineScope(): ManagedCoroutineScope =
-        ManagedCoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Creates a coroutine dispatcher for blocking I/O operations with limited parallelism.
@@ -301,13 +295,6 @@ internal class HttpServerErrorException(message: String, val statusCode: Int, va
 
 internal class WrongCredentialsException(message: String) : RuntimeException(message, null, false, false)
 
-internal class ManagedCoroutineScope(
-    override val coroutineContext: kotlin.coroutines.CoroutineContext
-) : CoroutineScope, AutoCloseable {
-    override fun close() {
-        coroutineContext.cancel()
-    }
-}
 
 sealed interface FileBusyTester {
     suspend fun isBusy(file: Path): Boolean

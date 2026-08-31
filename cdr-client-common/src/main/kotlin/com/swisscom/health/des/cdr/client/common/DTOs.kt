@@ -152,7 +152,7 @@ class DTOs {
             ERROR(true),
             BROKEN(true),
             AUTHN_DENIED(true),
-            AUTHN_REAUTHENTICATING(true),
+            AUTHN_AUTHENTICATING(true),
             AUTHN_COMMUNICATION_ERROR(true),
             AUTHN_UNKNOWN_ERROR(true),
             OFFLINE(false);

@@ -25,7 +25,7 @@ private val logger = KotlinLogging.logger {}
 internal class OAuth2TokenClient(
     private val retryIoErrors: RetryTemplate,
     private val proxy: Proxy?,
-    private val authTiming: OAuth2AuthTiming,
+    private val authTiming: OAuth2AuthNTiming,
 ) {
     fun getNewAccessToken(idpCredentials: IdpCredentials, idpEndpoint: URL, shouldRetry: Boolean = true): AuthNResponse {
         logger.info { "Starting OAuth token acquisition for client (retryEnabled=$shouldRetry)" }

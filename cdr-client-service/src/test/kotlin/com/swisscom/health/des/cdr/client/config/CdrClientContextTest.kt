@@ -40,8 +40,8 @@ internal class CdrClientContextTest {
 
         client.newCall(request).execute().use { response ->
             assertEquals(503, response.code)
-            assertEquals("Authentication re-establishment in progress", response.message)
-            assertEquals("Authentication is being re-established.", response.body.string())
+            assertEquals("Authentication in progress", response.message)
+            assertEquals("Authentication in progress.", response.body.string())
         }
         assertEquals(0, server.requestCount)
     }

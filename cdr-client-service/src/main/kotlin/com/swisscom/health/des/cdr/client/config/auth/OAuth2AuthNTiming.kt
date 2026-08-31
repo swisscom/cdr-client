@@ -6,24 +6,21 @@ import java.time.Duration
 import kotlin.math.pow
 import kotlin.time.Clock
 
-internal class OAuth2AuthTiming(
+internal class OAuth2AuthNTiming(
     private val config: CdrClientConfig,
     private val clock: Clock = Clock.System,
 ) {
-    fun tokenIsExpired(tokenResponse: AuthNResponse.Success): Boolean {
-        val expiresAtEpochSecond = tokenResponse.expiresAtEpochSecond ?: return true
-        return clock.now().epochSeconds > expiresAtEpochSecond
-    }
+    fun tokenIsExpired(tokenResponse: AuthNResponse.Success): Boolean =
+        clock.now().epochSeconds > tokenResponse.expiresAtEpochSecond
 
     fun delayUntilRefresh(tokenResponse: AuthNResponse.Success): Duration {
-        val expiresAtEpochSecond = tokenResponse.expiresAtEpochSecond ?: return Duration.ZERO
-        val refreshEpochSecond = expiresAtEpochSecond - config.authRefreshBeforeExpiry.seconds
+        val refreshEpochSecond = tokenResponse.expiresAtEpochSecond - config.authRefreshBeforeExpiry.seconds
         val delaySeconds = refreshEpochSecond - clock.now().epochSeconds
         return if (delaySeconds <= 0) Duration.ZERO else Duration.ofSeconds(delaySeconds)
     }
 
     fun capByRemainingLifetime(retryDelay: Duration, tokenResponse: AuthNResponse.Success): Duration {
-        val remainingSeconds = (tokenResponse.expiresAtEpochSecond ?: 0) - clock.now().epochSeconds
+        val remainingSeconds = tokenResponse.expiresAtEpochSecond - clock.now().epochSeconds
         return if (remainingSeconds <= 0) Duration.ZERO else minOf(retryDelay, Duration.ofSeconds(remainingSeconds))
     }
 
@@ -50,13 +47,13 @@ internal class OAuth2AuthTiming(
     }
 
     /**
-     * Computes `initialMillis * multiplier^exponent` safely, clamping to [Long.MAX_VALUE] if the
+     * Computes `initialMillis * multiplier^exponent` safely, falling back to `initialMillis` if the
      * result is [Double.NaN], infinite, or would overflow a [Long].
      */
     private fun safeExponentialMillis(initialMillis: Long, multiplier: Double, exponent: Int): Long {
         val scaled = initialMillis * multiplier.pow(exponent.toDouble())
         return when {
-            scaled.isNaN() || scaled.isInfinite() || scaled >= Long.MAX_VALUE.toDouble() -> Long.MAX_VALUE
+            scaled.isNaN() || scaled.isInfinite() || scaled >= Long.MAX_VALUE.toDouble() -> initialMillis
             else -> scaled.toLong()
         }
     }
@@ -69,9 +66,5 @@ internal class OAuth2AuthTiming(
         }
 
     private fun parsePositiveLifetimeSeconds(value: Any?): Long? =
-        when (value) {
-            is Number -> value.toLong().takeIf { it > 0 }
-            is String -> value.toLongOrNull()?.takeIf { it > 0 }
-            else -> null
-        }
+        parseEpochSecond(value)?.takeIf { it > 0 }
 }

@@ -51,7 +51,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_reset
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_communication_error
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_denied
-import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_reauthenticating
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_authenticating
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_unknown_error
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_broken
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_disabled
@@ -253,7 +253,7 @@ private fun statusStringResource(status: DTOs.StatusResponse.StatusCode): String
         DTOs.StatusResponse.StatusCode.ERROR -> stringResource(Res.string.status_error)
         DTOs.StatusResponse.StatusCode.OFFLINE -> stringResource(Res.string.status_offline)
         DTOs.StatusResponse.StatusCode.BROKEN -> stringResource(Res.string.status_broken)
-        DTOs.StatusResponse.StatusCode.AUTHN_REAUTHENTICATING -> stringResource(Res.string.status_authn_reauthenticating)
+        DTOs.StatusResponse.StatusCode.AUTHN_AUTHENTICATING -> stringResource(Res.string.status_authn_authenticating)
         DTOs.StatusResponse.StatusCode.AUTHN_COMMUNICATION_ERROR -> stringResource(Res.string.status_authn_communication_error)
         DTOs.StatusResponse.StatusCode.AUTHN_UNKNOWN_ERROR -> stringResource(Res.string.status_authn_unknown_error)
         DTOs.StatusResponse.StatusCode.AUTHN_DENIED -> stringResource(Res.string.status_authn_denied)
