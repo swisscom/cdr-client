@@ -79,7 +79,7 @@ internal class OAuth2AuthNService(
             }
 
             val next = current.copy(
-                response = AuthNResponse.Reauthenticating,
+                response = AuthNResponse.Authenticating,
                 managerJob = job,
             )
             if (authStateRef.compareAndSet(current, next)) {
@@ -112,7 +112,7 @@ internal class OAuth2AuthNService(
 
         return validCachedToken().also { tokenBeforeAttempt ->
             if (tokenBeforeAttempt == null) {
-                updateAuthNResponse(AuthNResponse.Reauthenticating)
+                updateAuthNResponse(AuthNResponse.Authenticating)
             }
         }
     }
@@ -128,7 +128,7 @@ internal class OAuth2AuthNService(
             is AuthNResponse.RetryableFailure -> handleRetryableFailureResponse(tokenBeforeAttempt, loopState)
             is AuthNResponse.Failed -> stopWith(tokenResponse)
             // States here should never be returned by the token client, but we handle them defensively in case of a programming error.
-            is AuthNResponse.Reauthenticating, is AuthNResponse.NotAuthenticated -> stopWithUnexpectedResponse(tokenResponse)
+            is AuthNResponse.Authenticating, is AuthNResponse.NotAuthenticated -> stopWithUnexpectedResponse(tokenResponse)
         }
 
     private fun handleSuccessfulAuthResponse(tokenResponse: AuthNResponse.Success): AuthLoopResult {
@@ -152,7 +152,7 @@ internal class OAuth2AuthNService(
             "IdP denied OAuth token acquisition; retrying in $denyRetryDelay " +
                 "(attempt=$nextDenyRetryAttempt/${config.denyRetryAttempts})"
         }
-        updateAuthNResponse(AuthNResponse.Reauthenticating)
+        updateAuthNResponse(AuthNResponse.Authenticating)
         return if (nextDenyRetryAttempt > config.denyRetryAttempts) {
             stopWith(tokenResponse)
         } else {
@@ -180,7 +180,7 @@ internal class OAuth2AuthNService(
             logger.warn {
                 "Transient OAuth token acquisition failure; retrying in $retryDelay (attempt=${loopState.retryableAttempt})"
             }
-            updateAuthNResponse(AuthNResponse.Reauthenticating)
+            updateAuthNResponse(AuthNResponse.Authenticating)
             retryDelay
         } else {
             val cappedDelay = authTiming.capByRemainingLifetime(retryDelay, tokenBeforeAttempt)
@@ -219,7 +219,7 @@ internal class OAuth2AuthNService(
         return when (val currentResponse = snapshot.response) {
             is AuthNResponse.Success -> {
                 if (snapshot.managerJob?.isActive == true && config.fileSynchronizationEnabled.value) {
-                    AuthNResponse.Reauthenticating
+                    AuthNResponse.Authenticating
                 } else {
                     AuthNResponse.NotAuthenticated
                 }
@@ -261,7 +261,7 @@ internal class OAuth2AuthNService(
         if (snapshot.managerJob === job) snapshot.copy(managerJob = null) else snapshot
 
     private fun resetToUnauthenticatedIfNeeded(snapshot: AuthStateSnapshot): AuthStateSnapshot =
-        if (snapshot.response is AuthNResponse.Reauthenticating) {
+        if (snapshot.response is AuthNResponse.Authenticating) {
             snapshot.copy(
                 response = AuthNResponse.NotAuthenticated,
             )

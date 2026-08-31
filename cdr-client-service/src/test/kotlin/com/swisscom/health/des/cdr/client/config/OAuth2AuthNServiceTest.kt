@@ -7,7 +7,6 @@ import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -290,7 +289,7 @@ class OAuth2AuthNServiceTest {
 
         waitForAuthState(authNService, AuthNState.AUTHENTICATED)
         assertEquals(AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
-        assertFalse(authNService.getAccessToken() is AuthNResponse.Reauthenticating)
+        assertFalse(authNService.getAccessToken() is AuthNResponse.Authenticating)
     }
 
 

@@ -36,7 +36,7 @@ internal sealed interface AuthNResponse {
     data class Deny(val error: WrongCredentialsException) : AuthNResponse
     data class RetryableFailure(val error: IOException) : AuthNResponse
     data class Failed(val error: IllegalStateException) : AuthNResponse
-    data object Reauthenticating : AuthNResponse
+    data object Authenticating : AuthNResponse
     data object NotAuthenticated : AuthNResponse
 }
 
@@ -57,6 +57,6 @@ internal fun AuthNResponse.toAuthNState(): AuthNState =
         is AuthNResponse.RetryableFailure -> AuthNState.RETRYABLE_FAILURE
         is AuthNResponse.Failed -> AuthNState.FAILED
         is AuthNResponse.Deny -> AuthNState.DENIED
-        is AuthNResponse.Reauthenticating -> AuthNState.REAUTHENTICATING
+        is AuthNResponse.Authenticating -> AuthNState.REAUTHENTICATING
         is AuthNResponse.NotAuthenticated -> AuthNState.UNAUTHENTICATED
     }

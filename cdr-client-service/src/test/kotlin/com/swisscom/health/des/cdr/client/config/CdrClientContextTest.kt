@@ -23,7 +23,7 @@ internal class CdrClientContextTest {
 
     @Test
     fun `okhttp interceptor returns synthetic 503 while reauthenticating`() {
-        every { authNService.getAccessToken() } returns AuthNResponse.Reauthenticating
+        every { authNService.getAccessToken() } returns AuthNResponse.Authenticating
 
         val client = CdrClientContext().okHttpClient(
             builder = OkHttpClient.Builder(),

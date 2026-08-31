@@ -114,7 +114,7 @@ internal class CdrClientContext {
                         when (authNResponse) {
                             is AuthNResponse.Success -> successProceeding(chain, authNResponse.response.tokens.accessToken.value)
 
-                            is AuthNResponse.Reauthenticating -> temporaryServiceUnavailableResponse(chain)
+                            is AuthNResponse.Authenticating -> temporaryServiceUnavailableResponse(chain)
 
                             else -> chain.proceed(chain.request()) // unauthenticated call; will probably fail with 401/403
                                 .also { _ ->
