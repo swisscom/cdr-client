@@ -43,6 +43,7 @@ class DomainObjects {
         PRODUCTION_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-prod-fn.azurewebsites.net"),
         STAGING("https", WELL_KNOWN_HTTPS_PORT, "stg.cdr.health.swisscom.ch"),
         STAGING_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-stg-fn.azurewebsites.net"),
+        INTEGRATION("https", WELL_KNOWN_HTTPS_PORT, "int.cdr.health.swisscom.ch"),
         INTEGRATION_INTERNAL("https", WELL_KNOWN_HTTPS_PORT, "cdr-int-fn.azurewebsites.net"),
         // apparently, on MS Windows, it is possible for non-admin users to run processes that listen on port 80;
         // as non-admin users may call the cdr-client-service API and set the CDR API endpoint to `LOCALHOST` we

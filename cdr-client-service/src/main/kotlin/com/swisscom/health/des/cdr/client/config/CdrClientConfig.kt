@@ -46,6 +46,15 @@ internal data class CdrClientConfig(
     /** OAuth IdP URL. */
     val idpEndpoint: URL,
 
+    /** Number of background retries after an authentication failure before transitioning to denied state. */
+    val maxDenyRetries: Int,
+
+    /** How long before token expiry the background auth manager should start refreshing the token. */
+    val authRefreshBeforeExpiry: Duration,
+
+    /** Shared backoff policy for retryable background auth-manager retries and permission-deny retries. */
+    val authRetry: RetryPolicy,
+
     /** Directory to temporarily store downloaded documents that are pending download acknowledgement. */
     val localFolder: TempDownloadDir,
 
@@ -97,6 +106,17 @@ internal data class CdrClientConfig(
     private fun logConfig() {
         logger.info { "$this" }
     }
+
+    data class RetryPolicy(
+        /** Initial delay before the first retry attempt. */
+        val initialDelay: Duration,
+
+        /** Exponential backoff multiplier applied to each retry. */
+        val backoffMultiplier: Double,
+
+        /** Maximum delay between retries. */
+        val maxDelay: Duration,
+    )
 
     data class RetryTemplateConfig(
         /** The number of retries to attempt (on top of the initial request). */

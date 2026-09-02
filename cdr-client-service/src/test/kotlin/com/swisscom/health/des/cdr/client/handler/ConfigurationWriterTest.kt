@@ -137,6 +137,13 @@ class ConfigurationWriterTest {
             ),
             oldFileThreshold = Duration.ofHours(2L),
             fileSystemCheckInterval = Duration.ofMinutes(5L),
+            maxDenyRetries = 5,
+            authRefreshBeforeExpiry = Duration.ofSeconds(60),
+            authRetry = CdrClientConfig.RetryPolicy(
+                initialDelay = Duration.ofSeconds(1L),
+                backoffMultiplier = 2.0,
+                maxDelay = Duration.ofMinutes(5L),
+            ),
         )
 
         every { configValidationService.validateAllConfigurationItems(any()) } returns ValidationResult.Success

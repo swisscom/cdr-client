@@ -152,6 +152,7 @@ class DTOs {
             ERROR(true),
             BROKEN(true),
             AUTHN_DENIED(true),
+            AUTHN_AUTHENTICATING(true),
             AUTHN_COMMUNICATION_ERROR(true),
             AUTHN_UNKNOWN_ERROR(true),
             OFFLINE(false);
@@ -201,6 +202,9 @@ class DTOs {
         val filesInProgressCacheSize: String,
         val idpCredentials: IdpCredentials,
         val idpEndpoint: URL,
+        val maxDenyRetries: Int,
+        val authRefreshBeforeExpiry: Duration = Duration.ZERO,
+        val authRetry: RetryPolicy = RetryPolicy.EMPTY,
         val localFolder: String,
         val pullThreadPoolSize: Int,
         val pushThreadPoolSize: Int,
@@ -224,6 +228,9 @@ class DTOs {
                 filesInProgressCacheSize = EMPTY_STRING,
                 idpCredentials = IdpCredentials.EMPTY,
                 idpEndpoint = URI("http://localhost").toURL(),
+                maxDenyRetries = 0,
+                authRefreshBeforeExpiry = Duration.ZERO,
+                authRetry = RetryPolicy.EMPTY,
                 localFolder = EMPTY_STRING,
                 pullThreadPoolSize = 0,
                 pushThreadPoolSize = 0,
@@ -237,6 +244,22 @@ class DTOs {
                 oldFileThreshold = Duration.ZERO,
                 fileSystemCheckInterval = Duration.ZERO,
             )
+        }
+
+        @Serializable
+        data class RetryPolicy(
+            val initialDelay: Duration,
+            val backoffMultiplier: Double,
+            val maxDelay: Duration,
+        ) {
+            companion object {
+                @JvmStatic
+                val EMPTY = RetryPolicy(
+                    initialDelay = Duration.ZERO,
+                    backoffMultiplier = 0.0,
+                    maxDelay = Duration.ZERO,
+                )
+            }
         }
 
         @Serializable

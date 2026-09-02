@@ -3,19 +3,24 @@ package com.swisscom.health.des.cdr.client.config
 import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy
 import com.mayakapps.kache.ObjectKache
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.time.delay
+import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpStatus
 import org.springframework.retry.support.RetryTemplate
 import java.io.IOException
 import java.net.Authenticator
@@ -107,17 +112,9 @@ internal class CdrClientContext {
                 oAuth2AuthNService.getAccessToken()
                     .let { authNResponse ->
                         when (authNResponse) {
-                            is AuthNResponse.Success -> {
-                                chain
-                                    .request()
-                                    .newBuilder()
-                                    .run {
-                                        header("Authorization", "Bearer ${authNResponse.response.tokens.accessToken.value}")
-                                        build()
-                                    }.let { authenticatedRequest ->
-                                        chain.proceed(authenticatedRequest)
-                                    }
-                            }
+                            is AuthNResponse.Success -> successProceeding(chain, authNResponse.response.tokens.accessToken.value)
+
+                            is AuthNResponse.Authenticating -> temporaryServiceUnavailableResponse(chain)
 
                             else -> chain.proceed(chain.request()) // unauthenticated call; will probably fail with 401/403
                                 .also { _ ->
@@ -142,6 +139,34 @@ internal class CdrClientContext {
             }
             .build()
 
+    private fun successProceeding(chain: Interceptor.Chain, accessToken: String): Response {
+        return chain
+            .request()
+            .newBuilder()
+            .run {
+                header("Authorization", "Bearer $accessToken")
+                build()
+            }.let { authenticatedRequest ->
+                chain.proceed(authenticatedRequest)
+            }
+    }
+
+    private fun temporaryServiceUnavailableResponse(chain: Interceptor.Chain): Response {
+        return Response.Builder()
+            .request(chain.request())
+            .protocol(Protocol.HTTP_1_1)
+            .code(HttpStatus.SERVICE_UNAVAILABLE.value())
+            .message("Authentication in progress")
+            .body(
+                "Authentication in progress."
+                    .toResponseBody("text/plain".toMediaType())
+            )
+            .build()
+            .also {
+                logger.warn { "Authentication is currently in progress; returning temporary 503 response." }
+            }
+    }
+
     /**
      * Creates and returns an instance of the OkHttpClient.Builder if one does not already exist.
      *
@@ -152,6 +177,7 @@ internal class CdrClientContext {
     fun okHttpClientBuilder(): OkHttpClient.Builder? {
         return OkHttpClient.Builder()
     }
+
 
     /**
      * Creates a coroutine dispatcher for blocking I/O operations with limited parallelism.
@@ -261,8 +287,6 @@ internal class CdrClientContext {
 
 }
 
-
-
 internal class HttpServerErrorException(message: String, val statusCode: Int, val responseBody: String) : RuntimeException(message, null, false, false) {
     override fun toString(): String {
         return "HttpServerErrorException(statusCode='$statusCode', responseBody='$responseBody', message='${message}')"
@@ -270,6 +294,7 @@ internal class HttpServerErrorException(message: String, val statusCode: Int, va
 }
 
 internal class WrongCredentialsException(message: String) : RuntimeException(message, null, false, false)
+
 
 sealed interface FileBusyTester {
     suspend fun isBusy(file: Path): Boolean

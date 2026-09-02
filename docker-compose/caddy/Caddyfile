@@ -9,6 +9,7 @@ localhost:80 {
     }
     reverse_proxy /isalive mock-oauth2-server:8080
     reverse_proxy /test-tenant-client-id/* mock-oauth2-server:8080
+    reverse_proxy /idp-wiremock/* wiremock:8080
     reverse_proxy /documents* wiremock:8080
     reverse_proxy /client-credentials wiremock:8080
 }

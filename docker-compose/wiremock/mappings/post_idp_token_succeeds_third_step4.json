@@ -1,0 +1,22 @@
+{
+  "scenarioName": "idp-token-succeeds-third-attempt",
+  "requiredScenarioState": "FOURTH_ATTEMPT",
+  "request": {
+    "urlPath": "/idp-wiremock/succeeds-third/oauth2/v2.0/token",
+    "method": "POST"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json;charset=UTF-8"
+    },
+    "jsonBody": {
+      "access_token": "wiremock-third-retry-token",
+      "token_type": "Bearer",
+      "not_before": 1760436404,
+      "expires_in": 900,
+      "ext_expires_in": 4102444800,
+      "resource": "wiremock-resource"
+    }
+  }
+}

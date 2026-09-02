@@ -233,7 +233,7 @@ object Constants {
     const val INTEGRATION_TEST_TAG = "integration-test"
 }
 
-val test by testing.suites.existing(JvmTestSuite::class)
+val test = testing.suites.named<JvmTestSuite>("test")
 
 tasks.register<Test>("integrationTest") {
     description = "Runs the integration tests."

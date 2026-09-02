@@ -6,6 +6,12 @@ client:
     # locations, which currently also fails the update
     max-credential-age: 365d
   idp-endpoint: https://login.microsoftonline.com/${client.idp-credentials.tenant-id}/oauth2/v2.0/token
+  max-deny-retries: 5
+  auth-refresh-before-expiry: 60s
+  auth-retry:
+    initial-delay: 1s
+    backoff-multiplier: 2.0
+    max-delay: 5m
   schedule-delay: PT10M
   files-in-progress-cache-size: 10MB
   connection-timeout-ms: 5000

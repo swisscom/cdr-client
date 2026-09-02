@@ -317,13 +317,13 @@ internal abstract class BaseUploadScheduler(
                 continueSpan(tracer, span) {
                     logger.debug {
                         "new file '${file.name}' in '${file.parent}' ; file ${
-                            if (file.extension == EXTENSION_XML) "ends"
+                            if (file.extension.equals(EXTENSION_XML, ignoreCase = true)) "ends"
                             else "does not end"
                         } with '.$EXTENSION_XML' and will be ${
-                            if (file.extension == EXTENSION_XML) "processed" else "ignored"
+                            if (file.extension.equals(EXTENSION_XML, ignoreCase = true)) "processed" else "ignored"
                         }"
                     }
-                    file.extension == EXTENSION_XML
+                    file.extension.equals(EXTENSION_XML, ignoreCase = true)
                 }.first
             }
             .filter { (file: Path, span: Span) ->
