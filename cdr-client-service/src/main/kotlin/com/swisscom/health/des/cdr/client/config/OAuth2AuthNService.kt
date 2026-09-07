@@ -17,17 +17,16 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.time.delay
 import org.springframework.context.annotation.DependsOn
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Service
 import java.net.Proxy
 import java.net.URL
-import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
+
 private val logger = KotlinLogging.logger {}
 
 @Service
@@ -60,9 +59,7 @@ internal class OAuth2AuthNService(
         }
 
         val job = authManagerScope.launch(start = CoroutineStart.LAZY) {
-            supervisorScope {
-                runAuthManagerLoop(config.idpCredentials, config.idpEndpoint)
-            }
+            runAuthManagerLoop(config.idpCredentials, config.idpEndpoint)
         }
 
         val didStart = startAuthManagerJob(job)
@@ -94,38 +91,61 @@ internal class OAuth2AuthNService(
 
     internal fun getAccessToken(): AuthNResponse = currentReadableResponse()
 
+    /**
+     * Main authentication manager loop.
+     *
+     * **Story:**
+     * 1. Prepare: Sleep until next retry attempt (initial delay is 0)
+     * 2. Acquire: Call token client to get new token (blocking, includes retries + backoff)
+     * 3. Evaluate: Process response and decide to continue with new delay or stop
+     *    - Success: Store token, compute refresh time, continue
+     *    - Deny: Update state to Authenticating, retry with backoff or stop if max retries reached
+     *    - RetryableFailure: Check FRESH cached token (after acquisition), cap delay if valid, retry with backoff
+     *    - Failed/Unexpected: Stop with failure state
+     *
+     * **Key design point:** Cached token is checked AFTER token acquisition returns, not before.
+     * This prevents using stale token state in retry logic if the token client call takes longer
+     * than the remaining token lifetime.
+     *
+     * Retry ownership contract:
+     * - This loop owns inter-attempt scheduling, auth-state transitions, and deny/retry stop conditions.
+     * - [OAuth2TokenClient] owns transport-level retries within each individual acquisition attempt.
+     */
     private suspend fun runAuthManagerLoop(idpCredentials: IdpCredentials, idpEndpoint: URL) {
         var loopState = AuthLoopState()
         while (true) {
-            val tokenBeforeAttempt = prepareForNextAttempt(loopState.nextDelay)
-            when (val loopResult = toAuthLoopResult(getNewAccessToken(idpCredentials, idpEndpoint), tokenBeforeAttempt, loopState)) {
+            // Step 1: Prepare for next attempt (sleep if this is a retry)
+            delay(loopState.nextDelay)
+
+            // Step 2: Acquire new token (blocking call with retry/backoff)
+            logger.debug { "Attempting OAuth token acquisition (attempt=${loopState.retryableAttempt})" }
+            val tokenResponse = getNewAccessToken(idpCredentials, idpEndpoint)
+
+            // Step 3: Evaluate result using FRESH cached token state (not captured before Step 2)
+            val cachedTokenAfterAcquisition = validCachedToken()
+            when (val loopResult = toAuthLoopResult(tokenResponse, cachedTokenAfterAcquisition, loopState)) {
                 is AuthLoopResult.Continue -> loopState = loopResult.state
                 AuthLoopResult.Stop -> break
             }
         }
     }
 
-    private suspend fun prepareForNextAttempt(nextDelay: Duration): AuthNResponse.Success? {
-        if (nextDelay > Duration.ZERO) {
-            delay(nextDelay)
-        }
-
-        return validCachedToken().also { tokenBeforeAttempt ->
-            if (tokenBeforeAttempt == null) {
-                updateAuthNResponse(AuthNResponse.Authenticating)
-            }
-        }
-    }
-
+    /**
+     * Evaluates the token acquisition result and determines whether to continue or stop the loop.
+     *
+     * **Parameter contract:**
+     * - `cachedTokenAfterAcquisition`: Fresh token state captured AFTER token client call returns.
+     *   This is not stale and reflects the actual current token availability.
+     */
     private fun toAuthLoopResult(
         tokenResponse: AuthNResponse,
-        tokenBeforeAttempt: AuthNResponse.Success?,
+        cachedTokenAfterAcquisition: AuthNResponse.Success?,
         loopState: AuthLoopState
     ): AuthLoopResult =
         when (tokenResponse) {
             is AuthNResponse.Success -> handleSuccessfulAuthResponse(tokenResponse)
             is AuthNResponse.Deny -> handleDeniedAuthResponse(tokenResponse, loopState)
-            is AuthNResponse.RetryableFailure -> handleRetryableFailureResponse(tokenBeforeAttempt, loopState)
+            is AuthNResponse.RetryableFailure -> handleRetryableFailureResponse(cachedTokenAfterAcquisition, loopState)
             is AuthNResponse.Failed -> stopWith(tokenResponse)
             // States here should never be returned by the token client, but we handle them defensively in case of a programming error.
             is AuthNResponse.Authenticating, is AuthNResponse.NotAuthenticated -> stopWithUnexpectedResponse(tokenResponse)
@@ -134,7 +154,7 @@ internal class OAuth2AuthNService(
     private fun handleSuccessfulAuthResponse(tokenResponse: AuthNResponse.Success): AuthLoopResult {
         logger.info {
             "OAuth token acquisition succeeded; expiresAtEpochSecond=${tokenResponse.expiresAtEpochSecond}, " +
-                "refreshIn=${authTiming.delayUntilRefresh(tokenResponse)}"
+                    "refreshIn=${authTiming.delayUntilRefresh(tokenResponse)}"
         }
         updateAuthNResponse(tokenResponse)
         return AuthLoopResult.Continue(AuthLoopState(nextDelay = authTiming.delayUntilRefresh(tokenResponse)))
@@ -150,10 +170,11 @@ internal class OAuth2AuthNService(
         )
         logger.warn {
             "IdP denied OAuth token acquisition; retrying in $denyRetryDelay " +
-                "(attempt=$nextDenyRetryAttempt/${config.maxDenyRetries})"
+                    "(attempt=$nextDenyRetryAttempt/${config.maxDenyRetries})"
         }
         updateAuthNResponse(AuthNResponse.Authenticating)
         return if (nextDenyRetryAttempt > config.maxDenyRetries) {
+            logger.warn { "IdP deny retries exhausted; stopping auth manager" }
             stopWith(tokenResponse)
         } else {
             AuthLoopResult.Continue(
@@ -166,8 +187,18 @@ internal class OAuth2AuthNService(
         }
     }
 
+    /**
+     * Handles transient token acquisition failures.
+     *
+     * If a cached token is still valid (fresh check AFTER acquisition), we cap the retry delay
+     * by the token's remaining lifetime. This prevents waiting longer than the token lives.
+     * If no cached token is valid, we use the full computed backoff delay.
+     *
+     * **Important:** `cachedTokenAfterAcquisition` is checked AFTER the token client call returns,
+     * not before. This ensures we're not using stale token state to compute delays.
+     */
     private fun handleRetryableFailureResponse(
-        tokenBeforeAttempt: AuthNResponse.Success?,
+        cachedTokenAfterAcquisition: AuthNResponse.Success?,
         loopState: AuthLoopState
     ): AuthLoopResult {
         val retryDelay = authTiming.backoffDelay(
@@ -176,16 +207,18 @@ internal class OAuth2AuthNService(
             multiplier = config.authRetry.backoffMultiplier,
             maxDelay = config.authRetry.maxDelay,
         )
-        val nextDelay = if (tokenBeforeAttempt == null) {
+        val nextDelay = if (cachedTokenAfterAcquisition == null) {
             logger.warn {
-                "Transient OAuth token acquisition failure; retrying in $retryDelay (attempt=${loopState.retryableAttempt})"
+                "Transient OAuth token acquisition failure with no cached token; retrying in $retryDelay (attempt=${loopState.retryableAttempt})"
             }
             updateAuthNResponse(AuthNResponse.Authenticating)
             retryDelay
         } else {
-            val cappedDelay = authTiming.capByRemainingLifetime(retryDelay, tokenBeforeAttempt)
+            val cappedDelay = authTiming.capByRemainingLifetime(retryDelay, cachedTokenAfterAcquisition)
+            val remainingLifetime = authTiming.delayUntilRefresh(cachedTokenAfterAcquisition)
             logger.warn {
-                "Transient OAuth token acquisition failure while cached token is still valid; retrying in $cappedDelay"
+                "Transient OAuth token acquisition failure while cached token is still valid; " +
+                        "retrying in $cappedDelay (remaining lifetime=$remainingLifetime)"
             }
             cappedDelay
         }
@@ -215,10 +248,25 @@ internal class OAuth2AuthNService(
         if (cachedToken != null) {
             return cachedToken
         }
+        return projectForExpiry(snapshot)
+    }
 
-        return when (val currentResponse = snapshot.response) {
+    /**
+     * Projects an expired [AuthNResponse.Success] to the appropriate effective state.
+     * When a token has expired:
+     * - if the manager loop is still active (refresh in flight), return [AuthNResponse.Authenticating]
+     * - otherwise, return [AuthNResponse.NotAuthenticated]
+     * All other responses are returned as-is.
+     *
+     * This is the only read-time state derivation: expiry is time-based and not explicitly
+     * written by the auth loop when the clock boundary is crossed.
+     */
+    private fun projectForExpiry(snapshot: AuthStateSnapshot): AuthNResponse {
+        val currentResponse = snapshot.response
+        return when (currentResponse) {
             is AuthNResponse.Success -> {
-                if (snapshot.managerJob?.isActive == true && config.fileSynchronizationEnabled.value) {
+                // Token expired; check if loop is still active (refresh in flight)
+                if (snapshot.managerJob?.isActive == true) {
                     AuthNResponse.Authenticating
                 } else {
                     AuthNResponse.NotAuthenticated
@@ -276,6 +324,13 @@ internal class OAuth2AuthNService(
         }
     }
 
+    /**
+     * Direct token acquisition entry point.
+     *
+     * This method does not mutate the auth-manager state machine by itself. It delegates to
+     * [OAuth2TokenClient] and is used both by the background auth loop (`shouldRetry=true`) and
+     * by single-shot credential validation probes (`shouldRetry=false`).
+     */
     internal fun getNewAccessToken(idpCredentials: IdpCredentials, idpEndpoint: URL, shouldRetry: Boolean = true): AuthNResponse =
         tokenClient.getNewAccessToken(idpCredentials, idpEndpoint, shouldRetry)
 }

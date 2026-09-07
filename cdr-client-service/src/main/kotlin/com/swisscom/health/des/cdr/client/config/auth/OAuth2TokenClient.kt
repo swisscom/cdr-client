@@ -27,6 +27,14 @@ internal class OAuth2TokenClient(
     private val proxy: Proxy?,
     private val authTiming: OAuth2AuthNTiming,
 ) {
+    /**
+     * Performs a single OAuth token acquisition attempt.
+     *
+     * Retry ownership contract:
+     * - This class owns only transport-level retries for a single acquisition attempt (`shouldRetry=true`).
+     * - The auth manager loop owns state transitions and inter-attempt scheduling/backoff.
+     * - Callers can set `shouldRetry=false` for single-shot probes (for example credential validation).
+     */
     fun getNewAccessToken(idpCredentials: IdpCredentials, idpEndpoint: URL, shouldRetry: Boolean = true): AuthNResponse {
         logger.info { "Starting OAuth token acquisition for client (retryEnabled=$shouldRetry)" }
 

@@ -222,6 +222,8 @@ internal class WebOperations(
             } else {
                 idpCredentials
             }
+            // Validation is a user-facing probe: run a single-shot token call for fast feedback and
+            // keep retry/state ownership in the background auth manager loop.
             authService.getNewAccessToken(effectiveCredentials.toCdrClientConfig(), URI(correctedIdpEndpoint).toURL(), false)
         }
     }.fold(

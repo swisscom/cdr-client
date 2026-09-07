@@ -1,11 +1,14 @@
 package com.swisscom.health.des.cdr.client.config
 
 import com.nimbusds.oauth2.sdk.AccessTokenResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthLoopResult
+import com.swisscom.health.des.cdr.client.config.auth.AuthLoopState
 import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.auth.AuthNState
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
+import io.mockk.mockk
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import mockwebserver3.MockResponse
@@ -36,8 +39,10 @@ import java.util.concurrent.TimeUnit
 @ExtendWith(MockKExtension::class)
 class OAuth2AuthNServiceTest {
 
-    @MockK
-    private lateinit var config: CdrClientConfig
+     private typealias AuthStateRef = java.util.concurrent.atomic.AtomicReference<com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot>
+
+     @MockK
+     private lateinit var config: CdrClientConfig
 
     @StartStop
     private val idpMock = MockWebServer()
@@ -292,11 +297,55 @@ class OAuth2AuthNServiceTest {
         assertFalse(authNService.getAccessToken() is AuthNResponse.Authenticating)
     }
 
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    fun `retryable failure uses fresh post-acquisition token view when cached token expires`() {
+        every { config.authRetry } returns CdrClientConfig.RetryPolicy(
+            initialDelay = Duration.ofSeconds(5),
+            backoffMultiplier = 1.0,
+            maxDelay = Duration.ofSeconds(5),
+        )
 
-    private fun newService(): OAuth2AuthNService =
+        val authNService = newService()
+        val shortLivedToken = buildTokenResponse(expiresAtEpochSecond = Instant.now().epochSecond + 1)
+        val snapshot = com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot(
+            response = shortLivedToken,
+            managerJob = null,
+        )
+        getAuthStateRef(authNService).set(snapshot)
+
+        // Simulate a long token acquisition by waiting until the previously cached token is definitely expired.
+        Thread.sleep(2100)
+
+        val validCachedTokenMethod = authNService::class.java.getDeclaredMethod("validCachedToken", snapshot::class.java)
+        validCachedTokenMethod.isAccessible = true
+        val freshTokenAfterAcquisition = validCachedTokenMethod.invoke(authNService, getAuthStateRef(authNService).get()) as AuthNResponse.Success?
+        assertEquals(null, freshTokenAfterAcquisition)
+
+        val toAuthLoopResultMethod = authNService::class.java.getDeclaredMethod(
+            "toAuthLoopResult",
+            AuthNResponse::class.java,
+            AuthNResponse.Success::class.java,
+            AuthLoopState::class.java,
+        )
+        toAuthLoopResultMethod.isAccessible = true
+        val result = toAuthLoopResultMethod.invoke(
+            authNService,
+            AuthNResponse.RetryableFailure(IOException("simulated io failure")),
+            freshTokenAfterAcquisition,
+            AuthLoopState(),
+        )
+
+        val continueResult = assertInstanceOf<AuthLoopResult.Continue>(result)
+        assertEquals(Duration.ofSeconds(5), continueResult.state.nextDelay)
+        assertInstanceOf<AuthNResponse.Authenticating>(getAuthStateRef(authNService).get().response)
+    }
+
+
+    private fun newService(retryTemplate: RetryTemplate = retryIoExceptionsTwice): OAuth2AuthNService =
         OAuth2AuthNService(
             config = config,
-            retryIoErrors = retryIoExceptionsTwice,
+            retryIoErrors = retryTemplate,
             proxy = null,
         ).also { testServices += it }
 
@@ -362,16 +411,128 @@ class OAuth2AuthNServiceTest {
             Thread.sleep(10)
         }
         assertEquals(expectedRequestCount, idpMock.requestCount)
-    }
+     }
 
-    private companion object {
-        const val MAX_ATTEMPTS = 3
-        const val ACCESS_TOKEN = "test-access-token"
-        const val ERROR_TOKEN_RESPONSE = """
-            {
-                "error": "invalid_client",
-                "error_description": "AADB2C90081: The specified client_secret does not match the expected value for this client."
-            }
-        """
-    }
+     @Test
+     fun `expired token with active manager loop returns authenticating`() {
+         val successResponse = buildTokenResponse(
+             expiresAtEpochSecond = Instant.now().epochSecond - 10, // Expired 10 seconds ago
+         )
+         val job = mockk<kotlinx.coroutines.Job>(relaxed = true)
+         every { job.isActive } returns true
+
+         val authNService = newService()
+         try {
+             // Directly set an expired Success response with active manager job (simulating loop in progress)
+             val snapshot = com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot(
+                 response = successResponse,
+                 managerJob = job
+             )
+             getAuthStateRef(authNService).set(snapshot)
+
+             // When we read the response, expired token with active loop should return Authenticating
+             val response = authNService.getAccessToken()
+             assertInstanceOf<AuthNResponse.Authenticating>(response)
+         } finally {
+             // Already called in @AfterEach, but be explicit
+         }
+     }
+
+     @Test
+     fun `expired token with inactive manager loop returns not authenticated`() {
+         val successResponse = buildTokenResponse(
+             expiresAtEpochSecond = Instant.now().epochSecond - 10, // Expired 10 seconds ago
+         )
+         val job = mockk<kotlinx.coroutines.Job>(relaxed = true)
+         every { job.isActive } returns false
+
+         val authNService = newService()
+         try {
+             // Directly set an expired Success response with inactive manager job
+             val snapshot = com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot(
+                 response = successResponse,
+                 managerJob = job
+             )
+             getAuthStateRef(authNService).set(snapshot)
+
+             // When we read the response, expired token with inactive loop should return NotAuthenticated
+             val response = authNService.getAccessToken()
+             assertInstanceOf<AuthNResponse.NotAuthenticated>(response)
+         } finally {
+             // Already called in @AfterEach, but be explicit
+         }
+     }
+
+     @Test
+     fun `unexpired token returns success even if stored`() {
+         val expiresInSeconds = 300L
+         val successResponse = buildTokenResponse(
+             expiresAtEpochSecond = Instant.now().epochSecond + expiresInSeconds, // Expires in 5 minutes
+         )
+         val job = mockk<kotlinx.coroutines.Job>(relaxed = true)
+         every { job.isActive } returns true
+
+         val authNService = newService()
+         try {
+             // Set a valid unexpired Success response
+             val snapshot = com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot(
+                 response = successResponse,
+                 managerJob = job
+             )
+             getAuthStateRef(authNService).set(snapshot)
+
+             // Valid unexpired token should return Success as-is, regardless of loop state
+             val response = authNService.getAccessToken()
+             assertInstanceOf<AuthNResponse.Success>(response)
+         } finally {
+             // Already called in @AfterEach, but be explicit
+         }
+     }
+
+     @Test
+     fun `denied response returns as-is without expiry projection`() {
+         val denyResponse = AuthNResponse.Deny(WrongCredentialsException("test error"))
+
+         val authNService = newService()
+         try {
+             // Set a Deny response (not Success, so expiry projection doesn't apply)
+             val snapshot = com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot(
+                 response = denyResponse,
+                 managerJob = null
+             )
+             getAuthStateRef(authNService).set(snapshot)
+
+             // Deny response should pass through unchanged
+             val response = authNService.getAccessToken()
+             assertInstanceOf<AuthNResponse.Deny>(response)
+         } finally {
+             // Already called in @AfterEach, but be explicit
+         }
+     }
+
+     @Suppress("UNCHECKED_CAST")
+     private fun getAuthStateRef(authNService: OAuth2AuthNService): AuthStateRef {
+         val authStateRefField = authNService::class.java.getDeclaredField("authStateRef")
+         authStateRefField.isAccessible = true
+         return authStateRefField.get(authNService) as AuthStateRef
+     }
+
+     private fun buildTokenResponse(expiresAtEpochSecond: Long): AuthNResponse.Success {
+         val tokenResponse = mockk<AccessTokenResponse>(relaxed = true)
+         return AuthNResponse.Success(
+             response = tokenResponse,
+             expiresAtEpochSecond = expiresAtEpochSecond,
+         )
+     }
+
+     private companion object {
+         const val MAX_ATTEMPTS = 3
+         const val ACCESS_TOKEN = "test-access-token"
+         const val ERROR_TOKEN_RESPONSE = """
+             {
+                 "error": "invalid_client",
+                 "error_description": "AADB2C90081: The specified client_secret does not match the expected value for this client."
+             }
+         """
+     }
 }

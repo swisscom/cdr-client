@@ -11,7 +11,7 @@ internal class OAuth2AuthNTiming(
     private val clock: Clock = Clock.System,
 ) {
     fun tokenIsExpired(tokenResponse: AuthNResponse.Success): Boolean =
-        clock.now().epochSeconds > tokenResponse.expiresAtEpochSecond
+        clock.now().epochSeconds >= tokenResponse.expiresAtEpochSecond
 
     fun delayUntilRefresh(tokenResponse: AuthNResponse.Success): Duration {
         val refreshEpochSecond = tokenResponse.expiresAtEpochSecond - config.authRefreshBeforeExpiry.seconds
