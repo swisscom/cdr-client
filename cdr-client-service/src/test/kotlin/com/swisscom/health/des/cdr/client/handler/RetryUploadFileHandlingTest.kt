@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
+import com.swisscom.health.des.cdr.client.LogCorrelation
 import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.Constants.UPLOAD_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -9,7 +10,6 @@ import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentResult
 import com.swisscom.health.des.cdr.client.xml.CommunicationType
 import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
-import io.micrometer.tracing.Tracer
 import io.mockk.every
 import io.mockk.junit5.MockKExtension
 import io.mockk.junit5.MockKExtension.CheckUnnecessaryStub
@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -35,9 +36,6 @@ internal class RetryUploadFileHandlingTest {
 
     @MockK
     private lateinit var cdrClientConfig: CdrClientConfig
-
-    @MockK
-    private lateinit var tracer: Tracer
 
     @MockK
     private lateinit var cdrApiClient: CdrApiClient
@@ -63,11 +61,8 @@ internal class RetryUploadFileHandlingTest {
         every { cdrClientConfig.pushThreadPoolSize } returns 1
         every { cdrClientConfig.retryDelay } returns listOf(Duration.ZERO)
         every { cdrClientConfig.customer } returns Customer(mutableListOf(connector))
-        every { tracer.currentSpan() } returns null
-
         retryUploadFileHandling = RetryUploadFileHandling(
             cdrClientConfig = cdrClientConfig,
-            tracer = tracer,
             cdrApiClient = cdrApiClient,
         )
     }
@@ -104,5 +99,35 @@ internal class RetryUploadFileHandlingTest {
         assertFalse(sourceFile.toFile().exists())
         assertNotEquals(existingUploadFile.fileName.toString(), uploadedFile.captured.fileName.toString())
         assertTrue(uploadedFile.captured.fileName.toString().matches(Regex("document_[0-9a-fA-F-]{36}\\.$UPLOAD_FILE_EXTENSION")))
+    }
+
+    @Test
+    fun `upload uses current correlation trace id for outbound call`() = runBlocking {
+        val sourceFile = tempDir.resolve("document.xml")
+        sourceFile.writeText("content")
+
+        val traceId = LogCorrelation.withNewTraceId {
+            val capturedTraceId = slot<String>()
+            every {
+                cdrApiClient.uploadDocument(
+                    contentType = any(),
+                    file = any(),
+                    connectorId = any(),
+                    mode = any(),
+                    traceId = capture(capturedTraceId),
+                )
+            } returns UploadDocumentResult.Success
+
+            retryUploadFileHandling.uploadRetrying(
+                file = sourceFile,
+                docMeta = documentMetaData,
+                connector = connector
+            )
+
+            capturedTraceId.captured
+        }
+
+        assertNotNull(traceId)
+        assertTrue(traceId.isNotBlank())
     }
 }

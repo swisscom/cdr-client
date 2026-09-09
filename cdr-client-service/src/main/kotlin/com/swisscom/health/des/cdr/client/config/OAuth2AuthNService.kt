@@ -137,7 +137,7 @@ internal class OAuth2AuthNService @OptIn(ExperimentalTime::class) constructor(
                     } else {
                         AuthNResponse.Deny(
                             WrongCredentialsException(
-                                "Failed to login; client id: '${idpCredentials.clientId}'; IdP endpoint: '$idpEndpoint'; message: '${
+                                "Failed to login; client id: '${idpCredentials.clientId.id}'; IdP endpoint: '$idpEndpoint'; message: '${
                                     httpResponse.toErrorResponse().toJSONObject()
                                 }'"
                             )
@@ -145,12 +145,12 @@ internal class OAuth2AuthNService @OptIn(ExperimentalTime::class) constructor(
                     }
                 },
                 onFailure = { t ->
-                    logger.debug { "Error while trying to get access token from IdP at '$idpEndpoint' for client id '${idpCredentials.clientId}': $t" }
+                    logger.debug { "Error while trying to get access token from IdP at '$idpEndpoint' for client id '${idpCredentials.clientId.id}': $t" }
                     when (t) {
                         is IOException -> AuthNResponse.RetryableFailure(t)
                         else -> AuthNResponse.Failed(
                             IllegalStateException(
-                                "Failed to login; client id: '${idpCredentials.clientId}'; IdP endpoint: '$idpEndpoint'; root cause: '$t'",
+                                "Failed to login; client id: '${idpCredentials.clientId.id}'; IdP endpoint: '$idpEndpoint'; root cause: '$t'",
                                 t,
                             )
                         )

@@ -1,11 +1,11 @@
 package com.swisscom.health.des.cdr.client
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
-import com.fasterxml.jackson.module.kotlin.kotlinModule
+import tools.jackson.databind.PropertyNamingStrategies
+import tools.jackson.databind.node.ObjectNode
+import tools.jackson.dataformat.yaml.YAMLFactory
+import tools.jackson.dataformat.yaml.YAMLMapper
+import tools.jackson.dataformat.yaml.YAMLWriteFeature
+import tools.jackson.module.kotlin.kotlinModule
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import kotlin.io.path.inputStream
@@ -33,18 +33,16 @@ object ConfigUpgrade {
 
     @JvmStatic
     private val YAML_MAPPER: YAMLMapper =
-        YAMLMapper.Builder(
-            YAMLMapper(
-                YAMLFactory()
-                    .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
-                    .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR)
-                    .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
-            )
-        ).run {
-            addModule(kotlinModule())
-            build()
-                .apply { setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE) }
-        }
+        YAMLMapper.builder(
+            YAMLFactory.builder()
+                .enable(YAMLWriteFeature.MINIMIZE_QUOTES)
+                .enable(YAMLWriteFeature.INDENT_ARRAYS_WITH_INDICATOR)
+                .disable(YAMLWriteFeature.WRITE_DOC_START_MARKER)
+                .build()
+        )
+            .addModule(kotlinModule { })
+            .propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
+            .build()
 
     /**
      * Applies all known upgrade steps to the external SpringBoot configuration file at [configLocation].
@@ -113,6 +111,6 @@ sealed class UpgradeResult {
 value class Version(val value: String)
 
 fun getConfigVersion(configRoot: ObjectNode): Version =
-    Version(configRoot[PROPERTY_NAME_VERSION]?.asText() ?: "1.0") // the first version of the configuration had no version property
+    Version(configRoot[PROPERTY_NAME_VERSION]?.asString() ?: "1.0") // the first version of the configuration had no version property
 
 const val PROPERTY_NAME_VERSION = "version"

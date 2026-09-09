@@ -13,7 +13,6 @@ import io.mockk.junit5.MockKExtension
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -58,7 +57,7 @@ internal class UploadStartupPreparationTest {
         every { schedulingValidationService.isSchedulingAllowed } returns true
         val restartFile = sourceDir.resolve("document.$RESTART_FILE_EXTENSION").also { it.writeText("payload") }
 
-        UploadStartupPreparation(config, schedulingValidationService, 0.0).prepareUploadStartupState()
+        UploadStartupPreparation(config, schedulingValidationService).prepareUploadStartupState()
 
         val xmlFile = sourceDir.resolve("document.xml")
         assertFalse(restartFile.exists())
@@ -71,7 +70,7 @@ internal class UploadStartupPreparationTest {
         every { schedulingValidationService.isSchedulingAllowed } returns false
         val restartFile = sourceDir.resolve("document.$RESTART_FILE_EXTENSION").also { it.writeText("payload") }
 
-        UploadStartupPreparation(config, schedulingValidationService, 0.0).prepareUploadStartupState()
+        UploadStartupPreparation(config, schedulingValidationService).prepareUploadStartupState()
 
         assertTrue(restartFile.exists())
         assertFalse(sourceDir.resolve("document.xml").exists())
@@ -82,7 +81,7 @@ internal class UploadStartupPreparationTest {
         every { schedulingValidationService.isSchedulingAllowed } returns true
         val uploadFile = sourceDir.resolve("document.$UPLOAD_FILE_EXTENSION").also { it.writeText("payload") }
 
-        UploadStartupPreparation(config, schedulingValidationService, 0.0).prepareUploadStartupState()
+        UploadStartupPreparation(config, schedulingValidationService).prepareUploadStartupState()
 
         assertTrue(uploadFile.exists())
         assertEquals("payload", uploadFile.toFile().readText())
@@ -91,14 +90,5 @@ internal class UploadStartupPreparationTest {
         assertEquals(1, regularFiles.size)
         assertEquals(uploadFile, regularFiles.single())
         assertEquals(UPLOAD_FILE_EXTENSION, regularFiles.single().extension)
-    }
-
-    @Test
-    fun `fails when telemetry sampling is enabled`() {
-        val startupPreparation = UploadStartupPreparation(config, schedulingValidationService, 0.1)
-
-        assertThrows<IllegalStateException> {
-            startupPreparation.prepareUploadStartupState()
-        }
     }
 }

@@ -21,7 +21,7 @@ import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
-import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime.Companion.BEGINNING_OF_TIME
+import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import com.swisscom.health.des.cdr.client.config.ProxyConfig
 import com.swisscom.health.des.cdr.client.config.ProxyPassword
 import com.swisscom.health.des.cdr.client.config.ProxyUrl
@@ -51,6 +51,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.attribute.PosixFilePermissions
 import java.time.Duration
+import java.time.Instant
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
@@ -849,7 +850,7 @@ internal class ConfigValidationServiceTest {
                 clientSecret = ClientSecret("fake-client-secret"),
                 scope = Scope(DomainObjects.OAuthScope.LOCALHOST.scope),
                 renewCredential = RenewCredential(true),
-                lastCredentialRenewalTime = BEGINNING_OF_TIME,
+                lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.ofEpochSecond(0L)),
             ),
             idpEndpoint = URI("http://localhost").toURL(),
             fileBusyTestStrategy = FileBusyTestStrategyProperty(CdrClientConfig.FileBusyTestStrategy.FILE_SIZE_CHANGED),

@@ -1,6 +1,10 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
+import tools.jackson.databind.json.JsonMapper
+import com.swisscom.health.des.cdr.client.LogCorrelation
 import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -10,9 +14,6 @@ import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.PULL_RESULT_ID_HEADER
-import io.micrometer.tracing.Span
-import io.micrometer.tracing.TraceContext
-import io.micrometer.tracing.Tracer
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
@@ -23,6 +24,9 @@ import mockwebserver3.junit5.StartStop
 import okhttp3.Headers
 import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -38,26 +42,12 @@ import java.util.UUID
 import kotlin.io.path.createDirectories
 import kotlin.io.path.extension
 import kotlin.io.path.listDirectoryEntries
+import org.slf4j.LoggerFactory
 
 @ExtendWith(MockKExtension::class)
 internal class PullFileHandlingTest {
     @MockK
     private lateinit var config: CdrClientConfig
-
-    @MockK
-    private lateinit var tracer: Tracer
-
-    @MockK
-    private lateinit var spanBuilder: Span.Builder
-
-    @MockK
-    private lateinit var span: Span
-
-    @MockK
-    private lateinit var spanInScope: Tracer.SpanInScope
-
-    @MockK
-    private lateinit var traceContext: TraceContext
 
     @MockK
     private lateinit var retryIoErrorsThrice: RetryTemplate
@@ -79,8 +69,6 @@ internal class PullFileHandlingTest {
 
     @BeforeEach
     fun setup() {
-        mockTracer()
-
         endpoint = CdrApi(
             host = Host(cdrServiceMock.hostName),
             basePath = "documents",
@@ -97,8 +85,8 @@ internal class PullFileHandlingTest {
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } returns "Mocked Result"
 
-        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), retryIoErrorsThrice, ObjectMapper(), "OS")
-        pullFileHandling = PullFileHandling(tracer, cdrApiClient)
+        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), retryIoErrorsThrice, JsonMapper.builder().findAndAddModules().build(), "OS")
+        pullFileHandling = PullFileHandling(cdrApiClient)
     }
 
     @Test
@@ -121,6 +109,67 @@ internal class PullFileHandlingTest {
         tmpDir.resolve(inflightDirectory).listDirectoryEntries().let {
             assertTrue(it.isEmpty())
         }
+    }
+
+    @Test
+    fun `pull sync emits one trace id across log lines and request headers`() {
+        enqueueFileResponseWithReportResponse()
+        enqueueEmptyResponse()
+        val appender = attachAppender()
+
+        try {
+            runBlocking {
+                pullFileHandling.pullSyncConnector(createConnector("1-2-3-4"))
+            }
+        } finally {
+            detachAppender(appender)
+        }
+
+        val requests = listOfNotNull(
+            cdrServiceMock.takeRequest(),
+            cdrServiceMock.takeRequest(),
+            cdrServiceMock.takeRequest(),
+        )
+        val requestTraceIds = requests.mapNotNull { it.headers[CdrApiClient.AZURE_TRACE_ID_HEADER] }
+        assertEquals(3, requestTraceIds.size)
+        assertTrue(requestTraceIds.all { it.isNotBlank() })
+        assertEquals(1, requestTraceIds.distinct().size)
+
+        val logTraceIds = appender.list
+            .mapNotNull { it.mdcPropertyMap[LogCorrelation.TRACE_ID_KEY] }
+            .filter { it.isNotBlank() }
+        assertFalse(logTraceIds.isEmpty())
+        assertEquals(1, logTraceIds.distinct().size)
+        assertEquals(requestTraceIds.first(), logTraceIds.first())
+    }
+
+    @Test
+    fun `pull sync assigns different trace ids to separate operations`() {
+        val firstAppender = attachAppender()
+        enqueueEmptyResponse()
+        val firstTraceId = try {
+            runBlocking {
+                pullFileHandling.pullSyncConnector(createConnector("1-2-3-4"))
+            }
+            cdrServiceMock.takeRequest().headers[CdrApiClient.AZURE_TRACE_ID_HEADER]
+        } finally {
+            detachAppender(firstAppender)
+        }
+
+        val secondAppender = attachAppender()
+        enqueueEmptyResponse()
+        val secondTraceId = try {
+            runBlocking {
+                pullFileHandling.pullSyncConnector(createConnector("1-2-3-4"))
+            }
+            cdrServiceMock.takeRequest().headers[CdrApiClient.AZURE_TRACE_ID_HEADER]
+        } finally {
+            detachAppender(secondAppender)
+        }
+
+        assertNotNull(firstTraceId)
+        assertNotNull(secondTraceId)
+        assertNotEquals(firstTraceId, secondTraceId)
     }
 
     @Test
@@ -370,19 +419,18 @@ internal class PullFileHandlingTest {
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).build())
     }
 
-    private fun mockTracer() {
-        every { tracer.spanBuilder() } returns spanBuilder
-        every { tracer.currentSpan() } returns null
-        every { spanBuilder.setNoParent() } returns spanBuilder
-        every { spanBuilder.name(any()) } returns spanBuilder
-        every { spanBuilder.start() } returns span
-        every { tracer.withSpan(any()) } returns spanInScope
-        every { span.name(any()) } returns span
-        every { span.start() } returns span
-        every { span.event(any()) } returns span
-        every { span.tag(any(), any<String>()) } returns span
-        every { span.context() } returns traceContext
-        every { spanInScope.close() } returns Unit
+    private fun attachAppender(): ListAppender<ILoggingEvent> {
+        val logger = LoggerFactory.getLogger("com.swisscom.health.des.cdr.client") as Logger
+        return ListAppender<ILoggingEvent>().apply {
+            start()
+            logger.addAppender(this)
+        }
+    }
+
+    private fun detachAppender(appender: ListAppender<ILoggingEvent>) {
+        val logger = LoggerFactory.getLogger("com.swisscom.health.des.cdr.client") as Logger
+        logger.detachAppender(appender)
+        appender.stop()
     }
 
 }

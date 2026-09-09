@@ -7,7 +7,6 @@ import com.swisscom.health.des.cdr.client.config.effectiveSourceFolders
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PostConstruct
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import java.nio.file.Files
@@ -22,22 +21,11 @@ private val logger = KotlinLogging.logger {}
 internal class UploadStartupPreparation(
     private val config: CdrClientConfig,
     private val schedulingValidationService: SchedulingValidationService,
-    @param:Value($$"${management.tracing.sampling.probability:0.0}")
-    private val samplerProbability: Double,
 ) {
 
     @PostConstruct
     @Suppress("NestedBlockDepth", "TooGenericExceptionCaught")
     internal fun prepareUploadStartupState() {
-        if (samplerProbability > BaseUploadScheduler.ZERO_SAMPLING_THRESHOLD) {
-            logger.error {
-                "Telemetry sampling is enabled (sampling probability is set to $samplerProbability). Currently we cannot support telemetry " +
-                        "sampling without introducing a memory leak due to the lack of framework integration of micrometer/open-telemetry with Kotlin " +
-                        "coroutines/asynchronous flows. You need to disable telemetry sampling."
-            }
-            error("Telemetry sampling is enabled. Please set the configuration property `management.tracing.sampling.probability` to 0.0")
-        }
-
         val sourceDirectories = config.customer.flatMap { it.effectiveSourceFolders.values.flatten().distinct() }
 
         sourceDirectories.forEach { dir ->

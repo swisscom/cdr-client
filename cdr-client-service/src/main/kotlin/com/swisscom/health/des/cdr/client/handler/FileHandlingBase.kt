@@ -1,7 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import io.github.oshai.kotlinlogging.KLogger
-import io.micrometer.tracing.Tracer
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -23,10 +22,3 @@ fun pathIsDirectoryAndWritable(path: Path, what: String, logger: KLogger): Boole
 
         else -> true
     }
-
-inline fun <A> Tracer.withSpan(spanName: String, block: () -> A): A {
-    val newSpan = this.spanBuilder().name(spanName).start()
-    return this.withSpan(newSpan).use {
-        block()
-    }
-}

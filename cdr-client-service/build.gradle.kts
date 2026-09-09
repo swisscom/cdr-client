@@ -10,7 +10,6 @@ val outputDir: Provider<Directory> = layout.buildDirectory.dir(".")
 plugins {
     alias(libs.plugins.docker.compose)
     alias(libs.plugins.spring.boot)
-    alias(libs.plugins.spring.dependency.management)
     jacoco
     application
     kotlin("jvm").version(libs.versions.kotlin.lang)
@@ -54,15 +53,13 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kfswatch)
     implementation(libs.kotlin.logging)
-    implementation(libs.micrometer.tracing)
-    implementation(libs.micrometer.tracing.bridge.otel)
+    implementation(libs.spring.boot.starter.actuator)
     implementation(libs.logstash.encoder)
     implementation(libs.kotlin.reflect)
-    implementation(libs.kotlin.stdlib)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.reactor) // to enable @Scheduled on Kotlin suspending functions
-    implementation(libs.spring.boot.starter.actuator)
     implementation(libs.spring.boot.starter.webflux)
+    implementation(libs.spring.boot.starter.jackson)
     implementation(libs.spring.retry)
     implementation(libs.jackson.dataformat.yaml)
     implementation(libs.jackson.module.kotlin)
@@ -75,8 +72,6 @@ dependencies {
     testImplementation(libs.mock.webserver)
     testImplementation(libs.mock.webserver.junit5)
     testImplementation(libs.mockk)
-    testImplementation(libs.junit.jupiter)
-    testImplementation(libs.micrometer.tracing.test)
     testImplementation(libs.spring.mockk)
     testImplementation(libs.awaitility)
 

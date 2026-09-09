@@ -1,6 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
+import tools.jackson.dataformat.yaml.YAMLMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
@@ -105,7 +105,7 @@ class ConfigurationWriterTest {
                 clientId = ClientId("fake-client-id"),
                 clientSecret = ClientSecret("fake-client-secret"),
                 scope = Scope("scope1"),
-                renewCredential = RenewCredential.ENABLED,
+                renewCredential = RenewCredential(true),
                 maxCredentialAge = Duration.ofDays(30),
                 lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
             ),
@@ -451,7 +451,7 @@ class ConfigurationWriterTest {
 
         // Verify the YAML file was updated
         val yaml = YAMLMapper().readTree(configFile.inputStream())
-        val writtenProxyUrl = yaml.get("client").get("proxy-config").get("url").asText()
+        val writtenProxyUrl = yaml.get("client").get("proxy-config").get("url").asString()
         assertEquals(newProxyUrl, writtenProxyUrl)
     }
 

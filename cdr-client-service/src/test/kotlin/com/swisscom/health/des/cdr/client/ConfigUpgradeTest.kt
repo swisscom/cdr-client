@@ -1,9 +1,9 @@
 package com.swisscom.health.des.cdr.client
 
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
-import com.fasterxml.jackson.module.kotlin.kotlinModule
+import tools.jackson.dataformat.yaml.YAMLFactory
+import tools.jackson.dataformat.yaml.YAMLMapper
+import tools.jackson.dataformat.yaml.YAMLWriteFeature
+import tools.jackson.module.kotlin.kotlinModule
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -21,17 +21,15 @@ class ConfigUpgradeTest {
     private lateinit var tempDir: Path
 
     private val yamlMapper: YAMLMapper =
-        YAMLMapper.Builder(
-            YAMLMapper(
-                YAMLFactory()
-                    .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
-                    .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR)
-                    .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
-            )
-        ).run {
-            addModule(kotlinModule())
-            build()
-        }
+        YAMLMapper.builder(
+            YAMLFactory.builder()
+                .enable(YAMLWriteFeature.MINIMIZE_QUOTES)
+                .enable(YAMLWriteFeature.INDENT_ARRAYS_WITH_INDICATOR)
+                .disable(YAMLWriteFeature.WRITE_DOC_START_MARKER)
+                .build()
+        )
+            .addModule(kotlinModule { })
+            .build()
 
     @BeforeEach
     fun copyResources() {
@@ -56,11 +54,11 @@ class ConfigUpgradeTest {
                 assertInstanceOf<UpgradeResult.Success>(upgradeResult)
                 assertEquals("1.2", upgradeResult.version.value)
                 val afterMigration = yamlMapper.readTree(configFile.inputStream())
-                assertEquals("1.2", afterMigration.get("version").asText())
+                assertEquals("1.2", afterMigration.get("version").asString())
                 assertTrue(afterMigration.at("/client/proxy-url").isMissingNode)
-                assertEquals("", afterMigration.at("/client/proxy-config/url").textValue())
-                assertEquals("", afterMigration.at("/client/proxy-config/username").textValue())
-                assertEquals("", afterMigration.at("/client/proxy-config/password").textValue())
+                assertEquals("", afterMigration.at("/client/proxy-config/url").asString())
+                assertEquals("", afterMigration.at("/client/proxy-config/username").asString())
+                assertEquals("", afterMigration.at("/client/proxy-config/password").asString())
             }
     }
 
@@ -72,11 +70,11 @@ class ConfigUpgradeTest {
                 assertInstanceOf<UpgradeResult.Success>(upgradeResult)
                 assertEquals("1.2", upgradeResult.version.value)
                 val afterMigration = yamlMapper.readTree(configFile.inputStream())
-                assertEquals("1.2", afterMigration.get("version").asText())
+                assertEquals("1.2", afterMigration.get("version").asString())
                 assertTrue(afterMigration.at("/client/proxy-url").isMissingNode)
-                assertEquals("https://proxy.internal:8080", afterMigration.at("/client/proxy-config/url").textValue())
-                assertEquals("", afterMigration.at("/client/proxy-config/username").textValue())
-                assertEquals("", afterMigration.at("/client/proxy-config/password").textValue())
+                assertEquals("https://proxy.internal:8080", afterMigration.at("/client/proxy-config/url").asString())
+                assertEquals("", afterMigration.at("/client/proxy-config/username").asString())
+                assertEquals("", afterMigration.at("/client/proxy-config/password").asString())
             }
     }
 

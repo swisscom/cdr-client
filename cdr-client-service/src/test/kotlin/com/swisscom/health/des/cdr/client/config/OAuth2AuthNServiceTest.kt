@@ -220,7 +220,7 @@ class OAuth2AuthNServiceTest {
         assertEquals("/fake-tenant-id/oauth2/v2.0/token", serverSideRequest.target)
         assertInstanceOf<AuthNResponse.Deny>(authNResponse)
         val wrappedException: WrongCredentialsException = authNResponse.error
-        assertTrue(wrappedException.message!!.startsWith("Failed to login; client id: 'ClientId(id=fake-client-id)'"))
+        assertTrue(wrappedException.message!!.startsWith("Failed to login; client id: 'fake-client-id'"))
 
         assertEquals(OAuth2AuthNService.AuthNState.DENIED, authNService.currentAuthNStateNonBlocking())
     }
