@@ -6,7 +6,7 @@
     <string name="label_exit">Exit</string>
     <string name="label_reset">Reset</string>
     <string name="label_close">Close</string>
-    <string name="label_apply">Apply</string>
+    <string name="label_apply">Save and restart</string>
     <string name="label_validate">Test</string>
     <string name="label_client_status">Client status</string>
     <string name="label_cdr_api_host">curaLINE host</string>
@@ -18,8 +18,8 @@
     <string name="label_proxy_password">Proxy Password</string>
     <string name="label_proxy_password_placeholder">Password for proxy authentication (leave empty if not required)</string>
     <string name="label_advanced_settings">Advanced Settings</string>
-    <string name="label_enable_client_service">Client Service</string>
-    <string name="label_enable_client_service_subtitle">Start synchronizing your documents</string>
+    <string name="label_enable_client_service">Enable Synchronization</string>
+    <string name="label_enable_client_service_subtitle">Enable or disable synchronization</string>
     <string name="label_enable_document_archive">Document Archive</string>
     <string name="label_enable_document_archive_subtitle">Keep an archive of successfully uploaded documents</string>
     <string name="label_client_service_status">curaLINE client service status:</string>
@@ -97,6 +97,7 @@
     <!-- Messages -->
     <string name="message_loading_initial_config">Loading initial configuration...</string>
     <string name="message_credentials_valid">Credentials are ok</string>
+    <string name="message_pending_sync_change">Unsaved changes. Use the Save and restart button below.</string>
 
     <!-- Tooltips -->
 
