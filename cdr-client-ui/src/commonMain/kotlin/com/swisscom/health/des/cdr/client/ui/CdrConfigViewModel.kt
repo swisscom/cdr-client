@@ -46,6 +46,7 @@ private typealias SuccessHandler<T> = suspend (T) -> Unit
 internal data class CdrConfigUiState(
     val clientServiceStatus: DTOs.StatusResponse.StatusCode = DTOs.StatusResponse.StatusCode.UNKNOWN,
     val clientServiceConfig: CdrClientConfigDto = CdrClientConfigDto.EMPTY,
+    val hasLocalConfigChanges: Boolean = false,
     val errorMessageKey: StringResourceWithArgs? = null, // should be an ArrayDeque<String>, but I have not figured out how to turn that into an observable state yet
     val fileMonitoringStatus: DTOs.FileMonitoringStatusResponse = DTOs.FileMonitoringStatusResponse(
         errorFileCount = 0,
@@ -73,11 +74,7 @@ internal class CdrConfigViewModel(
     fun applyClientServiceConfiguration(): Job =
         viewModelScope.launch {
             cdrClientApiClient.updateClientServiceConfiguration(_uiState.value.clientServiceConfig).handle { response: CdrClientConfigDto ->
-                _uiState.update {
-                    it.copy(
-                        clientServiceConfig = response,
-                    )
-                }
+                updateRemoteClientServiceConfig { response }
                 asyncClientServiceRestart().join()
             }
         }
@@ -119,11 +116,7 @@ internal class CdrConfigViewModel(
     fun queryClientServiceConfiguration(): Job =
         viewModelScope.launch {
             cdrClientApiClient.getClientServiceConfiguration().handle { config: CdrClientConfigDto ->
-                _uiState.update {
-                    it.copy(
-                        clientServiceConfig = config
-                    )
-                }
+                updateRemoteClientServiceConfig { config }
             }
         }
 
@@ -134,12 +127,8 @@ internal class CdrConfigViewModel(
      */
     fun setFileSync(enabled: Boolean) {
         logger.debug { "setFileSync: '$enabled'" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    fileSynchronizationEnabled = enabled
-                )
-            )
+        updateLocalClientServiceConfig { config ->
+            config.copy(fileSynchronizationEnabled = enabled)
         }
     }
 
@@ -152,12 +141,8 @@ internal class CdrConfigViewModel(
      */
     fun setFileBusyTestStrategy(strategy: String) {
         logger.debug { "setFileBusyTestStrategy: '$strategy'" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    fileBusyTestStrategy = CdrClientConfigDto.FileBusyTestStrategy.valueOf(strategy)
-                )
-            )
+        updateLocalClientServiceConfig { config ->
+            config.copy(fileBusyTestStrategy = CdrClientConfigDto.FileBusyTestStrategy.valueOf(strategy))
         }
     }
 
@@ -168,12 +153,8 @@ internal class CdrConfigViewModel(
      */
     fun setCdrApiEndpoint(apiEndpoint: DomainObjects.ApiEndpoint) {
         logger.debug { "setCdrApiHost: '$apiEndpoint'" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    cdrApi = apiEndpoint
-                )
-            )
+        updateLocalClientServiceConfig { config ->
+            config.copy(cdrApi = apiEndpoint)
         }
     }
 
@@ -184,12 +165,10 @@ internal class CdrConfigViewModel(
      */
     fun setProxyUrl(proxyUrl: String) {
         logger.debug { "setProxyUrl: '$proxyUrl'" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    proxyConfig = it.clientServiceConfig.proxyConfig.copy(
-                        url = proxyUrl
-                    )
+        updateLocalClientServiceConfig { config ->
+            config.copy(
+                proxyConfig = config.proxyConfig.copy(
+                    url = proxyUrl
                 )
             )
         }
@@ -202,12 +181,10 @@ internal class CdrConfigViewModel(
      */
     fun setProxyUsername(username: String) {
         logger.debug { "setProxyUsername: '$username'" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    proxyConfig = it.clientServiceConfig.proxyConfig.copy(
-                        username = username
-                    )
+        updateLocalClientServiceConfig { config ->
+            config.copy(
+                proxyConfig = config.proxyConfig.copy(
+                    username = username
                 )
             )
         }
@@ -220,12 +197,10 @@ internal class CdrConfigViewModel(
      */
     fun setProxyPassword(password: String) {
         logger.debug { "setProxyPassword: (hidden)" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    proxyConfig = it.clientServiceConfig.proxyConfig.copy(
-                        password = password
-                    )
+        updateLocalClientServiceConfig { config ->
+            config.copy(
+                proxyConfig = config.proxyConfig.copy(
+                    password = password
                 )
             )
         }
@@ -233,12 +208,10 @@ internal class CdrConfigViewModel(
 
     fun setIdpCredentialsScope(scope: DomainObjects.OAuthScope) {
         logger.debug { "setIdpCredentialsScope" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    idpCredentials = it.clientServiceConfig.idpCredentials.copy(
-                        scope = scope
-                    )
+        updateLocalClientServiceConfig { config ->
+            config.copy(
+                idpCredentials = config.idpCredentials.copy(
+                    scope = scope
                 )
             )
         }
@@ -251,12 +224,8 @@ internal class CdrConfigViewModel(
      */
     fun setLocalPath(path: String) {
         logger.debug { "setLocalPath: '$path'" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    localFolder = path
-                )
-            )
+        updateLocalClientServiceConfig { config ->
+            config.copy(localFolder = path)
         }
     }
 
@@ -267,12 +236,10 @@ internal class CdrConfigViewModel(
      */
     fun setIdpTenantId(id: DomainObjects.TenantId) {
         logger.debug { "setTenantId: '$id'" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    idpCredentials = it.clientServiceConfig.idpCredentials.copy(
-                        tenantId = id
-                    )
+        updateLocalClientServiceConfig { config ->
+            config.copy(
+                idpCredentials = config.idpCredentials.copy(
+                    tenantId = id
                 )
             )
         }
@@ -285,12 +252,10 @@ internal class CdrConfigViewModel(
      */
     fun setIdpClientId(id: String) {
         logger.debug { "setClientId: '$id'" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    idpCredentials = it.clientServiceConfig.idpCredentials.copy(
-                        clientId = id
-                    )
+        updateLocalClientServiceConfig { config ->
+            config.copy(
+                idpCredentials = config.idpCredentials.copy(
+                    clientId = id
                 )
             )
         }
@@ -303,12 +268,10 @@ internal class CdrConfigViewModel(
      */
     fun setIdpClientPassword(password: String) {
         logger.debug { "setClientPassword: '$password'" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    idpCredentials = it.clientServiceConfig.idpCredentials.copy(
-                        clientSecret = password
-                    )
+        updateLocalClientServiceConfig { config ->
+            config.copy(
+                idpCredentials = config.idpCredentials.copy(
+                    clientSecret = password
                 )
             )
         }
@@ -321,12 +284,10 @@ internal class CdrConfigViewModel(
      */
     fun setIdpRenewClientSecret(renew: Boolean) {
         logger.debug { "setIdpRenewClientSecret: '$renew'" }
-        _uiState.update {
-            it.copy(
-                clientServiceConfig = it.clientServiceConfig.copy(
-                    idpCredentials = it.clientServiceConfig.idpCredentials.copy(
-                        renewCredential = renew
-                    )
+        updateLocalClientServiceConfig { config ->
+            config.copy(
+                idpCredentials = config.idpCredentials.copy(
+                    renewCredential = renew
                 )
             )
         }
@@ -348,17 +309,12 @@ internal class CdrConfigViewModel(
      */
     private fun replaceConnector(old: ConnectorDto, new: ConnectorDto) {
         logger.debug { "setConnector; old: '$old', new: '$new'" }
-        _uiState.update { state: CdrConfigUiState ->
-            state.clientServiceConfig.customer
-                .map { connector: ConnectorDto ->
+        updateLocalClientServiceConfig { config ->
+            config.copy(
+                customer = config.customer.map { connector: ConnectorDto ->
                     if (connector === old) new else connector
-                }.let { updatedConnectorList ->
-                    state.copy(
-                        clientServiceConfig = state.clientServiceConfig.copy(
-                            customer = updatedConnectorList
-                        )
-                    )
                 }
+            )
         }
     }
 
@@ -656,12 +612,8 @@ internal class CdrConfigViewModel(
      */
     fun deleteConnector(connector: ConnectorDto) {
         logger.debug { "deleteConnector: '${connector.connectorId}'" }
-        _uiState.update { state: CdrConfigUiState ->
-            state.copy(
-                clientServiceConfig = state.clientServiceConfig.copy(
-                    customer = state.clientServiceConfig.customer.filterNot { it === connector }
-                )
-            )
+        updateLocalClientServiceConfig { config ->
+            config.copy(customer = config.customer.filterNot { it === connector })
         }
     }
 
@@ -673,12 +625,10 @@ internal class CdrConfigViewModel(
      */
     fun addEmptyConnector() {
         logger.debug { "addEmptyConnector" }
-        _uiState.update { state: CdrConfigUiState ->
-            state.copy(
-                clientServiceConfig = state.clientServiceConfig.copy(
-                    // EMPTY.copy() is required; every entry in the connector list must be a unique instance
-                    customer = state.clientServiceConfig.customer + ConnectorDto.EMPTY.copy()
-                )
+        updateLocalClientServiceConfig { config ->
+            config.copy(
+                // EMPTY.copy() is required; every entry in the connector list must be a unique instance
+                customer = config.customer + ConnectorDto.EMPTY.copy()
             )
         }
     }
@@ -833,6 +783,24 @@ internal class CdrConfigViewModel(
                     resourceId = messageKey,
                     formatArgs = formatArgs
                 )
+            )
+        }
+    }
+
+    private inline fun updateLocalClientServiceConfig(transform: (CdrClientConfigDto) -> CdrClientConfigDto) =
+        updateClientServiceConfig(hasLocalConfigChanges = true, transform = transform)
+
+    private inline fun updateRemoteClientServiceConfig(transform: (CdrClientConfigDto) -> CdrClientConfigDto) =
+        updateClientServiceConfig(hasLocalConfigChanges = false, transform = transform)
+
+    private inline fun updateClientServiceConfig(
+        hasLocalConfigChanges: Boolean,
+        transform: (CdrClientConfigDto) -> CdrClientConfigDto,
+    ) {
+        _uiState.update { state: CdrConfigUiState ->
+            state.copy(
+                clientServiceConfig = transform(state.clientServiceConfig),
+                hasLocalConfigChanges = hasLocalConfigChanges,
             )
         }
     }
