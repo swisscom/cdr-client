@@ -1,12 +1,12 @@
 [versions]
-jdk = "21" # upgrade to Java 25 is blocked by detekt; we will have to wait for release 2.0
-kotlin-lang = "2.3.20"
+jdk = "25"
+kotlin-lang = "2.4.10"
 compose-multiplatform = "1.10.3"
 compose-native-tray = "1.3.3"
 kotlin-logging = "8.0.4"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.10.0"
-detekt = "1.23.8" # version 2.0 is supposed to have Java 25 support
+detekt = "2.0.0-alpha.6"
 awaitility = "4.3.0"
 jacoco = "0.8.15"
 kache = "2.1.1"
@@ -71,7 +71,7 @@ spring-mockk = { group = "com.ninja-squad", name = "springmockk", version.ref = 
 awaitility = { group = "org.awaitility", name = "awaitility", version.ref = "awaitility" }
 
 [plugins]
-detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }
 docker-compose = { id = "com.avast.gradle.docker-compose", version.ref = "docker-compose" }
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }
