@@ -49,7 +49,13 @@ internal data class CdrClientConfig(
     /** Number of background retries after an authentication failure before transitioning to denied state. */
     val maxDenyRetries: Int,
 
-    /** How long before token expiry the background auth manager should start refreshing the token. */
+    /**
+     * How long before token expiry the background auth manager should start refreshing the token.
+     *
+     * This value doubles as the clock-skew tolerance: a cached token is treated as expired this long before its
+     * nominal expiry, so a client whose clock lags the IdP never keeps using a token past its real lifetime. Set it
+     * greater than or equal to the maximum expected clock drift between this host and the identity provider.
+     */
     val authRefreshBeforeExpiry: Duration,
 
     /** Shared backoff policy for retryable background auth-manager retries and permission-deny retries. */
