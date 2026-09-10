@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
@@ -7,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -21,6 +21,7 @@ import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,9 +35,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Res
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.Swisscom_Lifeform_RGB_Colour_icon
@@ -49,6 +50,7 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_enable_client_service_subtitle
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_reset
+import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.message_pending_sync_change
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_communication_error
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_denied
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.status_authn_authenticating
@@ -75,18 +77,50 @@ internal fun CdrConfigScreen(
 ) {
     val uiState: CdrConfigUiState by viewModel.uiStateFlow.collectAsStateWithLifecycle()
 
-    var initialConfigLoaded: Boolean by remember { mutableStateOf(false) }
-    var canEdit: Boolean by remember { mutableStateOf(false) }
+    val initialConfigLoaded: Boolean = isInitialConfigLoaded(uiState.clientServiceConfig)
+    val canEdit: Boolean = canEditConfig(initialConfigLoaded, uiState.clientServiceStatus)
+    var pendingChangesState: CdrConfigScreenPendingChangesState by remember { mutableStateOf(CdrConfigScreenPendingChangesState()) }
 
-    LaunchedEffect(uiState.clientServiceConfig, uiState.clientServiceStatus) {
-        initialConfigLoaded = uiState.clientServiceConfig !== CdrClientConfigDto.EMPTY
-        canEdit = initialConfigLoaded && uiState.clientServiceStatus.isOnlineCategory
+    LaunchedEffect(initialConfigLoaded, uiState.clientServiceConfig, uiState.hasLocalConfigChanges) {
+        pendingChangesState = pendingChangesState.observeConfig(
+            config = uiState.clientServiceConfig,
+            initialConfigLoaded = initialConfigLoaded,
+            hasLocalConfigChanges = uiState.hasLocalConfigChanges,
+        )
     }
+
+    LaunchedEffect(uiState.errorMessageKey) {
+        pendingChangesState = pendingChangesState.observeError(hasError = uiState.errorMessageKey != null)
+    }
+
+    val showPendingChangesBanner: Boolean = pendingChangesState.shouldShowPendingChangesBanner(
+        currentConfig = uiState.clientServiceConfig,
+        initialConfigLoaded = initialConfigLoaded,
+        hasLocalConfigChanges = uiState.hasLocalConfigChanges,
+    )
 
     Scaffold(
         modifier = modifier,
         topBar = { StatusTopBar(modifier = modifier, uiState = uiState) },
-        bottomBar = { ButtonsBottomAppBar(modifier = modifier, viewModel = viewModel, enabled = canEdit) },
+        bottomBar = {
+            Column(modifier = modifier.fillMaxWidth()) {
+                AnimatedVisibility(visible = showPendingChangesBanner) {
+                    PendingChangesBanner(modifier = modifier)
+                }
+                ButtonsBottomAppBar(
+                    modifier = modifier,
+                    enabled = canEdit,
+                    onResetClick = {
+                        pendingChangesState = pendingChangesState.onResetClicked()
+                        viewModel.queryClientServiceConfiguration()
+                    },
+                    onApplyClick = {
+                        pendingChangesState = pendingChangesState.onApplyClicked()
+                        viewModel.applyClientServiceConfiguration()
+                    },
+                )
+            }
+        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colors.surface
     ) { paddingValues: PaddingValues ->
@@ -289,19 +323,35 @@ private fun StatusTopBar(
 
 
 @Composable
+private fun PendingChangesBanner(modifier: Modifier) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        color = Color(0xFFFFF3CD),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Text(
+            text = stringResource(Res.string.message_pending_sync_change),
+            color = Color(0xFF664D03),
+            modifier = modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+        )
+    }
+}
+
+@Composable
 private fun ButtonsBottomAppBar(
     modifier: Modifier,
-    viewModel: CdrConfigViewModel,
     enabled: Boolean,
+    onResetClick: () -> Unit,
+    onApplyClick: () -> Unit,
 ) {
     BottomAppBar(
         modifier = modifier,
         containerColor = MaterialTheme.colors.surface,
         contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
     ) {
-        Column(
-            modifier = modifier.fillMaxHeight(),
-        ) {
+        Column(modifier = modifier.fillMaxWidth()) {
             Divider(
                 modifier = modifier.shadow(
                     elevation = 2.dp,
@@ -310,13 +360,15 @@ private fun ButtonsBottomAppBar(
                 )
             )
             Row(
-                modifier = modifier.fillMaxHeight(),
+                modifier = modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Spacer(modifier.weight(0.5F))
-                ResetButton(enabled = enabled, onClick = viewModel::queryClientServiceConfiguration)
+                ResetButton(enabled = enabled, onClick = onResetClick)
                 Spacer(modifier.width(30.dp))
-                ApplyButton(enabled = enabled, onClick = viewModel::applyClientServiceConfiguration)
+                ApplyButton(enabled = enabled, onClick = onApplyClick)
                 Spacer(modifier.weight(0.5F))
             }
         }
