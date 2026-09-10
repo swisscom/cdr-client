@@ -21,6 +21,8 @@ internal data class AuthStateSnapshot(
     val managerJob: Job? = null,
 ) {
     val state: AuthNState get() = response.toAuthNState()
+    val activeAccessToken: String?
+        get() = (response as? AuthNResponse.Success)?.response?.tokens?.accessToken?.value
 }
 
 internal sealed interface AuthNResponse {
@@ -46,9 +48,15 @@ internal data class AuthLoopState(
     val denyRetryAttempt: Int? = null,
 )
 
-internal sealed interface AuthLoopResult {
-    data class Continue(val state: AuthLoopState) : AuthLoopResult
-    data object Stop : AuthLoopResult
+/**
+ * Commands accepted by the single-writer auth manager actor.
+ *
+ * External callers never mutate auth state directly; they submit intents which the
+ * actor processes sequentially. This guarantees a single writer for [AuthStateSnapshot].
+ */
+internal sealed interface AuthCommand {
+    /** Request an immediate (out-of-schedule) token refresh, e.g. after a downstream 401/403. */
+    data class ForceReauth(val trigger: String) : AuthCommand
 }
 
 internal fun AuthNResponse.toAuthNState(): AuthNState =

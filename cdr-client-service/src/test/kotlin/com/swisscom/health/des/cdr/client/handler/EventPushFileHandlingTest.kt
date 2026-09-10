@@ -10,6 +10,7 @@ import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
 import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot
 import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
 import com.swisscom.health.des.cdr.client.config.Connector
@@ -22,6 +23,7 @@ import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TenantId
 import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
@@ -168,7 +170,12 @@ internal class EventPushFileHandlingTest {
         }
 
         // Keep these filesystem tests deterministic: the auth race is not what we are exercising here.
-        every { authNService.getAccessToken() } returns AuthNResponse.NotAuthenticated
+        every { authNService.currentStateSnapshot() } returns AuthStateSnapshot(
+            response = AuthNResponse.Success(
+                response = mockk(relaxed = true) { every { tokens.accessToken.value } returns "test-token" },
+                expiresAtEpochSecond = Long.MAX_VALUE,
+            )
+        )
     }
 
     @OptIn(ExperimentalPathApi::class)

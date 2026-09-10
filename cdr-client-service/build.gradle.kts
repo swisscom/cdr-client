@@ -162,6 +162,9 @@ tasks.withType<Test> {
         includeEngines("junit-jupiter")
     }
     finalizedBy(jacocoTestReport)
+    if (gradle.startParameter.taskNames.any { it == "test" || it.endsWith(":test") } && !gradle.startParameter.taskNames.contains("build")) {
+        finalizedBy(jacocoTestCoverageVerification)
+    }
 }
 
 jacoco {

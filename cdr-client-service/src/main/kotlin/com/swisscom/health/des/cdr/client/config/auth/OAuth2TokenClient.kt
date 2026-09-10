@@ -16,7 +16,9 @@ import com.swisscom.health.des.cdr.client.config.WrongCredentialsException
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.retry.support.RetryTemplate
 import java.io.IOException
+import java.net.ConnectException
 import java.net.Proxy
+import java.net.SocketTimeoutException
 import java.net.URI
 import java.net.URL
 
@@ -26,6 +28,7 @@ internal class OAuth2TokenClient(
     private val retryIoErrors: RetryTemplate,
     private val proxy: Proxy?,
     private val authTiming: OAuth2AuthNTiming,
+    private val config: TokenClientConfig = TokenClientConfig(),
 ) {
     /**
      * Performs a single OAuth token acquisition attempt.
@@ -36,19 +39,26 @@ internal class OAuth2TokenClient(
      * - Callers can set `shouldRetry=false` for single-shot probes (for example credential validation).
      */
     fun getNewAccessToken(idpCredentials: IdpCredentials, idpEndpoint: URL, shouldRetry: Boolean = true): AuthNResponse {
-        logger.info { "Starting OAuth token acquisition for client (retryEnabled=$shouldRetry)" }
+        logger.debug { "Starting OAuth token acquisition for client (retryEnabled=$shouldRetry)" }
 
         val clientSecret = Secret(idpCredentials.clientSecret.value)
         return try {
             val request = buildTokenRequest(idpCredentials, idpEndpoint, clientSecret)
-            val response = runCatching { sendTokenRequest(request, shouldRetry) }
+            val response = runCatching { sendTokenRequestWithTimeout(request, shouldRetry) }
                 .fold(
                     onSuccess = { httpResponse -> toAuthNResponse(httpResponse) },
-                    onFailure = { t -> toFailureResponse(t, idpCredentials) }
+                    onFailure = { t -> toFailureResponse(t) }
                 )
 
-            if (response is AuthNResponse.Failed) {
-                logger.error { "OAuth token acquisition failed permanently for client; error=${response.error.message}" }
+            when (response) {
+                is AuthNResponse.Failed -> logger.error { "OAuth token acquisition failed permanently; error=${response.error.message}" }
+                is AuthNResponse.Deny -> logger.warn { "OAuth token acquisition denied by IdP (invalid credentials?)" }
+                is AuthNResponse.RetryableFailure -> {
+                    val suffix = if (shouldRetry) "will retry" else "single-shot probe, will not retry"
+                    logger.warn { "Transient OAuth token acquisition failure ($suffix): ${response.error.javaClass.simpleName}" }
+                }
+                is AuthNResponse.Success -> logger.debug { "OAuth token acquisition succeeded" }
+                else -> {}
             }
             response
         } finally {
@@ -65,11 +75,13 @@ internal class OAuth2TokenClient(
         return TokenRequest(tokenEndpoint, clientAuth, clientGrant, scope)
     }
 
-    private fun sendTokenRequest(request: TokenRequest, shouldRetry: Boolean): TokenResponse {
+    private fun sendTokenRequestWithTimeout(request: TokenRequest, shouldRetry: Boolean): TokenResponse {
         val httpRequest = request.toHTTPRequest()
+        httpRequest.connectTimeout = config.connectTimeoutMs.toInt()
+        httpRequest.readTimeout = config.readTimeoutMs.toInt()
         proxy?.let { p ->
             httpRequest.proxy = p
-            logger.debug { "OAuth2 token request will use proxy: '$p'" }
+            logger.debug { "OAuth2 token request will use proxy" }
         }
         return if (shouldRetry) {
             retryIoErrors.execute<HTTPResponse, Throwable> { _ ->
@@ -84,13 +96,8 @@ internal class OAuth2TokenClient(
         if (httpResponse.indicatesSuccess()) {
             toSuccessfulAuthResponse(httpResponse.toSuccessResponse())
         } else {
-            AuthNResponse.Deny(
-                WrongCredentialsException(
-                    "Failed to login; message: '${
-                        httpResponse.toErrorResponse().toJSONObject()
-                    }'"
-                )
-            )
+            logger.debug { "OAuth token request failed (check server logs for details)" }
+            AuthNResponse.Deny(WrongCredentialsException("Failed to acquire token from IdP"))
         }
 
     private fun toSuccessfulAuthResponse(successResponse: AccessTokenResponse): AuthNResponse =
@@ -101,20 +108,31 @@ internal class OAuth2TokenClient(
             )
         } ?: AuthNResponse.Failed(
             IllegalStateException(
-                "Failed to login; missing token expiry metadata"
+                "Token acquisition succeeded but expiry metadata is missing"
             )
         )
 
-    private fun toFailureResponse(t: Throwable, idpCredentials: IdpCredentials): AuthNResponse {
-        logger.debug { "Error while trying to get access token from IdP for client id '${idpCredentials.clientId}': $t" }
+    private fun toFailureResponse(t: Throwable): AuthNResponse {
+        logger.debug { "Token acquisition failed: ${t.javaClass.simpleName}" }
         return when (t) {
-            is IOException -> AuthNResponse.RetryableFailure(t)
-            else -> AuthNResponse.Failed(
-                IllegalStateException(
-                    "Failed to login; root cause: '$t'",
-                    t,
-                )
+        is SocketTimeoutException -> AuthNResponse.RetryableFailure(
+            IOException("Token acquisition timed out (read timeout)", t)
+        )
+        is ConnectException -> AuthNResponse.RetryableFailure(
+            IOException("Cannot connect to OAuth server", t)
+        )
+        is IOException -> AuthNResponse.RetryableFailure(t)
+        else -> AuthNResponse.Failed(
+            IllegalStateException(
+                "Unexpected error during token acquisition: ${t.javaClass.simpleName}",
+                t,
             )
+        )
         }
     }
 }
+
+internal data class TokenClientConfig(
+    val connectTimeoutMs: Long = 30_000L,
+    val readTimeoutMs: Long = 60_000L,
+)

@@ -3,7 +3,9 @@ package com.swisscom.health.des.cdr.client.config
 import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy
 import com.mayakapps.kache.ObjectKache
-import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthFailureMapper
+import com.swisscom.health.des.cdr.client.config.auth.AuthHttpFailure
+import com.swisscom.health.des.cdr.client.config.auth.toAuthNState
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -40,6 +42,7 @@ private val logger = KotlinLogging.logger {}
 @Suppress("TooManyFunctions")
 @Configuration
 internal class CdrClientContext {
+    private val authFailureMapper = AuthFailureMapper()
 
     /**
      * Configures system-wide proxy authenticator for Nimbus JWT HTTP client.
@@ -108,23 +111,15 @@ internal class CdrClientContext {
                     }
                 }
             }
-            .addInterceptor { chain ->
-                oAuth2AuthNService.getAccessToken()
-                    .let { authNResponse ->
-                        when (authNResponse) {
-                            is AuthNResponse.Success -> successProceeding(chain, authNResponse.response.tokens.accessToken.value)
-
-                            is AuthNResponse.Authenticating -> temporaryServiceUnavailableResponse(chain)
-
-                            else -> chain.proceed(chain.request()) // unauthenticated call; will probably fail with 401/403
-                                .also { _ ->
-                                    logger.warn { "Authentication failed, proceeding unauthenticated; authentication response: '$authNResponse'" }
-                                }
-                        }
-                    }
-            }
+            .addInterceptor { chain -> authenticateRequest(chain, oAuth2AuthNService) }
             .addInterceptor { chain ->
                 val response: Response = chain.proceed(chain.request())
+
+                if (response.code == HttpStatus.UNAUTHORIZED.value() || response.code == HttpStatus.FORBIDDEN.value()) {
+                    oAuth2AuthNService.forceReauthentication(
+                        "downstream API returned ${response.code} for ${chain.request().method} ${chain.request().url.encodedPath}"
+                    )
+                }
 
                 @Suppress("MagicNumber")
                 if (response.code in 500..599) {
@@ -151,19 +146,42 @@ internal class CdrClientContext {
             }
     }
 
-    private fun temporaryServiceUnavailableResponse(chain: Interceptor.Chain): Response {
+    private fun authFailureResponse(chain: Interceptor.Chain, failure: AuthHttpFailure): Response {
         return Response.Builder()
             .request(chain.request())
             .protocol(Protocol.HTTP_1_1)
-            .code(HttpStatus.SERVICE_UNAVAILABLE.value())
-            .message("Authentication in progress")
+            .code(failure.status.value())
+            .message(failure.message)
             .body(
-                "Authentication in progress."
+                failure.body
                     .toResponseBody("text/plain".toMediaType())
             )
             .build()
             .also {
-                logger.warn { "Authentication is currently in progress; returning temporary 503 response." }
+                logger.warn { "Returning synthetic auth failure response with status ${failure.status.value()}" }
+            }
+    }
+
+    private fun authenticateRequest(
+        chain: Interceptor.Chain,
+        oAuth2AuthNService: OAuth2AuthNService,
+    ): Response {
+        val snapshot = oAuth2AuthNService.currentStateSnapshot()
+        val authNResponse = snapshot.response
+        return authFailureMapper.map(authNResponse)
+            ?.let { failure ->
+                authFailureResponse(chain, failure)
+                    .also {
+                        logger.warn {
+                            "Blocking outbound request because auth state is '${authNResponse.toAuthNState()}'"
+                        }
+                    }
+            }
+            ?: run {
+                val accessToken = requireNotNull(snapshot.activeAccessToken) {
+                    "Authenticated snapshot is missing an access token"
+                }
+                successProceeding(chain, accessToken)
             }
     }
 

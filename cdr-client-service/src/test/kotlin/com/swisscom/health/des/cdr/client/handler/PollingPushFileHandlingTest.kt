@@ -24,12 +24,14 @@ import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot
 import com.swisscom.health.des.cdr.client.config.getEffectiveSourceArchiveFolder
 import com.swisscom.health.des.cdr.client.config.getEffectiveSourceErrorFolder
 import com.swisscom.health.des.cdr.client.config.getEffectiveSourceFolder
 import com.swisscom.health.des.cdr.client.xml.CommunicationType
 import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
 import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
@@ -187,7 +189,12 @@ internal class PollingPushFileHandlingTest {
         }
 
         // Keep these filesystem tests deterministic: the auth race is not what we are exercising here.
-        every { authNService.getAccessToken() } returns AuthNResponse.NotAuthenticated
+        every { authNService.currentStateSnapshot() } returns AuthStateSnapshot(
+            response = AuthNResponse.Success(
+                response = mockk(relaxed = true) { every { tokens.accessToken.value } returns "test-token" },
+                expiresAtEpochSecond = Long.MAX_VALUE,
+            )
+        )
     }
 
     @AfterEach
