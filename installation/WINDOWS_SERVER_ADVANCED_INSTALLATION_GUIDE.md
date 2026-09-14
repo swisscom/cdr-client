@@ -14,13 +14,13 @@ This guide explains how to manually install and configure curaLINE Client on Win
 ## Overview
 
 curaLINE Client on Windows Server uses a three-tier service architecture:
-- **UpdateService** - Automatically downloads and applies updates from GitHub
+- **UpdateService** - Automatically downloads and applies updates from the Swisscom (Schweiz) AG download site
 - **Watchdog** - Monitors and restarts the main service if it crashes
 - **CDR Service** - The main application (runs as a Java JAR)
 
 ## What You Need
 
-From the GitHub release, download these files:
+From the [Swisscom (Schweiz) AG download site](https://cdr.health.swisscom.ch/share/downloads/manualInstallation/latest.json), download these files:
 1. **cdr-client-service-{version}.jar** - Main application
 2. **CdrClientWatchdog-{version}.zip** - Watchdog Windows service
 3. **curaLINEClient-updateservice-{version}.zip** - Update manager service
@@ -180,12 +180,15 @@ These paths are configured in the Watchdog's `JavaArguments` setting (see next s
    ```json
    {
      "UpdateCheckIntervalHours": 2,
-     "GitHubRepository": "owner/cdr-client",
+     "UpdateBaseUrl": "",
      "WatchdogServiceName": "CDRClientWatchdog",
      "InstallationPath": "C:\\Program Files\\Swisscom (Schweiz) AG\\curaLINEClient",
+     "PinnedVersion": "",
+     "MaxBackupsToKeep": 5,
      "CurrentVersions": {
        "Service": "1.0.0",
-       "Watchdog": "1.0.0"
+       "Watchdog": "1.0.0",
+       "UpdateService": "1.0.0"
      },
      "Artifacts": {
        "Service": {
@@ -197,7 +200,7 @@ These paths are configured in the Watchdog's `JavaArguments` setting (see next s
          "TargetPath": "bin/watchdog/"
        }
      },
-     "JavaExecutablePath": "jre/bin/java.exe"
+     "JavaExecutablePath": "..\\..\\jre\\bin\\java.exe"
    }
    ```
    Ensure that `WatchdogServiceName` matches any modifications made in the watchdog service installation step (`install-service.bat`) under [4. Install Watchdog Service step 3](#4-install-watchdog-service).
@@ -299,7 +302,7 @@ C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\        (Application configu
 
 Once installed:
 
-1. **UpdateService** checks GitHub for new releases (default: every 2 hours, configurable via `UpdateCheckIntervalHours` in `appsettings.json`)
+1. **UpdateService** checks the Swisscom download site for new releases (default: every 2 hours, configurable via `UpdateCheckIntervalHours` in `appsettings.json`)
 2. When a new version is found:
    - Downloads the new `cdr-client-service-{version}.jar`
    - Stops the Watchdog service (which stops the CDR service)
@@ -354,12 +357,12 @@ Once installed:
 ### Updates Not Applying
 
 1. Check UpdateService logs in Event Viewer
-2. Verify GitHub repository URL is correct
-3. Test network connectivity to GitHub:
+2. Verify the update-site URL is correct
+3. Test network connectivity to the update site:
    ```powershell
-   Test-NetConnection -ComputerName github.com -Port 443
+   Test-NetConnection -ComputerName cdr.health.swisscom.ch -Port 443
    ```
-4. Verify release artifacts exist on GitHub releases page
+4. Verify release artifacts exist on the Swisscom download site
 
 ### Manual Update Check
 
@@ -447,4 +450,3 @@ For issues:
 **Copyright © Swisscom (Schweiz) AG**
 
 **Note**: This manual installation method is designed for Windows Server environments where the default MSIX installer cannot be used. For **Windows Server 2022 and newer**, the MSIX package with automatic updates via Conveyor is the recommended installation method.
-

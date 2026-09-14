@@ -18,16 +18,20 @@ import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
 import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
 import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot
 import com.swisscom.health.des.cdr.client.config.getEffectiveSourceArchiveFolder
 import com.swisscom.health.des.cdr.client.config.getEffectiveSourceErrorFolder
 import com.swisscom.health.des.cdr.client.config.getEffectiveSourceFolder
 import com.swisscom.health.des.cdr.client.xml.CommunicationType
 import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
 import io.mockk.every
+import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.Dispatcher
 import mockwebserver3.MockResponse
@@ -88,6 +92,9 @@ internal class PollingPushFileHandlingTest {
 
     @SpykBean
     private lateinit var config: CdrClientConfig
+
+    @SpykBean
+    private lateinit var authNService: OAuth2AuthNService
 
     @Autowired
     private lateinit var fileCache: ObjectKache<String, Path>
@@ -180,6 +187,14 @@ internal class PollingPushFileHandlingTest {
             // give the file polling task some time to start up
             Thread.sleep(1_000L)
         }
+
+        // Keep these filesystem tests deterministic: the auth race is not what we are exercising here.
+        every { authNService.currentStateSnapshot() } returns AuthStateSnapshot(
+            response = AuthNResponse.Success(
+                response = mockk(relaxed = true) { every { tokens.accessToken.value } returns "test-token" },
+                expiresAtEpochSecond = Long.MAX_VALUE,
+            )
+        )
     }
 
     @AfterEach

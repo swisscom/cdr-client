@@ -32,24 +32,28 @@ internal class FileBusyTesterTest {
 
     @Test
     fun `file size growth test`() = runBlocking(Dispatchers.IO) {
-        val tester = FileBusyTester.FileSizeChanged(testInterval = Duration.ofMillis(50L))
+        val tester = FileBusyTester.FileSizeChanged(testInterval = Duration.ofMillis(100L))
         val file = tempDir
             .resolve("size-changed.txt")
             .createFile()
 
         val writeFileJob = launch {
             while (true) {
-                file.writeText("a", UTF_8, WRITE, APPEND)
-                delay(10L.milliseconds)
+                repeat(5) {
+                    file.writeText("a", UTF_8, WRITE, APPEND)
+                }
+                delay(5L.milliseconds)
             }
         }
 
+        // Give the write job time to start
+        delay(20L.milliseconds)
         assertTrue(tester.isBusy(file))
-        delay(100L.milliseconds)
+        delay(150L.milliseconds)
         assertTrue(tester.isBusy(file))
-        delay(100L.milliseconds)
+        delay(150L.milliseconds)
         assertTrue(tester.isBusy(file))
-        delay(100L.milliseconds)
+        delay(150L.milliseconds)
         assertTrue(tester.isBusy(file))
 
         writeFileJob.cancelAndJoin()

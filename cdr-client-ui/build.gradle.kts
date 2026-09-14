@@ -22,9 +22,9 @@ kotlin {
     }
 
     sourceSets {
-        val commonTest by getting
-        val desktopMain by getting
-        val desktopTest by getting
+        val commonTest = getByName("commonTest")
+        val desktopMain = getByName("desktopMain")
+        val desktopTest = getByName("desktopTest")
 
         commonMain.dependencies {
             // Dependency aliases are deprecated, but the BOM is not available yet; keeping the aliases until the BOM arrives
