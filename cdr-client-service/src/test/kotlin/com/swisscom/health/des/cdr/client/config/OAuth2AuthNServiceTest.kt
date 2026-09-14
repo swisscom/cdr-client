@@ -162,6 +162,7 @@ class OAuth2AuthNServiceTest {
 
         authNService.forceReauthentication("rotation")
         waitForRequestCount(2)
+        waitForAuthState(authNService, AuthNState.AUTHENTICATED)
 
         val refreshedSnapshot = authNService.currentStateSnapshot()
         assertEquals(AuthNState.AUTHENTICATED, refreshedSnapshot.state)
@@ -197,6 +198,7 @@ class OAuth2AuthNServiceTest {
         authNService.forceReauthentication("test-trigger")
 
         waitForRequestCount(2)
+        waitForAuthState(authNService, AuthNState.AUTHENTICATED)
         val successResponse = assertInstanceOf<AuthNResponse.Success>(authNService.getAccessToken())
         assertEquals("second-token", successResponse.response.tokens.accessToken.value)
     }
