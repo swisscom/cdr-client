@@ -3,19 +3,26 @@ package com.swisscom.health.des.cdr.client.config
 import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy
 import com.mayakapps.kache.ObjectKache
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService.AuthNResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthFailureMapper
+import com.swisscom.health.des.cdr.client.config.auth.AuthHttpFailure
+import com.swisscom.health.des.cdr.client.config.auth.toAuthNState
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.time.delay
+import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.http.HttpStatus
 import org.springframework.retry.support.RetryTemplate
 import java.io.IOException
 import java.net.Authenticator
@@ -35,6 +42,7 @@ private val logger = KotlinLogging.logger {}
 @Suppress("TooManyFunctions")
 @Configuration
 internal class CdrClientContext {
+    private val authFailureMapper = AuthFailureMapper()
 
     /**
      * Configures system-wide proxy authenticator for Nimbus JWT HTTP client.
@@ -103,31 +111,15 @@ internal class CdrClientContext {
                     }
                 }
             }
-            .addInterceptor { chain ->
-                oAuth2AuthNService.getAccessToken()
-                    .let { authNResponse ->
-                        when (authNResponse) {
-                            is AuthNResponse.Success -> {
-                                chain
-                                    .request()
-                                    .newBuilder()
-                                    .run {
-                                        header("Authorization", "Bearer ${authNResponse.response.tokens.accessToken.value}")
-                                        build()
-                                    }.let { authenticatedRequest ->
-                                        chain.proceed(authenticatedRequest)
-                                    }
-                            }
-
-                            else -> chain.proceed(chain.request()) // unauthenticated call; will probably fail with 401/403
-                                .also { _ ->
-                                    logger.warn { "Authentication failed, proceeding unauthenticated; authentication response: '$authNResponse'" }
-                                }
-                        }
-                    }
-            }
+            .addInterceptor { chain -> authenticateRequest(chain, oAuth2AuthNService) }
             .addInterceptor { chain ->
                 val response: Response = chain.proceed(chain.request())
+
+                if (response.code == HttpStatus.UNAUTHORIZED.value() || response.code == HttpStatus.FORBIDDEN.value()) {
+                    oAuth2AuthNService.forceReauthentication(
+                        "downstream API returned ${response.code} for ${chain.request().method} ${chain.request().url.encodedPath}"
+                    )
+                }
 
                 @Suppress("MagicNumber")
                 if (response.code in 500..599) {
@@ -142,6 +134,57 @@ internal class CdrClientContext {
             }
             .build()
 
+    private fun successProceeding(chain: Interceptor.Chain, accessToken: String): Response {
+        return chain
+            .request()
+            .newBuilder()
+            .run {
+                header("Authorization", "Bearer $accessToken")
+                build()
+            }.let { authenticatedRequest ->
+                chain.proceed(authenticatedRequest)
+            }
+    }
+
+    private fun authFailureResponse(chain: Interceptor.Chain, failure: AuthHttpFailure): Response {
+        return Response.Builder()
+            .request(chain.request())
+            .protocol(Protocol.HTTP_1_1)
+            .code(failure.status.value())
+            .message(failure.message)
+            .body(
+                failure.body
+                    .toResponseBody("text/plain".toMediaType())
+            )
+            .build()
+            .also {
+                logger.warn { "Returning synthetic auth failure response with status ${failure.status.value()}" }
+            }
+    }
+
+    private fun authenticateRequest(
+        chain: Interceptor.Chain,
+        oAuth2AuthNService: OAuth2AuthNService,
+    ): Response {
+        val snapshot = oAuth2AuthNService.currentStateSnapshot()
+        val authNResponse = snapshot.response
+        return authFailureMapper.map(authNResponse)
+            ?.let { failure ->
+                authFailureResponse(chain, failure)
+                    .also {
+                        logger.warn {
+                            "Blocking outbound request because auth state is '${authNResponse.toAuthNState()}'"
+                        }
+                    }
+            }
+            ?: run {
+                val accessToken = requireNotNull(snapshot.activeAccessToken) {
+                    "Authenticated snapshot is missing an access token"
+                }
+                successProceeding(chain, accessToken)
+            }
+    }
+
     /**
      * Creates and returns an instance of the OkHttpClient.Builder if one does not already exist.
      *
@@ -152,6 +195,7 @@ internal class CdrClientContext {
     fun okHttpClientBuilder(): OkHttpClient.Builder? {
         return OkHttpClient.Builder()
     }
+
 
     /**
      * Creates a coroutine dispatcher for blocking I/O operations with limited parallelism.
@@ -261,8 +305,6 @@ internal class CdrClientContext {
 
 }
 
-
-
 internal class HttpServerErrorException(message: String, val statusCode: Int, val responseBody: String) : RuntimeException(message, null, false, false) {
     override fun toString(): String {
         return "HttpServerErrorException(statusCode='$statusCode', responseBody='$responseBody', message='${message}')"
@@ -270,6 +312,7 @@ internal class HttpServerErrorException(message: String, val statusCode: Int, va
 }
 
 internal class WrongCredentialsException(message: String) : RuntimeException(message, null, false, false)
+
 
 sealed interface FileBusyTester {
     suspend fun isBusy(file: Path): Boolean

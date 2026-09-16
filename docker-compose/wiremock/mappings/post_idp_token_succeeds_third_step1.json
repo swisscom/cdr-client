@@ -1,0 +1,19 @@
+{
+  "scenarioName": "idp-token-succeeds-third-attempt",
+  "requiredScenarioState": "Started",
+  "newScenarioState": "SECOND_ATTEMPT",
+  "request": {
+    "urlPath": "/idp-wiremock/succeeds-third/oauth2/v2.0/token",
+    "method": "POST"
+  },
+  "response": {
+    "status": 401,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "jsonBody": {
+      "error": "invalid_client",
+      "error_description": "simulated deny on first auth attempt"
+    }
+  }
+}

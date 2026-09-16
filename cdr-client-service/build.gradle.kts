@@ -157,6 +157,9 @@ tasks.withType<Test> {
         includeEngines("junit-jupiter")
     }
     finalizedBy(jacocoTestReport)
+    if (gradle.startParameter.taskNames.any { it == "test" || it.endsWith(":test") } && !gradle.startParameter.taskNames.contains("build")) {
+        finalizedBy(jacocoTestCoverageVerification)
+    }
 }
 
 jacoco {
@@ -228,7 +231,7 @@ object Constants {
     const val INTEGRATION_TEST_TAG = "integration-test"
 }
 
-val test by testing.suites.existing(JvmTestSuite::class)
+val test = testing.suites.named<JvmTestSuite>("test")
 
 tasks.register<Test>("integrationTest") {
     description = "Runs the integration tests."

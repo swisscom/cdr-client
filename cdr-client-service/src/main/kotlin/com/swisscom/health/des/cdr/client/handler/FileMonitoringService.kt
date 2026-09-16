@@ -78,7 +78,7 @@ internal class FileMonitoringService(
                         Files.walk(errorFolder).use { files ->
                             files
                                 .asSequence()
-                                .count { file: Path -> file.isRegularFile() && file.extension.lowercase() == EXTENSION_XML }
+                                .count { file: Path -> file.isRegularFile() && file.extension.equals(EXTENSION_XML, ignoreCase = true) }
                                 .also { errorCount ->
                                     logger.debug { "Found '$errorCount' error file(s) in folder '$errorFolder' for connector '${connector.connectorId}'" }
                                 }
@@ -101,7 +101,7 @@ internal class FileMonitoringService(
 
                 Files.list(tempFolder).use { files ->
                     files.asSequence()
-                        .filter { it.isRegularFile() && it.extension.lowercase() == TEMP_FILE_EXTENSION }
+                        .filter { it.isRegularFile() && it.extension.equals(TEMP_FILE_EXTENSION, ignoreCase = true) }
                         .count { file ->
                             val lastModified = Files.getLastModifiedTime(file).toInstant()
                             lastModified.isBefore(threshold)

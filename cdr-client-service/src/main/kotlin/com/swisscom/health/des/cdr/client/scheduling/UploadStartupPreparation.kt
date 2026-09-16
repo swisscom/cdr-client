@@ -4,7 +4,6 @@ import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSIO
 import com.swisscom.health.des.cdr.client.common.Constants.UPLOAD_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.effectiveSourceFolders
-import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.annotation.PostConstruct
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -34,11 +33,6 @@ internal class UploadStartupPreparation(
                     logger.warn { "Found existing upload file '${file.absolutePathString()}'; leaving it untouched." }
                 }
             }
-        }
-
-        if (!schedulingValidationService.isSchedulingAllowed) {
-            logger.info { "Scheduling is not allowed. Skipping renaming of '.$RESTART_FILE_EXTENSION' files." }
-            return
         }
 
         logger.info { "Renaming '.$RESTART_FILE_EXTENSION' files to '.xml' in source directories..." }

@@ -46,7 +46,16 @@ internal fun List<Connector>.getConnectorBySourceFolder(file: Path, docMetaData:
         true -> file
         false -> file.parent
     }.let { dir: Path ->
-        this.first { it.getEffectiveSourceFolders(docMetaData.documentType).contains(dir) }
+        this.firstOrNull { it.getEffectiveSourceFolders(docMetaData.documentType).contains(dir) }
+            ?: throw NoSuchElementException(
+                "No connector source folder match for file '$file' (lookup dir '$dir') with " +
+                        "documentType='${docMetaData.documentType}' and communicationType='${docMetaData.communicationType}'. " +
+                        "Configured source folders for this document type: ${
+                            this.joinToString(separator = "; ") { connector ->
+                                "connectorId='${connector.connectorId}' -> ${connector.getEffectiveSourceFolders(docMetaData.documentType)}"
+                            }
+                        }"
+            )
     }
 
 /**
