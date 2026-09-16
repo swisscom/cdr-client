@@ -101,9 +101,10 @@ internal class ConfigValidationService(
     fun validateAllConfigurationItems(config: CdrClientConfig): ValidationResult {
         val validations = mutableListOf<ValidationResult>()
 
+        validations.add(validateDirectoryIsReadWritable(config.localFolder.value))
+
         with(config.toDto()) {
             validations.add(validateCdrApiEndpoint(cdrApi, idpCredentials))
-            validations.add(validateDirectoryIsReadWritable(localFolder))
             validations.add(validateDirectoryOverlap(this))
             validations.add(validateModeValue(customer))
             validations.add(validateModeOverlap(customer))
@@ -322,6 +323,17 @@ internal class ConfigValidationService(
      * This is used for UI validation where trailing/leading spaces should result in validation errors.
      */
     fun validateDirectoryIsReadWritable(pathString: String): ValidationResult {
+        if (pathString.isBlank()) {
+            return ValidationResult.Failure(
+                listOf(
+                    ValidationDetail.ConfigItemDetail(
+                        configItem = DomainObjects.ConfigurationItem.LOCAL_DIRECTORY,
+                        messageKey = NOT_A_DIRECTORY
+                    )
+                )
+            )
+        }
+
         fun pathIsReadAndWritable(path: Path): ValidationResult =
             if (!path.isReadable() || !path.isWritable()) {
                 logger.debug { "Path is not readable or writable: [${path}], readable: [${Files.isReadable(path)}], writable: [${Files.isWritable(path)}]" }

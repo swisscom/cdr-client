@@ -8,7 +8,6 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.RetryTemplateConfig
 import org.springframework.util.unit.DataSize
 import java.nio.file.Path
-import kotlin.io.path.absolutePathString
 import kotlin.reflect.KClass
 import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector as ConnectorDto
@@ -31,7 +30,7 @@ internal fun CdrClientConfig.toDto(): CdrClientConfigDto {
         maxDenyRetries = maxDenyRetries,
         authRefreshBeforeExpiry = authRefreshBeforeExpiry,
         authRetry = authRetry.toDto(),
-        localFolder = localFolder.path.absolutePathString(),
+        localFolder = localFolder.value,
         pullThreadPoolSize = pullThreadPoolSize,
         pushThreadPoolSize = pushThreadPoolSize,
         retryDelay = retryDelay,

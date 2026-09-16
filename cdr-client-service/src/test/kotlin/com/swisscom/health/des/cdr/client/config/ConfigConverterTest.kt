@@ -84,7 +84,7 @@ class ConfigConverterTest {
         ),
     )
 
-    private val sameConfigButAbsolutePaths: CdrClientConfig = CdrClientConfig(
+    private val sameConfigButAbsolutePathsExceptLocalFolder: CdrClientConfig = CdrClientConfig(
         fileSynchronizationEnabled = FileSynchronization.ENABLED,
         customer = Customer(
             mutableListOf(
@@ -156,13 +156,23 @@ class ConfigConverterTest {
     @Test
     fun `there and back again - make sure no information is lost in translation`() {
         val configRoundTrip = configAllRelativePaths.toDto().toCdrClientConfig()
-        sameConfigButAbsolutePaths.copy(
-            idpCredentials = sameConfigButAbsolutePaths.idpCredentials.copy(
+        sameConfigButAbsolutePathsExceptLocalFolder.copy(
+            localFolder = TempDownloadDir(RELATIVE_PATH),
+            idpCredentials = sameConfigButAbsolutePathsExceptLocalFolder.idpCredentials.copy(
                 clientSecret = ClientSecret.MASKED_SECRET
             )
-        ).also { sameConfigButAbsolutePathsMaskedSecret ->
-            assertEquals(sameConfigButAbsolutePathsMaskedSecret, configRoundTrip)
+        ).also { expectedConfig ->
+            assertEquals(expectedConfig, configRoundTrip)
         }
+    }
+
+    @Test
+    fun `blank local folder survives dto round trip`() {
+        val config = configAllRelativePaths.copy(localFolder = TempDownloadDir(""))
+
+        val roundTrip = config.toDto().toCdrClientConfig()
+
+        assertEquals("", roundTrip.localFolder.value)
     }
 
     private companion object {

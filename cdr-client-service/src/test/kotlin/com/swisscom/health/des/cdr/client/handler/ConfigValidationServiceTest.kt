@@ -186,6 +186,21 @@ internal class ConfigValidationServiceTest {
     }
 
     @Test
+    fun `test validation error if local directory is blank`() {
+        val clientConfig = allGoodCdrClientConfig.copy(localFolder = TempDownloadDir(""))
+
+        val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(clientConfig)
+
+        assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
+        assertEquals(1, validationResult.validationDetails.size)
+        validationResult.validationDetails.first().let { validationDetail ->
+            assertInstanceOf<DTOs.ValidationDetail.ConfigItemDetail>(validationDetail)
+            assertEquals(DomainObjects.ConfigurationItem.LOCAL_DIRECTORY, validationDetail.configItem)
+            assertEquals(DTOs.ValidationMessageKey.NOT_A_DIRECTORY, validationDetail.messageKey)
+        }
+    }
+
+    @Test
     fun `test validation error because local directory is overlapping with any another directory`() {
         // not using @ParameterizedTest because I rather not make all the temp directories `static`
         connectorDirs().forEach { notLegalLocalDir ->
