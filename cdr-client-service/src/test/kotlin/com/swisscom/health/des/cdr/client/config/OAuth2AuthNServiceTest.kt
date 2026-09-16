@@ -267,11 +267,18 @@ class OAuth2AuthNServiceTest {
         waitForRequestCount(2)
         waitForAuthState(authNService, AuthNState.AUTHENTICATED)
 
+        var revivedJob: Job? = authNService.currentStateSnapshot().managerJob
+        val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1500L)
+        while (revivedJob === deadJob && System.nanoTime() < deadlineNanos) {
+            Thread.sleep(10)
+            revivedJob = authNService.currentStateSnapshot().managerJob
+        }
+        val activeRevivedJob: Job = requireNotNull(revivedJob)
+
         val success = assertInstanceOf<AuthNResponse.Success>(authNService.getAccessToken())
         assertEquals("second-token", success.response.tokens.accessToken.value)
-        val revivedJob: Job = requireNotNull(authNService.currentStateSnapshot().managerJob)
-        assertTrue(revivedJob.isActive)
-        assertNotSame(deadJob, revivedJob)
+        assertTrue(activeRevivedJob.isActive)
+        assertNotSame(deadJob, activeRevivedJob)
     }
 
     @Test
