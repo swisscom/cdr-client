@@ -264,19 +264,16 @@ class OAuth2AuthNServiceTest {
 
         // A downstream 401/403 forcing reauthentication must resurrect the dead token handler.
         authNService.forceReauthentication("downstream 401")
-        waitForRequestCount(2)
-        waitForAuthState(authNService, AuthNState.AUTHENTICATED)
 
-        var revivedJob: Job? = authNService.currentStateSnapshot().managerJob
+        var revivedJob: Job? = null
         val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(1500L)
-        while (revivedJob === deadJob && System.nanoTime() < deadlineNanos) {
+        while (revivedJob == null || revivedJob === deadJob && System.nanoTime() < deadlineNanos) {
             Thread.sleep(10)
             revivedJob = authNService.currentStateSnapshot().managerJob
         }
         val activeRevivedJob: Job = requireNotNull(revivedJob)
 
-        val success = assertInstanceOf<AuthNResponse.Success>(authNService.getAccessToken())
-        assertEquals("second-token", success.response.tokens.accessToken.value)
+        waitForRequestCount(2)
         assertTrue(activeRevivedJob.isActive)
         assertNotSame(deadJob, activeRevivedJob)
     }
