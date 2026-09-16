@@ -15,7 +15,7 @@ pluginManagement {
         gradlePluginPortal()
     }
 
-    val foojayResolverPluginVersion: String by settings
+    val foojayResolverPluginVersion = providers.gradleProperty("foojayResolverPluginVersion").get()
     plugins {
         id("org.gradle.toolchains.foojay-resolver-convention") version foojayResolverPluginVersion
     }
