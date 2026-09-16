@@ -295,7 +295,7 @@ internal abstract class BaseUploadScheduler(
                         }"
                     }
                     file.extension.equals(EXTENSION_XML, ignoreCase = true)
-                }.first
+                }
             }
             .filter { (file: Path, traceId: String) ->
                 withContext(LogCorrelation.contextElement(traceId)) {

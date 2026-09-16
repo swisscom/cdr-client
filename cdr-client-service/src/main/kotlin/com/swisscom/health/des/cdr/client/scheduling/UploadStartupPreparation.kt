@@ -19,7 +19,6 @@ private val logger = KotlinLogging.logger {}
 @ConditionalOnProperty(prefix = "client", name = ["file-synchronization-enabled"])
 internal class UploadStartupPreparation(
     private val config: CdrClientConfig,
-    private val schedulingValidationService: SchedulingValidationService,
 ) {
 
     @PostConstruct
