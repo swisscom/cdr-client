@@ -176,7 +176,7 @@ internal class CdrApiClient(
                         response.code == HttpStatus.CONFLICT.value() -> UploadDocumentResult.Success.also { _ ->
                             logger.info {
                                 "Upload of '$file' failed with status code '${HttpStatus.CONFLICT}'; " +
-                                        "upload will be treated as a success, as a another copy of the document has already been uploaded."
+                                        "upload will be treated as a success, as another copy of the document has already been uploaded."
                             }
                         }
 

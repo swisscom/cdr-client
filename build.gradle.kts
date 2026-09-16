@@ -3,7 +3,7 @@ import org.gradle.kotlin.dsl.withType
 import org.gradle.api.GradleException
 
 allprojects {
-    version = "6.1.1"
+    version = "6.2.0"
 }
 
 plugins {
@@ -467,6 +467,8 @@ tasks.register("buildUpdateService") {
     })
     outputs.dir("cdr-client-updateservice/publish")
 
+    val currentVersion = project.version.toString()
+
     doLast {
         logger.info("Building CDR Client Update Service (Windows-only, cross-platform build)")
 
@@ -517,7 +519,6 @@ tasks.register("buildUpdateService") {
         logger.info("Updating appsettings.json with current version")
         val appsettingsFile = file("cdr-client-updateservice/publish/appsettings.json")
         if (appsettingsFile.exists()) {
-            val currentVersion = project.version.toString()
             val appsettingsContent = appsettingsFile.readText()
             val updatedContent = appsettingsContent.replace(
                 """"1.0.0"""",
@@ -574,8 +575,9 @@ tasks.register("buildManualInstallationArtifacts") {
     dependsOn(":cdr-client-service:bootJar")
     mustRunAfter("cleanAll", "buildWatchdogRelease", "buildUpdateService") // Ensure artifacts exist before packaging
 
+    val version = project.version.toString()
+
     doLast {
-        val version = project.version.toString()
         val releaseDir = file("release-artifacts")
 
         // Clean and create release directory

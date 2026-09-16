@@ -434,9 +434,17 @@ internal class CdrConfigViewModel(
      */
     fun setConnectorDocTypeRequestResponseSplit(docType: DocumentType, doSplit: Boolean, connector: ConnectorDto) {
         logger.debug { "setConnectorDocTypeRequestResponseSplit: '$docType' -> '$doSplit'" }
+        val currentDocTypeFolders = connector.docTypeFolders[docType] ?: ConnectorDto.DocTypeFolders.EMPTY
         val docTypeFolders: ConnectorDto.DocTypeFolders =
-            connector.docTypeFolders[docType]?.copy(requestResponseSplit = doSplit)
-                ?: ConnectorDto.DocTypeFolders(requestResponseSplit = doSplit)
+            currentDocTypeFolders
+                .copy(
+                    requestResponseSplit = doSplit,
+                    errorFolder = currentDocTypeFolders.errorFolder.takeIf { doSplit },
+                    archiveFolder = currentDocTypeFolders.archiveFolder.takeIf { doSplit },
+                )
+                .let { updatedDocTypeFolders ->
+                    if (doSplit) updatedDocTypeFolders.withDerivedSplitDefaults(docType, connector) else updatedDocTypeFolders
+                }
         val updatedConnector: ConnectorDto = updateDocTypeDirs(connector, docTypeFolders, docType)
         replaceConnector(connector, updatedConnector)
     }
@@ -804,6 +812,46 @@ internal class CdrConfigViewModel(
             )
         }
     }
+
+    private fun ConnectorDto.DocTypeFolders.withDerivedSplitDefaults(
+        docType: DocumentType,
+        connector: ConnectorDto,
+    ): ConnectorDto.DocTypeFolders =
+        copy(
+            targetFolderReq = targetFolderReq.orIfBlank { getEffectiveDocTypeTargetDirNoSplit(docType, connector) },
+            targetFolderResp = targetFolderResp.orIfBlank { getEffectiveDocTypeTargetDirNoSplit(docType, connector) },
+            sourceFolderReq = sourceFolderReq.orIfBlank { getEffectiveDocTypeSourceDirNoSplit(docType, connector) },
+            sourceFolderResp = sourceFolderResp.orIfBlank { getEffectiveDocTypeSourceDirNoSplit(docType, connector) },
+            errorFolder = errorFolder.orIfBlank { getEffectiveDocTypeErrorDirNoSplit(docType, connector) },
+            archiveFolder = archiveFolder.orIfBlank { getEffectiveDocTypeArchiveDirNoSplit(docType, connector) },
+        )
+
+    private fun getEffectiveDocTypeTargetDirNoSplit(docType: DocumentType, connector: ConnectorDto): String =
+        connector.docTypeFolders[docType]?.targetFolder ?: connector.targetFolder
+
+    private fun getEffectiveDocTypeSourceDirNoSplit(docType: DocumentType, connector: ConnectorDto): String =
+        connector.docTypeFolders[docType]?.sourceFolder ?: connector.sourceFolder
+
+    private fun getEffectiveDocTypeErrorDirNoSplit(docType: DocumentType, connector: ConnectorDto): String =
+        connector.docTypeFolders[docType]?.errorFolder ?: run {
+            val effectiveSourceDir = getEffectiveDocTypeSourceDirNoSplit(docType, connector)
+            if (effectiveSourceDir == connector.sourceFolder) connector.sourceErrorFolder ?: connector.sourceFolder
+            else effectiveSourceDir
+        }
+
+    private fun getEffectiveDocTypeArchiveDirNoSplit(docType: DocumentType, connector: ConnectorDto): String? =
+        if (connector.sourceArchiveEnabled) {
+            connector.docTypeFolders[docType]?.archiveFolder ?: run {
+                val effectiveSourceDir = getEffectiveDocTypeSourceDirNoSplit(docType, connector)
+                if (effectiveSourceDir == connector.sourceFolder) connector.sourceArchiveFolder ?: connector.sourceFolder
+                else effectiveSourceDir
+            }
+        } else {
+            null
+        }
+
+    private inline fun String?.orIfBlank(fallback: () -> String?): String? =
+        if (isNullOrBlank()) fallback() else this
 
     companion object {
         @JvmStatic

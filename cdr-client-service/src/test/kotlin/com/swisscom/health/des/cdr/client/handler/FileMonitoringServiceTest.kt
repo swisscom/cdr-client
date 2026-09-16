@@ -94,6 +94,16 @@ internal class FileMonitoringServiceTest {
     }
 
     @Test
+    fun `should count XML files with uppercase extension in error directories`() = runTest {
+        createErrorFile(errorDir1, "error1.XML")
+
+        fileMonitoringService.checkFileStatus()
+
+        val status = fileMonitoringService.monitoringStatus
+        assertEquals(1, status.errorFileCount)
+    }
+
+    @Test
     fun `should ignore non-XML files in error directories`() = runTest {
         createErrorFile(errorDir1, "error1.xml")
         createErrorFile(errorDir1, "error2.txt")
@@ -346,5 +356,12 @@ internal class FileMonitoringServiceTest {
             ),
             oldFileThreshold = Duration.ofHours(2L),
             fileSystemCheckInterval = Duration.ofMinutes(5L),
+            maxDenyRetries = 5,
+            authRefreshBeforeExpiry = Duration.ofSeconds(60),
+            authRetry = CdrClientConfig.RetryPolicy(
+                initialDelay = Duration.ofSeconds(1L),
+                backoffMultiplier = 2.0,
+                maxDelay = Duration.ofMinutes(5L),
+            ),
         )
 }

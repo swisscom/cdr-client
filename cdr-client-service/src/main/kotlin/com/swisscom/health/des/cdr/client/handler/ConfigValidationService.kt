@@ -188,6 +188,15 @@ internal class ConfigValidationService(
                 }
             }
 
+
+            DomainObjects.ApiEndpoint.INTEGRATION -> {
+                if (idpCredentials.tenantId != DomainObjects.TenantId.INTEGRATION || idpCredentials.scope != DomainObjects.OAuthScope.INTEGRATION) {
+                    illegalValueCombinationFailure
+                } else {
+                    ValidationResult.Success
+                }
+            }
+
             DomainObjects.ApiEndpoint.LOCALHOST -> {
                 if (idpCredentials.tenantId != DomainObjects.TenantId.LOCALHOST || idpCredentials.scope != DomainObjects.OAuthScope.LOCALHOST) {
                     illegalValueCombinationFailure

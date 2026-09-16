@@ -75,6 +75,13 @@ class ConfigConverterTest {
         proxyConfig = CdrClientConfigDto.ProxyConfig.EMPTY.toCdrClientConfig(),
         oldFileThreshold = Duration.ofHours(2L),
         fileSystemCheckInterval = Duration.ofMinutes(5L),
+        maxDenyRetries = 5,
+        authRefreshBeforeExpiry = Duration.ofSeconds(60),
+        authRetry = CdrClientConfig.RetryPolicy(
+            initialDelay = Duration.ofSeconds(1L),
+            backoffMultiplier = 2.0,
+            maxDelay = Duration.ofMinutes(5L),
+        ),
     )
 
     private val sameConfigButAbsolutePaths: CdrClientConfig = CdrClientConfig(
@@ -137,6 +144,13 @@ class ConfigConverterTest {
         proxyConfig = CdrClientConfigDto.ProxyConfig.EMPTY.toCdrClientConfig(),
         oldFileThreshold = Duration.ofHours(2L),
         fileSystemCheckInterval = Duration.ofMinutes(5L),
+        maxDenyRetries = 5,
+        authRefreshBeforeExpiry = Duration.ofSeconds(60),
+        authRetry = CdrClientConfig.RetryPolicy(
+            initialDelay = Duration.ofSeconds(1L),
+            backoffMultiplier = 2.0,
+            maxDelay = Duration.ofMinutes(5L),
+        ),
     )
 
     @Test
