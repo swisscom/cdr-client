@@ -439,6 +439,10 @@ internal class CdrConfigViewModel(
             currentDocTypeFolders
                 .copy(
                     requestResponseSplit = doSplit,
+                    targetFolderReq = currentDocTypeFolders.targetFolderReq.takeIf { doSplit },
+                    targetFolderResp = currentDocTypeFolders.targetFolderResp.takeIf { doSplit },
+                    sourceFolderReq = currentDocTypeFolders.sourceFolderReq.takeIf { doSplit },
+                    sourceFolderResp = currentDocTypeFolders.sourceFolderResp.takeIf { doSplit },
                     errorFolder = currentDocTypeFolders.errorFolder.takeIf { doSplit },
                     archiveFolder = currentDocTypeFolders.archiveFolder.takeIf { doSplit },
                 )
