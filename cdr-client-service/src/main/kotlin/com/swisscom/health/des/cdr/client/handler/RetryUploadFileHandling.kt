@@ -1,6 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
+import com.swisscom.health.des.cdr.client.LogCorrelation
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.common.Constants.UPLOAD_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -12,7 +12,6 @@ import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentRes
 import com.swisscom.health.des.cdr.client.scheduling.BaseUploadScheduler.Companion.EXTENSION_XML
 import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.micrometer.tracing.Tracer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.time.delay
@@ -42,7 +41,6 @@ private val logger = KotlinLogging.logger {}
 @Suppress("TooManyFunctions", "LongParameterList")
 internal class RetryUploadFileHandling(
     private val cdrClientConfig: CdrClientConfig,
-    private val tracer: Tracer,
     private val cdrApiClient: CdrApiClient,
 ) {
 
@@ -72,7 +70,7 @@ internal class RetryUploadFileHandling(
                     file = uploadFile,
                     connectorId = connector.connectorId.id,
                     mode = connector.mode,
-                    traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
+                    traceId = LogCorrelation.currentTraceId()
                 )
 
                 retryNeeded = when (response) {

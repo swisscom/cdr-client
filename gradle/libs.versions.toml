@@ -1,12 +1,12 @@
 [versions]
-jdk = "21" # upgrade to Java 25 is blocked by detekt; we will have to wait for release 2.0
-kotlin-lang = "2.3.20"
-compose-multiplatform = "1.10.3"
-compose-native-tray = "1.3.3"
+jdk = "25"
+kotlin-lang = "2.4.10"
+compose-multiplatform = "1.12.0"
+compose-native-tray = "2.1.6"
 kotlin-logging = "8.0.4"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.10.0"
-detekt = "1.23.8" # version 2.0 is supposed to have Java 25 support
+detekt = "2.0.0-alpha.6"
 awaitility = "4.3.0"
 jacoco = "0.8.15"
 kache = "2.1.1"
@@ -17,7 +17,7 @@ spring-mockk = "4.0.2" # 5.0 is a rewrite and comes with breaking changes: https
 nimbusOauth2SdkVersion = "11.38.2"
 okHttp = "5.5.0"
 spring-cloud = "2025.1.3"
-spring-boot = "3.5.14"
+spring-boot = "4.0.8"
 spring-dependency-management = "1.1.7"
 docker-compose = "0.17.21"
 conveyor-plugin = "2.0"
@@ -33,11 +33,8 @@ nimbusOAuth2Sdk = { group = "com.nimbusds", name = "oauth2-oidc-sdk", version.re
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okHttp" }
 kfswatch = { group = "io.github.irgaly.kfswatch", name = "kfswatch", version.ref = "kfs-watch" }
 kotlin-logging = { group = "io.github.oshai", name = "kotlin-logging-jvm", version.ref = "kotlin-logging" }
-micrometer-tracing = { group = "io.micrometer", name = "micrometer-tracing" }
-micrometer-tracing-bridge-otel = { group = "io.micrometer", name = "micrometer-tracing-bridge-otel" }
 logstash-encoder = { group = "net.logstash.logback", name = "logstash-logback-encoder", version.ref = "logstash-encoder" }
 kotlin-reflect = { group = "org.jetbrains.kotlin", name = "kotlin-reflect", version.ref = "kotlin-lang" }
-kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin-lang" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-reactor = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-reactor", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-swing = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
@@ -48,15 +45,16 @@ androidx-lifecycle-runtime-compose = { group = "org.jetbrains.androidx.lifecycle
 spring-boot-dependencies = { group = "org.springframework.boot", name = "spring-boot-dependencies", version.ref = "spring-boot" }
 spring-boot-starter-actuator = { group = "org.springframework.boot", name = "spring-boot-starter-actuator" }
 spring-boot-starter-webflux = { group = "org.springframework.boot", name = "spring-boot-starter-webflux" }
+spring-boot-starter-jackson = { group = "org.springframework.boot", name = "spring-boot-starter-jackson" }
 spring-retry = { group = "org.springframework.retry", name = "spring-retry" }
 spring-cloud-dependencies = { group = "org.springframework.cloud", name = "spring-cloud-dependencies", version.ref = "spring-cloud" }
-jackson-dataformat-yaml = { group = "com.fasterxml.jackson.dataformat", name = "jackson-dataformat-yaml" }
-jackson-module-kotlin = { group = "com.fasterxml.jackson.module", name = "jackson-module-kotlin" }
+jackson-dataformat-yaml = { group = "tools.jackson.dataformat", name = "jackson-dataformat-yaml" }
+jackson-module-kotlin = { group = "tools.jackson.module", name = "jackson-module-kotlin" }
 jackson-annotations = { group = "com.fasterxml.jackson.core", name = "jackson-annotations" }
 conveyor-control = { group = "dev.hydraulic.conveyor", name = "conveyor-control", version.ref = "conveyor-control-api" }
 jna = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jna" }
 uitiles = { group = "com.github.alorma.compose-settings", name = "ui-tiles", version.ref = "ui-tiles" }
-compose-native-tray = { group = "io.github.kdroidfilter", name = "composenativetray", version.ref = "compose-native-tray" }
+compose-native-tray = { group = "dev.nucleusframework", name = "composenativetray", version.ref = "compose-native-tray" }
 pgreze-kotlin-process = { group = "com.github.pgreze", name = "kotlin-process", version.ref = "pgreze-kotlin-process" }
 #### TEST DEPENDENCIES ####
 jacocoCore = { group = "org.jacoco", name = "org.jacoco.core", version.ref = "jacoco" }
@@ -65,13 +63,11 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 mock-webserver = { group = "com.squareup.okhttp3", name = "mockwebserver3", version.ref = "okHttp" }
 mock-webserver-junit5 = { group = "com.squareup.okhttp3", name = "mockwebserver3-junit5", version.ref = "okHttp" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
-junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter" }
-micrometer-tracing-test = { group = "io.micrometer", name = "micrometer-tracing-test" }
 spring-mockk = { group = "com.ninja-squad", name = "springmockk", version.ref = "spring-mockk" }
 awaitility = { group = "org.awaitility", name = "awaitility", version.ref = "awaitility" }
 
 [plugins]
-detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }
 docker-compose = { id = "com.avast.gradle.docker-compose", version.ref = "docker-compose" }
 spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
 spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }

@@ -1,4 +1,4 @@
-import io.gitlab.arturbosch.detekt.Detekt
+import dev.detekt.gradle.Detekt
 import org.gradle.kotlin.dsl.withType
 import org.gradle.api.GradleException
 
@@ -29,7 +29,7 @@ subprojects {
     }
 
     detekt {
-        config.from(rootProject.files("config/detekt.yml"))
+        config.from(rootProject.files("config/detekt/detekt.yml"))
         buildUponDefaultConfig = false // preconfigure defaults
         allRules = true
         parallel = true
@@ -37,21 +37,10 @@ subprojects {
 
     tasks.withType<Detekt> {
         reports {
-            xml.required.set(true)
+            checkstyle.required.set(true)
             html.required.set(false)
             sarif.required.set(false)
-            txt.required.set(false)
-        }
-    }
-
-    project.afterEvaluate {
-        // https://github.com/detekt/detekt/issues/6198#issuecomment-2265183695
-        configurations.matching { it.name == "detekt" }.all {
-            resolutionStrategy.eachDependency {
-                if (requested.group == "org.jetbrains.kotlin") {
-                    useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
-                }
-            }
+            markdown.required.set(false)
         }
     }
 }
@@ -65,7 +54,7 @@ tasks.updateDaemonJvm {
 // .NET 10 SDK Management and Watchdog Build Tasks
 // =============================================================================
 
-val dotnetVersion = "10.0.200"
+val dotnetVersion = "10.0.401"
 val dotnetInstallDir = layout.buildDirectory.dir("dotnet-sdk").get().asFile
 val dotnetExecutable = if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
     File(dotnetInstallDir, "dotnet.exe")

@@ -1,6 +1,6 @@
 package com.swisscom.health.des.cdr.client
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.json.JsonMapper
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
@@ -15,9 +15,6 @@ import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.PULL_RE
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import com.swisscom.health.des.cdr.client.scheduling.DocumentDownloadScheduler
-import io.micrometer.tracing.Span
-import io.micrometer.tracing.TraceContext
-import io.micrometer.tracing.Tracer
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
@@ -60,22 +57,6 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
     @MockK
     private lateinit var schedulingValidationService: SchedulingValidationService
-
-    @MockK
-    private lateinit var tracer: Tracer
-
-    @MockK
-    private lateinit var spanBuilder: Span.Builder
-
-    @MockK
-    private lateinit var span: Span
-
-    @MockK
-    private lateinit var spanInScope: Tracer.SpanInScope
-
-    @MockK
-    private lateinit var traceContext: TraceContext
-
 
     @MockK
     private lateinit var retryIoErrorsThrice: RetryTemplate
@@ -139,10 +120,8 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } answers { "Mocked Result" }
 
-        mockTracer()
-
-        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), retryIoErrorsThrice, ObjectMapper(), "OS")
-        pullFileHandling = PullFileHandling(tracer, cdrApiClient)
+        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), retryIoErrorsThrice, JsonMapper.builder().findAndAddModules().build(), "OS")
+        pullFileHandling = PullFileHandling(cdrApiClient)
         documentDownloadScheduler = DocumentDownloadScheduler(
             config,
             schedulingValidationService,
@@ -156,21 +135,6 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
     fun tearDown() {
         counterOne = 0
         counterTwo = 0
-    }
-
-    private fun mockTracer() {
-        every { tracer.spanBuilder() } returns spanBuilder
-        every { tracer.currentSpan() } returns null
-        every { spanBuilder.setNoParent() } returns spanBuilder
-        every { spanBuilder.name(any()) } returns spanBuilder
-        every { spanBuilder.start() } returns span
-        every { tracer.withSpan(any()) } returns spanInScope
-        every { span.name(any()) } returns span
-        every { span.start() } returns span
-        every { span.event(any()) } returns span
-        every { span.tag(any(), any<String>()) } returns span
-        every { span.context() } returns traceContext
-        every { spanInScope.close() } returns Unit
     }
 
     private fun handleDispatcher(request: RecordedRequest, practOneMaxCount: Int, practTwoMaxCount: Int): MockResponse {

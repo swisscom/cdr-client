@@ -1,6 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -99,7 +99,7 @@ internal class CdrApiClient(
 
                     require(cdrClientConfig.idpCredentials.clientId.id == appRegistration.clientId) {
                         "Client id in credential renewal response does not match local client id; " +
-                                "local: '${cdrClientConfig.idpCredentials.clientId}', received: '${appRegistration.clientId}'"
+                                "local: '${cdrClientConfig.idpCredentials.clientId.id}', received: '${appRegistration.clientId}'"
                     }
 
                     val clientSecret = appRegistration.clientSecret
@@ -136,7 +136,7 @@ internal class CdrApiClient(
                 }
 
                 else -> {
-                    logger.error { "Renewing client secret for client id '${cdrClientConfig.idpCredentials.clientId}' failed: '$t'" }
+                    logger.error { "Renewing client secret for client id '${cdrClientConfig.idpCredentials.clientId.id}' failed: '$t'" }
                     RenewClientSecretResult.RenewError(message = t.message ?: "Unknown error", cause = t)
                 }
             }

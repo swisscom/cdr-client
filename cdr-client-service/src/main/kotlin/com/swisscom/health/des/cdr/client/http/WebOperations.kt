@@ -1,6 +1,6 @@
 package com.swisscom.health.des.cdr.client.http
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.Constants.SHUTDOWN_DELAY
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
@@ -40,8 +40,8 @@ import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_S
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.actuate.health.HealthEndpoint
-import org.springframework.boot.actuate.health.SystemHealth
+import org.springframework.boot.health.actuate.endpoint.CompositeHealthDescriptor
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint
 import org.springframework.http.ResponseEntity
 import org.springframework.retry.RetryContext
 import org.springframework.retry.support.RetryTemplate
@@ -336,12 +336,13 @@ internal class WebOperations(
     @Suppress("CyclomaticComplexMethod")
     @GetMapping("api/status")
     internal suspend fun status(): ResponseEntity<DTOs.StatusResponse> = runCatching {
-        val healthStatus: SystemHealth = healthEndpoint.health() as SystemHealth
+        val healthStatus = healthEndpoint.health()
         logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
 
-        val configStatus: String? = healthStatus.components[CONFIG_INDICATOR_NAME]?.status?.code
-        val syncStatus: String? = healthStatus.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code
-        val authNStatus: String? = healthStatus.components[AUTHN_INDICATOR_NAME]?.status?.code
+        val components = (healthStatus as? CompositeHealthDescriptor)?.components.orEmpty()
+        val configStatus: String? = components[CONFIG_INDICATOR_NAME]?.status?.code
+        val syncStatus: String? = components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code
+        val authNStatus: String? = components[AUTHN_INDICATOR_NAME]?.status?.code
 
         val status =
             if (!configStatus.isNullOrBlank() && configStatus != CONFIG_OK) {

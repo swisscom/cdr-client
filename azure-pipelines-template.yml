@@ -16,24 +16,24 @@ parameters:
 
 steps:
   - task: AzureCLI@2
-    displayName: 'Download JDK 21'
+    displayName: 'Download JDK 25'
     inputs:
       azureSubscription: 'azdo-des-sp-CDR'
       scriptType: 'bash'
       scriptLocation: 'inlineScript'
       inlineScript: |
         az storage blob download \
-        -f $(Agent.BuildDirectory)/microsoft-jdk-21.0.8-linux-x64.tar.gz \
-        --blob-url https://$(storageName)/build-agent-files/microsoft-jdk-21.0.8-linux-x64.tar.gz
+        -f $(Agent.BuildDirectory)/microsoft-jdk-25.0.4.1-linux-x64.tar.gz \
+        --blob-url https://$(storageName)/build-agent-files/microsoft-jdk-25.0.4.1-linux-x64.tar.gz
 
   - task: JavaToolInstaller@0
-    displayName: 'Install JDK 21'
+    displayName: 'Install JDK 25'
     inputs:
-      versionSpec: "21"
+      versionSpec: "25"
       jdkArchitectureOption: x64
       jdkSourceOption: LocalDirectory
-      jdkFile: "$(Agent.BuildDirectory)/microsoft-jdk-21.0.8-linux-x64.tar.gz"
-      jdkDestinationDirectory: "$(agent.toolsDirectory)/jdk21"
+      jdkFile: "$(Agent.BuildDirectory)/microsoft-jdk-25.0.4.1-linux-x64.tar.gz"
+      jdkDestinationDirectory: "$(agent.toolsDirectory)/jdk25"
       cleanDestinationDirectory: true
   - script: |
       which java

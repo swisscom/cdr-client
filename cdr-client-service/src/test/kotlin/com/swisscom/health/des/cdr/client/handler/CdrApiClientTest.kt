@@ -1,6 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING

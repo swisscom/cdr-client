@@ -57,16 +57,10 @@ management:
       access: read_only
     info:
       access: read_only
-  tracing:
-    sampling:
-      # sampling has to be disabled; if enabled we create a memory leak as there is no way to guarantee a sampled span gets closed and releases its resources
-      # when used in asynchronous Kotlin flows/coroutines
-      probability: 0.0
-    enabled: false # we manage our own tracing via the micrometer api
 
 logging:
   pattern:
-    correlation: "%correlationId" # would be added automatically if we had not disabled tracing
+    correlation: "traceId=%X{traceId:-}"
     dateformat: "\"yyyy-MM-dd'T'HH:mm:ss.SSSXXX\", UTC"
   level:
     root: INFO

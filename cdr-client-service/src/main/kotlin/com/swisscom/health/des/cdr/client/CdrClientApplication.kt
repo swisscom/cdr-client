@@ -2,7 +2,6 @@ package com.swisscom.health.des.cdr.client
 
 import com.sun.jna.Platform
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
-import org.springframework.boot.actuate.autoconfigure.scheduling.ScheduledTasksObservabilityAutoConfiguration
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.runApplication
@@ -27,7 +26,7 @@ private const val LOGBACK_CONFIGURATION_FILE_PROPERTY = "logback.configurationFi
 /**
  * Spring Boot entry point
  */
-@SpringBootApplication(exclude = [ScheduledTasksObservabilityAutoConfiguration::class])
+@SpringBootApplication
 @EnableConfigurationProperties(CdrClientConfig::class)
 @EnableScheduling
 internal class CdrClientApplication

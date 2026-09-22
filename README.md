@@ -41,7 +41,7 @@ If you want to run the client service without the UI and without auto updates, y
 
 Pre-Requirements:
 
-* Java 17 (or higher) installed
+* Java 25 (or higher) installed
 
 Go to the [releases](https://github.com/swisscom/cdr-client/releases) GitHub page and click on the maven assets for the newest release:
 ![releases assets overview](./installation/releases-overview.png)

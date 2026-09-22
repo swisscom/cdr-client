@@ -12,7 +12,7 @@ import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
-import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime.Companion.BEGINNING_OF_TIME
+import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import com.swisscom.health.des.cdr.client.config.ProxyConfig
 import com.swisscom.health.des.cdr.client.config.ProxyPassword
 import com.swisscom.health.des.cdr.client.config.ProxyUrl
@@ -324,9 +324,9 @@ internal class FileMonitoringServiceTest {
                 clientId = ClientId("test-client"),
                 clientSecret = ClientSecret("test-secret"),
                 scope = Scope("test-scope"),
-                renewCredential = RenewCredential.DISABLED,
+                renewCredential = RenewCredential(false),
                 maxCredentialAge = Duration.ofDays(365),
-                lastCredentialRenewalTime = BEGINNING_OF_TIME,
+                lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.ofEpochSecond(0L)),
             ),
             idpEndpoint = URI("http://localhost").toURL(),
             localFolder = TempDownloadDir(tempDir),
