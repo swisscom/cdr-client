@@ -30,7 +30,7 @@ internal class PullFileHandling(
      * @param connector the connector to synchronize
      */
     suspend fun pullSyncConnector(connector: Connector) {
-        LogCorrelation.withNewTraceId {
+        LogCorrelation.withNewTraceIdSuspending {
             logger.info { "Sync connector '${connector.connectorId.id}' (${connector.mode}) - pulling" }
             var counter = 0
             runCatching {

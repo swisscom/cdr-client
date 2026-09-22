@@ -106,7 +106,7 @@ internal class RetryUploadFileHandlingTest {
         val sourceFile = tempDir.resolve("document.xml")
         sourceFile.writeText("content")
 
-        val traceId = LogCorrelation.withNewTraceId {
+        val traceId = LogCorrelation.withNewTraceIdSuspending {
             val capturedTraceId = slot<String>()
             every {
                 cdrApiClient.uploadDocument(
