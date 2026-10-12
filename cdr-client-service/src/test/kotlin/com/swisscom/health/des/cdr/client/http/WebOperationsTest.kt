@@ -1,12 +1,9 @@
 package com.swisscom.health.des.cdr.client.http
 
-import tools.jackson.databind.json.JsonMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
-import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
@@ -18,6 +15,7 @@ import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
+import com.swisscom.health.des.cdr.client.config.InstanceId
 import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
 import com.swisscom.health.des.cdr.client.config.ProxyConfig
@@ -28,6 +26,7 @@ import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
@@ -70,11 +69,13 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.util.unit.DataSize
+import tools.jackson.databind.json.JsonMapper
 import java.net.URI
 import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 
 @ExtendWith(MockKExtension::class)
 internal class WebOperationsTest {
@@ -529,6 +530,7 @@ internal class WebOperationsTest {
 
         @JvmStatic
         val DEFAULT_CDR_CONFIG = CdrClientConfig(
+            instanceId = InstanceId.random(),
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
             customer = Customer(
                 mutableListOf(

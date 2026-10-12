@@ -1,8 +1,8 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.LogCorrelation
-import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.Constants.UPLOAD_FILE_EXTENSION
+import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.ConnectorId
@@ -11,24 +11,24 @@ import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentRes
 import com.swisscom.health.des.cdr.client.xml.CommunicationType
 import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
 import io.mockk.every
+import io.mockk.impl.annotations.MockK
 import io.mockk.junit5.MockKExtension
 import io.mockk.junit5.MockKExtension.CheckUnnecessaryStub
-import io.mockk.impl.annotations.MockK
 import io.mockk.slot
 import io.mockk.verify
-import org.junit.jupiter.api.BeforeEach
+import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import java.time.Duration
 import kotlin.io.path.writeText
-import kotlinx.coroutines.runBlocking
 
 @ExtendWith(MockKExtension::class)
 @CheckUnnecessaryStub

@@ -582,7 +582,7 @@ internal class PollingPushFileHandlingTest {
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.I_AM_A_TEAPOT.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.UNAVAILABLE_FOR_LEGAL_REASONS.value()).body("{\"message\": \"Exception\"}").build())
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
 

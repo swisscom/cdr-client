@@ -1,12 +1,12 @@
 package com.swisscom.health.des.cdr.client
 
-import tools.jackson.databind.json.JsonMapper
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.Host
+import com.swisscom.health.des.cdr.client.config.InstanceId
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient
@@ -42,6 +42,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.retry.RetryCallback
 import org.springframework.retry.support.RetryTemplate
+import tools.jackson.databind.json.JsonMapper
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.UUID
@@ -112,6 +113,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         connector2.sourceFolder.createDirectories()
         localDir.createDirectories()
 
+        every { config.instanceId } returns InstanceId.random()
         every { config.customer } returns Customer(mutableListOf(connector1, connector2))
         every { config.cdrApi } returns endpoint
         every { config.localFolder } returns TempDownloadDir(localDir)

@@ -6,12 +6,15 @@ import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig.RetryTemplateConfig
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.util.unit.DataSize
 import java.nio.file.Path
 import kotlin.io.path.absolutePathString
 import kotlin.reflect.KClass
 import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector as ConnectorDto
+
+private val logger = KotlinLogging.logger {}
 
 /*
  * BEGIN - Spring Configuration -> Configuration DTOs
@@ -22,6 +25,7 @@ internal fun CdrClientConfig.toDto(): CdrClientConfigDto {
         CdrClientConfigDto.FileBusyTestStrategy.entries.first { it.name == strategy.name }
 
     return CdrClientConfigDto(
+        instanceId = instanceId.id.toString(),
         fileSynchronizationEnabled = fileSynchronizationEnabled.value,
         customer = customer.toDto(),
         cdrApi = cdrApi.toDto(),
@@ -122,6 +126,10 @@ internal fun CdrClientConfigDto.toCdrClientConfig(): CdrClientConfig {
     fun CdrClientConfigDto.FileBusyTestStrategy.toCdrClientConfig(): FileBusyTestStrategyProperty = FileBusyTestStrategyProperty.valueOf(name)
 
     return CdrClientConfig(
+        instanceId = InstanceId.fromString(instanceId).getOrElse { t ->
+            InstanceId.random()
+                .also { logger.info { "converting remote instance id value '$instanceId' failed: '${t.message}'; generated new value: '${it.id}'" } }
+        },
         fileSynchronizationEnabled = if (fileSynchronizationEnabled) FileSynchronization.ENABLED else FileSynchronization.DISABLED,
         customer = Customer(customer.toCdrClientConfig()),
         cdrApi = cdrApi.toCdrClientConfig(CdrApi::class),

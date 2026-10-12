@@ -190,7 +190,10 @@ tasks.named<BootJar>("bootJar") {
 // and https://stackoverflow.com/questions/40096007/how-to-configure-the-processresources-task-in-a-gradle-kotlin-build
 tasks.processResources {
     filesMatching("**/application.yaml") {
-        expand(project.properties)
+        expand(
+            "projectVersion" to project.version,
+            "projectName" to rootProject.name,
+        )
     }
 }
 

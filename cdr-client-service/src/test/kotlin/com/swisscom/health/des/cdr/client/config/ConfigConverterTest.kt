@@ -15,7 +15,10 @@ import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClie
 
 class ConfigConverterTest {
 
+    private val instanceId = InstanceId.random()
+
     private val configAllRelativePaths: CdrClientConfig = CdrClientConfig(
+        instanceId = instanceId,
         fileSynchronizationEnabled = FileSynchronization.ENABLED,
         customer = Customer(
             mutableListOf(
@@ -85,6 +88,7 @@ class ConfigConverterTest {
     )
 
     private val sameConfigButAbsolutePaths: CdrClientConfig = CdrClientConfig(
+        instanceId = instanceId,
         fileSynchronizationEnabled = FileSynchronization.ENABLED,
         customer = Customer(
             mutableListOf(

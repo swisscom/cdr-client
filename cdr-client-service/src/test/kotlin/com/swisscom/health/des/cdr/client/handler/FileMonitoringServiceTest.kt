@@ -12,6 +12,7 @@ import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
+import com.swisscom.health.des.cdr.client.config.InstanceId
 import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import com.swisscom.health.des.cdr.client.config.ProxyConfig
 import com.swisscom.health.des.cdr.client.config.ProxyPassword
@@ -310,6 +311,7 @@ internal class FileMonitoringServiceTest {
 
     private fun createConfigWith(vararg connectors: Connector): CdrClientConfig =
         CdrClientConfig(
+            instanceId = InstanceId.random(),
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
             customer = Customer(connectors.toMutableList()),
             cdrApi = CdrApi(

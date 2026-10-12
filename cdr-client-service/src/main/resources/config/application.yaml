@@ -70,3 +70,8 @@ logging:
   logback:
     rollingpolicy:
       max-file-size: 100MB
+
+info:
+  service:
+    name: ${projectName}
+    version: ${projectVersion}

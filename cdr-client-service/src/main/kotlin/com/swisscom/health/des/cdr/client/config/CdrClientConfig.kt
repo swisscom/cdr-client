@@ -15,6 +15,7 @@ import java.nio.file.Paths
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.UUID
 
 private val logger = KotlinLogging.logger {}
 
@@ -28,6 +29,9 @@ internal interface PropertyNameAware {
  */
 @ConfigurationProperties("client")
 internal data class CdrClientConfig(
+    /** Unique identifier of the client instance. Randomly generated. */
+    val instanceId: InstanceId,
+
     /** Whether file synchronization is enabled. If set to `false`, the client will not download or upload files. */
     val fileSynchronizationEnabled: FileSynchronization,
 
@@ -229,7 +233,7 @@ internal data class Connector(
                 "sourceFolders=${invert(effectiveSourceFolders)}, targetFolders=${invert(effectiveTargetFolders)}, " +
                 "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
                 "baseSourceArchiveFolder=${baseSourceArchiveFolder}, archiveFolders=${invert(effectiveArchiveFolders)}, " +
-                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${baseSourceErrorFolder}, errorFolders=${ invert(effectiveErrorFolders)}, " +
+                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${baseSourceErrorFolder}, errorFolders=${invert(effectiveErrorFolders)}, " +
                 "mode=$mode)"
     }
 
@@ -410,6 +414,20 @@ internal data class Customer(
 }
 
 @JvmInline
+internal value class InstanceId(val id: UUID) : PropertyNameAware {
+    override val propertyName: String
+        get() = PROPERTY_NAME
+
+    companion object {
+        private const val PROPERTY_NAME = "instance-id"
+
+        internal fun random(): InstanceId = InstanceId(UUID.randomUUID())
+
+        internal fun fromString(uuid: String): Result<InstanceId> = runCatching { InstanceId(UUID.fromString(uuid)) }
+    }
+}
+
+@JvmInline
 internal value class Scope(val scope: String) : PropertyNameAware {
     override val propertyName: String
         get() = PROPERTY_NAME
@@ -533,12 +551,6 @@ internal value class RenewCredential(val value: Boolean) : PropertyNameAware {
         get() = PROPERTY_NAME
 
     companion object {
-        @JvmStatic
-        val ENABLED = RenewCredential(true)
-
-        @JvmStatic
-        val DISABLED = RenewCredential(false)
-
         private const val PROPERTY_NAME = "renew-credential"
     }
 }
@@ -595,9 +607,6 @@ internal value class LastCredentialRenewalTime(val instant: Instant) : PropertyN
 
     companion object {
         private const val PROPERTY_NAME = "last-credential-renewal-time"
-
-        @JvmStatic
-        val BEGINNING_OF_TIME: LastCredentialRenewalTime = LastCredentialRenewalTime(Instant.ofEpochSecond(0L))
     }
 }
 

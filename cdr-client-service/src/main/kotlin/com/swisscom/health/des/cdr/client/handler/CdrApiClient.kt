@@ -371,6 +371,7 @@ internal class CdrApiClient(
             this[CLIENT_TYPE_HEADER] = clientType ?: "cdr-client"
             this[CLIENT_VERSION_HEADER] = clientVersion ?: "unknown"
             this[CLIENT_OS_HEADER] = osInformation
+            this[CLIENT_INSTANCE_ID_HEADER] = cdrClientConfig.instanceId.id.toString()
             this.build()
         }
     }
@@ -422,6 +423,7 @@ internal class CdrApiClient(
         const val CLIENT_TYPE_HEADER = "SWISSCOM-CLIENT-TYPE"
         const val CLIENT_VERSION_HEADER = "SWISSCOM-CLIENT-VERSION"
         const val CLIENT_OS_HEADER = "SWISSCOM-CLIENT-OS"
+        const val CLIENT_INSTANCE_ID_HEADER = "SWISSCOM-CLIENT-INSTANCE-ID"
         const val PULL_RESULT_ID_HEADER = "cdr-document-uuid"
         const val PULL_RESULT_FILE_PREFIX_HEADER = "cdr-document-prefix"
         const val TEMP_FILE_EXTENSION = "tmp"

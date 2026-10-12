@@ -1,6 +1,5 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import tools.jackson.dataformat.yaml.YAMLMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
@@ -17,6 +16,7 @@ import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
+import com.swisscom.health.des.cdr.client.config.InstanceId
 import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import com.swisscom.health.des.cdr.client.config.ProxyConfig
 import com.swisscom.health.des.cdr.client.config.ProxyPassword
@@ -48,6 +48,7 @@ import org.springframework.core.env.MutablePropertySources
 import org.springframework.core.io.FileSystemResource
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
+import tools.jackson.dataformat.yaml.YAMLMapper
 import java.net.URI
 import java.nio.file.Path
 import java.time.Duration
@@ -77,6 +78,7 @@ class ConfigurationWriterTest {
     @BeforeEach
     fun setup() {
         config = CdrClientConfig(
+            instanceId = InstanceId.random(),
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
             customer = Customer(
                 mutableListOf(
@@ -170,6 +172,7 @@ class ConfigurationWriterTest {
         val propOrigin = mockk<TextResourceOrigin>()
         every { propOrigin.resource } returns FileSystemResource(tempConfigDir) // directory -> fails `isWritable` check that requires resource to be a file
         val propSource = mockk<OriginTrackedMapPropertySource>()
+        every { propSource.getOrigin("client.instance-id") } returns propOrigin
         every { propSource.getOrigin("client.file-synchronization-enabled") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.renew-credential") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns propOrigin
@@ -202,6 +205,7 @@ class ConfigurationWriterTest {
         val fileSystemResource = FileSystemResource(configFile)
         every { propOrigin.resource } returns fileSystemResource
         val propSource = mockk<OriginTrackedMapPropertySource>()
+        every { propSource.getOrigin("client.instance-id") } returns propOrigin
         every { propSource.getOrigin("client.file-synchronization-enabled") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.renew-credential") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns propOrigin
@@ -237,6 +241,7 @@ class ConfigurationWriterTest {
         val fileSystemResource = FileSystemResource(configFile)
         every { propOrigin.resource } returns fileSystemResource
         val propSource = mockk<OriginTrackedMapPropertySource>()
+        every { propSource.getOrigin("client.instance-id") } returns propOrigin
         every { propSource.getOrigin("client.file-synchronization-enabled") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.renew-credential") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns propOrigin
@@ -285,6 +290,7 @@ class ConfigurationWriterTest {
         every { propOrigin2.resource } returns fileSystemResource
         val propSource1 = mockk<OriginTrackedMapPropertySource>()
         val propSource2 = mockk<OriginTrackedMapPropertySource>()
+        every { propSource1.getOrigin("client.instance-id") } returns propOrigin1
         every { propSource1.getOrigin("client.local-folder") } returns propOrigin1
         every { propSource1.getOrigin("client.proxy-config.username") } returns propOrigin1
         every { propSource1.getOrigin("client.proxy-config.url") } returns propOrigin1
@@ -301,6 +307,7 @@ class ConfigurationWriterTest {
         every { propSource1.getOrigin("client.credential-api.host") } returns propOrigin1
         every { propSource1.getOrigin("client.cdr-api.host") } returns propOrigin1
 
+        every { propSource2.getOrigin("client.instance-id") } returns null
         every { propSource2.getOrigin("client.local-folder") } returns null
         every { propSource2.getOrigin("client.proxy-config.username") } returns null
         every { propSource2.getOrigin("client.proxy-config.url") } returns null
@@ -340,6 +347,7 @@ class ConfigurationWriterTest {
         val fileSystemResourceNotWritable = FileSystemResource(tempConfigDir)
         every { propOriginNotWritable.resource } returns fileSystemResourceNotWritable
         val propSource = mockk<OriginTrackedMapPropertySource>()
+        every { propSource.getOrigin("client.instance-id") } returns null
         every { propSource.getOrigin("client.file-synchronization-enabled") } returns propOriginWritable // writable
         every { propSource.getOrigin("client.idp-credentials.renew-credential") } returns propOriginNotWritable // not writable
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns null // not writable
@@ -431,6 +439,7 @@ class ConfigurationWriterTest {
         val fileSystemResource = FileSystemResource(configFile)
         every { propOrigin.resource } returns fileSystemResource
         val propSource = mockk<OriginTrackedMapPropertySource>()
+        every { propSource.getOrigin("client.instance-id") } returns propOrigin
         every { propSource.getOrigin("client.file-synchronization-enabled") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.renew-credential") } returns propOrigin
         every { propSource.getOrigin("client.idp-credentials.client-secret") } returns propOrigin

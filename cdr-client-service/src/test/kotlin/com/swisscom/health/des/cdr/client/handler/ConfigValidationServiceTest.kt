@@ -5,7 +5,6 @@ package com.swisscom.health.des.cdr.client.handler
 import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ApiEndpoint
@@ -21,6 +20,7 @@ import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
+import com.swisscom.health.des.cdr.client.config.InstanceId
 import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import com.swisscom.health.des.cdr.client.config.ProxyConfig
 import com.swisscom.health.des.cdr.client.config.ProxyPassword
@@ -57,6 +57,7 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.deleteRecursively
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 
 @ExtendWith(MockKExtension::class)
 internal class ConfigValidationServiceTest {
@@ -824,6 +825,7 @@ internal class ConfigValidationServiceTest {
 
     private fun createCdrClientConfig(customers: List<Connector>, defaultLocalFolder: Path = localFolder0): CdrClientConfig =
         CdrClientConfig(
+            instanceId = InstanceId.random(),
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
             scheduleDelay = Duration.ofSeconds(1),
             localFolder = TempDownloadDir(defaultLocalFolder),

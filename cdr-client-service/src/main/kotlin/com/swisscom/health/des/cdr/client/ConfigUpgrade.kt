@@ -28,7 +28,8 @@ object ConfigUpgrade {
     @JvmStatic
     private val UPGRADE_STEPS: List<ConfigUpgradeStep> = listOf(
         ConfigUpgradeStep.V10ToV11,
-        ConfigUpgradeStep.V11ToV12
+        ConfigUpgradeStep.V11ToV12,
+        ConfigUpgradeStep.V12ToV13,
     )
 
     @JvmStatic

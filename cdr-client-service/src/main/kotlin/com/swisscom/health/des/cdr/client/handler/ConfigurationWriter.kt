@@ -31,6 +31,7 @@ import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
+import java.util.UUID
 import kotlin.reflect.full.memberProperties
 
 private val logger = KotlinLogging.logger {}
@@ -237,7 +238,7 @@ internal class ConfigurationWriter(
                         logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue.name}' as type '${newValue::class}'" }
                     }
 
-                    is Duration, is DataSize, is Instant, is URL, is Path, is MediaType -> {
+                    is Duration, is DataSize, is Instant, is URL, is Path, is MediaType, is UUID -> {
                         // handle Duration, DataSize, Instant, URL, etc., anything that SpringBoot's unmarshalling magic creates
                         // from what was originally a string
                         newValue.toString().let { stringValue ->
