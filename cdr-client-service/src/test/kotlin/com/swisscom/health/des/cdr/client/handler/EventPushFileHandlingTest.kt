@@ -1,7 +1,7 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.mayakapps.kache.ObjectKache
-import com.ninjasquad.springmockk.SpykBean
+import com.ninjasquad.springmockk.MockkSpyBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
@@ -78,13 +78,13 @@ import kotlin.io.path.walk
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 internal class EventPushFileHandlingTest {
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var config: CdrClientConfig
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var authNService: OAuth2AuthNService
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var schedulingValidationService: SchedulingValidationService
 
     @Autowired
@@ -157,7 +157,7 @@ internal class EventPushFileHandlingTest {
 
         // The test is racing the code under test. We need to make sure that the event watcher task
         // is not yet started to be sure that when it starts, it picks up the configuration we injected
-        // above in the @SpykBean.
+        // above in the @MockkSpyBean.
         if (isFirstTest.compareAndSet(true, false)) {
             val eventWatcher = scheduledTaskHolder.scheduledTasks.filter { it.task.toString().endsWith("launchFileWatcher") }
             assertEquals(1, eventWatcher.size)

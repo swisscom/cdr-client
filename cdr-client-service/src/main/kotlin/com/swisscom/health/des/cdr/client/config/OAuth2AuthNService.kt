@@ -33,6 +33,7 @@ import java.time.Duration
 import java.time.Instant
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 
 private val logger = KotlinLogging.logger {}
 
@@ -202,7 +203,7 @@ internal class OAuth2AuthNService(
         } catch (e: CancellationException) {
             logger.info { "Auth manager actor cancelled" }
             throw e
-        } catch (@Suppress("SwallowedException") e: ClosedReceiveChannelException) {
+        } catch (@Suppress("SwallowedException") _: ClosedReceiveChannelException) {
             logger.info { "Auth manager actor stopped: command channel closed" }
         }
     }
@@ -246,7 +247,7 @@ internal class OAuth2AuthNService(
     }
 
     /** @return `true` if acquisition should proceed, `false` to skip this iteration. */
-    private suspend fun prepareForcedReauth(trigger: String, actor: ActorState): Boolean =
+    private fun prepareForcedReauth(trigger: String, actor: ActorState): Boolean =
         when (applyForcedReauth(trigger, actor.forced)) {
             ForceDecision.PROCEED -> {
                 actor.loopState = AuthLoopState()
@@ -273,7 +274,7 @@ internal class OAuth2AuthNService(
         return exceeded
     }
 
-    private suspend fun acquireAndSchedule(actor: ActorState, idpCredentials: IdpCredentials, idpEndpoint: URL) {
+    private fun acquireAndSchedule(actor: ActorState, idpCredentials: IdpCredentials, idpEndpoint: URL) {
         logger.debug { "Attempting token acquisition (attempt=${actor.loopState.retryableAttempt})" }
         val tokenResponse = tokenClient.getNewAccessToken(idpCredentials, idpEndpoint)
         val step = evaluateAcquisition(tokenResponse, actor.loopState, actor.failureWindowStart)
@@ -286,7 +287,7 @@ internal class OAuth2AuthNService(
         when {
             nextDelay == null -> commands.receive()
             nextDelay <= Duration.ZERO -> commands.tryReceive().getOrNull()
-            else -> withTimeoutOrNull(nextDelay.toMillis()) { commands.receive() }
+            else -> withTimeoutOrNull(nextDelay.toMillis().milliseconds) { commands.receive() }
         }
 
     /** One acquisition outcome mapped to the next schedule. Pure w.r.t. actor-local vars. */
@@ -296,7 +297,7 @@ internal class OAuth2AuthNService(
         val failureWindowStart: Instant?,
     )
 
-    private suspend fun evaluateAcquisition(
+    private fun evaluateAcquisition(
         tokenResponse: AuthNResponse,
         loopState: AuthLoopState,
         failureWindowStart: Instant?,
@@ -311,7 +312,7 @@ internal class OAuth2AuthNService(
                 terminal(AuthNResponse.Failed(IllegalStateException("Unexpected response type in auth loop: $tokenResponse")))
         }
 
-    private suspend fun onSuccess(tokenResponse: AuthNResponse.Success): Step {
+    private fun onSuccess(tokenResponse: AuthNResponse.Success): Step {
         updateTokenState(tokenResponse)
         val nextDelay = authTiming.delayUntilRefresh(tokenResponse)
         logger.info { "Token acquired successfully; next refresh in $nextDelay" }
@@ -322,7 +323,7 @@ internal class OAuth2AuthNService(
         )
     }
 
-    private suspend fun onDeny(loopState: AuthLoopState, failureWindowStart: Instant?): Step {
+    private fun onDeny(loopState: AuthLoopState, failureWindowStart: Instant?): Step {
         val nextDenyAttempt = (loopState.denyRetryAttempt ?: 0) + 1
         val delay = retryPolicy.nextDenyRetryDelay(
             currentAttempt = nextDenyAttempt,
@@ -345,7 +346,7 @@ internal class OAuth2AuthNService(
         }
     }
 
-    private suspend fun onRetryableFailure(loopState: AuthLoopState, failureWindowStart: Instant?): Step {
+    private fun onRetryableFailure(loopState: AuthLoopState, failureWindowStart: Instant?): Step {
         val delay = retryPolicy.nextTransientRetryDelay(
             currentAttempt = loopState.retryableAttempt,
             initialDelay = config.authRetry.initialDelay,
@@ -368,7 +369,7 @@ internal class OAuth2AuthNService(
         }
     }
 
-    private suspend fun terminal(tokenResponse: AuthNResponse): Step {
+    private fun terminal(tokenResponse: AuthNResponse): Step {
         updateTokenState(tokenResponse)
         return Step(AuthLoopState(), nextDelay = null, failureWindowStart = null)
     }
@@ -455,9 +456,9 @@ internal class OAuth2AuthNService(
     // ---------------------------------------------------------------------------------------------
 
     private fun handleActorCompletion(cause: Throwable?) {
-        when {
-            cause == null -> logger.debug { "Auth manager actor completed normally" }
-            cause is CancellationException -> logger.info { "Auth manager actor was cancelled" }
+        when (cause) {
+            null -> logger.debug { "Auth manager actor completed normally" }
+            is CancellationException -> logger.info { "Auth manager actor was cancelled" }
             else -> {
                 logger.error(cause) { "Auth manager actor terminated with error" }
                 _state.value = _state.value.copy(response = AuthNResponse.NotAuthenticated)

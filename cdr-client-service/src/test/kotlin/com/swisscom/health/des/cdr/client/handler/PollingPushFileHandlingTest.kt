@@ -4,7 +4,7 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.mayakapps.kache.ObjectKache
-import com.ninjasquad.springmockk.SpykBean
+import com.ninjasquad.springmockk.MockkSpyBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.LogCorrelation
 import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
@@ -99,10 +99,10 @@ internal class PollingPushFileHandlingTest {
     private val docMetaNotification = DocumentMetaData(DocumentType.NOTIFICATION, CommunicationType.UNKNOWN)
     private val docMetaInvoice = DocumentMetaData(DocumentType.INVOICE, CommunicationType.UNKNOWN)
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var config: CdrClientConfig
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var authNService: OAuth2AuthNService
 
     @Autowired

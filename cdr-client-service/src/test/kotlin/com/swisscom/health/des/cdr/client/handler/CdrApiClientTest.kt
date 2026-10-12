@@ -1,7 +1,7 @@
 package com.swisscom.health.des.cdr.client.handler
 
+import com.ninjasquad.springmockk.MockkSpyBean
 import tools.jackson.databind.ObjectMapper
-import com.ninjasquad.springmockk.SpykBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.CdrApi
@@ -64,7 +64,7 @@ import kotlin.io.path.writeText
 @Tag("integration-test")
 internal class CdrApiClientTest {
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var config: CdrClientConfig
 
     @Autowired
