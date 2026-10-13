@@ -101,7 +101,7 @@ internal class WebOperationsTest {
     @MockK
     private lateinit var authNService: OAuth2AuthNService
 
-    private val objectMapper = JsonMapper.builder().findAndAddModules().build()
+    private val jsonMapper = JsonMapper.builder().findAndAddModules().build()
 
     private lateinit var webOperations: WebOperations
 
@@ -121,7 +121,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = retryIOExceptionsAndServerErrors,
@@ -310,7 +310,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -350,7 +350,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -385,7 +385,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -418,7 +418,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -451,7 +451,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -495,7 +495,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = configWithOriginalEndpoint,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,

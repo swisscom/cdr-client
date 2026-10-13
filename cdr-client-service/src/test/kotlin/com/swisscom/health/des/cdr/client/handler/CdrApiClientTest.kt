@@ -1,7 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.ninjasquad.springmockk.MockkSpyBean
-import tools.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.CdrApi
@@ -39,6 +38,7 @@ import org.springframework.http.ProblemDetail
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
+import tools.jackson.databind.json.JsonMapper
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
@@ -71,7 +71,7 @@ internal class CdrApiClientTest {
     private lateinit var cdrApiClient: CdrApiClient
 
     @Autowired
-    private lateinit var objectMapper: ObjectMapper
+    private lateinit var jsonMapper: JsonMapper
 
     @TempDir
     private lateinit var sourceDir: Path
@@ -220,7 +220,7 @@ internal class CdrApiClientTest {
 
     @Test
     fun `test document upload - status 409`() {
-        val problemJsonStr = objectMapper.writeValueAsString(
+        val problemJsonStr = jsonMapper.writeValueAsString(
             ProblemDetail.forStatus(HttpStatus.CONFLICT.value())
                 .run {
                     title = HttpStatus.CONFLICT.reasonPhrase

@@ -1,6 +1,5 @@
 package com.swisscom.health.des.cdr.client.http
 
-import tools.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.Constants.SHUTDOWN_DELAY
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
@@ -50,6 +49,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import tools.jackson.databind.json.JsonMapper
 import java.net.URI
 import java.time.Instant
 
@@ -63,7 +63,7 @@ private val logger = KotlinLogging.logger {}
 @Suppress("LongParameterList")
 internal class WebOperations(
     private val healthEndpoint: HealthEndpoint,
-    private val objectMapper: ObjectMapper,
+    private val jsonMapper: JsonMapper,
     private val shutdownService: ShutdownService,
     private val configWriter: ConfigurationWriter,
     private val config: CdrClientConfig,
@@ -337,7 +337,7 @@ internal class WebOperations(
     @GetMapping("api/status")
     internal suspend fun status(): ResponseEntity<DTOs.StatusResponse> = runCatching {
         val healthStatus = healthEndpoint.health()
-        logger.debug { "Health endpoint response: '${objectMapper.writeValueAsString(healthStatus)}'" }
+        logger.debug { "Health endpoint response: '${jsonMapper.writeValueAsString(healthStatus)}'" }
 
         val components = (healthStatus as? CompositeHealthDescriptor)?.components.orEmpty()
         val configStatus: String? = components[CONFIG_INDICATOR_NAME]?.status?.code

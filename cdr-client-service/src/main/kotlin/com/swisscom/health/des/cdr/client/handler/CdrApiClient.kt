@@ -1,6 +1,5 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import tools.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -23,6 +22,7 @@ import org.springframework.stereotype.Service
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
 import org.springframework.web.util.UriComponentsBuilder
+import tools.jackson.databind.json.JsonMapper
 import java.net.URL
 import java.nio.file.Path
 import kotlin.io.path.outputStream
@@ -37,7 +37,7 @@ internal class CdrApiClient(
     private val httpClient: OkHttpClient,
     @param:Qualifier("retryIoAndServerErrors")
     private val retryIOExceptionsAndServerErrors: RetryTemplate,
-    private val objectMapper: ObjectMapper,
+    private val jsonMapper: JsonMapper,
     private val osInformation: String,
 ) {
 
@@ -91,7 +91,7 @@ internal class CdrApiClient(
                         }
                     }
 
-                    val appRegistration = objectMapper.readValue(response.body.byteStream(), CdrClientAppRegistrationDto::class.java)
+                    val appRegistration = jsonMapper.readValue(response.body.byteStream(), CdrClientAppRegistrationDto::class.java)
 
                     appRegistration.warnings.forEach { warning ->
                         logger.warn { "Client secret renewal server-side warning: '$warning'" }
