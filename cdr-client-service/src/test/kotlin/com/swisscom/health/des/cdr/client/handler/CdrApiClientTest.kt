@@ -7,7 +7,6 @@ import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.CredentialApi
 import com.swisscom.health.des.cdr.client.config.Host
-import com.swisscom.health.des.cdr.client.config.InstanceId
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.AZURE_TRACE_ID_HEADER
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CDR_PROCESSING_MODE_HEADER
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CLIENT_INSTANCE_ID_HEADER
@@ -30,6 +29,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -41,6 +41,7 @@ import org.springframework.test.context.ActiveProfiles
 import tools.jackson.databind.json.JsonMapper
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.exists
 import kotlin.io.path.readText
@@ -71,6 +72,10 @@ internal class CdrApiClientTest {
     private lateinit var cdrApiClient: CdrApiClient
 
     @Autowired
+    @Qualifier("cdrClientInstanceId")
+    private lateinit var cdrClientInstanceId: UUID
+
+    @Autowired
     private lateinit var jsonMapper: JsonMapper
 
     @TempDir
@@ -81,8 +86,6 @@ internal class CdrApiClientTest {
 
     @BeforeEach
     fun setup() {
-        every { config.instanceId } returns TEST_INSTANCE_ID
-
         every { config.credentialApi } returns CredentialApi(
             scheme = "http",
             host = Host(apiServerMock.hostName),
@@ -211,7 +214,7 @@ internal class CdrApiClientTest {
         assertEquals("test-connector-id", request.headers[CONNECTOR_ID_HEADER])
         assertEquals(CdrClientConfig.Mode.TEST.value, request.headers[CDR_PROCESSING_MODE_HEADER])
         assertEquals(DEFAULT_TRACE_ID, request.headers[AZURE_TRACE_ID_HEADER])
-        assertEquals(TEST_INSTANCE_ID.id.toString(), request.headers[CLIENT_INSTANCE_ID_HEADER])
+        assertEquals(cdrClientInstanceId.toString(), request.headers[CLIENT_INSTANCE_ID_HEADER])
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).startsWith("Bearer "))
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).removePrefix("Bearer ").isNotBlank())
 
@@ -284,7 +287,7 @@ internal class CdrApiClientTest {
         assertEquals("some-other-connector-id", request.headers[CONNECTOR_ID_HEADER])
         assertEquals(CdrClientConfig.Mode.PRODUCTION.value, request.headers[CDR_PROCESSING_MODE_HEADER])
         assertEquals(DEFAULT_TRACE_ID, request.headers[AZURE_TRACE_ID_HEADER])
-        assertEquals(TEST_INSTANCE_ID.id.toString(), request.headers[CLIENT_INSTANCE_ID_HEADER])
+        assertEquals(cdrClientInstanceId.toString(), request.headers[CLIENT_INSTANCE_ID_HEADER])
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).startsWith("Bearer "))
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).removePrefix("Bearer ").isNotBlank())
 
@@ -337,7 +340,7 @@ internal class CdrApiClientTest {
         assertEquals("some-other-connector-id", request.headers[CONNECTOR_ID_HEADER])
         assertEquals(CdrClientConfig.Mode.PRODUCTION.value, request.headers[CDR_PROCESSING_MODE_HEADER])
         assertEquals(DEFAULT_TRACE_ID, request.headers[AZURE_TRACE_ID_HEADER])
-        assertEquals(TEST_INSTANCE_ID.id.toString(), request.headers[CLIENT_INSTANCE_ID_HEADER])
+        assertEquals(cdrClientInstanceId.toString(), request.headers[CLIENT_INSTANCE_ID_HEADER])
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).startsWith("Bearer "))
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).removePrefix("Bearer ").isNotBlank())
 
@@ -346,7 +349,6 @@ internal class CdrApiClientTest {
 
     private companion object {
         private const val DEFAULT_TRACE_ID = "fake_trace_id"
-        private val TEST_INSTANCE_ID = InstanceId.random()
         private const val TEST_CLIENT_ID = "easy-system-test-user-id"
         private const val RENEWED_SECRET = "Placeholder_eWN8Q~MkHkK4vI.97tH2S65AQcP4qBsg2KzBcbSy"
         private const val RENEW_SECRET_RESPONSE = """

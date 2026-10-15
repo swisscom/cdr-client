@@ -1,18 +1,16 @@
 package com.swisscom.health.des.cdr.client
 
-import tools.jackson.dataformat.yaml.YAMLFactory
-import tools.jackson.dataformat.yaml.YAMLMapper
-import tools.jackson.dataformat.yaml.YAMLWriteFeature
-import tools.jackson.module.kotlin.kotlinModule
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.io.TempDir
+import tools.jackson.dataformat.yaml.YAMLFactory
+import tools.jackson.dataformat.yaml.YAMLMapper
+import tools.jackson.dataformat.yaml.YAMLWriteFeature
+import tools.jackson.module.kotlin.kotlinModule
 import java.nio.file.Path
-import java.util.UUID
 import kotlin.io.path.copyTo
 import kotlin.io.path.inputStream
 import kotlin.io.path.name
@@ -39,7 +37,6 @@ class ConfigUpgradeTest {
             "config_versions/application-customer-1.0.yaml",
             "config_versions/application-customer-1.1.yaml",
             "config_versions/application-customer-1.2.yaml",
-            "config_versions/application-customer-1.3.yaml",
             "config_versions/application-customer-1.1_invalid.yaml"
         ).forEach { resourcePath: String ->
             Path.of(this.javaClass.classLoader.getResource(resourcePath)!!.path)
@@ -50,64 +47,45 @@ class ConfigUpgradeTest {
     }
 
     @Test
-    fun `migrate 1_0 to 1_3`() {
+    fun `migrate 1_0 to 1_2`() {
         val configFile = tempDir.resolve("application-customer-1.0.yaml")
         ConfigUpgrade.applyPendingUpgradeSteps(configLocation = configFile)
             .also { upgradeResult: UpgradeResult ->
                 assertInstanceOf<UpgradeResult.Success>(upgradeResult)
-                assertEquals("1.3", upgradeResult.version.value)
+                assertEquals("1.2", upgradeResult.version.value)
                 val afterMigration = yamlMapper.readTree(configFile.inputStream())
-                assertEquals("1.3", afterMigration.get("version").asString())
+                assertEquals("1.2", afterMigration.get("version").asString())
                 assertTrue(afterMigration.at("/client/proxy-url").isMissingNode)
                 assertEquals("", afterMigration.at("/client/proxy-config/url").asString())
                 assertEquals("", afterMigration.at("/client/proxy-config/username").asString())
                 assertEquals("", afterMigration.at("/client/proxy-config/password").asString())
-                assertDoesNotThrow { UUID.fromString(afterMigration.at("/client/instance-id").asString()) }
             }
     }
 
     @Test
-    fun `migrate 1_1 to 1_3`() {
+    fun `migrate 1_1 to 1_2`() {
         val configFile = tempDir.resolve("application-customer-1.1.yaml")
         ConfigUpgrade.applyPendingUpgradeSteps(configLocation = configFile)
             .also { upgradeResult: UpgradeResult ->
                 assertInstanceOf<UpgradeResult.Success>(upgradeResult)
-                assertEquals("1.3", upgradeResult.version.value)
+                assertEquals("1.2", upgradeResult.version.value)
                 val afterMigration = yamlMapper.readTree(configFile.inputStream())
-                assertEquals("1.3", afterMigration.get("version").asString())
+                assertEquals("1.2", afterMigration.get("version").asString())
                 assertTrue(afterMigration.at("/client/proxy-url").isMissingNode)
                 assertEquals("https://proxy.internal:8080", afterMigration.at("/client/proxy-config/url").asString())
                 assertEquals("", afterMigration.at("/client/proxy-config/username").asString())
                 assertEquals("", afterMigration.at("/client/proxy-config/password").asString())
-                assertDoesNotThrow { UUID.fromString(afterMigration.at("/client/instance-id").asString()) }
             }
     }
 
     @Test
-    fun `migrate 1_2 to 1_3`() {
+    fun `migrate 1_2 to 1_2`() {
         val configFile = tempDir.resolve("application-customer-1.2.yaml")
-        ConfigUpgrade.applyPendingUpgradeSteps(configLocation = configFile)
-            .also { upgradeResult: UpgradeResult ->
-                assertInstanceOf<UpgradeResult.Success>(upgradeResult)
-                assertEquals("1.3", upgradeResult.version.value)
-                val afterMigration = yamlMapper.readTree(configFile.inputStream())
-                assertEquals("1.3", afterMigration.get("version").asString())
-                assertTrue(afterMigration.at("/client/proxy-url").isMissingNode)
-                assertEquals("https://proxy.internal:8080", afterMigration.at("/client/proxy-config/url").asString())
-                assertEquals("", afterMigration.at("/client/proxy-config/username").asString())
-                assertEquals("", afterMigration.at("/client/proxy-config/password").asString())
-                assertDoesNotThrow { UUID.fromString(afterMigration.at("/client/instance-id").asString()) }
-            }
-    }
-
-    @Test
-    fun `migrate 1_3 to 1_3`() {
-        val configFile = tempDir.resolve("application-customer-1.3.yaml")
         ConfigUpgrade.applyPendingUpgradeSteps(configLocation = configFile)
             .also { upgradeResult: UpgradeResult ->
                 assertInstanceOf<UpgradeResult.AlreadyAtLatestVersion>(upgradeResult)
                 val beforeMigration =
-                    yamlMapper.readTree(this.javaClass.classLoader.getResource("config_versions/application-customer-1.3.yaml")!!.openStream())
+                    yamlMapper.readTree(this.javaClass.classLoader.getResource("config_versions/application-customer-1.2.yaml")!!.openStream())
                 val afterMigration = yamlMapper.readTree(configFile.inputStream())
                 assertEquals(beforeMigration, afterMigration)
             }

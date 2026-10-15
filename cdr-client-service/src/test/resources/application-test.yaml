@@ -1,5 +1,4 @@
 client:
-  instance-id: ${random.uuid}
   file-synchronization-enabled: true
   idp-credentials:
     renew-credential: true

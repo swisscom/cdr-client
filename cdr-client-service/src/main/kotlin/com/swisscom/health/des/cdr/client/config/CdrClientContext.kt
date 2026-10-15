@@ -29,6 +29,7 @@ import java.net.PasswordAuthentication
 import java.net.Proxy
 import java.nio.file.Path
 import java.time.Duration
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.fileSize
 import kotlin.io.path.name
@@ -42,6 +43,9 @@ private val logger = KotlinLogging.logger {}
 @Configuration
 internal class CdrClientContext {
     private val authFailureMapper = AuthFailureMapper()
+
+    @Bean(name = ["cdrClientInstanceId"])
+    fun cdrClientInstanceId(): UUID = UUID.randomUUID()
 
     /**
      * Configures system-wide proxy authenticator for Nimbus JWT HTTP client.

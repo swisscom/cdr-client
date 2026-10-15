@@ -29,20 +29,20 @@ import org.springframework.stereotype.Service
 import java.net.Proxy
 import java.net.URL
 import java.io.IOException
-import java.time.Duration
-import java.time.Instant
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
+import kotlin.time.toKotlinDuration
 
 private val logger = KotlinLogging.logger {}
 
 private const val MAX_TRANSIENT_RETRIES = 30
-private const val MAX_TOTAL_RETRY_DURATION_MINUTES = 5
-private const val MIN_RETRY_BACKOFF_MILLIS = 100L
-
-private val MAX_TOTAL_RETRY_DURATION = Duration.ofMinutes(MAX_TOTAL_RETRY_DURATION_MINUTES.toLong())
-private val MIN_RETRY_BACKOFF = Duration.ofMillis(MIN_RETRY_BACKOFF_MILLIS)
+private val MAX_TOTAL_RETRY_DURATION = 5.minutes
+private val MIN_RETRY_BACKOFF = 100.milliseconds
 
 /**
  * Owns the OAuth2 access-token lifecycle for the CDR client.
@@ -233,17 +233,20 @@ internal class OAuth2AuthNService(
         logger.error(e) { "Auth manager iteration failed; degrading to retryable failure and backing off" }
         updateTokenState(AuthNResponse.RetryableFailure(IOException("Auth manager iteration failed: ${e.message}", e)))
         if (actor.failureWindowStart == null) {
-            actor.failureWindowStart = Instant.now()
+            actor.failureWindowStart = TimeSource.Monotonic.markNow()
         }
         actor.nextDelay = retryPolicy.minRetryBackoff
     }
 
     /** Mutable state owned exclusively by the single actor coroutine. */
-    private class ActorState {
-        var loopState: AuthLoopState = AuthLoopState()
-        var nextDelay: Duration? = Duration.ZERO
-        var failureWindowStart: Instant? = null
-        val forced: ForcedReauthBudget = ForcedReauthBudget()
+    private class ActorState (
+        var loopState: AuthLoopState = AuthLoopState(),
+        var nextDelay: Duration? = Duration.ZERO,
+        var failureWindowStart: TimeMark? = null,
+        val forced: ForcedReauthBudget = ForcedReauthBudget(),
+    ) {
+        val expireBy: TimeMark?
+            get() = failureWindowStart?.plus(MAX_TOTAL_RETRY_DURATION)
     }
 
     /** @return `true` if acquisition should proceed, `false` to skip this iteration. */
@@ -262,9 +265,7 @@ internal class OAuth2AuthNService(
 
     /** @return `true` if the consecutive-failure window was exceeded (and state set to failed). */
     private fun exceededFailureWindow(actor: ActorState): Boolean {
-        val start = actor.failureWindowStart
-        val exceeded = start != null &&
-            retryPolicy.hasExceededMaxTotalDuration(Duration.between(start, Instant.now()))
+        val exceeded = actor.expireBy?.hasPassedNow() == true
         if (exceeded) {
             logger.warn { "Auth manager exceeded max total retry duration; giving up until next trigger" }
             updateTokenState(AuthNResponse.Failed(IllegalStateException("Auth retry timeout exceeded")))
@@ -287,20 +288,20 @@ internal class OAuth2AuthNService(
         when {
             nextDelay == null -> commands.receive()
             nextDelay <= Duration.ZERO -> commands.tryReceive().getOrNull()
-            else -> withTimeoutOrNull(nextDelay.toMillis().milliseconds) { commands.receive() }
+            else -> withTimeoutOrNull(nextDelay) { commands.receive() }
         }
 
     /** One acquisition outcome mapped to the next schedule. Pure w.r.t. actor-local vars. */
     private data class Step(
         val loopState: AuthLoopState,
         val nextDelay: Duration?,
-        val failureWindowStart: Instant?,
+        val failureWindowStart: TimeMark?,
     )
 
     private fun evaluateAcquisition(
         tokenResponse: AuthNResponse,
         loopState: AuthLoopState,
-        failureWindowStart: Instant?,
+        failureWindowStart: TimeMark?,
     ): Step =
         when (tokenResponse) {
             is AuthNResponse.Success -> onSuccess(tokenResponse)
@@ -323,13 +324,13 @@ internal class OAuth2AuthNService(
         )
     }
 
-    private fun onDeny(loopState: AuthLoopState, failureWindowStart: Instant?): Step {
+    private fun onDeny(loopState: AuthLoopState, failureWindowStart: TimeMark?): Step {
         val nextDenyAttempt = (loopState.denyRetryAttempt ?: 0) + 1
         val delay = retryPolicy.nextDenyRetryDelay(
             currentAttempt = nextDenyAttempt,
-            initialDelay = config.authRetry.initialDelay,
+            initialDelay = config.authRetry.initialDelay.toKotlinDuration(),
             multiplier = config.authRetry.backoffMultiplier,
-            maxDelay = config.authRetry.maxDelay,
+            maxDelay = config.authRetry.maxDelay.toKotlinDuration(),
         )
         return if (delay == null) {
             logger.warn { "Auth denied; max retries (${config.maxDenyRetries}) exhausted" }
@@ -341,17 +342,17 @@ internal class OAuth2AuthNService(
             Step(
                 loopState = loopState.copy(nextDelay = delay, retryableAttempt = 1, denyRetryAttempt = nextDenyAttempt),
                 nextDelay = delay,
-                failureWindowStart = failureWindowStart ?: Instant.now(),
+                failureWindowStart = failureWindowStart ?: TimeSource.Monotonic.markNow(),
             )
         }
     }
 
-    private fun onRetryableFailure(loopState: AuthLoopState, failureWindowStart: Instant?): Step {
+    private fun onRetryableFailure(loopState: AuthLoopState, failureWindowStart: TimeMark?): Step {
         val delay = retryPolicy.nextTransientRetryDelay(
             currentAttempt = loopState.retryableAttempt,
-            initialDelay = config.authRetry.initialDelay,
+            initialDelay = config.authRetry.initialDelay.toKotlinDuration(),
             multiplier = config.authRetry.backoffMultiplier,
-            maxDelay = config.authRetry.maxDelay,
+            maxDelay = config.authRetry.maxDelay.toKotlinDuration(),
             cachedTokenRemainingLifetime = getTokenRemainingLifetime(),
         )
         return if (delay == null) {
@@ -364,7 +365,7 @@ internal class OAuth2AuthNService(
             Step(
                 loopState = loopState.copy(nextDelay = delay, retryableAttempt = loopState.retryableAttempt + 1),
                 nextDelay = delay,
-                failureWindowStart = failureWindowStart ?: Instant.now(),
+                failureWindowStart = failureWindowStart ?: TimeSource.Monotonic.markNow(),
             )
         }
     }
@@ -382,13 +383,12 @@ internal class OAuth2AuthNService(
 
     private class ForcedReauthBudget {
         var attempt: Int = 0
-        var lastAt: Instant? = null
+        var lastAt: TimeMark? = null
         var exhausted: Boolean = false
     }
 
     private fun applyForcedReauth(trigger: String, forced: ForcedReauthBudget): ForceDecision {
-        val now = Instant.now()
-        resetForcedBudgetIfQuiet(forced, now)
+        resetForcedBudgetIfQuiet(forced)
 
         if (forced.exhausted) {
             logger.error { "Forced reauthentication budget exhausted; ignoring trigger='$trigger'" }
@@ -398,21 +398,21 @@ internal class OAuth2AuthNService(
         val nextAttempt = forced.attempt + 1
         val requiredCooldown = retryPolicy.nextDenyRetryDelay(
             currentAttempt = nextAttempt,
-            initialDelay = config.authRetry.initialDelay,
+            initialDelay = config.authRetry.initialDelay.toKotlinDuration(),
             multiplier = config.authRetry.backoffMultiplier,
-            maxDelay = config.authRetry.maxDelay,
+            maxDelay = config.authRetry.maxDelay.toKotlinDuration(),
         )
 
         return when {
             requiredCooldown == null -> exhaustForcedBudget(forced, trigger)
-            withinForcedCooldown(forced, now, requiredCooldown, nextAttempt) -> ForceDecision.SKIP
-            else -> commitForcedReauth(forced, now, trigger, nextAttempt)
+            withinForcedCooldown(forced, requiredCooldown, nextAttempt) -> ForceDecision.SKIP
+            else -> commitForcedReauth(forced, TimeSource.Monotonic.markNow(), trigger, nextAttempt)
         }
     }
 
-    private fun resetForcedBudgetIfQuiet(forced: ForcedReauthBudget, now: Instant) {
-        forced.lastAt?.let { last ->
-            if (Duration.between(last, now) >= config.authRetry.maxDelay) {
+    private fun resetForcedBudgetIfQuiet(forced: ForcedReauthBudget) {
+        forced.lastAt?.let { last: TimeMark ->
+            if (last.elapsedNow() >= config.authRetry.maxDelay.toKotlinDuration()) {
                 forced.attempt = 0
                 forced.exhausted = false
             }
@@ -428,12 +428,11 @@ internal class OAuth2AuthNService(
 
     private fun withinForcedCooldown(
         forced: ForcedReauthBudget,
-        now: Instant,
         requiredCooldown: Duration,
         nextAttempt: Int,
     ): Boolean {
         val last = forced.lastAt ?: return false
-        val elapsed = Duration.between(last, now)
+        val elapsed = last.elapsedNow()
         return (elapsed < requiredCooldown).also { within ->
             if (within) {
                 logger.warn {
@@ -443,7 +442,7 @@ internal class OAuth2AuthNService(
         }
     }
 
-    private fun commitForcedReauth(forced: ForcedReauthBudget, now: Instant, trigger: String, nextAttempt: Int): ForceDecision {
+    private fun commitForcedReauth(forced: ForcedReauthBudget, now: TimeMark, trigger: String, nextAttempt: Int): ForceDecision {
         forced.attempt = nextAttempt
         forced.lastAt = now
         logger.warn { "Forcing reauthentication (trigger='$trigger', attempt=$nextAttempt)" }

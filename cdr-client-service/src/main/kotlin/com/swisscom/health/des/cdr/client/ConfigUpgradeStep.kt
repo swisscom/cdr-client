@@ -1,7 +1,6 @@
 package com.swisscom.health.des.cdr.client
 
 import tools.jackson.databind.node.ObjectNode
-import java.util.UUID
 
 /**
  * An atomic upgrade step from a source version to a target version of the configuration.
@@ -115,27 +114,6 @@ sealed class ConfigUpgradeStep(
                     configRoot = configRoot,
                     reason = "Failed to look up '/$PROPERTY_NAME_CLIENT/$PROPERTY_NAME_PROXY_URL' object node"
                 )
-    }
-
-    object V12ToV13 : ConfigUpgradeStep(fromVersion = Version("1.2"), toVersion = Version("1.3")) {
-
-        private const val PROPERTY_NAME_CLIENT = "client"
-        private const val PROPERTY_NAME_INSTANCE_ID = "instance-id"
-
-        override fun upgradeImpl(configRoot: ObjectNode): UpgradeStepResult =
-            configRoot[PROPERTY_NAME_CLIENT]
-                ?.let { it as ObjectNode }
-                ?.let { clientNode: ObjectNode ->
-                    clientNode.put(PROPERTY_NAME_INSTANCE_ID, UUID.randomUUID().toString())
-                    UpgradeStepResult.Success(
-                        configRoot = configRoot
-                    )
-                }
-                ?: UpgradeStepResult.Failure(
-                    configRoot = configRoot,
-                    reason = "Failed to look up 'client' object node"
-                )
-
     }
 }
 

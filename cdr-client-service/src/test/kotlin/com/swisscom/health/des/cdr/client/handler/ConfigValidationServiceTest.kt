@@ -20,7 +20,6 @@ import com.swisscom.health.des.cdr.client.config.FileBusyTestStrategyProperty
 import com.swisscom.health.des.cdr.client.config.FileSynchronization
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
-import com.swisscom.health.des.cdr.client.config.InstanceId
 import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
 import com.swisscom.health.des.cdr.client.config.ProxyConfig
 import com.swisscom.health.des.cdr.client.config.ProxyPassword
@@ -825,7 +824,6 @@ internal class ConfigValidationServiceTest {
 
     private fun createCdrClientConfig(customers: List<Connector>, defaultLocalFolder: Path = localFolder0): CdrClientConfig =
         CdrClientConfig(
-            instanceId = InstanceId.random(),
             fileSynchronizationEnabled = FileSynchronization.ENABLED,
             scheduleDelay = Duration.ofSeconds(1),
             localFolder = TempDownloadDir(defaultLocalFolder),

@@ -196,7 +196,6 @@ class DTOs {
      */
     @Serializable
     data class CdrClientConfig(
-        val instanceId: String,
         val fileSynchronizationEnabled: Boolean,
         val customer: List<Connector>,
         val cdrApi: DomainObjects.ApiEndpoint,
@@ -223,7 +222,6 @@ class DTOs {
         companion object {
             @JvmStatic
             val EMPTY = CdrClientConfig(
-                instanceId = EMPTY_STRING,
                 fileSynchronizationEnabled = false,
                 customer = emptyList(),
                 cdrApi = DomainObjects.ApiEndpoint.PRODUCTION,

@@ -25,6 +25,7 @@ import org.springframework.web.util.UriComponentsBuilder
 import tools.jackson.databind.json.JsonMapper
 import java.net.URL
 import java.nio.file.Path
+import java.util.UUID
 import kotlin.io.path.outputStream
 import kotlin.io.path.readBytes
 
@@ -35,10 +36,12 @@ private val logger = KotlinLogging.logger {}
 internal class CdrApiClient(
     private val cdrClientConfig: CdrClientConfig,
     private val httpClient: OkHttpClient,
-    @param:Qualifier("retryIoAndServerErrors")
+    @Qualifier("retryIoAndServerErrors")
     private val retryIOExceptionsAndServerErrors: RetryTemplate,
     private val jsonMapper: JsonMapper,
     private val osInformation: String,
+    @Qualifier("cdrClientInstanceId")
+    private val cdrClientInstanceId: UUID,
 ) {
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
@@ -371,7 +374,7 @@ internal class CdrApiClient(
             this[CLIENT_TYPE_HEADER] = clientType ?: "cdr-client"
             this[CLIENT_VERSION_HEADER] = clientVersion ?: "unknown"
             this[CLIENT_OS_HEADER] = osInformation
-            this[CLIENT_INSTANCE_ID_HEADER] = cdrClientConfig.instanceId.id.toString()
+            this[CLIENT_INSTANCE_ID_HEADER] = cdrClientInstanceId.toString()
             this.build()
         }
     }

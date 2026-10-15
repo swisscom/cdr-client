@@ -11,7 +11,6 @@ import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.Host
-import com.swisscom.health.des.cdr.client.config.InstanceId
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.PULL_RESULT_ID_HEADER
@@ -80,14 +79,20 @@ internal class PullFileHandlingTest {
         tmpDir.resolve(targetDirectory).also { it.createDirectories() }
         val inflightDir = tmpDir.resolve(inflightDirectory).also { it.createDirectories() }
 
-        every { config.instanceId } returns InstanceId.random()
         every { config.cdrApi } returns endpoint
         every { config.localFolder } returns TempDownloadDir(inflightDir)
         every { config.idpCredentials.tenantId } returns TenantId("something")
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } returns "Mocked Result"
 
-        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), retryIoErrorsThrice, JsonMapper.builder().findAndAddModules().build(), "OS")
+        cdrApiClient = CdrApiClient(
+            config,
+            OkHttpClient.Builder().build(),
+            retryIoErrorsThrice,
+            JsonMapper.builder().findAndAddModules().build(),
+            "OS",
+            UUID.randomUUID()
+        )
         pullFileHandling = PullFileHandling(cdrApiClient)
     }
 

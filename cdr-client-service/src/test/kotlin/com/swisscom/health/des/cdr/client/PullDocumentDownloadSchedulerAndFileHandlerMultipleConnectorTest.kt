@@ -6,7 +6,6 @@ import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.ConnectorId
 import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.Host
-import com.swisscom.health.des.cdr.client.config.InstanceId
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient
@@ -113,7 +112,6 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         connector2.sourceFolder.createDirectories()
         localDir.createDirectories()
 
-        every { config.instanceId } returns InstanceId.random()
         every { config.customer } returns Customer(mutableListOf(connector1, connector2))
         every { config.cdrApi } returns endpoint
         every { config.localFolder } returns TempDownloadDir(localDir)
@@ -122,7 +120,14 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } answers { "Mocked Result" }
 
-        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), retryIoErrorsThrice, JsonMapper.builder().findAndAddModules().build(), "OS")
+        cdrApiClient = CdrApiClient(
+            config,
+            OkHttpClient.Builder().build(),
+            retryIoErrorsThrice,
+            JsonMapper.builder().findAndAddModules().build(),
+            "OS",
+            UUID.randomUUID()
+        )
         pullFileHandling = PullFileHandling(cdrApiClient)
         documentDownloadScheduler = DocumentDownloadScheduler(
             config,
