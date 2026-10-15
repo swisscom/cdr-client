@@ -12,6 +12,37 @@ managed by a dedicated watchdog service.
 
 On macOS, the client UI application starts the client service and shuts it down again when itself is shut down.
 
+## Security considerations and local access
+
+The CDR Client service exposes a local, unauthenticated HTTP API for the client UI. The configuration API is available at
+`http://localhost:8191/api/service-configuration`. It can be used to read and update the service configuration. The
+management server on port `8193` is separate and exposes health and information endpoints; it does not host the
+configuration API.
+
+Any user or process that can connect to the service locally can change settings, including the client ID and secret,
+upload and download directories, and other configuration. The configured secret is masked in responses and cannot be
+retrieved through this API, but it can be overwritten. The CDR API destination is restricted to supported endpoints and
+cannot be changed to an arbitrary host.
+
+Local access to this API is not restricted between users of the machine. The service is designed to run on a system with
+restricted local access. Do not install or run it on a machine where Guest access or other untrusted users are allowed to
+sign in.
+
+### Disabling the local service HTTP API
+
+To disable the service's HTTP API, including the endpoints used by the UI, set the application type to `none` in
+`application-customer.yaml` and restart the service:
+
+```yaml
+spring:
+  main:
+    web-application-type: none
+```
+
+The UI will no longer be able to connect to or manage the service. This disables the HTTP web application, so the
+management endpoints on port `8193` will also be unavailable. There is no supported configuration setting to disable
+only the configuration endpoint while leaving the other HTTP endpoints available.
+
 ## Installation / Run the client
 
 ### Installer
@@ -34,35 +65,6 @@ For Windows Server environments (especially 2019 version that don't support MSIX
    * Fully automated - zero manual intervention for monthly updates
    * See [Advanced Installation Guide](installation/WINDOWS_SERVER_ADVANCED_INSTALLATION_GUIDE.md) for setup instructions
    * **Note**: Windows Server 2022 and newer should use the default MSIX installer instead
-
-### Manual Installation - Jar only, no auto update
-
-If you want to run the client service without the UI and without auto updates, you can download the jar file directly.
-
-Pre-Requirements:
-
-* Java 25 (or higher) installed
-
-Go to the [releases](https://github.com/swisscom/cdr-client/releases) GitHub page and click on the maven assets for the newest release:
-![releases assets overview](./installation/releases-overview.png)
-Download the jar file:
-![release jar download](./installation/single-release-overview.png)
-Place a file named application-customer.yaml in the same directory as the jar file. The application-customer.yaml file
-should contain the configuration for the client. An example can be found [here](#configuration).
-
-Open a terminal and navigate to the directory where the jar file is located. Run the following command to start the
-client (check the jar name and replace it in the command or rename the jar itself):
-> The -D parameters need to be placed before the "-jar cdr-client-service.jar".<p>
-> The quotes are necessary for Windows, but not for Unix systems
-
-```shell
-java "-Dspring.config.additional-location=./application-customer.yaml" -jar cdr-client-service.jar
-```
-
-Check that no error messages are present in the terminal (or have a look at the "cdr-client-service.log" file that is created in
-the same directory as you've placed the jar file) and that the client is running.
-
-Configure an OS appropriate service to run the client as a background service.
 
 ## API
 
