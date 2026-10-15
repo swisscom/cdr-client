@@ -1,12 +1,9 @@
 package com.swisscom.health.des.cdr.client.http
 
-import tools.jackson.databind.json.JsonMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
-import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
@@ -28,6 +25,7 @@ import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
@@ -70,11 +68,13 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.util.unit.DataSize
+import tools.jackson.databind.json.JsonMapper
 import java.net.URI
 import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 
 @ExtendWith(MockKExtension::class)
 internal class WebOperationsTest {
@@ -100,7 +100,7 @@ internal class WebOperationsTest {
     @MockK
     private lateinit var authNService: OAuth2AuthNService
 
-    private val objectMapper = JsonMapper.builder().findAndAddModules().build()
+    private val jsonMapper = JsonMapper.builder().findAndAddModules().build()
 
     private lateinit var webOperations: WebOperations
 
@@ -120,7 +120,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = retryIOExceptionsAndServerErrors,
@@ -309,7 +309,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -349,7 +349,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -384,7 +384,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -417,7 +417,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -450,7 +450,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -494,7 +494,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = configWithOriginalEndpoint,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,

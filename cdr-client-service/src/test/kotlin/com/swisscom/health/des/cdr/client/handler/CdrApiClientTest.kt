@@ -1,7 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import tools.jackson.databind.ObjectMapper
-import com.ninjasquad.springmockk.SpykBean
+import com.ninjasquad.springmockk.MockkSpyBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.config.CdrApi
@@ -10,6 +9,7 @@ import com.swisscom.health.des.cdr.client.config.CredentialApi
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.AZURE_TRACE_ID_HEADER
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CDR_PROCESSING_MODE_HEADER
+import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CLIENT_INSTANCE_ID_HEADER
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.CONNECTOR_ID_HEADER
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.Companion.PULL_RESULT_ID_HEADER
 import io.mockk.every
@@ -29,6 +29,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -37,8 +38,10 @@ import org.springframework.http.ProblemDetail
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
+import tools.jackson.databind.json.JsonMapper
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.exists
 import kotlin.io.path.readText
@@ -62,14 +65,18 @@ import kotlin.io.path.writeText
 @Tag("integration-test")
 internal class CdrApiClientTest {
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var config: CdrClientConfig
 
     @Autowired
     private lateinit var cdrApiClient: CdrApiClient
 
     @Autowired
-    private lateinit var objectMapper: ObjectMapper
+    @Qualifier("cdrClientInstanceId")
+    private lateinit var cdrClientInstanceId: UUID
+
+    @Autowired
+    private lateinit var jsonMapper: JsonMapper
 
     @TempDir
     private lateinit var sourceDir: Path
@@ -207,6 +214,7 @@ internal class CdrApiClientTest {
         assertEquals("test-connector-id", request.headers[CONNECTOR_ID_HEADER])
         assertEquals(CdrClientConfig.Mode.TEST.value, request.headers[CDR_PROCESSING_MODE_HEADER])
         assertEquals(DEFAULT_TRACE_ID, request.headers[AZURE_TRACE_ID_HEADER])
+        assertEquals(cdrClientInstanceId.toString(), request.headers[CLIENT_INSTANCE_ID_HEADER])
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).startsWith("Bearer "))
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).removePrefix("Bearer ").isNotBlank())
 
@@ -215,7 +223,7 @@ internal class CdrApiClientTest {
 
     @Test
     fun `test document upload - status 409`() {
-        val problemJsonStr = objectMapper.writeValueAsString(
+        val problemJsonStr = jsonMapper.writeValueAsString(
             ProblemDetail.forStatus(HttpStatus.CONFLICT.value())
                 .run {
                     title = HttpStatus.CONFLICT.reasonPhrase
@@ -279,6 +287,7 @@ internal class CdrApiClientTest {
         assertEquals("some-other-connector-id", request.headers[CONNECTOR_ID_HEADER])
         assertEquals(CdrClientConfig.Mode.PRODUCTION.value, request.headers[CDR_PROCESSING_MODE_HEADER])
         assertEquals(DEFAULT_TRACE_ID, request.headers[AZURE_TRACE_ID_HEADER])
+        assertEquals(cdrClientInstanceId.toString(), request.headers[CLIENT_INSTANCE_ID_HEADER])
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).startsWith("Bearer "))
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).removePrefix("Bearer ").isNotBlank())
 
@@ -331,6 +340,7 @@ internal class CdrApiClientTest {
         assertEquals("some-other-connector-id", request.headers[CONNECTOR_ID_HEADER])
         assertEquals(CdrClientConfig.Mode.PRODUCTION.value, request.headers[CDR_PROCESSING_MODE_HEADER])
         assertEquals(DEFAULT_TRACE_ID, request.headers[AZURE_TRACE_ID_HEADER])
+        assertEquals(cdrClientInstanceId.toString(), request.headers[CLIENT_INSTANCE_ID_HEADER])
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).startsWith("Bearer "))
         assertTrue(requireNotNull(request.headers[HttpHeaders.AUTHORIZATION]).removePrefix("Bearer ").isNotBlank())
 

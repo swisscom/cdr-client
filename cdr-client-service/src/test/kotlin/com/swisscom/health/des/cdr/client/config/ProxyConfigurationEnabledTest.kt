@@ -3,6 +3,7 @@ package com.swisscom.health.des.cdr.client.config
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
+import mockwebserver3.QueueDispatcher
 import mockwebserver3.RecordedRequest
 import okhttp3.Headers
 import okhttp3.OkHttpClient
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -24,6 +24,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.net.URI
 import java.util.Optional
 import java.util.concurrent.TimeUnit
 
@@ -50,6 +51,7 @@ import java.util.concurrent.TimeUnit
     ]
 )
 @ActiveProfiles("test", "noPollingUploadScheduler", "noEventTriggerUploadScheduler", "noDownloadScheduler")
+// `AFTER_EACH_TEST_METHOD` is required so AuthNService bean is re-initialized for each test function and requests the OAuth2 token again
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 @Tag("integration-test")
 internal class ProxyConfigurationEnabledTest {
@@ -82,14 +84,17 @@ internal class ProxyConfigurationEnabledTest {
     @Test
     fun `application OkHttpClient routes HTTP requests through configured proxy`() {
         // Given: Application's OkHttpClient bean with proxy configured
-        // Note: OkHttpClient has an auth interceptor that requests OAuth2 token first
-        mockProxyServer.enqueue(
-            MockResponse.Builder()
-                .code(HttpStatus.OK.value())
-                .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
-                .body(OAUTH2_TOKEN_RESPONSE)
-                .build()
-        )
+        // Given: AuthNService http client with proxy configured
+
+        // First request (asynchronous in AuthNService): OAuth2 token (from auth interceptor)
+        val oauth2Request: RecordedRequest? = mockProxyServer.takeRequest(5, TimeUnit.SECONDS)
+        assertNotNull(oauth2Request, "APPLICATION's auth interceptor did NOT route OAuth2 request through proxy!")
+        oauth2Request?.let {
+            assertTrue(it.target.contains("token")) {
+                "Expected OAuth2 token request through proxy, but got: ${it.target}"
+            }
+        }
+
         mockProxyServer.enqueue(
             MockResponse.Builder()
                 .code(HttpStatus.OK.value())
@@ -106,15 +111,7 @@ internal class ProxyConfigurationEnabledTest {
 
         val response = okHttpClient.newCall(request).execute()
 
-        // Then: Both OAuth2 token request AND HTTP request should have gone through the proxy
-        // First request: OAuth2 token (from auth interceptor)
-        val oauth2Request: RecordedRequest? = mockProxyServer.takeRequest(5, TimeUnit.SECONDS)
-        assertNotNull(oauth2Request, "APPLICATION's auth interceptor did NOT route OAuth2 request through proxy!")
-        oauth2Request?.let {
-            assertTrue(it.target.contains("token")) {
-                "Expected OAuth2 token request through proxy, but got: ${it.target}"
-            }
-        }
+        // Then: HTTP request should have gone through the proxy
 
         // Second request: Actual HTTP request
         val proxyRequest: RecordedRequest? = mockProxyServer.takeRequest(5, TimeUnit.SECONDS)
@@ -130,6 +127,17 @@ internal class ProxyConfigurationEnabledTest {
     @Test
     fun `application OAuth2AuthNService routes token requests through configured proxy`() {
         // Given: Application's OAuth2AuthNService with proxy configured
+
+        // First request (asynchronous in AuthNService): OAuth2 token (from auth interceptor)
+        val oauth2Request: RecordedRequest? = mockProxyServer.takeRequest(5, TimeUnit.SECONDS)
+
+        assertNotNull(oauth2Request, "APPLICATION's auth interceptor did NOT route OAuth2 request through proxy!")
+        oauth2Request?.let {
+            assertTrue(it.target.contains("token")) {
+                "Expected OAuth2 token request through proxy, but got: ${it.target}"
+            }
+        }
+
         mockProxyServer.enqueue(
             MockResponse.Builder()
                 .code(HttpStatus.OK.value())
@@ -142,7 +150,7 @@ internal class ProxyConfigurationEnabledTest {
         try {
             oauth2AuthNService.getNewAccessToken(
                 config.idpCredentials,
-                java.net.URI("http://${mockIdpServer.hostName}:${mockIdpServer.port}/oauth2/token").toURL(),
+                URI("http://${mockIdpServer.hostName}:${mockIdpServer.port}/oauth2/onDemandToken").toURL(),
                 shouldRetry = false
             )
         } catch (_: Exception) {
@@ -154,7 +162,7 @@ internal class ProxyConfigurationEnabledTest {
 
         assertNotNull(proxyRequest, "APPLICATION's OAuth2AuthNService did NOT route request through proxy!")
         proxyRequest?.let {
-            assertTrue(it.target.contains("token")) {
+            assertTrue(it.url.pathSegments.contains("onDemandToken")) {
                 "Expected OAuth2 token request through proxy, but got: ${it.target}"
             }
         }
@@ -162,15 +170,18 @@ internal class ProxyConfigurationEnabledTest {
 
     @Test
     fun `application CdrApiClient routes API calls through configured proxy`() {
-        // Given: Application's CdrApiClient with proxy configured
-        // Note: OkHttpClient has an auth interceptor that requests OAuth2 token first
-        mockProxyServer.enqueue(
-            MockResponse.Builder()
-                .code(HttpStatus.OK.value())
-                .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
-                .body(OAUTH2_TOKEN_RESPONSE)
-                .build()
-        )
+        // Given: Application's OkHttpClient bean with proxy configured
+        // Given: AuthNService http client with proxy configured
+
+        // First request (asynchronous in AuthNService): OAuth2 token (from auth interceptor)
+        val authNServiceRequest: RecordedRequest? = mockProxyServer.takeRequest(5, TimeUnit.SECONDS)
+        assertNotNull(authNServiceRequest, "APPLICATION's auth interceptor did NOT route OAuth2 request through proxy!")
+        authNServiceRequest?.let {
+            assertTrue(it.target.contains("token")) {
+                "Expected OAuth2 token request through proxy, but got: ${it.target}"
+            }
+        }
+
         mockProxyServer.enqueue(
             MockResponse.Builder()
                 .code(HttpStatus.OK.value())
@@ -182,21 +193,11 @@ internal class ProxyConfigurationEnabledTest {
         // When: CdrApiClient makes API call
         cdrApiClient.renewClientCredential("test-trace-id")
 
-        // Then: Both OAuth2 token request AND API call should have gone through the proxy
-        // First request: OAuth2 token (from auth interceptor)
-        val oauth2Request: RecordedRequest? = mockProxyServer.takeRequest(5, TimeUnit.SECONDS)
-        assertNotNull(oauth2Request, "APPLICATION's auth interceptor did NOT route OAuth2 request through proxy!")
-        oauth2Request?.let {
-            assertTrue(it.target.contains("token")) {
-                "Expected OAuth2 token request through proxy, but got: ${it.target}"
-            }
-        }
-
         // Second request: Actual client-credentials API call
         val apiRequest: RecordedRequest? = mockProxyServer.takeRequest(5, TimeUnit.SECONDS)
         assertNotNull(apiRequest, "APPLICATION's CdrApiClient did NOT route request through proxy!")
         apiRequest?.let {
-            assertTrue(it.target.contains("client-credentials")) {
+            assertTrue(it.url.pathSegments.contains("client-credentials")) {
                 "Expected client-credentials request through proxy, but got: ${it.target}"
             }
         }
@@ -204,9 +205,19 @@ internal class ProxyConfigurationEnabledTest {
 
     @Test
     fun `application routes multiple HTTP calls through proxy`() {
-        // Given: Application with proxy configured
-        // Note: OkHttpClient may make OAuth2 token requests via auth interceptor, so enqueue enough responses
-        repeat(5) {
+        // Given: Application's OkHttpClient bean with proxy configured
+        // Given: AuthNService http client with proxy configured
+
+        // First request (asynchronous in AuthNService): OAuth2 token (from auth interceptor)
+        val authNServiceRequest: RecordedRequest? = mockProxyServer.takeRequest(5, TimeUnit.SECONDS)
+        assertNotNull(authNServiceRequest, "APPLICATION's auth interceptor did NOT route OAuth2 request through proxy!")
+        authNServiceRequest?.let {
+            assertTrue(it.target.contains("token")) {
+                "Expected OAuth2 token request through proxy, but got: ${it.target}"
+            }
+        }
+
+        repeat(3) {
             mockProxyServer.enqueue(MockResponse.Builder().code(200).body("ok").build())
         }
 
@@ -218,29 +229,25 @@ internal class ProxyConfigurationEnabledTest {
                     .get()
                     .build()
                 okHttpClient.newCall(request).execute()
-            } catch(_: Exception) {
+            } catch (_: Exception) {
                 // Ignore exceptions, we only care if requests went through proxy
             }
         }
 
         // Then: All requests should have gone through the proxy
-        // Note: May be more than 3 due to OAuth2 token requests from auth interceptor
+        // Note: 3 calls by okHttpClient, 1 by AuthNService (already consumed above)
         val requestCount = mockProxyServer.requestCount
-        assertTrue(requestCount >= 3) {
+        assertTrue(requestCount == 4) {
             "Expected at least 3 requests through proxy, but got $requestCount"
         }
 
         // Verify that our API calls went through proxy (may have OAuth2 requests mixed in)
-        val allRequests = mutableListOf<RecordedRequest>()
-        repeat(requestCount) {
-            mockProxyServer.takeRequest(1, TimeUnit.SECONDS)?.let { allRequests.add(it) }
+        repeat(3) { i ->
+            mockProxyServer.takeRequest(1, TimeUnit.SECONDS)?.let {
+                assertTrue(it.url.pathSegments.contains("call$i"))
+            }
         }
 
-        // Count how many of our actual API calls went through
-        val apiCallCount = allRequests.count { it.target.contains("call") }
-        assertTrue(apiCallCount >= 3) {
-            "Expected at least 3 API calls through proxy, but got $apiCallCount"
-        }
     }
 
     companion object {
@@ -262,6 +269,22 @@ internal class ProxyConfigurationEnabledTest {
             mockIdpServer = MockWebServer()
             mockIdpServer.start()
 
+            // register dispatcher that intercepts /token requests and sends a token response,
+            // irrespective of what other responses have been queued; only non-token requests
+            // are answered with queued requests
+            mockProxyServer.dispatcher = object : QueueDispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse =
+                    if (request.url.pathSegments.contains("token")) {
+                        MockResponse.Builder()
+                            .code(HttpStatus.OK.value())
+                            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+                            .body(OAUTH2_TOKEN_RESPONSE)
+                            .build()
+                    } else {
+                        super.dispatch(request)
+                    }
+            }
+
             // Configure application with proxy pointing to our mock server
             registry.add("client.proxy-config.url") { "http://${mockProxyServer.hostName}:${mockProxyServer.port}" }
             registry.add("client.proxy-config.username") { "test-proxy-user" }
@@ -271,12 +294,6 @@ internal class ProxyConfigurationEnabledTest {
             registry.add("client.cdr-api.port") { mockApiServer.port }
             registry.add("client.credential-api.host") { mockApiServer.hostName }
             registry.add("client.credential-api.port") { mockApiServer.port }
-        }
-
-        @JvmStatic
-        @BeforeAll
-        fun setupClass() {
-            // MockWebServers are started in @DynamicPropertySource
         }
 
         @JvmStatic
@@ -300,4 +317,5 @@ internal class ProxyConfigurationEnabledTest {
             "expiresAt": "2026-12-31T23:59:59Z"
         }"""
     }
+
 }

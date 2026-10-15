@@ -2,8 +2,9 @@ package com.swisscom.health.des.cdr.client.config.auth
 
 import com.nimbusds.oauth2.sdk.AccessTokenResponse
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
-import java.time.Duration
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 internal class OAuth2AuthNTiming(
     private val config: CdrClientConfig,
@@ -25,7 +26,7 @@ internal class OAuth2AuthNTiming(
     fun delayUntilRefresh(tokenResponse: AuthNResponse.Success): Duration {
         val refreshEpochSecond = tokenResponse.expiresAtEpochSecond - config.authRefreshBeforeExpiry.seconds
         val delaySeconds = refreshEpochSecond - clock.now().epochSeconds
-        return if (delaySeconds <= 0) Duration.ZERO else Duration.ofSeconds(delaySeconds)
+        return if (delaySeconds <= 0) Duration.ZERO else delaySeconds.seconds
     }
 
     fun resolveTokenExpiryEpochSecond(successResponse: AccessTokenResponse): Long? {

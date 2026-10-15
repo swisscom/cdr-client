@@ -1,6 +1,5 @@
 package com.swisscom.health.des.cdr.client
 
-import tools.jackson.databind.json.JsonMapper
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.Connector
@@ -42,6 +41,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.retry.RetryCallback
 import org.springframework.retry.support.RetryTemplate
+import tools.jackson.databind.json.JsonMapper
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.UUID
@@ -120,7 +120,14 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
 
         every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } answers { "Mocked Result" }
 
-        cdrApiClient = CdrApiClient(config, OkHttpClient.Builder().build(), retryIoErrorsThrice, JsonMapper.builder().findAndAddModules().build(), "OS")
+        cdrApiClient = CdrApiClient(
+            config,
+            OkHttpClient.Builder().build(),
+            retryIoErrorsThrice,
+            JsonMapper.builder().findAndAddModules().build(),
+            "OS",
+            UUID.randomUUID()
+        )
         pullFileHandling = PullFileHandling(cdrApiClient)
         documentDownloadScheduler = DocumentDownloadScheduler(
             config,

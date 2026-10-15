@@ -1,6 +1,5 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import tools.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
@@ -23,8 +22,10 @@ import org.springframework.stereotype.Service
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
 import org.springframework.web.util.UriComponentsBuilder
+import tools.jackson.databind.json.JsonMapper
 import java.net.URL
 import java.nio.file.Path
+import java.util.UUID
 import kotlin.io.path.outputStream
 import kotlin.io.path.readBytes
 
@@ -35,10 +36,12 @@ private val logger = KotlinLogging.logger {}
 internal class CdrApiClient(
     private val cdrClientConfig: CdrClientConfig,
     private val httpClient: OkHttpClient,
-    @param:Qualifier("retryIoAndServerErrors")
+    @Qualifier("retryIoAndServerErrors")
     private val retryIOExceptionsAndServerErrors: RetryTemplate,
-    private val objectMapper: ObjectMapper,
+    private val jsonMapper: JsonMapper,
     private val osInformation: String,
+    @Qualifier("cdrClientInstanceId")
+    private val cdrClientInstanceId: UUID,
 ) {
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
@@ -91,7 +94,7 @@ internal class CdrApiClient(
                         }
                     }
 
-                    val appRegistration = objectMapper.readValue(response.body.byteStream(), CdrClientAppRegistrationDto::class.java)
+                    val appRegistration = jsonMapper.readValue(response.body.byteStream(), CdrClientAppRegistrationDto::class.java)
 
                     appRegistration.warnings.forEach { warning ->
                         logger.warn { "Client secret renewal server-side warning: '$warning'" }
@@ -371,6 +374,7 @@ internal class CdrApiClient(
             this[CLIENT_TYPE_HEADER] = clientType ?: "cdr-client"
             this[CLIENT_VERSION_HEADER] = clientVersion ?: "unknown"
             this[CLIENT_OS_HEADER] = osInformation
+            this[CLIENT_INSTANCE_ID_HEADER] = cdrClientInstanceId.toString()
             this.build()
         }
     }
@@ -422,6 +426,7 @@ internal class CdrApiClient(
         const val CLIENT_TYPE_HEADER = "SWISSCOM-CLIENT-TYPE"
         const val CLIENT_VERSION_HEADER = "SWISSCOM-CLIENT-VERSION"
         const val CLIENT_OS_HEADER = "SWISSCOM-CLIENT-OS"
+        const val CLIENT_INSTANCE_ID_HEADER = "SWISSCOM-CLIENT-INSTANCE-ID"
         const val PULL_RESULT_ID_HEADER = "cdr-document-uuid"
         const val PULL_RESULT_FILE_PREFIX_HEADER = "cdr-document-prefix"
         const val TEMP_FILE_EXTENSION = "tmp"

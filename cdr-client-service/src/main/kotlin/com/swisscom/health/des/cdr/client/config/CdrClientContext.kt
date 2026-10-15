@@ -9,7 +9,6 @@ import com.swisscom.health.des.cdr.client.config.auth.toAuthNState
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.time.delay
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -30,6 +29,7 @@ import java.net.PasswordAuthentication
 import java.net.Proxy
 import java.nio.file.Path
 import java.time.Duration
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.fileSize
 import kotlin.io.path.name
@@ -43,6 +43,9 @@ private val logger = KotlinLogging.logger {}
 @Configuration
 internal class CdrClientContext {
     private val authFailureMapper = AuthFailureMapper()
+
+    @Bean(name = ["cdrClientInstanceId"])
+    fun cdrClientInstanceId(): UUID = UUID.randomUUID()
 
     /**
      * Configures system-wide proxy authenticator for Nimbus JWT HTTP client.
@@ -205,7 +208,6 @@ internal class CdrClientContext {
      * thread pool size can be enrolled in the upload process at the same time. Only the
      * blocking i/o operations are limited to the configured thread pool size.
      */
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Bean(name = ["limitedParallelismCdrUploadsDispatcher"])
     fun limitedParallelCdrUploadsDispatcher(config: CdrClientConfig): CoroutineDispatcher {
         return Dispatchers.IO.limitedParallelism(config.pushThreadPoolSize)
@@ -214,7 +216,6 @@ internal class CdrClientContext {
     /**
      * Creates a coroutine dispatcher for blocking I/O operations with limited parallelism.
      */
-    @OptIn(ExperimentalCoroutinesApi::class)
     @Bean(name = ["limitedParallelismCdrDownloadsDispatcher"])
     fun limitedParallelCdrDownloadsDispatcher(config: CdrClientConfig): CoroutineDispatcher {
         return Dispatchers.IO.limitedParallelism(config.pullThreadPoolSize)
@@ -244,7 +245,6 @@ internal class CdrClientContext {
      * Creates and returns a spring retry-template that retries on IOExceptions up to three times before bailing out.
      */
     @Bean(name = ["retryIoAndServerErrors"])
-    @Suppress("MagicNumber")
     fun retryIOExceptionsAndServerErrorsTemplate(
         @Value($$"${client.retry-template.retries}")
         retries: Int,

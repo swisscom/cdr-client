@@ -1,6 +1,5 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import tools.jackson.dataformat.yaml.YAMLMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
@@ -48,6 +47,7 @@ import org.springframework.core.env.MutablePropertySources
 import org.springframework.core.io.FileSystemResource
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
+import tools.jackson.dataformat.yaml.YAMLMapper
 import java.net.URI
 import java.nio.file.Path
 import java.time.Duration

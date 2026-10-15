@@ -229,7 +229,7 @@ internal data class Connector(
                 "sourceFolders=${invert(effectiveSourceFolders)}, targetFolders=${invert(effectiveTargetFolders)}, " +
                 "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
                 "baseSourceArchiveFolder=${baseSourceArchiveFolder}, archiveFolders=${invert(effectiveArchiveFolders)}, " +
-                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${baseSourceErrorFolder}, errorFolders=${ invert(effectiveErrorFolders)}, " +
+                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${baseSourceErrorFolder}, errorFolders=${invert(effectiveErrorFolders)}, " +
                 "mode=$mode)"
     }
 
@@ -533,12 +533,6 @@ internal value class RenewCredential(val value: Boolean) : PropertyNameAware {
         get() = PROPERTY_NAME
 
     companion object {
-        @JvmStatic
-        val ENABLED = RenewCredential(true)
-
-        @JvmStatic
-        val DISABLED = RenewCredential(false)
-
         private const val PROPERTY_NAME = "renew-credential"
     }
 }
@@ -595,9 +589,6 @@ internal value class LastCredentialRenewalTime(val instant: Instant) : PropertyN
 
     companion object {
         private const val PROPERTY_NAME = "last-credential-renewal-time"
-
-        @JvmStatic
-        val BEGINNING_OF_TIME: LastCredentialRenewalTime = LastCredentialRenewalTime(Instant.ofEpochSecond(0L))
     }
 }
 

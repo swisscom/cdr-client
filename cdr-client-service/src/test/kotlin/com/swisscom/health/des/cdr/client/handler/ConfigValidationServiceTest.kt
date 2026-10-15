@@ -5,7 +5,6 @@ package com.swisscom.health.des.cdr.client.handler
 import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ApiEndpoint
@@ -57,6 +56,7 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.deleteRecursively
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 
 @ExtendWith(MockKExtension::class)
 internal class ConfigValidationServiceTest {

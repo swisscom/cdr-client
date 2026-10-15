@@ -1,15 +1,15 @@
 package com.swisscom.health.des.cdr.client
 
-import tools.jackson.dataformat.yaml.YAMLFactory
-import tools.jackson.dataformat.yaml.YAMLMapper
-import tools.jackson.dataformat.yaml.YAMLWriteFeature
-import tools.jackson.module.kotlin.kotlinModule
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.io.TempDir
+import tools.jackson.dataformat.yaml.YAMLFactory
+import tools.jackson.dataformat.yaml.YAMLMapper
+import tools.jackson.dataformat.yaml.YAMLWriteFeature
+import tools.jackson.module.kotlin.kotlinModule
 import java.nio.file.Path
 import kotlin.io.path.copyTo
 import kotlin.io.path.inputStream
