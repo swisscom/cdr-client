@@ -1,5 +1,6 @@
 [versions]
-jdk = "25"
+jdk-version = "25"
+jdk-vendor = "AZUL"
 kotlin-lang = "2.4.20"
 compose-multiplatform = "1.12.0"
 compose-native-tray = "2.1.6"
