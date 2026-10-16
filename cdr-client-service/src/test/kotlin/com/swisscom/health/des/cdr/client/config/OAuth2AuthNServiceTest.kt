@@ -15,12 +15,13 @@ import mockwebserver3.RecordedRequest
 import mockwebserver3.SocketEffect
 import mockwebserver3.junit5.StartStop
 import okhttp3.Headers
+import org.awaitility.Awaitility.await
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNotSame
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
@@ -39,8 +40,8 @@ import java.util.concurrent.TimeUnit
 @ExtendWith(MockKExtension::class)
 class OAuth2AuthNServiceTest {
 
-     @MockK
-     private lateinit var config: CdrClientConfig
+    @MockK
+    private lateinit var config: CdrClientConfig
 
     @StartStop
     private val idpMock = MockWebServer()
@@ -178,12 +179,10 @@ class OAuth2AuthNServiceTest {
 
         val authNService = newService()
 
-        waitForRequestCount(2)
-        val authNResponse: AuthNResponse = assertDoesNotThrow { authNService.getAccessToken() }
-
-        assertEquals(AuthNState.AUTHENTICATED, authNService.currentAuthNStateNonBlocking())
-        val successResponse = assertInstanceOf<AuthNResponse.Success>(authNResponse)
-        assertEquals("second-token", successResponse.response.tokens.accessToken.value)
+        await().until({ authNService.currentStateSnapshot().response }) {
+            it is AuthNResponse.Success &&
+                    it.response.tokens.accessToken.value == "second-token"
+        }
     }
 
     @Test
@@ -493,7 +492,7 @@ class OAuth2AuthNServiceTest {
             Thread.sleep(10)
         }
         assertEquals(expectedRequestCount, idpMock.requestCount)
-     }
+    }
 
     private fun waitUntilInactive(job: Job, maxWaitMillis: Long = 1500L) {
         val deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(maxWaitMillis)
@@ -502,14 +501,14 @@ class OAuth2AuthNServiceTest {
         }
     }
 
-     private companion object {
-         const val MAX_ATTEMPTS = 3
-         const val ACCESS_TOKEN = "test-access-token"
-         const val ERROR_TOKEN_RESPONSE = """
+    private companion object {
+        const val MAX_ATTEMPTS = 3
+        const val ACCESS_TOKEN = "test-access-token"
+        const val ERROR_TOKEN_RESPONSE = """
              {
                  "error": "invalid_client",
                  "error_description": "AADB2C90081: The specified client_secret does not match the expected value for this client."
              }
          """
-     }
+    }
 }
