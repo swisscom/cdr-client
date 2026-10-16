@@ -1,9 +1,7 @@
 import dev.detekt.gradle.Detekt
-import org.gradle.kotlin.dsl.withType
-import org.gradle.api.GradleException
 
 allprojects {
-    version = "7.0.0"
+    version = "7.0.1"
 }
 
 plugins {
@@ -47,7 +45,8 @@ subprojects {
 
 // NOTE: you should to run this target or manually update `gradle/gradle-daemon-jvm.properties` if we change the Java version!
 tasks.updateDaemonJvm {
-    languageVersion = JavaLanguageVersion.of(libs.versions.jdk.get().toInt())
+    languageVersion = JavaLanguageVersion.of(libs.versions.jdk.version.get().toInt())
+    vendor = JvmVendorSpec.of(libs.versions.jdk.vendor.get())
 }
 
 // =============================================================================

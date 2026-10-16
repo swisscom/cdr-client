@@ -89,13 +89,13 @@ springBoot {
 
 kotlin {
     jvmToolchain {
-        languageVersion.set(JavaLanguageVersion.of(libs.versions.jdk.get().toInt()))
-        vendor.set(JvmVendorSpec.ADOPTIUM)
+        languageVersion = JavaLanguageVersion.of(libs.versions.jdk.version.get().toInt())
+        vendor = JvmVendorSpec.of(libs.versions.jdk.vendor.get())
     }
 
     compilerOptions {
         progressiveMode = true
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.jdk.get())
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.fromTarget(libs.versions.jdk.version.get())
         freeCompilerArgs = listOf("-Xjsr305=strict")
     }
 }
