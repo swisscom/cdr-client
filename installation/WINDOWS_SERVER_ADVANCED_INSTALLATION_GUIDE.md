@@ -30,7 +30,7 @@ From the [Swisscom (Schweiz) AG download site](https://cdr.health.swisscom.ch/sh
 - Windows Server (2019 or compatible version)
 - Administrator privileges
 - .NET 10 Runtime for Windows
-- Java Runtime Environment (JRE) 21 or later
+- Java Runtime Environment (JRE) 25 or later
 
 ## Installation Steps
 

@@ -16,8 +16,6 @@ import androidx.compose.ui.window.rememberWindowState
 import com.github.pgreze.process.ProcessResult
 import com.github.pgreze.process.Redirect
 import com.github.pgreze.process.process
-import com.kdroid.composetray.tray.api.Tray
-import com.kdroid.composetray.utils.isMenuBarInDarkMode
 import com.sun.jna.Platform
 import com.swisscom.health.des.cdr.client.common.Constants.CONFIG_CHANGE_EXIT_CODE
 import com.swisscom.health.des.cdr.client.common.DTOs
@@ -33,6 +31,8 @@ import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.l
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_exit
 import com.swisscom.health.des.cdr.client.ui.cdr_client_ui.generated.resources.label_open_application_window
 import com.swisscom.health.des.cdr.client.ui.data.CdrClientApiClient
+import dev.nucleusframework.composenativetray.tray.api.Tray
+import dev.nucleusframework.composenativetray.utils.isMenuBarInDarkMode
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.cancelAndJoin
@@ -182,9 +182,9 @@ private fun ApplicationScope.CdrSystemTray(
     val labelExit = stringResource(Res.string.label_exit)
 
     val isMenuBarDark: Boolean = isMenuBarInDarkMode()
-    val colorIcon = painterResource(Res.drawable.Swisscom_Lifeform_RGB_Colour_icon)
-    val monochromeIconLight = painterResource(Res.drawable.Swisscom_Lifeform_RGB_Solid_White_icon)
-    val monochromeIconDark = painterResource(Res.drawable.Swisscom_Lifeform_RGB_Solid_Navy_icon)
+    val colorIcon = Res.drawable.Swisscom_Lifeform_RGB_Colour_icon
+    val monochromeIconLight = Res.drawable.Swisscom_Lifeform_RGB_Solid_White_icon
+    val monochromeIconDark = Res.drawable.Swisscom_Lifeform_RGB_Solid_Navy_icon
 
     val icon =
         when {
@@ -213,7 +213,6 @@ private fun ApplicationScope.CdrSystemTray(
         Item(
             label = labelExit,
         ) {
-            dispose() // dispose system tray
             exitApplication()
         }
     }

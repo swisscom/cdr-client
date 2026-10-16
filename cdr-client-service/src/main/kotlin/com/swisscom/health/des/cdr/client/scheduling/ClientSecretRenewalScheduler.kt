@@ -1,11 +1,10 @@
 package com.swisscom.health.des.cdr.client.scheduling
 
+import com.swisscom.health.des.cdr.client.LogCorrelation
 import com.swisscom.health.des.cdr.client.handler.ClientSecretRenewalService
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import com.swisscom.health.des.cdr.client.handler.ShutdownService
-import com.swisscom.health.des.cdr.client.handler.withSpan
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.micrometer.tracing.Tracer
 import jakarta.annotation.PostConstruct
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
@@ -18,8 +17,8 @@ private val logger = KotlinLogging.logger {}
  * If the secret was successfully renewed, it triggers a shutdown of the application to refresh the Spring context.
  *
  * @param clientSecretRenewalService The service to renew the client secret.
+ * @param schedulingValidationService The service to validate if scheduling is allowed.
  * @param shutdownService The service to handle application shutdowns.
- * @param tracer A Micrometer tracer for to create new `span`s.
  * @see [ClientSecretRenewalService]
  * @see [ShutdownService]
  */
@@ -29,7 +28,6 @@ internal class ClientSecretRenewalScheduler(
     private val clientSecretRenewalService: ClientSecretRenewalService,
     private val schedulingValidationService: SchedulingValidationService,
     private val shutdownService: ShutdownService,
-    private val tracer: Tracer,
 ) {
 
     @Suppress("UnusedPrivateMember")
@@ -40,7 +38,7 @@ internal class ClientSecretRenewalScheduler(
         fixedDelayString = "#{ @'client-com.swisscom.health.des.cdr.client.config.CdrClientConfig'.getIdpCredentials().getMaxCredentialAge().toMillis() }",
         initialDelayString= "#{ @'client-com.swisscom.health.des.cdr.client.config.CdrClientConfig'.getIdpCredentials().getMillisUntilNextCredentialRenewal() }"
     )
-    fun renewClientSecret(): Unit = tracer.withSpan("Renew Client Secret") {
+    fun renewClientSecret(): Unit = LogCorrelation.withNewTraceId {
         if(schedulingValidationService.isSchedulingAllowed) {
             logger.info { "Renewing client secret..." }
             val result = clientSecretRenewalService.renewClientSecret()

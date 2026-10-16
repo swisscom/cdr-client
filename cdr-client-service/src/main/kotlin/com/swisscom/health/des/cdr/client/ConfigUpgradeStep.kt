@@ -1,6 +1,6 @@
 package com.swisscom.health.des.cdr.client
 
-import com.fasterxml.jackson.databind.node.ObjectNode
+import tools.jackson.databind.node.ObjectNode
 
 /**
  * An atomic upgrade step from a source version to a target version of the configuration.
@@ -90,7 +90,7 @@ sealed class ConfigUpgradeStep(
         override fun upgradeImpl(configRoot: ObjectNode): UpgradeStepResult =
             configRoot.at("/$PROPERTY_NAME_CLIENT/$PROPERTY_NAME_PROXY_URL")
                 .takeUnless { it.isMissingNode }
-                ?.textValue()
+                ?.stringValue()
                 ?.let { proxyUrl: String ->
                     configRoot[PROPERTY_NAME_CLIENT]
                         ?.let { it as ObjectNode }

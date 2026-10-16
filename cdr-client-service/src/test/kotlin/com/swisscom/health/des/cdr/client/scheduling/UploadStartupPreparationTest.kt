@@ -12,7 +12,6 @@ import io.mockk.junit5.MockKExtension
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
@@ -53,7 +52,7 @@ internal class UploadStartupPreparationTest {
     fun `renames restart files when scheduling is allowed`() {
         val restartFile = sourceDir.resolve("document.$RESTART_FILE_EXTENSION").also { it.writeText("payload") }
 
-        UploadStartupPreparation(config, 0.0).prepareUploadStartupState()
+        UploadStartupPreparation(config).prepareUploadStartupState()
 
         val xmlFile = sourceDir.resolve("document.xml")
         assertFalse(restartFile.exists())
@@ -65,7 +64,7 @@ internal class UploadStartupPreparationTest {
     fun `leaves upload files untouched`() {
         val uploadFile = sourceDir.resolve("document.$UPLOAD_FILE_EXTENSION").also { it.writeText("payload") }
 
-        UploadStartupPreparation(config, 0.0).prepareUploadStartupState()
+        UploadStartupPreparation(config).prepareUploadStartupState()
 
         assertTrue(uploadFile.exists())
         assertEquals("payload", uploadFile.toFile().readText())
@@ -74,14 +73,5 @@ internal class UploadStartupPreparationTest {
         assertEquals(1, regularFiles.size)
         assertEquals(uploadFile, regularFiles.single())
         assertEquals(UPLOAD_FILE_EXTENSION, regularFiles.single().extension)
-    }
-
-    @Test
-    fun `fails when telemetry sampling is enabled`() {
-        val startupPreparation = UploadStartupPreparation(config, 0.1)
-
-        assertThrows<IllegalStateException> {
-            startupPreparation.prepareUploadStartupState()
-        }
     }
 }

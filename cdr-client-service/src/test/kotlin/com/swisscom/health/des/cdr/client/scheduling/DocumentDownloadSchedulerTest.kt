@@ -7,9 +7,6 @@ import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.handler.PullFileHandling
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
-import io.micrometer.tracing.Span
-import io.micrometer.tracing.TraceContext
-import io.micrometer.tracing.Tracer
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -37,21 +34,6 @@ internal class DocumentDownloadSchedulerTest {
     private lateinit var schedulingValidationService: SchedulingValidationService
 
     @MockK
-    private lateinit var tracer: Tracer
-
-    @MockK
-    private lateinit var spanBuilder: Span.Builder
-
-    @MockK
-    private lateinit var span: Span
-
-    @MockK
-    private lateinit var spanInScope: Tracer.SpanInScope
-
-    @MockK
-    private lateinit var traceContext: TraceContext
-
-    @MockK
     private lateinit var pullFileHandling: PullFileHandling
 
     private val inflightDirectory = "inflight"
@@ -75,22 +57,6 @@ internal class DocumentDownloadSchedulerTest {
         every { config.customer } returns Customer(mutableListOf(connector))
         every { config.localFolder } returns TempDownloadDir(inflightDir)
         every { schedulingValidationService.isSchedulingAllowed } returns true
-        mockTracer()
-    }
-
-    private fun mockTracer() {
-        every { tracer.spanBuilder() } returns spanBuilder
-        every { spanBuilder.setNoParent() } returns spanBuilder
-        every { spanBuilder.name(any()) } returns spanBuilder
-        every { spanBuilder.start() } returns span
-        every { tracer.withSpan(any()) } returns spanInScope
-        every { span.name(any()) } returns span
-        every { span.start() } returns span
-        every { span.event(any()) } returns span
-        every { span.tag(any(), any<String>()) } returns span
-        every { span.context() } returns traceContext
-        every { spanInScope.close() } returns Unit
-        every { traceContext.traceId() } returns "1"
     }
 
     @Test
