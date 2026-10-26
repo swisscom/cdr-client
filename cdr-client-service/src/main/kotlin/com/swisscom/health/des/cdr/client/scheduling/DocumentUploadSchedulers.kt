@@ -45,8 +45,8 @@ import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.nio.file.attribute.BasicFileAttributes
-import java.util.*
 import java.util.Objects.isNull
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.io.path.absolute
@@ -234,8 +234,8 @@ internal class PollingUploadScheduler(
                                     .sortedBy { Files.readAttributes(it, BasicFileAttributes::class.java).lastModifiedTime() }
                                     .map { path -> path to UUID.randomUUID().toString() }
                             }
-                                    }.forEach { (path, traceId) ->
-                                        emit(path.absolute() to traceId)
+                    }.forEach { (path, traceId) ->
+                        emit(path.absolute() to traceId)
                     }
                 logger.debug { "Next poll in '${config.scheduleDelay}'" }
                 delay(config.scheduleDelay)
