@@ -5,7 +5,7 @@
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>%d{ISO8601} [%thread] %-5level %logger{36} -%kvp- %msg%n</pattern>
+            <pattern>%d{ISO8601} [%thread] %-5level [traceId=%X{traceId:-}] %logger{36} -%kvp- %msg%n</pattern>
         </encoder>
     </appender>
 
@@ -18,7 +18,7 @@
             <totalSizeCap>1GB</totalSizeCap>
         </rollingPolicy>
         <encoder>
-            <pattern>%d{ISO8601} [%thread] %-5level %logger{36} -%kvp- %msg%n</pattern>
+            <pattern>%d{ISO8601} [%thread] %-5level [traceId=%X{traceId:-}] %logger{36} -%kvp- %msg%n</pattern>
         </encoder>
     </appender>
 

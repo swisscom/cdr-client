@@ -60,7 +60,7 @@ management:
 
 logging:
   pattern:
-    correlation: "traceId=%X{traceId:-}"
+    correlation: "[traceId=%X{traceId:-}] "
     dateformat: "\"yyyy-MM-dd'T'HH:mm:ss.SSSXXX\", UTC"
   level:
     root: INFO
