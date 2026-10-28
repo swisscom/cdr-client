@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import java.lang.reflect.InvocationTargetException
 import java.nio.file.AccessDeniedException
 import java.nio.file.FileSystem
 import java.nio.file.Path
@@ -33,10 +32,10 @@ class ConfigInitTest {
 
     @BeforeEach
     fun setUp() {
-        Platform.isWindows()
+        Platform.isWindows() // initialize JNA before mocking; otherwise mockk records its static initializer calls
         mockkStatic(Platform::class)
         mockkStatic(Advapi32Util::class)
-        mockkObject(ConfigInit, recordPrivateCalls = true)
+        mockkObject(ConfigInit)
         every { Platform.isWindows() } returns true
         every { configFile.fileSystem } returns fileSystem
         every { fileSystem.provider() } returns provider
@@ -50,8 +49,10 @@ class ConfigInitTest {
     }
 
     @Test
-    fun `SYSTEM filters ACLs without resolving account names`() {
-        every { ConfigInit invoke "currentWindowsUserSid" withArguments emptyList() } returns "S-1-5-18"
+    fun `SYSTEM service user filters ACLs by well-known SIDs without resolving other accounts`() {
+        every { Advapi32Util.getAccountBySid("S-1-5-18") } returns Advapi32Util.Account().apply { fqn = "NT AUTHORITY\\SYSTEM" }
+        every { Advapi32Util.getAccountBySid("S-1-5-32-544") } returns Advapi32Util.Account().apply { fqn = "BUILTIN\\Administrators" }
+        every { ConfigInit.currentWindowsUserSid() } returns "S-1-5-18"
         val system = entry("NT AUTHORITY\\SYSTEM")
         val administrators = entry("BUILTIN\\Administrators")
         every { aclView.acl } answers {
@@ -61,13 +62,15 @@ class ConfigInitTest {
         assertEquals(configFile, removeWorldAccess())
 
         assertEquals(listOf(system, administrators), remainingEntries)
+
         verify(exactly = 0) { Advapi32Util.getAccountByName(any<String>()) }
     }
 
     @Test
     fun `custom service account retains its existing ACL entry`() {
         val serviceSid = "S-1-5-21-1-2-3-1001"
-        every { ConfigInit invoke "currentWindowsUserSid" withArguments emptyList() } returns serviceSid
+        every { ConfigInit.currentWindowsUserSid() } returns serviceSid
+        every { Advapi32Util.getAccountByName("NT AUTHORITY\\SYSTEM") } returns Advapi32Util.Account().apply { sidString = "S-1-5-18" }
         every { Advapi32Util.getAccountByName("CONTOSO\\service") } returns Advapi32Util.Account().apply { sidString = serviceSid }
         every { Advapi32Util.getAccountByName("CONTOSO\\user") } returns Advapi32Util.Account().apply { sidString = "S-1-5-21-1-2-3-1002" }
         val system = entry("NT AUTHORITY\\SYSTEM")
@@ -82,8 +85,32 @@ class ConfigInitTest {
     }
 
     @Test
+    fun `unresolvable account leaves ACLs untouched`() {
+        every { ConfigInit.currentWindowsUserSid() } returns "S-1-5-21-1-2-3-1001"
+        every { Advapi32Util.getAccountByName("CONTOSO\\ghost") } throws IllegalStateException("account not found")
+        every { Advapi32Util.getAccountByName("NT AUTHORITY\\SYSTEM") } returns Advapi32Util.Account().apply { sidString = "S-1-5-18" }
+        every { aclView.acl } returns listOf(entry("NT AUTHORITY\\SYSTEM"), entry("CONTOSO\\ghost"))
+
+        assertEquals(configFile, removeWorldAccess())
+
+        verify(exactly = 0) { aclView.acl = any() }
+    }
+
+    @Test
+    fun `SYSTEM service user leaves ACLs untouched if well-known SIDs cannot be resolved`() {
+        every { ConfigInit.currentWindowsUserSid() } returns "S-1-5-18"
+        every { Advapi32Util.getAccountBySid("S-1-5-18") } throws IllegalStateException("lookup failed")
+        every { Advapi32Util.getAccountBySid("S-1-5-32-544") } returns Advapi32Util.Account().apply { fqn = "BUILTIN\\Administrators" }
+        every { aclView.acl } returns listOf(entry("NT AUTHORITY\\SYSTEM"))
+
+        removeWorldAccess()
+
+        verify(exactly = 0) { aclView.acl = any() }
+    }
+
+    @Test
     fun `unknown identity leaves ACLs untouched and allows initialization`() {
-        every { ConfigInit invoke "currentWindowsUserSid" withArguments emptyList() } returns null
+        every { ConfigInit.currentWindowsUserSid() } returns null
 
         assertEquals(configFile, removeWorldAccess())
 
@@ -93,21 +120,16 @@ class ConfigInitTest {
 
     @Test
     fun `ACL write failure still propagates`() {
-        every { ConfigInit invoke "currentWindowsUserSid" withArguments emptyList() } returns "S-1-5-18"
+        every { ConfigInit.currentWindowsUserSid() } returns "S-1-5-18"
+        every { Advapi32Util.getAccountBySid("S-1-5-18") } returns Advapi32Util.Account().apply { fqn = "NT AUTHORITY\\SYSTEM" }
+        every { Advapi32Util.getAccountBySid("S-1-5-32-544") } returns Advapi32Util.Account().apply { fqn = "BUILTIN\\Administrators" }
         every { aclView.acl } returns listOf(entry("NT AUTHORITY\\SYSTEM"))
         every { aclView.acl = any() } throws AccessDeniedException(configFile.toString())
 
         assertThrows<AccessDeniedException> { removeWorldAccess() }
     }
 
-    private fun removeWorldAccess(): Path =
-        try {
-            ConfigInit::class.java.getDeclaredMethod("removeWorldAccess", Path::class.java)
-                .apply { isAccessible = true }
-                .invoke(ConfigInit, configFile) as Path
-        } catch (exception: InvocationTargetException) {
-            throw exception.targetException
-        }
+    private fun removeWorldAccess(): Path = with(ConfigInit) { configFile.removeWorldAccess() }
 
     private fun entry(name: String): AclEntry =
         AclEntry.newBuilder()

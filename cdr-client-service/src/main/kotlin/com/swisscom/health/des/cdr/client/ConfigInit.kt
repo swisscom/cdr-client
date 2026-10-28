@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client
 
+import com.sun.jna.Native
 import com.sun.jna.Platform
 import com.sun.jna.platform.win32.Advapi32
 import com.sun.jna.platform.win32.Advapi32Util
@@ -29,6 +30,7 @@ object ConfigInit {
     private const val DEFAULT_CUSTOMER_CONFIG_FILE = "default-application-customer.yaml"
     private const val SERVICE_LOGBACK_FILE = "logback-service.xml"
     private const val WINDOWS_SYSTEM_SID = "S-1-5-18"
+    private const val WINDOWS_ADMINISTRATORS_SID = "S-1-5-32-544"
 
     /**
      * Checks if a configuration file already exists at [configPath]. If it does not exist, the default
@@ -159,7 +161,8 @@ object ConfigInit {
                 logbackConfigFile
             }
 
-    private fun Path.removeWorldAccess(): Path =
+    @Suppress("TooGenericExceptionCaught")
+    internal fun Path.removeWorldAccess(): Path =
         when {
             Platform.isWindows() -> {
                 val serviceUserSid = currentWindowsUserSid()
@@ -168,12 +171,28 @@ object ConfigInit {
                 } else {
                     logMsg { "Removing all ACLs but for SYSTEM, Administrators, and the service user (SID '$serviceUserSid') from '$this'." }
                     val aclView = Files.getFileAttributeView(this, AclFileAttributeView::class.java)
-                    aclView.acl = aclView.acl.filter { aclEntry ->
-                        val principalName = aclEntry.principal().name
-                        principalName.lowercase().matches("""^.*(system|administrators|administratoren|administrateurs|amministratori)$""".toRegex()) ||
-                                (serviceUserSid != WINDOWS_SYSTEM_SID && principalName.toWindowsSid() == serviceUserSid)
+                    val currentAcl = aclView.acl
+                    val retainedAcl = if (serviceUserSid == WINDOWS_SYSTEM_SID) {
+                        // service runs as SYSTEM: resolve the two well-known SIDs to their (localized) account names and compare
+                        // against the principal names; avoids resolving arbitrary (e.g. domain) accounts
+                        val wellKnownNames = listOf(WINDOWS_SYSTEM_SID, WINDOWS_ADMINISTRATORS_SID).map { it.toWindowsAccountName()?.lowercase() }
+                        if (wellKnownNames.any { it == null }) null else currentAcl.filter { it.principal().name.lowercase() in wellKnownNames }
+                    } else {
+                        val retainedSids = setOf(WINDOWS_SYSTEM_SID, WINDOWS_ADMINISTRATORS_SID, serviceUserSid)
+                        val sidByPrincipal = currentAcl.map { it.principal().name }.distinct().associateWith { it.toWindowsSid() }
+                        if (sidByPrincipal.values.any { it == null }) null else currentAcl.filter { sidByPrincipal[it.principal().name] in retainedSids }
                     }
-                    logMsg { "Remaining ACL entries: ${aclView.acl}" }
+                    if (retainedAcl == null) {
+                        logMsg { "WARNING! Cannot reliably identify all ACL principals; leaving ACLs unchanged for '$this'." }
+                    } else {
+                        try {
+                            aclView.acl = retainedAcl
+                        } catch (exception: Exception) {
+                            // insufficient rights to modify the ACLs must prevent the startup; the exception is rethrown
+                            logMsg { "ERROR! Cannot modify the ACLs of '$this': $exception" }
+                            throw exception
+                        }
+                    }
                 }
             }
 
@@ -198,12 +217,13 @@ object ConfigInit {
             this
         }
 
-    private fun currentWindowsUserSid(): String? =
+    @Suppress("TooGenericExceptionCaught")
+    internal fun currentWindowsUserSid(): String? =
         try {
             val processToken = WinNT.HANDLEByReference()
             val currentProcess = Kernel32.INSTANCE.GetCurrentProcess()
             if (!Advapi32.INSTANCE.OpenProcessToken(currentProcess, WinNT.TOKEN_QUERY, processToken)) {
-                throw Win32Exception(Kernel32.INSTANCE.GetLastError())
+                throw Win32Exception(Native.getLastError())
             }
             try {
                 val tokenUserInformation = WinNT.TOKEN_INFORMATION_CLASS.TokenUser
@@ -211,8 +231,8 @@ object ConfigInit {
 
                 // Windows requires two calls: first query the buffer size, then read the token user.
                 Advapi32.INSTANCE.GetTokenInformation(processToken.value, tokenUserInformation, null, 0, requiredBufferSize)
-                val bufferSizeQueryError = Kernel32.INSTANCE.GetLastError()
-                if (bufferSizeQueryError != WinError.ERROR_INSUFFICIENT_BUFFER) {
+                val bufferSizeQueryError = Native.getLastError()
+                if (bufferSizeQueryError != WinError.ERROR_INSUFFICIENT_BUFFER || requiredBufferSize.value <= 0) {
                     throw Win32Exception(bufferSizeQueryError)
                 }
 
@@ -225,16 +245,16 @@ object ConfigInit {
                     requiredBufferSize
                 )
                 if (!userInformationRead) {
-                    throw Win32Exception(Kernel32.INSTANCE.GetLastError())
+                    throw Win32Exception(Native.getLastError())
                 }
 
                 Advapi32Util.convertSidToStringSid(tokenUser.User.Sid)
             } finally {
                 if (!Kernel32.INSTANCE.CloseHandle(processToken.value)) {
-                    logMsg { "WARNING! Could not close the Windows process token (error ${Kernel32.INSTANCE.GetLastError()})." }
+                    logMsg { "WARNING! Could not close the Windows process token (error ${Native.getLastError()})." }
                 }
             }
-        } catch (exception: Win32Exception) {
+        } catch (exception: Exception) {
             logMsg { "WARNING! Could not read the Windows process user SID: $exception" }
             null
         } catch (error: LinkageError) {
@@ -242,12 +262,21 @@ object ConfigInit {
             null
         }
 
+    @Suppress("TooGenericExceptionCaught")
     private fun String.toWindowsSid(): String? =
         try {
             Advapi32Util.getAccountByName(this).sidString
-        } catch (exception: Win32Exception) {
+        } catch (exception: Exception) {
             logMsg { "Could not resolve ACL principal '$this' to a Windows SID; it will not be retained: $exception" }
             null
         }
 
+    @Suppress("TooGenericExceptionCaught")
+    private fun String.toWindowsAccountName(): String? =
+        try {
+            Advapi32Util.getAccountBySid(this).fqn
+        } catch (exception: Exception) {
+            logMsg { "Could not resolve well-known SID '$this' to an account name: $exception" }
+            null
+        }
 }
