@@ -1,6 +1,11 @@
 package com.swisscom.health.des.cdr.client
 
 import com.sun.jna.Platform
+import com.sun.jna.platform.win32.Advapi32
+import com.sun.jna.platform.win32.Advapi32Util
+import com.sun.jna.platform.win32.Kernel32
+import com.sun.jna.platform.win32.Win32Exception
+import com.sun.jna.platform.win32.WinNT
 import com.swisscom.health.des.cdr.client.common.escalatingFind
 import java.nio.file.Files
 import java.nio.file.Path
@@ -154,12 +159,13 @@ object ConfigInit {
     private fun Path.removeWorldAccess(): Path =
         when {
             Platform.isWindows() -> {
-                logMsg { "Removing all ACLs but for SYSTEM and Administrators groups from '$this'." }
+                val serviceUserSid = currentWindowsUserSid()
+                logMsg { "Removing all ACLs but for SYSTEM, Administrators, and the service user from '$this'." }
                 val aclView = Files.getFileAttributeView(this, AclFileAttributeView::class.java)
-                // remove all ACLs for users/groups that do not have 'system' or 'administrators' (en/de/fr/it) in their name; is this good enough,
-                // or do we have to go down the JNA route and call Windows' native API to query the administrator group principal by SID?
                 aclView.acl = aclView.acl.filter { aclEntry ->
-                    aclEntry.principal().name.lowercase().matches("""^.*(system|administrators|administratoren|administrateurs|amministratori)$""".toRegex())
+                    val principalName = aclEntry.principal().name
+                    principalName.lowercase().matches("""^.*(system|administrators|administratoren|administrateurs|amministratori)$""".toRegex()) ||
+                            principalName.toWindowsSid() == serviceUserSid
                 }
                 logMsg { "Remaining ACL entries: ${aclView.acl}" }
             }
@@ -183,6 +189,26 @@ object ConfigInit {
             else -> logMsg { "WARNING! Unsupported platform '${Platform.getOSType()}' - cannot set file permissions for file at '$this'" }
         }.let { _ ->
             this
+        }
+
+    private fun currentWindowsUserSid(): String {
+        val token = WinNT.HANDLEByReference()
+        check(Advapi32.INSTANCE.OpenProcessToken(Kernel32.INSTANCE.GetCurrentProcess(), WinNT.TOKEN_QUERY, token)) {
+            "Could not open the current process token to identify the Windows service user (error ${Kernel32.INSTANCE.GetLastError()})."
+        }
+        return try {
+            Advapi32Util.getTokenAccount(token.value).sidString
+        } finally {
+            Kernel32.INSTANCE.CloseHandle(token.value)
+        }
+    }
+
+    private fun String.toWindowsSid(): String? =
+        try {
+            Advapi32Util.getAccountByName(this).sidString
+        } catch (exception: Win32Exception) {
+            logMsg { "Could not resolve ACL principal '$this' to a Windows SID; it will not be retained: $exception" }
+            null
         }
 
 }
