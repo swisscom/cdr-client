@@ -5,7 +5,9 @@ import com.sun.jna.platform.win32.Advapi32
 import com.sun.jna.platform.win32.Advapi32Util
 import com.sun.jna.platform.win32.Kernel32
 import com.sun.jna.platform.win32.Win32Exception
+import com.sun.jna.platform.win32.WinError
 import com.sun.jna.platform.win32.WinNT
+import com.sun.jna.ptr.IntByReference
 import com.swisscom.health.des.cdr.client.common.escalatingFind
 import java.nio.file.Files
 import java.nio.file.Path
@@ -26,6 +28,7 @@ import kotlin.io.path.writeText
 object ConfigInit {
     private const val DEFAULT_CUSTOMER_CONFIG_FILE = "default-application-customer.yaml"
     private const val SERVICE_LOGBACK_FILE = "logback-service.xml"
+    private const val WINDOWS_SYSTEM_SID = "S-1-5-18"
 
     /**
      * Checks if a configuration file already exists at [configPath]. If it does not exist, the default
@@ -160,14 +163,18 @@ object ConfigInit {
         when {
             Platform.isWindows() -> {
                 val serviceUserSid = currentWindowsUserSid()
-                logMsg { "Removing all ACLs but for SYSTEM, Administrators, and the service user from '$this'." }
-                val aclView = Files.getFileAttributeView(this, AclFileAttributeView::class.java)
-                aclView.acl = aclView.acl.filter { aclEntry ->
-                    val principalName = aclEntry.principal().name
-                    principalName.lowercase().matches("""^.*(system|administrators|administratoren|administrateurs|amministratori)$""".toRegex()) ||
-                            principalName.toWindowsSid() == serviceUserSid
+                if (serviceUserSid == null) {
+                    logMsg { "WARNING! Cannot identify the Windows service user; leaving ACLs unchanged for '$this'." }
+                } else {
+                    logMsg { "Removing all ACLs but for SYSTEM, Administrators, and the service user (SID '$serviceUserSid') from '$this'." }
+                    val aclView = Files.getFileAttributeView(this, AclFileAttributeView::class.java)
+                    aclView.acl = aclView.acl.filter { aclEntry ->
+                        val principalName = aclEntry.principal().name
+                        principalName.lowercase().matches("""^.*(system|administrators|administratoren|administrateurs|amministratori)$""".toRegex()) ||
+                                (serviceUserSid != WINDOWS_SYSTEM_SID && principalName.toWindowsSid() == serviceUserSid)
+                    }
+                    logMsg { "Remaining ACL entries: ${aclView.acl}" }
                 }
-                logMsg { "Remaining ACL entries: ${aclView.acl}" }
             }
 
             Platform.isLinux() -> {
@@ -191,17 +198,49 @@ object ConfigInit {
             this
         }
 
-    private fun currentWindowsUserSid(): String {
-        val token = WinNT.HANDLEByReference()
-        check(Advapi32.INSTANCE.OpenProcessToken(Kernel32.INSTANCE.GetCurrentProcess(), WinNT.TOKEN_QUERY, token)) {
-            "Could not open the current process token to identify the Windows service user (error ${Kernel32.INSTANCE.GetLastError()})."
+    private fun currentWindowsUserSid(): String? =
+        try {
+            val processToken = WinNT.HANDLEByReference()
+            val currentProcess = Kernel32.INSTANCE.GetCurrentProcess()
+            if (!Advapi32.INSTANCE.OpenProcessToken(currentProcess, WinNT.TOKEN_QUERY, processToken)) {
+                throw Win32Exception(Kernel32.INSTANCE.GetLastError())
+            }
+            try {
+                val tokenUserInformation = WinNT.TOKEN_INFORMATION_CLASS.TokenUser
+                val requiredBufferSize = IntByReference()
+
+                // Windows requires two calls: first query the buffer size, then read the token user.
+                Advapi32.INSTANCE.GetTokenInformation(processToken.value, tokenUserInformation, null, 0, requiredBufferSize)
+                val bufferSizeQueryError = Kernel32.INSTANCE.GetLastError()
+                if (bufferSizeQueryError != WinError.ERROR_INSUFFICIENT_BUFFER) {
+                    throw Win32Exception(bufferSizeQueryError)
+                }
+
+                val tokenUser = WinNT.TOKEN_USER(requiredBufferSize.value)
+                val userInformationRead = Advapi32.INSTANCE.GetTokenInformation(
+                    processToken.value,
+                    tokenUserInformation,
+                    tokenUser,
+                    requiredBufferSize.value,
+                    requiredBufferSize
+                )
+                if (!userInformationRead) {
+                    throw Win32Exception(Kernel32.INSTANCE.GetLastError())
+                }
+
+                Advapi32Util.convertSidToStringSid(tokenUser.User.Sid)
+            } finally {
+                if (!Kernel32.INSTANCE.CloseHandle(processToken.value)) {
+                    logMsg { "WARNING! Could not close the Windows process token (error ${Kernel32.INSTANCE.GetLastError()})." }
+                }
+            }
+        } catch (exception: Win32Exception) {
+            logMsg { "WARNING! Could not read the Windows process user SID: $exception" }
+            null
+        } catch (error: LinkageError) {
+            logMsg { "WARNING! Native Windows identity APIs are unavailable: $error" }
+            null
         }
-        return try {
-            Advapi32Util.getTokenAccount(token.value).sidString
-        } finally {
-            Kernel32.INSTANCE.CloseHandle(token.value)
-        }
-    }
 
     private fun String.toWindowsSid(): String? =
         try {

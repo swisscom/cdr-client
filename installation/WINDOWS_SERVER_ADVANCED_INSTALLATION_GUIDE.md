@@ -255,6 +255,10 @@ instead of the default account, configure it and its permissions before starting
 
    Preserve SYSTEM and Administrators access. Do not grant Full control to broad groups such as Everyone or Users.
 
+   If the service cannot determine its process user SID, it logs a warning and leaves the existing ACL unchanged rather than risking removal of the service
+   account's access. Startup continues, but automatic ACL hardening is skipped; investigate the warning and verify that the file's permissions are appropriately
+   restricted. When running as SYSTEM (`S-1-5-18`), the service applies the SYSTEM/Administrators filter without additional account-name lookups.
+
 3. **Verify before restarting**:
 
    ```cmd
