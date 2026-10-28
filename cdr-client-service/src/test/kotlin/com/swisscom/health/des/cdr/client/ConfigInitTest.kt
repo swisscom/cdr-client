@@ -49,20 +49,17 @@ class ConfigInitTest {
     }
 
     @Test
-    fun `SYSTEM service user filters ACLs by well-known SIDs without resolving other accounts`() {
-        every { Advapi32Util.getAccountBySid("S-1-5-18") } returns Advapi32Util.Account().apply { fqn = "NT AUTHORITY\\SYSTEM" }
-        every { Advapi32Util.getAccountBySid("S-1-5-32-544") } returns Advapi32Util.Account().apply { fqn = "BUILTIN\\Administrators" }
+    fun `SYSTEM service user retains SYSTEM and Administrators only`() {
+        mockAccountBySid("S-1-5-18", "NT AUTHORITY\\SYSTEM")
+        mockAccountBySid("S-1-5-32-544", "BUILTIN\\Administrators")
         every { ConfigInit.currentWindowsUserSid() } returns "S-1-5-18"
         val system = entry("NT AUTHORITY\\SYSTEM")
         val administrators = entry("BUILTIN\\Administrators")
-        every { aclView.acl } answers {
-            if (::remainingEntries.isInitialized) remainingEntries else listOf(system, administrators, entry("CONTOSO\\user"))
-        }
+        every { aclView.acl } returns listOf(system, administrators, entry("CONTOSO\\user"))
 
         assertEquals(configFile, removeWorldAccess())
 
         assertEquals(listOf(system, administrators), remainingEntries)
-
         verify(exactly = 0) { Advapi32Util.getAccountByName(any<String>()) }
     }
 
@@ -70,26 +67,38 @@ class ConfigInitTest {
     fun `custom service account retains its existing ACL entry`() {
         val serviceSid = "S-1-5-21-1-2-3-1001"
         every { ConfigInit.currentWindowsUserSid() } returns serviceSid
-        every { Advapi32Util.getAccountByName("NT AUTHORITY\\SYSTEM") } returns Advapi32Util.Account().apply { sidString = "S-1-5-18" }
-        every { Advapi32Util.getAccountByName("CONTOSO\\service") } returns Advapi32Util.Account().apply { sidString = serviceSid }
-        every { Advapi32Util.getAccountByName("CONTOSO\\user") } returns Advapi32Util.Account().apply { sidString = "S-1-5-21-1-2-3-1002" }
+        mockAccountBySid("S-1-5-18", "NT AUTHORITY\\SYSTEM")
+        mockAccountBySid("S-1-5-32-544", "BUILTIN\\Administrators")
+        mockAccountBySid(serviceSid, "CONTOSO\\service")
         val system = entry("NT AUTHORITY\\SYSTEM")
         val service = entry("CONTOSO\\service")
-        every { aclView.acl } answers {
-            if (::remainingEntries.isInitialized) remainingEntries else listOf(system, service, entry("CONTOSO\\user"))
-        }
+        every { aclView.acl } returns listOf(system, service, entry("CONTOSO\\user"))
 
         removeWorldAccess()
 
         assertEquals(listOf(system, service), remainingEntries)
+        verify(exactly = 0) { Advapi32Util.getAccountByName(any<String>()) }
     }
 
     @Test
-    fun `unresolvable account leaves ACLs untouched`() {
-        every { ConfigInit.currentWindowsUserSid() } returns "S-1-5-21-1-2-3-1001"
-        every { Advapi32Util.getAccountByName("CONTOSO\\ghost") } throws IllegalStateException("account not found")
-        every { Advapi32Util.getAccountByName("NT AUTHORITY\\SYSTEM") } returns Advapi32Util.Account().apply { sidString = "S-1-5-18" }
-        every { aclView.acl } returns listOf(entry("NT AUTHORITY\\SYSTEM"), entry("CONTOSO\\ghost"))
+    fun `principal names are compared case-insensitively`() {
+        mockAccountBySid("S-1-5-18", "NT AUTHORITY\\SYSTEM")
+        mockAccountBySid("S-1-5-32-544", "BUILTIN\\Administrators")
+        every { ConfigInit.currentWindowsUserSid() } returns "S-1-5-18"
+        val system = entry("nt authority\\system")
+        every { aclView.acl } returns listOf(system, entry("CONTOSO\\user"))
+
+        removeWorldAccess()
+
+        assertEquals(listOf(system), remainingEntries)
+    }
+
+    @Test
+    fun `unresolvable well-known SID leaves ACLs untouched`() {
+        every { ConfigInit.currentWindowsUserSid() } returns "S-1-5-18"
+        every { Advapi32Util.getAccountBySid("S-1-5-18") } throws IllegalStateException("lookup failed")
+        mockAccountBySid("S-1-5-32-544", "BUILTIN\\Administrators")
+        every { aclView.acl } returns listOf(entry("NT AUTHORITY\\SYSTEM"))
 
         assertEquals(configFile, removeWorldAccess())
 
@@ -97,13 +106,15 @@ class ConfigInitTest {
     }
 
     @Test
-    fun `SYSTEM service user leaves ACLs untouched if well-known SIDs cannot be resolved`() {
-        every { ConfigInit.currentWindowsUserSid() } returns "S-1-5-18"
-        every { Advapi32Util.getAccountBySid("S-1-5-18") } throws IllegalStateException("lookup failed")
-        every { Advapi32Util.getAccountBySid("S-1-5-32-544") } returns Advapi32Util.Account().apply { fqn = "BUILTIN\\Administrators" }
-        every { aclView.acl } returns listOf(entry("NT AUTHORITY\\SYSTEM"))
+    fun `unresolvable service user SID leaves ACLs untouched`() {
+        val serviceSid = "S-1-5-21-1-2-3-1001"
+        every { ConfigInit.currentWindowsUserSid() } returns serviceSid
+        mockAccountBySid("S-1-5-18", "NT AUTHORITY\\SYSTEM")
+        mockAccountBySid("S-1-5-32-544", "BUILTIN\\Administrators")
+        every { Advapi32Util.getAccountBySid(serviceSid) } throws IllegalStateException("lookup failed")
+        every { aclView.acl } returns listOf(entry("NT AUTHORITY\\SYSTEM"), entry("CONTOSO\\service"))
 
-        removeWorldAccess()
+        assertEquals(configFile, removeWorldAccess())
 
         verify(exactly = 0) { aclView.acl = any() }
     }
@@ -121,12 +132,16 @@ class ConfigInitTest {
     @Test
     fun `ACL write failure still propagates`() {
         every { ConfigInit.currentWindowsUserSid() } returns "S-1-5-18"
-        every { Advapi32Util.getAccountBySid("S-1-5-18") } returns Advapi32Util.Account().apply { fqn = "NT AUTHORITY\\SYSTEM" }
-        every { Advapi32Util.getAccountBySid("S-1-5-32-544") } returns Advapi32Util.Account().apply { fqn = "BUILTIN\\Administrators" }
+        mockAccountBySid("S-1-5-18", "NT AUTHORITY\\SYSTEM")
+        mockAccountBySid("S-1-5-32-544", "BUILTIN\\Administrators")
         every { aclView.acl } returns listOf(entry("NT AUTHORITY\\SYSTEM"))
         every { aclView.acl = any() } throws AccessDeniedException(configFile.toString())
 
         assertThrows<AccessDeniedException> { removeWorldAccess() }
+    }
+
+    private fun mockAccountBySid(sid: String, fqn: String) {
+        every { Advapi32Util.getAccountBySid(sid) } returns Advapi32Util.Account().apply { this.fqn = fqn }
     }
 
     private fun removeWorldAccess(): Path = with(ConfigInit) { configFile.removeWorldAccess() }

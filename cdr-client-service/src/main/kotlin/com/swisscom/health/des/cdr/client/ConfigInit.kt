@@ -12,6 +12,7 @@ import com.sun.jna.ptr.IntByReference
 import com.swisscom.health.des.cdr.client.common.escalatingFind
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.AclEntry
 import java.nio.file.attribute.AclFileAttributeView
 import java.nio.file.attribute.PosixFilePermission
 import kotlin.io.path.absolute
@@ -171,16 +172,14 @@ object ConfigInit {
                 } else {
                     logMsg { "Removing all ACLs but for SYSTEM, Administrators, and the service user (SID '$serviceUserSid') from '$this'." }
                     val aclView = Files.getFileAttributeView(this, AclFileAttributeView::class.java)
-                    val currentAcl = aclView.acl
-                    val retainedAcl = if (serviceUserSid == WINDOWS_SYSTEM_SID) {
-                        // service runs as SYSTEM: resolve the two well-known SIDs to their (localized) account names and compare
-                        // against the principal names; avoids resolving arbitrary (e.g. domain) accounts
-                        val wellKnownNames = listOf(WINDOWS_SYSTEM_SID, WINDOWS_ADMINISTRATORS_SID).map { it.toWindowsAccountName()?.lowercase() }
-                        if (wellKnownNames.any { it == null }) null else currentAcl.filter { it.principal().name.lowercase() in wellKnownNames }
-                    } else {
-                        val retainedSids = setOf(WINDOWS_SYSTEM_SID, WINDOWS_ADMINISTRATORS_SID, serviceUserSid)
-                        val sidByPrincipal = currentAcl.map { it.principal().name }.distinct().associateWith { it.toWindowsSid() }
-                        if (sidByPrincipal.values.any { it == null }) null else currentAcl.filter { sidByPrincipal[it.principal().name] in retainedSids }
+                    val currentAcl: List<AclEntry> = aclView.acl
+                    val wellKnownNames = setOf(WINDOWS_SYSTEM_SID, WINDOWS_ADMINISTRATORS_SID, serviceUserSid).map { it.toWindowsAccountName()?.lowercase() }
+                    val retainedAcl = if (wellKnownNames.any { it == null }) null else currentAcl.filter {
+                        logMsg {
+                            "Checking ACL principal '${it.principal().name}' against well-known names: $wellKnownNames: " +
+                                    "${it.principal().name.lowercase() in wellKnownNames}"
+                        }
+                        it.principal().name.lowercase() in wellKnownNames
                     }
                     if (retainedAcl == null) {
                         logMsg { "WARNING! Cannot reliably identify all ACL principals; leaving ACLs unchanged for '$this'." }
@@ -259,15 +258,6 @@ object ConfigInit {
             null
         } catch (error: LinkageError) {
             logMsg { "WARNING! Native Windows identity APIs are unavailable: $error" }
-            null
-        }
-
-    @Suppress("TooGenericExceptionCaught")
-    private fun String.toWindowsSid(): String? =
-        try {
-            Advapi32Util.getAccountByName(this).sidString
-        } catch (exception: Exception) {
-            logMsg { "Could not resolve ACL principal '$this' to a Windows SID; it will not be retained: $exception" }
             null
         }
 
