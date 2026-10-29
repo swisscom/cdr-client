@@ -2,7 +2,7 @@
 jdk-version = "25"
 jdk-vendor = "AZUL"
 kotlin-lang = "2.4.20"
-compose-multiplatform = "1.12.0"
+compose-multiplatform = "1.12.2"
 compose-native-tray = "2.1.6"
 kotlin-logging = "8.0.4"
 kotlinx-coroutines = "1.10.2"

@@ -22,7 +22,7 @@ curaLINE Client on Windows Server uses a three-tier service architecture:
 
 From the [Swisscom (Schweiz) AG download site](https://cdr.health.swisscom.ch/share/downloads/manualInstallation/latest.json), download these files:
 1. **cdr-client-service-{version}.jar** - Main application
-2. **CdrClientWatchdog-{version}.zip** - Watchdog Windows service
+2. **curaLINEClient-watchdog-{version}.zip** - Watchdog Windows service
 3. **curaLINEClient-updateservice-{version}.zip** - Update manager service
 
 ## Prerequisites
@@ -139,7 +139,7 @@ These paths are configured in the Watchdog's `JavaArguments` setting (see next s
 1. **Extract the ZIP**:
    ```cmd
    cd "%USERPROFILE%\Downloads"
-   tar -xf CdrClientWatchdog-{version}.zip -C "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\bin\watchdog"
+   tar -xf curaLINEClient-watchdog-{version}.zip -C "C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\bin\watchdog"
    ```
 
 2. **Configure the Watchdog**:
@@ -193,7 +193,7 @@ These paths are configured in the Watchdog's `JavaArguments` setting (see next s
          "TargetPath": "lib/cdr-client-service.jar"
        },
        "Watchdog": {
-         "FileName": "CdrClientWatchdog.zip",
+         "FileName": "curaLINEClient-watchdog.zip",
          "TargetPath": "bin/watchdog/"
        }
      },
