@@ -1,78 +1,86 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
 REM Install curaLINEClientWatchdog Service
-REM Run this script as Administrator
+REM Run this script as Administrator.
 
 REM Configuration - change this to customize the service name
-set SERVICE_NAME=CDRClientWatchdog
-set DISPLAY_NAME=curaLINE Client Service
-set DESCRIPTION=Monitors and restarts curaLINE Client service when it fails
+set "SERVICE_NAME=CDRClientWatchdog"
+set "DISPLAY_NAME=curaLINE Client Service"
+set "DESCRIPTION=Monitors and restarts curaLINE Client service when it fails"
 
-echo Installing !DISPLAY_NAME!...
+REM Manual installation keeps the executable next to this script; Conveyor puts it
+REM into a "watchdog" subdirectory.
+set "WATCHDOG_PATH=%~dp0CdrClientWatchdog.exe"
+if not exist "%WATCHDOG_PATH%" set "WATCHDOG_PATH=%~dp0watchdog\CdrClientWatchdog.exe"
 
-REM Determine the correct path to CdrClientWatchdog.exe
-REM Check if it's in the current directory (manual installation)
-if exist "%~dp0CdrClientWatchdog.exe" (
-    set "WATCHDOG_PATH=%~dp0CdrClientWatchdog.exe"
-    echo Detected manual installation: using !WATCHDOG_PATH!
-) else if exist "%~dp0watchdog\CdrClientWatchdog.exe" (
-    REM Check if it's in the watchdog subdirectory (Conveyor installation)
-    set "WATCHDOG_PATH=%~dp0watchdog\CdrClientWatchdog.exe"
-    echo Detected Conveyor installation: using !WATCHDOG_PATH!
-) else (
+REM Reading the LocalSystem registry hive succeeds only for elevated processes.
+reg query "HKU\S-1-5-19" >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: Administrator privileges are required.
+    echo Right-click this script and choose "Run as administrator".
+    goto :fail
+)
+
+if not exist "%WATCHDOG_PATH%" (
     echo ERROR: CdrClientWatchdog.exe not found!
     echo Looked in:
     echo   - %~dp0CdrClientWatchdog.exe
     echo   - %~dp0watchdog\CdrClientWatchdog.exe
-    echo.
-    echo Please ensure CdrClientWatchdog.exe is in the correct location.
-    pause
-    exit /b 1
+    goto :fail
 )
 
-REM Stop service if it exists
-sc stop "!SERVICE_NAME!" >nul 2>&1
+echo Installing %DISPLAY_NAME% using %WATCHDOG_PATH%...
 
-REM Delete service if it exists
-sc delete "!SERVICE_NAME!" >nul 2>&1
+REM Remove any previous installation. Both commands fail on a clean machine,
+REM which is expected and therefore not treated as an error.
+sc stop "%SERVICE_NAME%" >nul 2>&1
+if not errorlevel 1 (
+    REM A stop was actually initiated. Give the SCM a moment to finish it,
+    REM otherwise the delete below only marks the service for deletion.
+    echo Stopping the running service...
+    ping -n 6 127.0.0.1 >nul
+)
+sc delete "%SERVICE_NAME%" >nul 2>&1
 
-REM Create the service
-sc create "!SERVICE_NAME!" ^
-    binPath= "\"!WATCHDOG_PATH!\" --service-name !SERVICE_NAME!" ^
+sc create "%SERVICE_NAME%" ^
+    binPath= "\"%WATCHDOG_PATH%\" --serviceName \"%SERVICE_NAME%\"" ^
     start= auto ^
-    DisplayName= "!DISPLAY_NAME!"
-
-set "WAIT_SECONDS=7"
-
-if %ERRORLEVEL% == 0 (
-    echo Service installed successfully.
-
-    echo Add description to service...
-    sc description !SERVICE_NAME! !DESCRIPTION!
-    
-    REM Start the service
-    echo Starting service...
-    sc start !SERVICE_NAME! >nul 2>&1
-
-    REM Wait a fixed number of seconds, then check once if the service is RUNNING
-    REM Increase WAIT_SECONDS if your service needs more time to initialize on slower machines.
-    echo "Waiting !WAIT_SECONDS! second(s) for the service to transition to RUNNING..."
-    timeout /t !WAIT_SECONDS! >nul
-
-    REM Check if the service reports RUNNING (case-insensitive)
-    sc query "!SERVICE_NAME!" | findstr /I "RUNNING" >nul && (
-        echo Service reached RUNNING state.
-        echo.
-        echo The !SERVICE_NAME! service is now monitoring your curaLINE Client service.
-        echo It will automatically restart the service if it exits with a non-zero exit code.
-    ) || (
-        echo Warning: Service did not reach RUNNING within !WAIT_SECONDS! seconds. Manual check is required.
-        REM Show current sc query output for debugging
-        sc query "!SERVICE_NAME!"
-    )
-) else (
-    echo Error: Failed to install service. Make sure you're running as Administrator.
+    DisplayName= "%DISPLAY_NAME%"
+if errorlevel 1 (
+    echo.
+    echo ERROR: Failed to create the service.
+    echo If sc reported "marked for deletion", close the Services console and any
+    echo open service property dialogs, then run this script again.
+    goto :fail
 )
+
+sc description "%SERVICE_NAME%" "%DESCRIPTION%"
+if errorlevel 1 echo WARNING: Could not set the service description.
+
+echo Starting service...
+sc start "%SERVICE_NAME%"
+if errorlevel 1 (
+    echo.
+    echo ERROR: Failed to start the service.
+    echo Check the Windows event log ^(source "%SERVICE_NAME%"^) for details.
+    goto :fail
+)
+
+REM sc start returns while the service is still START_PENDING, so wait briefly
+REM before reporting the state.
+ping -n 4 127.0.0.1 >nul
 
 echo.
+sc query "%SERVICE_NAME%"
+echo.
+echo %SERVICE_NAME% installed. Confirm that STATE above reads RUNNING.
+echo.
 pause
+exit /b 0
+
+:fail
+echo.
+echo Installation did not complete successfully.
+echo.
+pause
+exit /b 1
