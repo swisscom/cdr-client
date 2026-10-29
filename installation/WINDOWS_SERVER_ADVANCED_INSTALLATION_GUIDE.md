@@ -122,13 +122,10 @@ The curaLINE Client service requires configuration files for application setting
    ```
 
 4. **Set Permissions**:
-   
-   Ensure the service account can read/write to these directories:
-   ```cmd
-   icacls "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient" /grant "NT AUTHORITY\LOCAL SERVICE:(OI)(CI)F" /T
-   ```
-   
-   Or if running as a specific user, grant permissions accordingly.
+
+   If using a dedicated service account, grant **Full control** on `application-customer.yaml` and **Modify** on the application data folders as described
+   in [Using a Dedicated Service Account](#55-using-a-dedicated-service-account). Read/write or Modify access alone is not sufficient for
+   `application-customer.yaml`, because the service also updates that file's permissions at startup.
 
 **Configuration Paths Explained:**
 - `spring.config.additional-location`: Path to your custom application YAML configuration
@@ -215,6 +212,63 @@ These paths are configured in the Watchdog's `JavaArguments` setting (see next s
    ```cmd
    sc query curaLINEClientUpdateService
    ```
+
+### 5.5. Using a Dedicated Service Account
+
+The CDR Service runs under the account used by **CDRClientWatchdog**, which launches the Java process. If using a dedicated local or domain service account
+instead of the default account, configure it and its permissions before starting the services.
+
+1. **Configure the service identity**:
+   - Stop `CDRClientWatchdog` if the installation script has already started it. Stop `curaLINEClientUpdateService` during setup as well, so it cannot restart
+     the Watchdog while permissions are being configured.
+   - Open **Services** (`services.msc`), open **CDRClientWatchdog**, and select the **Log On** tab.
+   - Select **This account**, enter the service account (for example, `CONTOSO\svc-curaline` or `SERVERNAME\svc-curaline`) and its password, and apply the
+     change.
+   - Ensure the account has the **Log on as a service** user right. In domain-managed environments, coordinate this with the administrator responsible for Group
+     Policy.
+   - The Update Service has its own identity and permissions; changing the Watchdog account does not change the Update Service account.
+
+2. **Grant filesystem permissions**:
+
+   | Location | Required permission |
+      |----------|---------------------|
+   | `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\application-customer.yaml` | **Full control**, including permission to change the file's ACL |
+   | Application data folders under `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\`, including `conf` and `logs`, and their other files | **Modify** |
+   | Configured document input, output, archive, and error folders | **Modify** |
+   | Installation files under `C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\`, including the JRE and service JAR | **Read & execute** for the Watchdog/CDR service account; the Update Service separately needs permission to replace application files |
+
+   Run the following in an **administrator Command Prompt**, replacing `CONTOSO\svc-curaline` with the actual account. Create `application-customer.yaml` from
+   the template first (Step 3.5). Grant Modify on the data folders first, then Full control on the YAML file:
+
+   ```cmd
+   icacls "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient" /grant:r "CONTOSO\svc-curaline:(OI)(CI)M" /T
+   icacls "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\application-customer.yaml" /grant:r "CONTOSO\svc-curaline:F"
+   ```
+
+   Apply **Modify** permissions to any document folders configured outside this directory as well. For network shares, grant access to the service account in
+   both the share permissions and the filesystem permissions; use UNC paths rather than mapped drives.
+
+   **Why Full control on the YAML file?** At startup, the service restricts its ACL to SYSTEM, Administrators, and the service account. Windows requires
+   **Change permissions** (`WRITE_DAC`) to perform this operation; **Modify** does not include that right. Without it, startup can fail with
+   `java.nio.file.AccessDeniedException` immediately after the message `Removing all ACLs but for SYSTEM, Administrators, and the service user`. The service
+   retains an existing ACL entry for its own account; it does not create that entry or grant itself additional rights.
+
+   Preserve SYSTEM and Administrators access. Do not grant Full control to broad groups such as Everyone or Users.
+
+   If the service cannot determine its process user SID, it logs a warning and leaves the existing ACL unchanged rather than risking removal of the service
+   account's access. Startup continues, but automatic ACL hardening is skipped; investigate the warning and verify that the file's permissions are appropriately
+   restricted. When running as SYSTEM (`S-1-5-18`), the service applies the SYSTEM/Administrators filter without additional account-name lookups.
+
+3. **Verify before restarting**:
+
+   ```cmd
+   sc qc CDRClientWatchdog
+   icacls "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\application-customer.yaml"
+   icacls "C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\logs"
+   ```
+
+   Confirm `SERVICE_START_NAME` is the intended account, the account has `(F)` on `application-customer.yaml`, and it has `(M)` on the data folders. Start the
+   services as described below, then check the initialization log for permission errors.
 
 ### 6. Start Services
 
@@ -332,7 +386,9 @@ Once installed:
 - Check that `application-customer.yaml` exists at: `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\application-customer.yaml`
 - Verify YAML syntax in `application-customer.yaml` (YAML is strict about indentation)
 - Check initialization log: `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\logs\cdr-service-init.log` for configuration errors
-- Verify the service account has read/write permissions on `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\`
+- Verify the service account has **Full control** on `application-customer.yaml` and **Modify** on the application data folders. An `AccessDeniedException`
+  after `Removing all ACLs...` can indicate missing permission to change the YAML file's ACL.
+  See [Using a Dedicated Service Account](#55-using-a-dedicated-service-account).
 - **Common mistake:** Verify config paths in watchdog's `appsettings.json` use `C:/ProgramData/Swisscom (Schweiz) AG/curaLINEClient/` NOT `C:/Program Files/`
 
 **Logs not being created:**

@@ -9,6 +9,8 @@ import com.swisscom.health.des.cdr.client.config.auth.toAuthNState
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.time.delay
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -227,19 +229,21 @@ internal class CdrClientContext {
      */
     @Bean
     fun processingInProgressCache(config: CdrClientConfig): ObjectKache<String, Path> =
-        InMemoryKache(maxSize = config.filesInProgressCacheSize.toBytes())
-        {
-            strategy = KacheStrategy.LRU
-            onEntryRemoved = { evicted: Boolean, key: String, _: Path, _: Path? ->
-                if (evicted) {
-                    logger.warn {
-                        "The file object with key '$key' has been evicted from the processing cache because the capacity limit of the cache " +
-                                "has been reached; this indicates a very large number of files in the source directories that cannot be processed. " +
-                                "Please investigate. "
+        SynchronizedObjectKache(
+            InMemoryKache(maxSize = config.filesInProgressCacheSize.toBytes())
+            {
+                strategy = KacheStrategy.LRU
+                onEntryRemoved = { evicted: Boolean, key: String, _: Path, _: Path? ->
+                    if (evicted) {
+                        logger.warn {
+                            "The file object with key '$key' has been evicted from the processing cache because the capacity limit of the cache " +
+                                    "has been reached; this indicates a very large number of files in the source directories that cannot be processed. " +
+                                    "Please investigate. "
+                        }
                     }
                 }
             }
-        }
+        )
 
     /**
      * Creates and returns a spring retry-template that retries on IOExceptions up to three times before bailing out.
@@ -357,3 +361,39 @@ internal data class ProxyCredentials(
     val username: ProxyUsername,
     val password: ProxyPassword,
 )
+
+/**
+ * A coroutine-safe wrapper for an [ObjectKache] that synchronizes access using a Mutex.
+ * This is a workaround as it seems the Kache project is dead and our
+ * [bug report](https://github.com/MayakaApps/Kache/issues/401) about concurrency issues
+ * is not going to be addressed any time soon.
+ *
+ * Synchronized functions are
+ * * [ObjectKache.put]
+ * * [ObjectKache.get]
+ * * [ObjectKache.remove]
+ *
+ * All other functions are directly delegated to the underlying [ObjectKache] instance
+ * and are not synchronized.
+ *
+ */
+private class SynchronizedObjectKache<K : Any, V : Any>(private val delegate: ObjectKache<K, V>) : ObjectKache<K, V> by delegate {
+
+    private val mutex = Mutex()
+
+    override suspend fun put(key: K, value: V): V? =
+        mutex.withLock {
+            delegate.put(key, value)
+        }
+
+    override suspend fun get(key: K): V? =
+        mutex.withLock {
+            delegate.get(key)
+        }
+
+    override suspend fun remove(key: K): V? =
+        mutex.withLock {
+            delegate.remove(key)
+        }
+
+}

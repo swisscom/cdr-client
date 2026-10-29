@@ -4,10 +4,11 @@ import com.mayakapps.kache.ObjectKache
 import com.swisscom.health.des.cdr.client.LogCorrelation
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.FileBusyTester
-import com.swisscom.health.des.cdr.client.config.getConnectorBySourceFolder
 import com.swisscom.health.des.cdr.client.config.effectiveSourceFolders
+import com.swisscom.health.des.cdr.client.config.getConnectorBySourceFolder
 import com.swisscom.health.des.cdr.client.handler.RetryUploadFileHandling
 import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
+import com.swisscom.health.des.cdr.client.model.UploadOutcome
 import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
 import com.swisscom.health.des.cdr.client.xml.extractDocumentMetaData
 import io.github.irgaly.kfswatch.KfsDirectoryWatcher
@@ -45,8 +46,8 @@ import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.Objects.isNull
-import java.util.concurrent.TimeUnit
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.io.path.absolute
 import kotlin.io.path.absolutePathString
@@ -233,8 +234,8 @@ internal class PollingUploadScheduler(
                                     .sortedBy { Files.readAttributes(it, BasicFileAttributes::class.java).lastModifiedTime() }
                                     .map { path -> path to UUID.randomUUID().toString() }
                             }
-                                    }.forEach { (path, traceId) ->
-                                        emit(path.absolute() to traceId)
+                    }.forEach { (path, traceId) ->
+                        emit(path.absolute() to traceId)
                     }
                 logger.debug { "Next poll in '${config.scheduleDelay}'" }
                 delay(config.scheduleDelay)
@@ -314,7 +315,17 @@ internal abstract class BaseUploadScheduler(
                         runCatching {
                             dispatchForUpload(file, file.extractDocumentMetaData())
                         }.fold(
-                            onSuccess = { uploaded -> logger.info { "'$file' ${if (uploaded) "uploaded or error handled" else "not uploaded"}" } },
+                            onSuccess = { outcome ->
+                                logger.info {
+                                    "'$file' " + when (outcome) {
+                                        UploadOutcome.Retry -> error("Retry must be handled within uploadRetrying, not returned as a terminal outcome")
+                                        UploadOutcome.Uploaded -> "uploaded"
+                                        is UploadOutcome.Rejected -> "rejected (HTTP ${outcome.code}); moved to error directory and response file written"
+                                        is UploadOutcome.DeferredUntilRestart -> "deferred until restart due to configuration error (HTTP ${outcome.code})"
+                                        UploadOutcome.FileBusy -> "not uploaded; file is busy"
+                                    }
+                                }
+                            },
                             onFailure = { t: Throwable ->
                                 when (t) {
                                     is CancellationException -> throw t
@@ -345,17 +356,16 @@ internal abstract class BaseUploadScheduler(
             .collect()
     }
 
-    private suspend fun dispatchForUpload(file: Path, docMetaData: DocumentMetaData): Boolean =
+    private suspend fun dispatchForUpload(file: Path, docMetaData: DocumentMetaData): UploadOutcome =
         config.customer.getConnectorBySourceFolder(file, docMetaData).let { connector ->
             if (!file.isBusy()) {
                 // limit parallelism of uploads; cdrUploadsDispatcher is defined as a limited parallelism IO dispatcher
                 withContext(cdrUploadsDispatcher) {
                     retryUploadFileHandling.uploadRetrying(file, docMetaData, connector)
                 }
-                true
             } else {
                 logger.warn { "'$file' is still busy after '${config.fileBusyTestTimeout}'; giving up; file will be picked up again on next poll" }
-                false
+                UploadOutcome.FileBusy
             }
         }
 

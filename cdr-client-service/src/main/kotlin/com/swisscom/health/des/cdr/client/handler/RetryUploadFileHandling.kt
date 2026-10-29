@@ -9,17 +9,19 @@ import com.swisscom.health.des.cdr.client.config.getConnectorBySourceFolder
 import com.swisscom.health.des.cdr.client.config.getDailyEffectiveSourceArchiveFolder
 import com.swisscom.health.des.cdr.client.config.getEffectiveSourceErrorFolder
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.UploadDocumentResult
+import com.swisscom.health.des.cdr.client.model.UploadOutcome
 import com.swisscom.health.des.cdr.client.scheduling.BaseUploadScheduler.Companion.EXTENSION_XML
 import com.swisscom.health.des.cdr.client.xml.DocumentMetaData
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.time.delay
 import org.springframework.stereotype.Component
+import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
-import java.nio.file.FileAlreadyExistsException
 import java.util.UUID
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
@@ -50,95 +52,95 @@ internal class RetryUploadFileHandling(
      * Retries the upload of a file until it is successful or a 4xx error occurred.
      */
     @Suppress("NestedBlockDepth", "LongMethod", "CyclomaticComplexMethod")
-    suspend fun uploadRetrying(file: Path, docMeta: DocumentMetaData, connector: Connector) {
+    suspend fun uploadRetrying(file: Path, docMeta: DocumentMetaData, connector: Connector): UploadOutcome {
         logger.debug { "Uploading file '$file'" }
         var retryCount = 0
-        var retryNeeded: Boolean
 
         // a successful rename of the file to upload should guarantee that we can also delete it after a successful upload,
         // and thus prevent duplicate uploads of a file if we fail to delete or archive it after a successful upload.
         // Any exception here propagates to the caller before runCatching is entered; the source file stays in place.
         val uploadFile: Path = moveFileToUploadFile(file)
 
-        runCatching {
-            uploadGuard.acquire()
-            do {
-                val retryIndex = min(retryCount, cdrClientConfig.retryDelay.size - 1)
+        return runCatching<UploadOutcome> {
+            var outcome: UploadOutcome
+            uploadGuard.withPermit {
+                do {
+                    val retryIndex = min(retryCount, cdrClientConfig.retryDelay.size - 1)
 
-                val response: UploadDocumentResult = cdrApiClient.uploadDocument(
-                    contentType = connector.contentType,
-                    file = uploadFile,
-                    connectorId = connector.connectorId.id,
-                    mode = connector.mode,
-                    traceId = LogCorrelation.currentTraceId()
-                )
+                    val response: UploadDocumentResult = cdrApiClient.uploadDocument(
+                        contentType = connector.contentType,
+                        file = uploadFile,
+                        connectorId = connector.connectorId.id,
+                        mode = connector.mode,
+                        traceId = LogCorrelation.currentTraceId()
+                    )
 
-                retryNeeded = when (response) {
-                    is UploadDocumentResult.Success -> {
-                        logger.debug { "File '${uploadFile.fileName}' successfully synchronized." }
-                        deleteOrArchiveFile(uploadFile, docMeta)
-                        false
-                    }
-
-                    is UploadDocumentResult.UploadClientRetryableErrorResponse -> {
-                        logger.error {
-                            "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
-                                    "Retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}'"
+                    outcome = when (response) {
+                        is UploadDocumentResult.Success -> {
+                            logger.debug { "File '${uploadFile.fileName}' successfully synchronized." }
+                            deleteOrArchiveFile(uploadFile, docMeta)
+                            UploadOutcome.Uploaded
                         }
-                        true
-                    }
 
-                    is UploadDocumentResult.UploadClientConfigNonRetryableErrorResponse -> {
-                        logger.error {
-                            "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
-                                    "The file extension will be modified and it will be retried after the next restart."
+                        is UploadDocumentResult.UploadClientRetryableErrorResponse -> {
+                            logger.error {
+                                "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
+                                        "Retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}'"
+                            }
+                            UploadOutcome.Retry
                         }
-                        renameFileToFail(uploadFile)
-                        false
-                    }
 
-                    is UploadDocumentResult.UploadClientErrorResponse -> {
-                        logger.error {
-                            "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
-                                    "No retry will be attempted and the file will be moved to the error directory due to client-side issue."
+                        is UploadDocumentResult.UploadClientConfigNonRetryableErrorResponse -> {
+                            logger.error {
+                                "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
+                                        "The file extension will be modified and it will be retried after the next restart."
+                            }
+                            renameFileToFail(uploadFile)
+                            UploadOutcome.DeferredUntilRestart(response.code)
                         }
-                        renameFileToErrorAndCreateLogFile(uploadFile, docMeta, response.responseBody)
-                        false
-                    }
 
-                    is UploadDocumentResult.UploadServerErrorResponse -> {
-                        logger.error {
-                            "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
-                                    "Retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}' - server response:\n'${response.responseBody}'"
+                        is UploadDocumentResult.UploadClientErrorResponse -> {
+                            logger.error {
+                                "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
+                                        "No retry will be attempted and the file will be moved to the error directory due to client-side issue."
+                            }
+                            renameFileToErrorAndCreateLogFile(uploadFile, docMeta, response.responseBody)
+                            UploadOutcome.Rejected(response.code)
                         }
-                        true
-                    }
 
-                    is UploadDocumentResult.UploadError -> {
-                        logger.error {
-                            "File synchronization failed for '${uploadFile.fileName}'. No server response is available. " +
-                                    "Retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}' - exception message: '${response.t?.message}'"
+                        is UploadDocumentResult.UploadServerErrorResponse -> {
+                            logger.error {
+                                "File synchronization failed for '${uploadFile.fileName}'. Received a client error (response code: '${response.code}'). " +
+                                        "Retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}' - server response:\n'${response.responseBody}'"
+                            }
+                            UploadOutcome.Retry
                         }
-                        true
-                    }
-                }
 
-                if (retryNeeded) {
-                    delay(cdrClientConfig.retryDelay[retryIndex])
-                    retryCount++
-                    logger.info { "Retry attempt '#$retryCount' for file '${uploadFile.fileName}'" }
-                }
-            } while (retryNeeded)
+                        is UploadDocumentResult.UploadError -> {
+                            logger.error {
+                                "File synchronization failed for '${uploadFile.fileName}'. No server response is available. " +
+                                        "Retry will be attempted in '${cdrClientConfig.retryDelay[retryIndex]}' - exception message: '${response.t?.message}'"
+                            }
+                            UploadOutcome.Retry
+                        }
+                    }
+
+                    if (outcome == UploadOutcome.Retry) {
+                        delay(cdrClientConfig.retryDelay[retryIndex])
+                        retryCount++
+                        logger.info { "Retry attempt '#$retryCount' for file '${uploadFile.fileName}'" }
+                    }
+                } while (outcome == UploadOutcome.Retry)
+                outcome
+            }
         }.fold(
-            onSuccess = {
+            onSuccess = { outcome ->
                 logger.debug { "Upload of file '${uploadFile.fileName}' done." }
-                uploadGuard.release()
+                outcome
             },
             onFailure = { t: Throwable ->
                 when (t) {
                     is CancellationException -> {
-                        // don't release the semaphore if we are getting cancelled; the CancellationException might have been thrown by the `acquire()` call;
-                        // calling release() without the matching successful acquire() might throw an IllegalStateException
                         throw t.also {
                             if (uploadFile.exists()) {
                                 logger.debug {
@@ -153,7 +155,6 @@ internal class RetryUploadFileHandling(
 
                     else -> throw t.also {
                         logger.error(t) { "Upload of file '${uploadFile.fileName}' has failed." }
-                        uploadGuard.release()
                     }
                 }
             }
@@ -204,7 +205,10 @@ internal class RetryUploadFileHandling(
         file.moveTo(failFile)
     }.fold(
         onSuccess = {},
-        onFailure = { t: Throwable -> logger.error { "Error during renaming of file '${file}': '$t'" } }
+        onFailure = { t: Throwable ->
+            logger.error(t) { "Error during renaming of file '${file}'" }
+            throw t
+        }
     )
 
     /**
@@ -220,7 +224,10 @@ internal class RetryUploadFileHandling(
         Files.write(logFile, responseBody.toByteArray(), StandardOpenOption.APPEND, StandardOpenOption.CREATE)
     }.fold(
         onSuccess = { },
-        onFailure = { t: Throwable -> logger.error { "Error during handling of failed upload of '${file}': '$t'" } }
+        onFailure = { t: Throwable ->
+            logger.error(t) { "Error during handling of failed upload of '${file}'" }
+            throw t
+        }
     )
 
     /**
