@@ -85,7 +85,7 @@ Edit `appsettings.json` to customize behavior:
       "TargetPath": "lib/cdr-client-service.jar"
     },
     "Watchdog": {
-      "FileName": "CdrClientWatchdog.zip",
+      "FileName": "curaLINEClient-watchdog.zip",
       "TargetPath": "bin/watchdog/"
     }
   },
@@ -204,11 +204,11 @@ downloads/manualInstallation/
 ├── 5.3.0/
 │   ├── manifest.json                    # Describes available artifacts
 │   ├── cdr-client-service-5.3.0.jar    # Service JAR (always included)
-│   └── CdrClientWatchdog-5.3.0.zip     # Watchdog (when changed)
+│   └── curaLINEClient-watchdog-5.3.0.zip     # Watchdog (when changed)
 └── 5.3.1/
     ├── manifest.json
     ├── cdr-client-service-5.3.1.jar
-    └── CdrClientWatchdog-5.3.1.zip
+    └── curaLINEClient-watchdog-5.3.1.zip
 ```
 
 ### Manifest Format

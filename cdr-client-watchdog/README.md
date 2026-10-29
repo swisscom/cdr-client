@@ -12,7 +12,20 @@ The watchdog supports two execution modes:
 - **Failure Protection**: Prevents endless restart loops by limiting consecutive failures
 - **Configurable**: Settings can be adjusted via `appsettings.json`
 - **Logging**: Comprehensive logging to Windows Event Log and console
-- **Graceful Shutdown**: Properly stops the monitored service when the watchdog is stopped
+- **Coordinated Shutdown**: Cancels monitoring before cleanup and terminates the monitored process tree with a bounded exit wait
+
+## MSIX update servicing
+
+Conveyor and Windows App Installer continue to manage MSIX updates. The watchdog
+handles SCM stop requests without starting another client during shutdown.
+Monitoring owns process cleanup, requests forced termination of the entire managed
+process tree, and waits up to 10 seconds for the tracked process to exit. Cleanup
+errors are logged and propagated rather than reported as a successful stop.
+
+This is forced termination, not a graceful JVM shutdown. It does not guarantee
+that Windows will request a stop for every update attempt, close the UI, or remove
+descendants that have already outlived their tracked parent. Windows may defer
+package registration while other package processes remain active.
 
 ## Configuration
 
@@ -73,6 +86,11 @@ These paths must be configured in the `JavaArguments` setting. See [CONFIG_EXAMP
 - **ServiceJarPath**: Path to the service JAR file (e.g., `..\\..\\lib\\cdr-client-service.jar`)
 - **JavaExecutablePath**: Path to the Java executable (e.g., `..\\..\\jre\\bin\\java.exe`)
 - **JavaArguments**: Java command-line arguments, including Spring Boot configuration paths
+
+## Testing
+
+Run `./gradlew testWatchdog` to execute the watchdog tests. Both `buildWatchdog` and
+`buildWatchdogRelease` run these tests before publishing and fail if any test fails.
 
 ## Installation
 
@@ -138,7 +156,7 @@ Or use the Windows Services Manager (`services.msc`).
 3. If the CDR Client exits with code 0 (clean exit), the watchdog respects this and doesn't restart
 4. If the CDR Client exits with a non-zero code (error), the watchdog waits for the configured restart delay and restarts it
 5. If there are too many consecutive failures (default: 5), the watchdog stops to prevent endless loops
-6. When the watchdog service is stopped, it gracefully shuts down the CDR Client service
+6. When the watchdog service is stopped, monitoring is cancelled and its cleanup terminates the CDR Client process tree
 
 ## Integration with Conveyor
 
