@@ -1,7 +1,7 @@
 import dev.detekt.gradle.Detekt
 
 allprojects {
-    version = "7.0.2-SNAPSHOT"
+    version = "7.0.2"
 }
 
 plugins {
