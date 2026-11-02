@@ -32,11 +32,15 @@ public class Program
             provider.GetRequiredService<IConfiguration>(),
             provider.GetRequiredService<ServicePathResolver>()));
         builder.Services.AddSingleton<IManagedServiceProcess, ManagedServiceProcess>();
+        builder.Services.AddSingleton(provider => new ServiceLaunchConfiguration(
+            provider.GetRequiredService<WatchdogSettings>(),
+            provider.GetRequiredService<ILogger<ServiceLaunchConfiguration>>()));
         builder.Services.AddSingleton(provider => new WatchdogService(
             provider.GetRequiredService<ILogger<WatchdogService>>(),
             provider.GetRequiredService<IHostApplicationLifetime>(),
             provider.GetRequiredService<WatchdogSettings>(),
-            provider.GetRequiredService<IManagedServiceProcess>()));
+            provider.GetRequiredService<IManagedServiceProcess>(),
+            provider.GetRequiredService<ServiceLaunchConfiguration>()));
         builder.Services.AddHostedService<WatchdogService>(provider => provider.GetService<WatchdogService>()!);
 
         builder.Services.AddWindowsService(options =>

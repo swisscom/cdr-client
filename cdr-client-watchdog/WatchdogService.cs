@@ -23,20 +23,24 @@ public class WatchdogService : BackgroundService
     private bool _isStopping;
 
     public WatchdogService(ILogger<WatchdogService> logger, IConfiguration configuration, IHostApplicationLifetime hostLifetime)
-        : this(logger, hostLifetime,
-            new WatchdogSettings(configuration, new ServicePathResolver(logger)),
-            new ManagedServiceProcess(logger))
+        : this(logger, hostLifetime, new WatchdogSettings(configuration, new ServicePathResolver(logger)))
+    {
+    }
+
+    private WatchdogService(ILogger<WatchdogService> logger, IHostApplicationLifetime hostLifetime, WatchdogSettings settings)
+        : this(logger, hostLifetime, settings, new ManagedServiceProcess(logger),
+            new ServiceLaunchConfiguration(settings, logger))
     {
     }
 
     internal WatchdogService(ILogger<WatchdogService> logger, IHostApplicationLifetime hostLifetime,
-        WatchdogSettings settings, IManagedServiceProcess process)
+        WatchdogSettings settings, IManagedServiceProcess process, ServiceLaunchConfiguration launchConfiguration)
     {
         _logger = logger;
         _hostLifetime = hostLifetime;
         _settings = settings;
         _process = process;
-        _launchConfiguration = new ServiceLaunchConfiguration(settings, logger);
+        _launchConfiguration = launchConfiguration;
         _logger.LogInformation("Watchdog initialized in {Mode} mode", _settings.ServiceExecutionMode);
     }
 
@@ -49,6 +53,12 @@ public class WatchdogService : BackgroundService
 
         try
         {
+            if (!await _launchConfiguration.CheckJavaVersionAsync(monitoringToken))
+            {
+                _hostLifetime.StopApplication();
+                return;
+            }
+
             while (!monitoringToken.IsCancellationRequested)
             {
                 await MonitorServiceHealth(monitoringToken);

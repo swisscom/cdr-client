@@ -305,6 +305,63 @@ public sealed class WatchdogServiceTests
         Assert.DoesNotContain("=== Watchdog service stopped successfully ===", logger.Messages);
     }
 
+    [Fact]
+    public async Task UnsupportedJavaVersionStopsWatchdogWithoutLaunchingClient()
+    {
+        using var directory = new TestDirectory();
+        using var lifetime = new TestLifetime();
+        var logger = new TestLogger();
+        var process = new FakeManagedServiceProcess();
+        using var watchdog = CreateJarWatchdog(directory, lifetime, logger, process,
+            (_, _) => Task.FromResult("openjdk version \"21.0.5\" 2024-10-15 LTS"));
+
+        await watchdog.StartAsync(CancellationToken.None);
+        await watchdog.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(lifetime.ApplicationStopping.IsCancellationRequested);
+        Assert.Equal(0, process.Starts);
+        Assert.Contains(logger.Messages, m => m.Contains("detected Java 21, Java 25 or newer is required"));
+    }
+
+    [Fact]
+    public async Task StopDuringJavaVersionCheckCancelsItWithoutLaunchingClient()
+    {
+        using var directory = new TestDirectory();
+        using var lifetime = new TestLifetime();
+        var logger = new TestLogger();
+        var process = new FakeManagedServiceProcess();
+        var checkStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var watchdog = CreateJarWatchdog(directory, lifetime, logger, process, async (_, token) =>
+        {
+            checkStarted.SetResult();
+            await Task.Delay(Timeout.Infinite, token);
+            return "";
+        });
+
+        await watchdog.StartAsync(CancellationToken.None);
+        await checkStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await watchdog.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(0, process.Starts);
+        Assert.DoesNotContain(logger.Messages, m => m.Contains("Java version check timed out"));
+        Assert.Contains("Watchdog monitoring cancelled - service shutdown requested", logger.Messages);
+    }
+
+    private static WatchdogService CreateJarWatchdog(TestDirectory directory, TestLifetime lifetime, TestLogger logger,
+        FakeManagedServiceProcess process, Func<string, CancellationToken, Task<string>> readJavaVersionOutput)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ServiceExecutionMode"] = "Jar",
+            ["JavaExecutablePath"] = directory.CreateFile("java.exe"),
+            ["ServiceJarPath"] = directory.CreateFile("service.jar"),
+            ["HealthCheckIntervalSeconds"] = "1"
+        }).Build();
+        var settings = new WatchdogSettings(configuration, new ServicePathResolver(logger));
+        var launch = new ServiceLaunchConfiguration(settings, logger, readJavaVersionOutput, TimeSpan.FromSeconds(30));
+        return new WatchdogService(logger, lifetime, settings, process, launch);
+    }
+
     private static WatchdogService CreateWatchdog(TestLifetime lifetime, TestLogger logger,
         string? executable = null, int restartDelay = 0, int healthInterval = 1,
         Process? managedProcess = null, IManagedServiceProcess? processController = null)
@@ -318,7 +375,8 @@ public sealed class WatchdogServiceTests
         }).Build();
         var settings = new WatchdogSettings(configuration, new ServicePathResolver(logger));
         return new WatchdogService(logger, lifetime, settings,
-            processController ?? new ManagedServiceProcess(logger, managedProcess));
+            processController ?? new ManagedServiceProcess(logger, managedProcess),
+            new ServiceLaunchConfiguration(settings, logger));
     }
 
     private static Process StartShell(string command)
