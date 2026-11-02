@@ -86,11 +86,20 @@ These paths must be configured in the `JavaArguments` setting. See [CONFIG_EXAMP
 - **ServiceJarPath**: Path to the service JAR file (e.g., `..\\..\\lib\\cdr-client-service.jar`)
 - **JavaExecutablePath**: Path to the Java executable (e.g., `..\\..\\jre\\bin\\java.exe`)
 - **JavaArguments**: Java command-line arguments, including Spring Boot configuration paths
+- The watchdog checks once at startup that Java 25 or newer is available before starting the service. A detected older version is logged and stops the watchdog;
+  if the version cannot be determined (including when `java -version` does not finish within 10 seconds), a warning is logged and startup continues. Stopping
+  the watchdog cancels the check immediately.
 
 ## Testing
 
 Run `./gradlew testWatchdog` to execute the watchdog tests. Both `buildWatchdog` and
 `buildWatchdogRelease` run these tests before publishing and fail if any test fails.
+
+The implementation separates monitoring (`WatchdogService`), configuration (`WatchdogSettings`), executable discovery (`ServicePathResolver`), launch validation
+and arguments (`ServiceLaunchConfiguration`), and process ownership and termination (`ManagedServiceProcess`). Monitoring tests can inject
+`IManagedServiceProcess`
+without launching an OS process or using reflection. Process-tree termination is
+also covered by integration tests with real processes.
 
 ## Installation
 
