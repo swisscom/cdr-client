@@ -92,6 +92,12 @@ These paths must be configured in the `JavaArguments` setting. See [CONFIG_EXAMP
 Run `./gradlew testWatchdog` to execute the watchdog tests. Both `buildWatchdog` and
 `buildWatchdogRelease` run these tests before publishing and fail if any test fails.
 
+The implementation separates monitoring (`WatchdogService`), configuration (`WatchdogSettings`), executable discovery (`ServicePathResolver`), launch validation
+and arguments (`ServiceLaunchConfiguration`), and process ownership and termination (`ManagedServiceProcess`). Monitoring tests can inject
+`IManagedServiceProcess`
+without launching an OS process or using reflection. Process-tree termination is
+also covered by integration tests with real processes.
+
 ## Installation
 
 ### Prerequisites
