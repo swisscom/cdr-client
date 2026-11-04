@@ -75,8 +75,8 @@ class DomainObjects {
 
     enum class OAuthScope(val scope: String) {
         PRODUCTION("https://identity.health.swisscom.ch/CdrApi/.default"),
-        STAGING("https://tst.identity.health.swisscom.ch/CdrApi/.default"),
-        INTEGRATION("https://dev.identity.health.swisscom.ch/CdrApi/.default"),
+        STAGING("https://tst-b2c.health.swisscom.ch/CdrApi/.default"),
+        INTEGRATION("https://dev-b2c.health.swisscom.ch/CdrApi/.default"),
         LOCALHOST("https://localhost/CdrApi/.default"),
         UNKNOWN("");
 
