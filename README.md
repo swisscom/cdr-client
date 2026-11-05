@@ -285,4 +285,4 @@ client:
       mode: production
 ```
 
-If the host is set to stage instead of production, then the scope is set to `https://tst.identity.health.swisscom.ch/CdrApi/.default`.
+If the host is set to stage instead of production, then the scope is set to `https://tst-b2c.health.swisscom.ch/CdrApi/.default`.
