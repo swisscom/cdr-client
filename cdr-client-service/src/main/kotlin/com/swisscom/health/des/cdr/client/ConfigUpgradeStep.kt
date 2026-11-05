@@ -142,17 +142,17 @@ sealed class ConfigUpgradeStep(
                     reason = "Failed to look up '$IDP_CREDENTIALS_PATH' object node"
                 )
 
-            val currentScope = idpCredentialsNode[PROPERTY_NAME_SCOPE]
+            return idpCredentialsNode[PROPERTY_NAME_SCOPE]
                 ?.takeIf { it.isString }
                 ?.asString()
-                ?: return UpgradeStepResult.Failure(
+                ?.let { currentScope ->
+                    LEGACY_TO_CURRENT_SCOPE[currentScope]?.let { idpCredentialsNode.put(PROPERTY_NAME_SCOPE, it) }
+                    UpgradeStepResult.Success(configRoot = configRoot)
+                }
+                ?: UpgradeStepResult.Failure(
                     configRoot = configRoot,
                     reason = "Failed to look up '$SCOPE_PATH' string value"
                 )
-
-            LEGACY_TO_CURRENT_SCOPE[currentScope]?.let { idpCredentialsNode.put(PROPERTY_NAME_SCOPE, it) }
-
-            return UpgradeStepResult.Success(configRoot = configRoot)
         }
     }
 }
