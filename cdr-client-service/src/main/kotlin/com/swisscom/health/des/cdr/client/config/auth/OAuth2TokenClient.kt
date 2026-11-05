@@ -9,12 +9,12 @@ import com.nimbusds.oauth2.sdk.TokenResponse
 import com.nimbusds.oauth2.sdk.auth.ClientAuthentication
 import com.nimbusds.oauth2.sdk.auth.ClientSecretPost
 import com.nimbusds.oauth2.sdk.auth.Secret
-import com.nimbusds.oauth2.sdk.http.HTTPResponse
 import com.nimbusds.oauth2.sdk.id.ClientID
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
 import com.swisscom.health.des.cdr.client.config.WrongCredentialsException
+import com.swisscom.health.des.cdr.client.model.RetryableHttpOperation
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.springframework.retry.support.RetryTemplate
+import org.springframework.core.retry.RetryTemplate
 import java.io.IOException
 import java.net.ConnectException
 import java.net.Proxy
@@ -84,9 +84,14 @@ internal class OAuth2TokenClient(
             logger.debug { "OAuth2 token request will use proxy" }
         }
         return if (shouldRetry) {
-            retryIoErrors.execute<HTTPResponse, Throwable> { _ ->
-                httpRequest.send()
-            }.run { TokenResponse.parse(this) }
+            retryIoErrors.execute(
+                RetryableHttpOperation(
+                    operationName = "send JWT token request",
+                    url = httpRequest.url,
+                ) {
+                    httpRequest.send()
+                }
+            ).run { TokenResponse.parse(this) }
         } else {
             httpRequest.send().run { TokenResponse.parse(this) }
         }
@@ -115,19 +120,21 @@ internal class OAuth2TokenClient(
     private fun toFailureResponse(t: Throwable): AuthNResponse {
         logger.debug { "Token acquisition failed: ${t.javaClass.simpleName}" }
         return when (t) {
-        is SocketTimeoutException -> AuthNResponse.RetryableFailure(
-            IOException("Token acquisition timed out (read timeout)", t)
-        )
-        is ConnectException -> AuthNResponse.RetryableFailure(
-            IOException("Cannot connect to OAuth server", t)
-        )
-        is IOException -> AuthNResponse.RetryableFailure(t)
-        else -> AuthNResponse.Failed(
-            IllegalStateException(
-                "Unexpected error during token acquisition: ${t.javaClass.simpleName}",
-                t,
+            is SocketTimeoutException -> AuthNResponse.RetryableFailure(
+                IOException("Token acquisition timed out (read timeout)", t)
             )
-        )
+
+            is ConnectException -> AuthNResponse.RetryableFailure(
+                IOException("Cannot connect to OAuth server", t)
+            )
+
+            is IOException -> AuthNResponse.RetryableFailure(t)
+            else -> AuthNResponse.Failed(
+                IllegalStateException(
+                    "Unexpected error during token acquisition: ${t.javaClass.simpleName}",
+                    t,
+                )
+            )
         }
     }
 }

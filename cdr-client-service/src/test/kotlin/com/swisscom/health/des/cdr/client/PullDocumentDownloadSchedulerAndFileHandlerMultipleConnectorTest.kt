@@ -37,10 +37,10 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.core.io.ClassPathResource
+import org.springframework.core.retry.RetryTemplate
+import org.springframework.core.retry.Retryable
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
-import org.springframework.retry.RetryCallback
-import org.springframework.retry.support.RetryTemplate
 import tools.jackson.databind.json.JsonMapper
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
@@ -118,7 +118,7 @@ internal class PullDocumentDownloadSchedulerAndFileHandlerMultipleConnectorTest 
         every { config.idpCredentials.tenantId } returns TenantId("something")
         every { schedulingValidationService.isSchedulingAllowed } returns true
 
-        every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } answers { "Mocked Result" }
+        every { retryIoErrorsThrice.execute(any<Retryable<String>>()) } answers { "Mocked Result" }
 
         cdrApiClient = CdrApiClient(
             config,
