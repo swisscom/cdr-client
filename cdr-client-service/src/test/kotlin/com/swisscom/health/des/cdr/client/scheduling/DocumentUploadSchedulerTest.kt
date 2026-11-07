@@ -17,6 +17,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -28,7 +29,9 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Path
 import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.io.path.writeText
+import kotlin.time.Instant
 
 internal class DocumentUploadSchedulerTest {
     @TempDir
@@ -38,6 +41,7 @@ internal class DocumentUploadSchedulerTest {
     private val handler = mockk<RetryUploadFileHandling>()
     private val cache = mockk<ObjectKache<String, Path>>()
     private val busyTester = mockk<FileBusyTester>()
+    private val liveUploadJobs = ConcurrentHashMap<Job, Instant>()
     private lateinit var file: Path
 
     @BeforeEach
@@ -108,7 +112,14 @@ internal class DocumentUploadSchedulerTest {
     }
 
     private suspend fun upload() {
-        val scheduler = object : BaseUploadScheduler(config, handler, Dispatchers.Unconfined, cache, busyTester) {
+        val scheduler = object : BaseUploadScheduler(
+            config = config,
+            retryUploadFileHandling = handler,
+            cdrUploadsDispatcher = Dispatchers.Unconfined,
+            processingInProgressCache = cache,
+            fileBusyTester = busyTester,
+            inProgressUploads = liveUploadJobs,
+        ) {
             suspend fun upload() = uploadFiles(flowOf(file to "test-trace"))
         }
         scheduler.upload()

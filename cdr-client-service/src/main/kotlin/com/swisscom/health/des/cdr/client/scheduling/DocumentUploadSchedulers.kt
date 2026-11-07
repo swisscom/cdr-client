@@ -15,9 +15,12 @@ import io.github.irgaly.kfswatch.KfsDirectoryWatcher
 import io.github.irgaly.kfswatch.KfsDirectoryWatcherEvent
 import io.github.irgaly.kfswatch.KfsEvent
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.annotation.PreDestroy
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.coroutineScope
@@ -31,8 +34,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.time.delay
+import kotlinx.coroutines.time.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.springframework.beans.factory.annotation.Qualifier
@@ -40,13 +46,16 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.DependsOn
 import org.springframework.context.annotation.Profile
 import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.stereotype.Component
 import org.springframework.stereotype.Service
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path
 import java.nio.file.attribute.BasicFileAttributes
+import java.time.Duration
 import java.util.Objects.isNull
 import java.util.UUID
+import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.io.path.absolute
@@ -55,9 +64,31 @@ import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger {}
+
+@Component
+internal class GracefulShutdownHandler(
+    private val inProgressUploads: ConcurrentMap<Job, Instant>
+) {
+
+    @PreDestroy
+    private fun waitForActiveUploads() = runBlocking {
+        withContext(NonCancellable) {
+            logger.info { "Waiting for '${inProgressUploads.size}' upload jobs to complete..." }
+            val success: Unit? = withTimeoutOrNull(Duration.ofMinutes(1)) { inProgressUploads.keys.joinAll() }
+            if (success == null) {
+                logger.warn { "Timeout while waiting for upload jobs to complete; check the client source directories for orphaned `.upload` files." }
+            } else {
+                logger.info { "All live upload jobs have completed." }
+            }
+        }
+    }
+
+}
 
 @Service
 @DependsOn("uploadStartupPreparation")
@@ -72,15 +103,17 @@ internal class EventTriggerUploadScheduler(
     retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
     fileBusyTester: FileBusyTester,
+    @Qualifier("inProgressUploads")
+    inProgressUploads: ConcurrentMap<Job, Instant>,
 ) : BaseUploadScheduler(
     config = config,
     retryUploadFileHandling = retryUploadFileHandling,
     cdrUploadsDispatcher = cdrUploadsDispatcher,
     processingInProgressCache = processingInProgressCache,
     fileBusyTester = fileBusyTester,
+    inProgressUploads = inProgressUploads,
 ) {
-
-    // NOTE: The scheduled tasks are racing the SpringBoot/integration tests; we need to give the tests enough time to update the client configuration
+    // NOTE: The scheduled tasks are racing the Spring Boot/integration tests; we need to give the tests enough time to update the client configuration
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFileWatcher(): Unit = runCatching {
@@ -164,21 +197,24 @@ internal class EventTriggerUploadScheduler(
 internal class PollingUploadScheduler(
     private val config: CdrClientConfig,
     private val schedulingValidationService: SchedulingValidationService,
-    @param:Qualifier("limitedParallelismCdrUploadsDispatcher")
-    private val cdrUploadsDispatcher: CoroutineDispatcher,
+    @Qualifier("limitedParallelismCdrUploadsDispatcher")
+    cdrUploadsDispatcher: CoroutineDispatcher,
     retryUploadFileHandling: RetryUploadFileHandling,
     processingInProgressCache: ObjectKache<String, Path>,
     fileBusyTester: FileBusyTester,
+    @Qualifier("inProgressUploads")
+    inProgressUploads: MutableMap<Job, Instant>,
 ) : BaseUploadScheduler(
     config = config,
     retryUploadFileHandling = retryUploadFileHandling,
     cdrUploadsDispatcher = cdrUploadsDispatcher,
     processingInProgressCache = processingInProgressCache,
     fileBusyTester = fileBusyTester,
+    inProgressUploads = inProgressUploads,
 ) {
 
 
-    // NOTE: The scheduled tasks are racing the SpringBoot/integration tests; we need to give the tests enough time to update the client configuration
+    // NOTE: The scheduled tasks are racing the Spring Boot/integration tests; we need to give the tests enough time to update the client configuration
     // for the test scenario before the scheduled tasks start; the shorter we make the initial delay, the higher the likelihood that the tests fail.
     @Scheduled(initialDelay = DEFAULT_INITIAL_DELAY_MILLIS, fixedDelay = DEFAULT_RESTART_DELAY_MILLIS, timeUnit = TimeUnit.MILLISECONDS)
     suspend fun launchFilePoller(): Unit = runCatching {
@@ -242,7 +278,7 @@ internal class PollingUploadScheduler(
             }
         }
             .onCompletion { error: Throwable? ->
-                // `shareIn(..)` makes this a hot flow which never terminates unless an error occurs, or it is explicitly canceled
+                // `shareIn()` makes this a hot flow which never terminates unless an error occurs, or it is explicitly canceled
                 when (error) {
                     !is CancellationException -> logger.error {
                         "File system polling flow terminated${if (error != null) " with error: '${error::class}'; message: '${error.message}'" else "."}"
@@ -267,6 +303,7 @@ internal abstract class BaseUploadScheduler(
     private val cdrUploadsDispatcher: CoroutineDispatcher,
     private val processingInProgressCache: ObjectKache<String, Path>,
     private val fileBusyTester: FileBusyTester,
+    private val inProgressUploads: MutableMap<Job, Instant>,
 ) {
 
     @Suppress("LongMethod", "CyclomaticComplexMethod")
@@ -311,38 +348,54 @@ internal abstract class BaseUploadScheduler(
             .onEach { (file: Path, traceId) ->
                 withContext(LogCorrelation.contextElement(traceId)) {
                     logger.info { "queuing '${file}' for upload" }
-                    launch(LogCorrelation.contextElement(traceId)) {
-                        runCatching {
-                            dispatchForUpload(file, file.extractDocumentMetaData())
-                        }.fold(
-                            onSuccess = { outcome ->
-                                logger.info {
-                                    "'$file' " + when (outcome) {
-                                        UploadOutcome.Retry -> error("Retry must be handled within uploadRetrying, not returned as a terminal outcome")
-                                        UploadOutcome.Uploaded -> "uploaded"
-                                        is UploadOutcome.Rejected -> "rejected (HTTP ${outcome.code}); moved to error directory and response file written"
-                                        is UploadOutcome.DeferredUntilRestart -> "deferred until restart due to configuration error (HTTP ${outcome.code})"
-                                        UploadOutcome.FileBusy -> "not uploaded; file is busy"
-                                    }
-                                }
-                            },
-                            onFailure = { t: Throwable ->
-                                when (t) {
-                                    is CancellationException -> throw t
-                                    else -> logger.error { "failed to upload '${file}': ${t.message}" }
+                }
+
+                // Here we create jobs for every document delivered down the flow. In a scenario where we start the client with
+                // lots of pending files, the idea is to process them roughly in the order oldest to newest. However, we create jobs
+                // as fast as we can here, and only in `RetryUploadFileHandling` throttle the number of concurrent uploads with a mutex.
+                // While the mutex is fair and processes requests in the order they arrive, the order in which the jobs created here
+                // get scheduled is random. This effectively means we are uploading files in an almost random order.
+                // TODO: Do we need to move the mutex to here to throttle the creation of jobs and still ensure processing documents
+                //   in temporal order?
+                val job: Job = this@coroutineScope.launch(LogCorrelation.contextElement(traceId)) {
+                    runCatching {
+                        dispatchForUpload(file, file.extractDocumentMetaData())
+                    }.fold(
+                        onSuccess = { outcome ->
+                            logger.info {
+                                "'$file' " + when (outcome) {
+                                    UploadOutcome.Retry -> error("Retry must be handled within uploadRetrying, not returned as a terminal outcome")
+                                    UploadOutcome.Uploaded -> "uploaded"
+                                    is UploadOutcome.Rejected -> "rejected (HTTP ${outcome.code}); moved to error directory and response file written"
+                                    is UploadOutcome.DeferredUntilRestart -> "deferred until restart due to configuration error (HTTP ${outcome.code})"
+                                    UploadOutcome.FileBusy -> "not uploaded; file is busy"
                                 }
                             }
-                        )
-                        isNull(processingInProgressCache.remove(file.absolutePathString())).also { missing ->
-                            if (missing) {
-                                logger.warn {
-                                    "File '${file.absolutePathString()}' was not in the processing cache when we tried to remove it from the cache! " +
-                                            "It appears that we have a bug in our state management."
+                        },
+                        onFailure = { t: Throwable ->
+                            when (t) {
+                                is CancellationException -> {
+                                    logger.debug { "Upload task for '${file}' was canceled." }
+                                    throw t
                                 }
+
+                                else -> logger.error { "failed to upload '${file}': ${t.message}" }
+                            }
+                        }
+                    )
+                    isNull(processingInProgressCache.remove(file.absolutePathString())).also { missing ->
+                        if (missing) {
+                            logger.warn {
+                                "File '${file.absolutePathString()}' was not in the processing cache when we tried to remove it from the cache! " +
+                                        "It appears that we have a bug in our state management."
                             }
                         }
                     }
                 }
+
+                inProgressUploads[job] = Clock.System.now()
+
+                job.invokeOnCompletion { _: Throwable? -> inProgressUploads.remove(job) }
             }
             .onCompletion { error: Throwable? ->
                 when (error) {
