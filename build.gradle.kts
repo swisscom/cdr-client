@@ -53,7 +53,7 @@ tasks.updateDaemonJvm {
 // .NET 10 SDK Management and Watchdog Build Tasks
 // =============================================================================
 
-val dotnetVersion = "10.0.401"
+val dotnetVersion = "10.0.403"
 val dotnetInstallDir = layout.buildDirectory.dir("dotnet-sdk").get().asFile
 val dotnetExecutable = if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
     File(dotnetInstallDir, "dotnet.exe")
