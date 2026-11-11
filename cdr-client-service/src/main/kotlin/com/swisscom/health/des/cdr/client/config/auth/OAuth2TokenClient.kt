@@ -14,6 +14,7 @@ import com.swisscom.health.des.cdr.client.config.IdpCredentials
 import com.swisscom.health.des.cdr.client.config.WrongCredentialsException
 import com.swisscom.health.des.cdr.client.model.RetryableHttpOperation
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.springframework.core.retry.RetryException
 import org.springframework.core.retry.RetryTemplate
 import java.io.IOException
 import java.net.ConnectException
@@ -118,21 +119,22 @@ internal class OAuth2TokenClient(
         )
 
     private fun toFailureResponse(t: Throwable): AuthNResponse {
-        logger.debug { "Token acquisition failed: ${t.javaClass.simpleName}" }
-        return when (t) {
+        val cause = if (t is RetryException) t.cause else t
+        logger.debug { "Token acquisition failed: ${cause.javaClass.simpleName}" }
+        return when (cause) {
             is SocketTimeoutException -> AuthNResponse.RetryableFailure(
-                IOException("Token acquisition timed out (read timeout)", t)
+                IOException("Token acquisition timed out (read timeout)", cause)
             )
 
             is ConnectException -> AuthNResponse.RetryableFailure(
-                IOException("Cannot connect to OAuth server", t)
+                IOException("Cannot connect to OAuth server", cause)
             )
 
-            is IOException -> AuthNResponse.RetryableFailure(t)
+            is IOException -> AuthNResponse.RetryableFailure(cause)
             else -> AuthNResponse.Failed(
                 IllegalStateException(
-                    "Unexpected error during token acquisition: ${t.javaClass.simpleName}",
-                    t,
+                    "Unexpected error during token acquisition: ${cause.javaClass.simpleName}",
+                    cause,
                 )
             )
         }

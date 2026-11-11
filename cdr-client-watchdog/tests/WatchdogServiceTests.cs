@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Reflection;
 using CdrClientWatchdog;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -20,20 +19,19 @@ public sealed class WatchdogServiceTests
         var executable = OperatingSystem.IsWindows()
             ? Path.Combine(Environment.SystemDirectory, "cmd.exe")
             : "/bin/sh";
-        using var watchdog = CreateWatchdog(lifetime, logger, executable, restartDelay: 1);
         using var process = StartShell($"exit {exitCode}");
         await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
-        SetManagedProcess(watchdog, process);
+        using var watchdog = CreateWatchdog(lifetime, logger, executable, restartDelay: 1, managedProcess: process);
 
         try
         {
             await watchdog.StartAsync(CancellationToken.None);
-            await WaitUntil(() => logger.Messages.Any(m => m.StartsWith("CDR Client service started successfully")));
+            await WaitUntil(() => logger.Messages.Any(m => m.StartsWith("curaLINE Client service started successfully")));
 
             Assert.False(lifetime.ApplicationStopping.IsCancellationRequested);
-            Assert.Contains(logger.Messages, m => m.StartsWith($"CDR Client service exited with error code {exitCode}"));
+            Assert.Contains(logger.Messages, m => m.StartsWith($"curaLINE Client service exited with error code {exitCode}"));
             Assert.Contains(logger.Messages, m => m.StartsWith("Waiting 1 seconds before restart attempt"));
-            Assert.Single(logger.Messages, m => m.StartsWith("CDR Client service started successfully"));
+            Assert.Single(logger.Messages, m => m.StartsWith("curaLINE Client service started successfully"));
         }
         finally
         {
@@ -46,17 +44,16 @@ public sealed class WatchdogServiceTests
     {
         using var lifetime = new TestLifetime();
         var logger = new TestLogger();
-        using var watchdog = CreateWatchdog(lifetime, logger);
         using var process = StartShell("exit 0");
         await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
-        SetManagedProcess(watchdog, process);
+        using var watchdog = CreateWatchdog(lifetime, logger, managedProcess: process);
 
         await watchdog.StartAsync(CancellationToken.None);
         await watchdog.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(10));
         await watchdog.StopAsync(CancellationToken.None);
 
         Assert.True(lifetime.ApplicationStopping.IsCancellationRequested);
-        Assert.DoesNotContain(logger.Messages, m => m.StartsWith("Starting CDR Client service"));
+        Assert.DoesNotContain(logger.Messages, m => m.StartsWith("Starting curaLINE Client service"));
         Assert.DoesNotContain(logger.Messages, m => m.Contains("not found"));
     }
 
@@ -67,10 +64,9 @@ public sealed class WatchdogServiceTests
     {
         using var lifetime = new TestLifetime();
         var logger = new TestLogger();
-        using var watchdog = CreateWatchdog(lifetime, logger, restartDelay: 30);
         using var process = StartShell("exit 1");
         await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
-        SetManagedProcess(watchdog, process);
+        using var watchdog = CreateWatchdog(lifetime, logger, restartDelay: 30, managedProcess: process);
         await watchdog.StartAsync(CancellationToken.None);
         await WaitUntil(() => logger.Messages.Any(m => m.StartsWith("Waiting 30 seconds")));
 
@@ -82,8 +78,8 @@ public sealed class WatchdogServiceTests
         await watchdog.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
         await watchdog.StopAsync(CancellationToken.None);
 
-        Assert.DoesNotContain(logger.Messages, m => m.StartsWith("Starting CDR Client service"));
-        Assert.Equal(1, logger.Messages.Count(m => m == "CDRClientWatchdog Service stopping monitoring loop"));
+        Assert.DoesNotContain(logger.Messages, m => m.StartsWith("Starting curaLINE Client service"));
+        Assert.Equal(1, logger.Messages.Count(m => m == "curaLINE Client watchdog service stopping monitoring loop"));
     }
 
     [Fact]
@@ -97,7 +93,7 @@ public sealed class WatchdogServiceTests
         await watchdog.StartAsync(CancellationToken.None);
         await watchdog.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.DoesNotContain(logger.Messages, m => m.StartsWith("Starting CDR Client service"));
+        Assert.DoesNotContain(logger.Messages, m => m.StartsWith("Starting curaLINE Client service"));
     }
 
     [Fact]
@@ -111,7 +107,7 @@ public sealed class WatchdogServiceTests
         await watchdog.StartAsync(CancellationToken.None);
         await watchdog.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.DoesNotContain(logger.Messages, m => m.StartsWith("Starting CDR Client service"));
+        Assert.DoesNotContain(logger.Messages, m => m.StartsWith("Starting curaLINE Client service"));
     }
 
     [Fact]
@@ -128,7 +124,7 @@ public sealed class WatchdogServiceTests
             await watchdog.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(10));
 
             Assert.True(lifetime.ApplicationStopping.IsCancellationRequested);
-            Assert.Equal(3, logger.Messages.Count(m => m == "Error starting CDR Client service"));
+            Assert.Equal(3, logger.Messages.Count(m => m == "Error starting curaLINE Client service"));
         }
         finally
         {
@@ -144,17 +140,16 @@ public sealed class WatchdogServiceTests
         var pidFile = Path.Combine(Path.GetTempPath(), $"watchdog-child-{Guid.NewGuid():N}.pid");
         using var lifetime = new TestLifetime();
         var logger = new TestLogger();
-        using var watchdog = CreateWatchdog(lifetime, logger, healthInterval: 3600);
         using var parent = StartProcessTree(pidFile);
+        using var watchdog = CreateWatchdog(lifetime, logger, healthInterval: 3600, managedProcess: parent);
         Process? child = null;
         try
         {
             await WaitUntil(() => File.Exists(pidFile) &&
                                   int.TryParse(File.ReadAllText(pidFile).Trim(), out _));
             child = Process.GetProcessById(int.Parse(File.ReadAllText(pidFile).Trim()));
-            SetManagedProcess(watchdog, parent);
             await watchdog.StartAsync(CancellationToken.None);
-            await WaitUntil(() => logger.Messages.Any(m => m.Contains("Service started in Executable mode")));
+            await WaitUntil(() => logger.Messages.Any(m => m.Contains("watchdog service started in Executable mode")));
 
             if (applicationStopping)
             {
@@ -165,8 +160,8 @@ public sealed class WatchdogServiceTests
 
             await child.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
             Assert.True(child.HasExited);
-            Assert.DoesNotContain(logger.Messages, m => m.StartsWith("Starting CDR Client service"));
-            Assert.Equal(1, logger.Messages.Count(m => m.StartsWith("Terminating CDR Client service process tree")));
+            Assert.DoesNotContain(logger.Messages, m => m.StartsWith("Starting curaLINE Client service"));
+            Assert.Equal(1, logger.Messages.Count(m => m.StartsWith("Terminating curaLINE Client service process tree")));
             Assert.Contains("=== Watchdog service stopped successfully ===", logger.Messages);
         }
         finally
@@ -181,8 +176,195 @@ public sealed class WatchdogServiceTests
         }
     }
 
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(29, 1)]
+    public async Task InjectedProcessExitAppliesRestartPolicyWithoutLaunchingAProcess(int exitCode, int expectedStarts)
+    {
+        using var lifetime = new TestLifetime();
+        var logger = new TestLogger();
+        var process = new FakeManagedServiceProcess { HasProcess = true, HasExited = true, ExitCode = exitCode };
+        using var watchdog = CreateWatchdog(lifetime, logger, processController: process);
+
+        try
+        {
+            await watchdog.StartAsync(CancellationToken.None);
+            if (exitCode == 0)
+            {
+                await watchdog.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(5));
+                Assert.True(lifetime.ApplicationStopping.IsCancellationRequested);
+            }
+            else
+            {
+                await WaitUntil(() => process.Starts == 1);
+                Assert.False(lifetime.ApplicationStopping.IsCancellationRequested);
+            }
+        }
+        finally
+        {
+            await watchdog.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+
+        Assert.Equal(expectedStarts, process.Starts);
+        Assert.Equal(1, process.Clears);
+        Assert.Equal(1, process.Stops);
+    }
+
+    [Fact]
+    public async Task InjectedStartFailuresStopAtConfiguredLimit()
+    {
+        using var lifetime = new TestLifetime();
+        var logger = new TestLogger();
+        var process = new FakeManagedServiceProcess { StartError = new InvalidOperationException("Start failed") };
+        using var watchdog = CreateWatchdog(lifetime, logger, healthInterval: 0, processController: process);
+
+        await watchdog.StartAsync(CancellationToken.None);
+        await watchdog.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        await watchdog.StopAsync(CancellationToken.None);
+
+        Assert.Equal(3, process.Starts);
+        Assert.True(lifetime.ApplicationStopping.IsCancellationRequested);
+        Assert.Equal(1, process.Stops);
+    }
+
+    [Fact]
+    public async Task RepeatedImmediateExitsStopAtConfiguredLimit()
+    {
+        using var lifetime = new TestLifetime();
+        var logger = new TestLogger();
+        var process = new FakeManagedServiceProcess { ExitImmediately = true, ExitCode = 1 };
+        using var watchdog = CreateWatchdog(lifetime, logger, healthInterval: 0, processController: process);
+
+        await watchdog.StartAsync(CancellationToken.None);
+        await watchdog.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(5));
+        await watchdog.StopAsync(CancellationToken.None);
+
+        Assert.Equal(3, process.Starts);
+        Assert.Equal(3, process.Clears);
+        Assert.True(lifetime.ApplicationStopping.IsCancellationRequested);
+    }
+
+    [Fact]
+    public async Task HealthyProcessResetsEarlierStartFailures()
+    {
+        using var lifetime = new TestLifetime();
+        var logger = new TestLogger();
+        var process = new FakeManagedServiceProcess { FailFirstStarts = 2 };
+        using var watchdog = CreateWatchdog(lifetime, logger, processController: process);
+
+        try
+        {
+            await watchdog.StartAsync(CancellationToken.None);
+            await WaitUntil(() => logger.Messages.Any(m => m.Contains("Resetting failure counter")));
+            process.ExitCode = 1;
+            process.HasExited = true;
+            await WaitUntil(() => Volatile.Read(ref process.Starts) == 4);
+
+            Assert.False(lifetime.ApplicationStopping.IsCancellationRequested);
+            Assert.Contains(logger.Messages, m => m.Contains("Consecutive failures: 1/3"));
+        }
+        finally
+        {
+            await watchdog.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+    }
+
+    [Fact]
+    public async Task MissingExecutableStopsWithoutAttemptingProcessStart()
+    {
+        using var lifetime = new TestLifetime();
+        var logger = new TestLogger();
+        var process = new FakeManagedServiceProcess();
+        using var directory = new TestDirectory();
+        using var watchdog = CreateWatchdog(lifetime, logger,
+            executable: Path.Combine(directory.Root, "missing.exe"), processController: process);
+
+        await watchdog.StartAsync(CancellationToken.None);
+        await watchdog.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(lifetime.ApplicationStopping.IsCancellationRequested);
+        Assert.Equal(0, process.Starts);
+        Assert.Contains(logger.Messages, m => m.StartsWith("Service executable not found"));
+    }
+
+    [Fact]
+    public async Task CleanupFailurePropagatesWithoutReportingSuccessfulStop()
+    {
+        using var lifetime = new TestLifetime();
+        var logger = new TestLogger();
+        var failure = new TimeoutException("Process did not exit");
+        var process = new FakeManagedServiceProcess { StopError = failure };
+        using var watchdog = CreateWatchdog(lifetime, logger, processController: process);
+        await watchdog.StartAsync(CancellationToken.None);
+        await WaitUntil(() => process.Starts == 1);
+
+        var error = await Assert.ThrowsAsync<TimeoutException>(() => watchdog.StopAsync(CancellationToken.None));
+
+        Assert.Same(failure, error);
+        Assert.Equal(1, process.Stops);
+        Assert.DoesNotContain("=== Watchdog service stopped successfully ===", logger.Messages);
+    }
+
+    [Fact]
+    public async Task UnsupportedJavaVersionStopsWatchdogWithoutLaunchingClient()
+    {
+        using var directory = new TestDirectory();
+        using var lifetime = new TestLifetime();
+        var logger = new TestLogger();
+        var process = new FakeManagedServiceProcess();
+        using var watchdog = CreateJarWatchdog(directory, lifetime, logger, process,
+            (_, _) => Task.FromResult("openjdk version \"21.0.5\" 2024-10-15 LTS"));
+
+        await watchdog.StartAsync(CancellationToken.None);
+        await watchdog.ExecuteTask!.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(lifetime.ApplicationStopping.IsCancellationRequested);
+        Assert.Equal(0, process.Starts);
+        Assert.Contains(logger.Messages, m => m.Contains("detected Java 21, Java 25 or newer is required"));
+    }
+
+    [Fact]
+    public async Task StopDuringJavaVersionCheckCancelsItWithoutLaunchingClient()
+    {
+        using var directory = new TestDirectory();
+        using var lifetime = new TestLifetime();
+        var logger = new TestLogger();
+        var process = new FakeManagedServiceProcess();
+        var checkStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var watchdog = CreateJarWatchdog(directory, lifetime, logger, process, async (_, token) =>
+        {
+            checkStarted.SetResult();
+            await Task.Delay(Timeout.Infinite, token);
+            return "";
+        });
+
+        await watchdog.StartAsync(CancellationToken.None);
+        await checkStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        await watchdog.StopAsync(CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(0, process.Starts);
+        Assert.DoesNotContain(logger.Messages, m => m.Contains("Java version check timed out"));
+        Assert.Contains("Watchdog monitoring cancelled - service shutdown requested", logger.Messages);
+    }
+
+    private static WatchdogService CreateJarWatchdog(TestDirectory directory, TestLifetime lifetime, TestLogger logger,
+        FakeManagedServiceProcess process, Func<string, CancellationToken, Task<string>> readJavaVersionOutput)
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["ServiceExecutionMode"] = "Jar",
+            ["JavaExecutablePath"] = directory.CreateFile("java.exe"),
+            ["ServiceJarPath"] = directory.CreateFile("service.jar"),
+            ["HealthCheckIntervalSeconds"] = "1"
+        }).Build();
+        var settings = new WatchdogSettings(configuration, new ServicePathResolver(logger));
+        var launch = new ServiceLaunchConfiguration(settings, logger, readJavaVersionOutput, TimeSpan.FromSeconds(30));
+        return new WatchdogService(logger, lifetime, settings, process, launch);
+    }
+
     private static WatchdogService CreateWatchdog(TestLifetime lifetime, TestLogger logger,
-        string? executable = null, int restartDelay = 0, int healthInterval = 1)
+        string? executable = null, int restartDelay = 0, int healthInterval = 1,
+        Process? managedProcess = null, IManagedServiceProcess? processController = null)
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -191,13 +373,10 @@ public sealed class WatchdogServiceTests
             ["HealthCheckIntervalSeconds"] = healthInterval.ToString(),
             ["MaxConsecutiveFailures"] = "3"
         }).Build();
-        return new WatchdogService(logger, configuration, lifetime);
-    }
-
-    private static void SetManagedProcess(WatchdogService watchdog, Process process)
-    {
-        typeof(WatchdogService).GetField("_watchedProcess", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(watchdog, process);
+        var settings = new WatchdogSettings(configuration, new ServicePathResolver(logger));
+        return new WatchdogService(logger, lifetime, settings,
+            processController ?? new ManagedServiceProcess(logger, managedProcess),
+            new ServiceLaunchConfiguration(settings, logger));
     }
 
     private static Process StartShell(string command)
@@ -257,6 +436,47 @@ public sealed class WatchdogServiceTests
         catch (InvalidOperationException)
         {
             // Watchdog cleanup may already have disposed its managed process.
+        }
+    }
+
+    private sealed class FakeManagedServiceProcess : IManagedServiceProcess
+    {
+        private volatile bool _hasExited;
+        public bool HasProcess { get; set; }
+        public bool HasExited { get => _hasExited; set => _hasExited = value; }
+        public int Id => 123;
+        public int ExitCode { get; set; }
+        public int Starts;
+        public int Clears { get; private set; }
+        public int Stops { get; private set; }
+        public Exception? StartError { get; init; }
+        public Exception? StopError { get; init; }
+        public bool ExitImmediately { get; init; }
+        public int FailFirstStarts { get; init; }
+
+        public void Start(ProcessStartInfo startInfo)
+        {
+            if (StartError != null || Starts < FailFirstStarts)
+            {
+                Interlocked.Increment(ref Starts);
+                throw StartError ?? new InvalidOperationException("Simulated process start failure");
+            }
+            HasProcess = true;
+            HasExited = ExitImmediately;
+            Interlocked.Increment(ref Starts);
+        }
+
+        public void Clear()
+        {
+            Clears++;
+            HasProcess = false;
+        }
+
+        public Task StopAsync()
+        {
+            Stops++;
+            HasProcess = false;
+            return StopError == null ? Task.CompletedTask : Task.FromException(StopError);
         }
     }
 
