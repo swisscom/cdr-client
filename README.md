@@ -192,6 +192,12 @@ If you do not provide a value for `LOGGING_FILE_NAME` the log file gets auto cre
 
 ## Configuration
 
+For a first installation, `client.local-folder: ""` leaves the download staging directory unconfigured.
+The service starts and exposes its configuration API for the UI, but file synchronization remains blocked
+until the complete configuration is valid. Choose an existing, readable and writable directory in the UI;
+the service does not substitute the working directory or a system temporary directory for an empty value.
+Save the configuration and restart the service to activate it.
+
 ### Per Connector Directories
 
 At the very least you have to configure a base source (upload) and target (download) directory for each connector:

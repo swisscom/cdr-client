@@ -31,7 +31,9 @@ import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
+import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.full.memberProperties
+import kotlin.reflect.jvm.jvmErasure
 
 private val logger = KotlinLogging.logger {}
 
@@ -414,6 +416,7 @@ internal class ConfigurationWriter(
 
             else -> {
                 value::class.memberProperties
+                    .filter { it.returnType.jvmErasure.isSubclassOf(PropertyNameAware::class) }
                     .mapNotNull { kProperty -> kProperty.call(value) }
                     .filterIsInstance<PropertyNameAware>()
                     .toList()

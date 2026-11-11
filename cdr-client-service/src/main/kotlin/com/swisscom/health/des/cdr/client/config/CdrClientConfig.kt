@@ -516,7 +516,10 @@ internal value class TempDownloadDir(val value: String) : PropertyNameAware {
     constructor(path: Path) : this(path.toString())
 
     val path: Path
-        get() = Paths.get(value)
+        get() {
+            check(value.isNotBlank()) { "client.local-folder must be configured before accessing the download directory" }
+            return Paths.get(value)
+        }
 
     override val propertyName: String
         get() = PROPERTY_NAME

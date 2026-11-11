@@ -5,7 +5,6 @@ package com.swisscom.health.des.cdr.client.handler
 import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ApiEndpoint
@@ -42,6 +41,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.core.env.Environment
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
@@ -56,6 +57,7 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.createDirectory
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.deleteRecursively
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 
 @ExtendWith(MockKExtension::class)
 internal class ConfigValidationServiceTest {
@@ -185,9 +187,10 @@ internal class ConfigValidationServiceTest {
         }
     }
 
-    @Test
-    fun `test validation error if local directory is blank`() {
-        val clientConfig = allGoodCdrClientConfig.copy(localFolder = TempDownloadDir(""))
+    @ParameterizedTest
+    @ValueSource(strings = ["", " ", "\t"])
+    fun `test validation error if local directory is blank`(value: String) {
+        val clientConfig = allGoodCdrClientConfig.copy(localFolder = TempDownloadDir(value))
 
         val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(clientConfig)
 

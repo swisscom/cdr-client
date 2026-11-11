@@ -4,6 +4,9 @@ import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
 import java.net.URI
@@ -173,6 +176,20 @@ class ConfigConverterTest {
         val roundTrip = config.toDto().toCdrClientConfig()
 
         assertEquals("", roundTrip.localFolder.value)
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["", " ", "\t"])
+    fun `blank local folder cannot resolve to a filesystem path`(value: String) {
+        val folder = TempDownloadDir(value)
+
+        assertThrows<IllegalStateException> { folder.path }
+    }
+
+    @Test
+    fun `configured local folder retains its path`() {
+        assertEquals(RELATIVE_PATH, TempDownloadDir(RELATIVE_PATH).path)
+        assertEquals(ABSOLUTE_PATH, TempDownloadDir(ABSOLUTE_PATH).path)
     }
 
     private companion object {

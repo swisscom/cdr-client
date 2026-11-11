@@ -94,6 +94,11 @@ internal class FileMonitoringService(
      * Counts files older than the configured threshold in the temporary download directory.
      */
     private fun countOldTempFiles(): Int {
+        if (config.localFolder.value.isBlank()) {
+            logger.debug { "Skipping temporary file monitoring: client.local-folder is not configured" }
+            return 0
+        }
+
         return runCatching {
             val tempFolder = config.localFolder.path
             val count = if (tempFolder.exists() && tempFolder.isDirectory()) {

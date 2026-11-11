@@ -1,7 +1,7 @@
 version: "1.2"
 client:
   file-synchronization-enabled: true
-  local-folder:
+  local-folder: ""
   proxy-config:
     url:
     username:
