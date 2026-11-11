@@ -60,7 +60,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.reactor) // to enable @Scheduled on Kotlin suspending functions
     implementation(libs.spring.boot.starter.webflux)
     implementation(libs.spring.boot.starter.jackson)
-    implementation(libs.spring.retry)
     implementation(libs.jackson.dataformat.yaml)
     implementation(libs.jackson.module.kotlin)
     implementation(projects.cdrClientCommon)

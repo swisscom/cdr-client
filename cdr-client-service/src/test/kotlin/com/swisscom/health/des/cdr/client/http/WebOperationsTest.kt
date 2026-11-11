@@ -64,9 +64,10 @@ import org.springframework.boot.health.actuate.endpoint.CompositeHealthDescripto
 import org.springframework.boot.health.actuate.endpoint.HealthDescriptor
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint
 import org.springframework.boot.health.contributor.Status
+import org.springframework.core.retry.RetryPolicy
+import org.springframework.core.retry.RetryTemplate
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
-import org.springframework.retry.support.RetryTemplate
 import org.springframework.util.unit.DataSize
 import tools.jackson.databind.json.JsonMapper
 import java.net.URI
@@ -300,9 +301,12 @@ internal class WebOperationsTest {
 
     @Test
     fun `test validateCredentials - success with valid access token`() = runTest {
-        val realRetryTemplate = RetryTemplate.builder()
-            .maxAttempts(3)
-            .build()
+        val realRetryTemplate = RetryPolicy.builder()
+            .maxRetries(2)
+            .delay(Duration.ofMillis(10))
+            .build().let { policy ->
+                RetryTemplate(policy)
+            }
 
         // Create WebOperations with real RetryTemplate
         val webOperationsWithRealRetry = WebOperations(
@@ -340,9 +344,12 @@ internal class WebOperationsTest {
     @Test
     fun `test validateCredentials - failure authN response`() = runTest {
         // Create a real RetryTemplate instead of mocking it
-        val realRetryTemplate = RetryTemplate.builder()
-            .maxAttempts(2)
-            .build()
+        val realRetryTemplate = RetryPolicy.builder()
+            .maxRetries(1)
+            .delay(Duration.ofMillis(10))
+            .build().let { policy ->
+                RetryTemplate(policy)
+            }
 
         // Create WebOperations with real RetryTemplate
         val webOperationsWithRealRetry = WebOperations(
@@ -379,7 +386,12 @@ internal class WebOperationsTest {
 
     @Test
     fun `test validateCredentials - masked secret is substituted with real secret from config`() = runTest {
-        val realRetryTemplate = RetryTemplate.builder().maxAttempts(1).build()
+        val realRetryTemplate = RetryPolicy.builder()
+            .maxRetries(0)
+            .delay(Duration.ofMillis(10))
+            .build().let { policy ->
+                RetryTemplate(policy)
+            }
         val webOperationsWithRealRetry = WebOperations(
             shutdownService = shutdownService,
             configWriter = configWriter,
@@ -412,7 +424,12 @@ internal class WebOperationsTest {
 
     @Test
     fun `test validateCredentials - any all-asterisk string is treated as masked and replaced with config secret`() = runTest {
-        val realRetryTemplate = RetryTemplate.builder().maxAttempts(1).build()
+        val realRetryTemplate = RetryPolicy.builder()
+            .maxRetries(0)
+            .delay(Duration.ofMillis(10))
+            .build().let { policy ->
+                RetryTemplate(policy)
+            }
         val webOperationsWithRealRetry = WebOperations(
             shutdownService = shutdownService,
             configWriter = configWriter,
@@ -445,7 +462,12 @@ internal class WebOperationsTest {
 
     @Test
     fun `test validateCredentials - real secret is passed through to authService unchanged`() = runTest {
-        val realRetryTemplate = RetryTemplate.builder().maxAttempts(1).build()
+        val realRetryTemplate = RetryPolicy.builder()
+            .maxRetries(0)
+            .delay(Duration.ofMillis(10))
+            .build().let { policy ->
+                RetryTemplate(policy)
+            }
         val webOperationsWithRealRetry = WebOperations(
             shutdownService = shutdownService,
             configWriter = configWriter,
@@ -480,9 +502,12 @@ internal class WebOperationsTest {
     @Test
     fun `test validateCredentials - verifies correct endpoint correction logic`() = runTest {
         // Create a real RetryTemplate instead of mocking it
-        val realRetryTemplate = RetryTemplate.builder()
-            .maxAttempts(3)
-            .build()
+        val realRetryTemplate = RetryPolicy.builder()
+            .maxRetries(2)
+            .delay(Duration.ofMillis(10))
+            .build().let { policy ->
+                RetryTemplate(policy)
+            }
 
         // Create a config with the original endpoint that needs correction
         val configWithOriginalEndpoint = DEFAULT_CDR_CONFIG.copy(
