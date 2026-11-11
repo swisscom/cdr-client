@@ -13,6 +13,7 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption.APPEND
+import java.nio.file.StandardOpenOption.SYNC
 import java.nio.file.StandardOpenOption.WRITE
 import java.time.Duration
 import kotlin.io.path.createFile
@@ -39,9 +40,7 @@ internal class FileBusyTesterTest {
 
         val writeFileJob = launch {
             while (true) {
-                repeat(5) {
-                    file.writeText("a", UTF_8, WRITE, APPEND)
-                }
+                file.writeText("a", UTF_8, SYNC, WRITE, APPEND)
                 delay(5L.milliseconds)
             }
         }
@@ -49,11 +48,8 @@ internal class FileBusyTesterTest {
         // Give the write job time to start
         delay(20L.milliseconds)
         assertTrue(tester.isBusy(file))
-        delay(150L.milliseconds)
         assertTrue(tester.isBusy(file))
-        delay(150L.milliseconds)
         assertTrue(tester.isBusy(file))
-        delay(150L.milliseconds)
         assertTrue(tester.isBusy(file))
 
         writeFileJob.cancelAndJoin()

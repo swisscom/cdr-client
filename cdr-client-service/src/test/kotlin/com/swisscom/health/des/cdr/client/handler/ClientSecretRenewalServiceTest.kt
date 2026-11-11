@@ -1,7 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
-import io.micrometer.tracing.Tracer
 import io.mockk.confirmVerified
 import io.mockk.every
 import io.mockk.impl.annotations.MockK
@@ -17,9 +16,6 @@ import org.mockito.Mockito.mock
 @ExtendWith(MockKExtension::class)
 @CheckUnnecessaryStub
 internal class ClientSecretRenewalServiceTest {
-
-    @MockK
-    private lateinit var tracer: Tracer
 
     @MockK
     private lateinit var cdrApiClient: CdrApiClient
@@ -38,7 +34,6 @@ internal class ClientSecretRenewalServiceTest {
             config = config,
             configurationWriter = configurationWriter,
             cdrApiClient = cdrApiClient,
-            tracer = tracer
         )
     }
 
@@ -57,7 +52,6 @@ internal class ClientSecretRenewalServiceTest {
     @Test
     fun `failing call to credential API should leave config file unchanged`() {
         every { configurationWriter.isWritableConfigurationItem(any<String>()) } returns ConfigurationWriter.ConfigLookupResult.Writable(resource = mock())
-        every { tracer.currentSpan() } returns null
         every { cdrApiClient.renewClientCredential(any<String>()) } returns CdrApiClient.RenewClientSecretResult.RenewHttpErrorResponse(500, "API call failed")
 
         val result: ClientSecretRenewalService.RenewClientSecretResult = clientSecretRenewalService.renewClientSecret()

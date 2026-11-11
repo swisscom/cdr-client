@@ -1,8 +1,12 @@
 package com.swisscom.health.des.cdr.client.handler
 
+import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import com.mayakapps.kache.ObjectKache
-import com.ninjasquad.springmockk.SpykBean
+import com.ninjasquad.springmockk.MockkSpyBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
+import com.swisscom.health.des.cdr.client.LogCorrelation
 import com.swisscom.health.des.cdr.client.common.Constants.ARCHIVE_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
@@ -42,10 +46,14 @@ import okhttp3.Headers
 import org.awaitility.Awaitility.await
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
@@ -58,6 +66,7 @@ import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
 import java.net.URI
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
@@ -90,10 +99,10 @@ internal class PollingPushFileHandlingTest {
     private val docMetaNotification = DocumentMetaData(DocumentType.NOTIFICATION, CommunicationType.UNKNOWN)
     private val docMetaInvoice = DocumentMetaData(DocumentType.INVOICE, CommunicationType.UNKNOWN)
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var config: CdrClientConfig
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var authNService: OAuth2AuthNService
 
     @Autowired
@@ -170,7 +179,7 @@ internal class PollingPushFileHandlingTest {
                           "token_type" : "Bearer",
                           "access_token" : "eyJraWQiOiJ0ZXN0LXRlbmFudC1pZC9vYXV0aDIvdjIuMCIsInR5cCI6IkpXVCIsImFsZyI6IkVTMjU2In0.eyJzdWIiOiJ0ZXN0LWNsaWVudC1pZCIsIm5iZiI6MTc2MDU0NjA0Nywicm9sZXMiOlsiQ2RyQXBwbGljYXRpb25NYW5hZ2VyLlJlYWRXcml0ZS5BbGwiXSwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdC90ZXN0LXRlbmFudC1pZC9vYXV0aDIvdjIuMCIsImV4cCI6MTc2MDU0NjQwNywiaWF0IjoxNzYwNTQ2MDQ3LCJqdGkiOiI4MDEzNzc2YS1jMWMyLTRhZGYtODE3Yi1hOWZiMDIxMTc3NmQifQ.RiL2mqiU7e40hmXzPzMIJQJUTa1gjgusFbav1TcXLjnuehaC944AVCWIvg1QQW4dTm89d_YoRTqo6SlIR8qySQ",
                           "expires_in" : 359,
-                          "scope" : "https://dev.identity.health.swisscom.ch/CdrApi/.default"
+                          "scope" : "https://dev-b2c.health.swisscom.ch/CdrApi/.default"
                         }
                         """
                     )
@@ -236,6 +245,86 @@ internal class PollingPushFileHandlingTest {
 
         // processed files should be removed from cache
         await().until({ runBlocking { fileCache.getKeys() } }) { it.isEmpty() }
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `polling scheduler propagates distinct trace ids per concurrent file upload`() {
+        val mockResponse = MockResponse.Builder()
+            .code(HttpStatus.OK.value())
+            .headers(Headers.Builder().add(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE).build())
+            .body("{\"message\": \"Upload successful\"}")
+            .build()
+        cdrServiceMock.enqueue(mockResponse)
+        cdrServiceMock.enqueue(mockResponse)
+
+        val appender = attachAppender()
+        val sourceDir = tmpDir.resolve(sourceDirectory)
+        val payload1 = sourceDir.resolve("trace-one.xml.tmp")
+        val payload2 = sourceDir.resolve("trace-two.xml.tmp")
+        payload1.outputStream().use { it.write("Hello".toByteArray()) }
+        payload2.outputStream().use { it.write("Hello 2".toByteArray()) }
+
+        try {
+            Files.move(payload1, payload1.resolveSibling(payload1.nameWithoutExtension))
+            Files.move(payload2, payload2.resolveSibling(payload2.nameWithoutExtension))
+
+            await().during(1000L, TimeUnit.MILLISECONDS).until(sourceDir::listDirectoryEntries) { paths -> paths.none { path -> path.isRegularFile() } }
+            await().untilAsserted {
+                assertEquals(2, cdrServiceMock.requestCount)
+            }
+        } finally {
+            detachAppender(appender)
+        }
+
+        val requests = listOfNotNull(
+            cdrServiceMock.takeRequest(),
+            cdrServiceMock.takeRequest(),
+        )
+        val requestTraceIdsByBody: Map<String, String> = requests.associate { request ->
+            requireNotNull(request.body).string(StandardCharsets.UTF_8) to requireNotNull(request.headers[CdrApiClient.AZURE_TRACE_ID_HEADER])
+        }
+
+        val queueTraceIdsByFile = mutableMapOf<String, String>()
+        val uploadTraceIdsByFile = mutableMapOf<String, String>()
+        appender.list.forEach { event ->
+            val traceId = event.mdcPropertyMap[LogCorrelation.TRACE_ID_KEY] ?: return@forEach
+            val message = event.formattedMessage
+            when {
+                "queuing '" in message -> {
+                    val fileName = message.substringAfterLast("/").substringBefore("'")
+                    queueTraceIdsByFile[fileName] = traceId
+                }
+                "Uploading file '" in message -> {
+                    val fileName = message.substringAfterLast("/").substringBeforeLast(".")
+                    uploadTraceIdsByFile[fileName] = traceId
+                }
+            }
+        }
+
+        assertEquals(2, queueTraceIdsByFile.size)
+        assertEquals(2, uploadTraceIdsByFile.size)
+        queueTraceIdsByFile.forEach { (fileName, queueTraceId) ->
+            val uploadFileName = fileName.substringBeforeLast(".")
+            val uploadTraceId = uploadTraceIdsByFile[uploadFileName]
+            assertNotNull(uploadTraceId)
+            assertEquals(queueTraceId, uploadTraceId)
+            val requestTraceId = requestTraceIdsByBody[
+                when (fileName) {
+                    "trace-one.xml" -> "Hello"
+                    "trace-two.xml" -> "Hello 2"
+                    else -> error("unexpected file name: $fileName")
+                }
+            ]
+            assertNotNull(requestTraceId)
+            assertEquals(queueTraceId, requestTraceId)
+        }
+
+        val distinctTraceIds = queueTraceIdsByFile.values.toSet()
+        assertEquals(2, distinctTraceIds.size)
+        assertNotEquals(queueTraceIdsByFile.values.elementAt(0), queueTraceIdsByFile.values.elementAt(1))
+        assertTrue(queueTraceIdsByFile.values.all { it.isNotBlank() })
+        assertFalse(requestTraceIdsByBody.values.any { it.isBlank() })
     }
 
     @Test
@@ -493,7 +582,7 @@ internal class PollingPushFileHandlingTest {
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
         cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.INTERNAL_SERVER_ERROR.value()).body("{\"message\": \"Exception\"}").build())
-        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.I_AM_A_TEAPOT.value()).body("{\"message\": \"Exception\"}").build())
+        cdrServiceMock.enqueue(MockResponse.Builder().code(HttpStatus.UNAVAILABLE_FOR_LEGAL_REASONS.value()).body("{\"message\": \"Exception\"}").build())
 
         val sourceDir = tmpDir.resolve(sourceDirectory)
 
@@ -663,6 +752,20 @@ internal class PollingPushFileHandlingTest {
         @JvmStatic
         private val isFirstTest: AtomicBoolean = AtomicBoolean(true)
 
+    }
+
+    private fun attachAppender(): ListAppender<ILoggingEvent> {
+        val logger = LoggerFactory.getLogger("com.swisscom.health.des.cdr.client") as Logger
+        return ListAppender<ILoggingEvent>().apply {
+            start()
+            logger.addAppender(this)
+        }
+    }
+
+    private fun detachAppender(appender: ListAppender<ILoggingEvent>) {
+        val logger = LoggerFactory.getLogger("com.swisscom.health.des.cdr.client") as Logger
+        logger.detachAppender(appender)
+        appender.stop()
     }
 
 }

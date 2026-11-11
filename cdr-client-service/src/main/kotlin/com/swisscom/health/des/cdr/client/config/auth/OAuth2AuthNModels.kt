@@ -4,7 +4,7 @@ import com.nimbusds.oauth2.sdk.AccessTokenResponse
 import com.swisscom.health.des.cdr.client.config.WrongCredentialsException
 import kotlinx.coroutines.Job
 import java.io.IOException
-import java.time.Duration
+import kotlin.time.Duration
 
 internal enum class AuthNState {
     AUTHENTICATED,

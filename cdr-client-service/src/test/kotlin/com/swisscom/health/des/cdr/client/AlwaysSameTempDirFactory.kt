@@ -9,7 +9,7 @@ import kotlin.io.path.createDirectory
 import kotlin.io.path.exists
 
 internal class AlwaysSameTempDirFactory : TempDirFactory {
-    override fun createTempDirectory(elementContext: AnnotatedElementContext?, extensionContext: ExtensionContext?): Path =
+    override fun createTempDirectory(elementContext: AnnotatedElementContext, extensionContext: ExtensionContext): Path =
         Path.of(System.getProperty("java.io.tmpdir"), "cdr-client-test-source")
             .also { basePath ->
                 if (!basePath.exists()) basePath.createDirectory()

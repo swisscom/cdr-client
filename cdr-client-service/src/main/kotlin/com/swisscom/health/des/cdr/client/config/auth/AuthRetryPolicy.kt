@@ -1,9 +1,9 @@
 package com.swisscom.health.des.cdr.client.config.auth
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.time.Duration
-import kotlin.math.min
 import kotlin.math.pow
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 private val logger = KotlinLogging.logger {}
 
@@ -75,21 +75,12 @@ internal class AuthRetryPolicy(
 
         // If cached token is still valid, don't wait longer than it lives
         val cappedDelay = cachedTokenRemainingLifetime?.let { remaining ->
-            Duration.ofMillis(min(backoffDelay.toMillis(), remaining.toMillis()))
+            backoffDelay.coerceAtMost(remaining)
         } ?: backoffDelay
 
         // Enforce minimum backoff to prevent busy loops
         return if (cappedDelay < minRetryBackoff) minRetryBackoff else cappedDelay
     }
-
-    /**
-     * Checks whether the total retry duration has exceeded the absolute limit.
-     *
-     * This prevents scenarios where exponential backoff with high maxDelay
-     * allows the service to remain in "Authenticating" state for hours.
-     */
-    fun hasExceededMaxTotalDuration(totalDurationElapsed: Duration): Boolean =
-        totalDurationElapsed >= maxTotalRetryDuration
 
     private fun computeBackoffDelay(
         attempt: Int,
@@ -102,11 +93,11 @@ internal class AuthRetryPolicy(
             else -> {
                 val exponent = (attempt - 1).coerceAtLeast(0)
                 val delayMillis = safeExponentialMillis(
-                    initialDelay.toMillis(),
+                    initialDelay.inWholeMilliseconds,
                     multiplier,
                     exponent
                 )
-                Duration.ofMillis(delayMillis).coerceAtMost(maxDelay)
+                delayMillis.milliseconds.coerceAtMost(maxDelay)
             }
         }
 

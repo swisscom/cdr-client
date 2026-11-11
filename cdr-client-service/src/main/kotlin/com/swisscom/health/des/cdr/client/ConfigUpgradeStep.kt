@@ -1,6 +1,6 @@
 package com.swisscom.health.des.cdr.client
 
-import com.fasterxml.jackson.databind.node.ObjectNode
+import tools.jackson.databind.node.ObjectNode
 
 /**
  * An atomic upgrade step from a source version to a target version of the configuration.
@@ -11,6 +11,10 @@ sealed class ConfigUpgradeStep(
     private val fromVersion: Version,
     private val toVersion: Version,
 ) {
+
+    private companion object {
+        const val PROPERTY_NAME_CLIENT = "client"
+    }
 
     protected abstract fun upgradeImpl(configRoot: ObjectNode): UpgradeStepResult
 
@@ -49,7 +53,6 @@ sealed class ConfigUpgradeStep(
      */
     object V10ToV11 : ConfigUpgradeStep(fromVersion = Version("1.0"), toVersion = Version("1.1")) {
 
-        private const val PROPERTY_NAME_CLIENT = "client"
         private const val PROPERTY_NAME_PROXY_URL = "proxy-url"
 
         override fun upgradeImpl(configRoot: ObjectNode): UpgradeStepResult =
@@ -80,7 +83,6 @@ sealed class ConfigUpgradeStep(
      */
     object V11ToV12 : ConfigUpgradeStep(fromVersion = Version("1.1"), toVersion = Version("1.2")) {
 
-        private const val PROPERTY_NAME_CLIENT = "client"
         private const val PROPERTY_NAME_PROXY_URL = "proxy-url"
         private const val PROPERTY_NAME_PROXY_CONFIG = "proxy-config"
         private const val PROPERTY_NAME_PROXY_CONFIG_URL = "url"
@@ -90,7 +92,7 @@ sealed class ConfigUpgradeStep(
         override fun upgradeImpl(configRoot: ObjectNode): UpgradeStepResult =
             configRoot.at("/$PROPERTY_NAME_CLIENT/$PROPERTY_NAME_PROXY_URL")
                 .takeUnless { it.isMissingNode }
-                ?.textValue()
+                ?.stringValue()
                 ?.let { proxyUrl: String ->
                     configRoot[PROPERTY_NAME_CLIENT]
                         ?.let { it as ObjectNode }
@@ -114,6 +116,44 @@ sealed class ConfigUpgradeStep(
                     configRoot = configRoot,
                     reason = "Failed to look up '/$PROPERTY_NAME_CLIENT/$PROPERTY_NAME_PROXY_URL' object node"
                 )
+    }
+
+    /**
+     * Replace the legacy dev and staging IdP scopes in `client.idp-credentials.scope` with their B2C equivalents.
+     * Any other scope value (e.g. production) is left untouched.
+     */
+    object V12ToV13 : ConfigUpgradeStep(fromVersion = Version("1.2"), toVersion = Version("1.3")) {
+
+        private const val PROPERTY_NAME_IDP_CREDENTIALS = "idp-credentials"
+        private const val PROPERTY_NAME_SCOPE = "scope"
+        private const val IDP_CREDENTIALS_PATH = "$PROPERTY_NAME_CLIENT.$PROPERTY_NAME_IDP_CREDENTIALS"
+        private const val SCOPE_PATH = "$IDP_CREDENTIALS_PATH.$PROPERTY_NAME_SCOPE"
+
+        private val LEGACY_TO_CURRENT_SCOPE: Map<String, String> = mapOf(
+            "https://dev.identity.health.swisscom.ch/CdrApi/.default" to "https://dev-b2c.health.swisscom.ch/CdrApi/.default",
+            "https://tst.identity.health.swisscom.ch/CdrApi/.default" to "https://tst-b2c.health.swisscom.ch/CdrApi/.default",
+        )
+
+        override fun upgradeImpl(configRoot: ObjectNode): UpgradeStepResult {
+            val idpCredentialsNode = (configRoot[PROPERTY_NAME_CLIENT] as? ObjectNode)
+                ?.get(PROPERTY_NAME_IDP_CREDENTIALS) as? ObjectNode
+                ?: return UpgradeStepResult.Failure(
+                    configRoot = configRoot,
+                    reason = "Failed to look up '$IDP_CREDENTIALS_PATH' object node"
+                )
+
+            return idpCredentialsNode[PROPERTY_NAME_SCOPE]
+                ?.takeIf { it.isString }
+                ?.asString()
+                ?.let { currentScope ->
+                    LEGACY_TO_CURRENT_SCOPE[currentScope]?.let { idpCredentialsNode.put(PROPERTY_NAME_SCOPE, it) }
+                    UpgradeStepResult.Success(configRoot = configRoot)
+                }
+                ?: UpgradeStepResult.Failure(
+                    configRoot = configRoot,
+                    reason = "Failed to look up '$SCOPE_PATH' string value"
+                )
+        }
     }
 }
 

@@ -1,9 +1,7 @@
-import io.gitlab.arturbosch.detekt.Detekt
-import org.gradle.kotlin.dsl.withType
-import org.gradle.api.GradleException
+import dev.detekt.gradle.Detekt
 
 allprojects {
-    version = "6.2.1-SNAPSHOT"
+    version = "7.0.3-SNAPSHOT"
 }
 
 plugins {
@@ -29,7 +27,7 @@ subprojects {
     }
 
     detekt {
-        config.from(rootProject.files("config/detekt.yml"))
+        config.from(rootProject.files("config/detekt/detekt.yml"))
         buildUponDefaultConfig = false // preconfigure defaults
         allRules = true
         parallel = true
@@ -37,35 +35,25 @@ subprojects {
 
     tasks.withType<Detekt> {
         reports {
-            xml.required.set(true)
+            checkstyle.required.set(true)
             html.required.set(false)
             sarif.required.set(false)
-            txt.required.set(false)
-        }
-    }
-
-    project.afterEvaluate {
-        // https://github.com/detekt/detekt/issues/6198#issuecomment-2265183695
-        configurations.matching { it.name == "detekt" }.all {
-            resolutionStrategy.eachDependency {
-                if (requested.group == "org.jetbrains.kotlin") {
-                    useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
-                }
-            }
+            markdown.required.set(false)
         }
     }
 }
 
 // NOTE: you should to run this target or manually update `gradle/gradle-daemon-jvm.properties` if we change the Java version!
 tasks.updateDaemonJvm {
-    languageVersion = JavaLanguageVersion.of(libs.versions.jdk.get().toInt())
+    languageVersion = JavaLanguageVersion.of(libs.versions.jdk.version.get().toInt())
+    vendor = JvmVendorSpec.of(libs.versions.jdk.vendor.get())
 }
 
 // =============================================================================
 // .NET 10 SDK Management and Watchdog Build Tasks
 // =============================================================================
 
-val dotnetVersion = "10.0.200"
+val dotnetVersion = "10.0.403"
 val dotnetInstallDir = layout.buildDirectory.dir("dotnet-sdk").get().asFile
 val dotnetExecutable = if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
     File(dotnetInstallDir, "dotnet.exe")
@@ -223,6 +211,88 @@ fun getDotnetCommand(): String {
 }
 
 /**
+ * Runs the CDR Client Watchdog tests
+ */
+tasks.register("testWatchdog") {
+    group = "dotnet"
+    description = "Runs the CDR Client Watchdog tests"
+
+    dependsOn("ensureDotnetSdk")
+    mustRunAfter("cleanAll", "cleanWatchdog")
+
+    inputs.files(fileTree("cdr-client-watchdog") {
+        include("**/*.cs", "**/*.csproj", "**/*.json")
+    })
+
+    doLast {
+        val dotnetCmd = getDotnetCommand()
+        logger.info("Using dotnet command: $dotnetCmd")
+
+        logger.info("Restoring Watchdog test packages...")
+        val restoreProcessBuilder = ProcessBuilder(
+            dotnetCmd,
+            "restore",
+            "tests/CdrClientWatchdog.Tests.csproj"
+        )
+            .directory(file("cdr-client-watchdog"))
+            .redirectErrorStream(true)
+
+        if (dotnetCmd == dotnetExecutable.absolutePath) {
+            restoreProcessBuilder.environment().apply {
+                put("DOTNET_ROOT", dotnetInstallDir.absolutePath)
+                put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
+            }
+        }
+
+        val restoreProcess = restoreProcessBuilder.start()
+        val restoreOutput = restoreProcess.inputStream.bufferedReader().readText()
+        val restoreExitCode = restoreProcess.waitFor()
+        if (restoreExitCode != 0) {
+            logger.error(restoreOutput)
+            throw GradleException("Watchdog test restore failed with exit code $restoreExitCode")
+        }
+
+        logger.info("Running Watchdog tests...")
+        val testProcessBuilder = ProcessBuilder(
+            dotnetCmd,
+            "test",
+            "tests/CdrClientWatchdog.Tests.csproj",
+            "--no-restore",
+            "--verbosity", "normal",
+            "-p:UseSharedCompilation=false"
+        )
+            .directory(file("cdr-client-watchdog"))
+            .redirectErrorStream(true)
+
+        if (dotnetCmd == dotnetExecutable.absolutePath) {
+            testProcessBuilder.environment().apply {
+                put("DOTNET_ROOT", dotnetInstallDir.absolutePath)
+                put("DOTNET_CLI_HOME", dotnetInstallDir.absolutePath)
+            }
+        }
+
+        val testOutput = StringBuilder()
+        val testProcess = testProcessBuilder.start()
+        testProcess.inputStream.bufferedReader().forEachLine { line ->
+            testOutput.appendLine(line)
+            if (line.contains("Passed") || line.contains("Failed") || line.contains("Total tests") ||
+                line.contains("error") || line.contains("Error")
+            ) {
+                logger.lifecycle(line)
+            }
+        }
+        val testExitCode = testProcess.waitFor()
+        if (testExitCode != 0) {
+            logger.error("=== FULL TEST OUTPUT (exitCode=$testExitCode) ===")
+            logger.error(testOutput.toString())
+            logger.error("=============================================")
+            throw GradleException("Watchdog tests failed with exit code $testExitCode. See full output above.")
+        }
+        logger.lifecycle("Watchdog tests passed")
+    }
+}
+
+/**
  * Builds the CDR Client Watchdog service
  */
 tasks.register("buildWatchdog") {
@@ -230,7 +300,7 @@ tasks.register("buildWatchdog") {
     description = "Builds the CDR Client Watchdog Windows service"
 
     // Ensure .NET SDK is available if not present on system
-    dependsOn("ensureDotnetSdk")
+    dependsOn("ensureDotnetSdk", "testWatchdog")
     mustRunAfter("cleanAll", "cleanWatchdog") // Ensure clean tasks complete before building
 
     inputs.files(fileTree("cdr-client-watchdog") {
@@ -301,7 +371,7 @@ tasks.register("buildWatchdogRelease") {
     group = "dotnet"
     description = "Builds the CDR Client Watchdog Windows service (framework-dependent for GitHub releases)"
 
-    dependsOn("ensureDotnetSdk")
+    dependsOn("ensureDotnetSdk", "testWatchdog")
     mustRunAfter("buildWatchdog", "cleanAll", "cleanWatchdog") // Ensure proper task ordering when both are run
 
     inputs.files(fileTree("cdr-client-watchdog") {
@@ -597,7 +667,7 @@ tasks.register("buildManualInstallationArtifacts") {
         val watchdogPublishDir = file("cdr-client-watchdog/publish-release")
         if (watchdogPublishDir.exists() && watchdogPublishDir.listFiles()?.isNotEmpty() == true) {
             logger.info("Packaging watchdog...")
-            val watchdogZip = file("$releaseDir/CdrClientWatchdog-${version}.zip")
+            val watchdogZip = file("$releaseDir/curaLINEClient-watchdog-${version}.zip")
             ant.invokeMethod("zip", mapOf(
                 "destfile" to watchdogZip,
                 "basedir" to watchdogPublishDir

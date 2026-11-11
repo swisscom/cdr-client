@@ -1,16 +1,14 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.mayakapps.kache.ObjectKache
-import com.ninjasquad.springmockk.SpykBean
+import com.ninjasquad.springmockk.MockkSpyBean
 import com.swisscom.health.des.cdr.client.AlwaysSameTempDirFactory
 import com.swisscom.health.des.cdr.client.common.Constants.ERROR_DIR_NAME
 import com.swisscom.health.des.cdr.client.common.Constants.RESTART_FILE_EXTENSION
 import com.swisscom.health.des.cdr.client.common.Constants.UPLOAD_FILE_EXTENSION
+import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
-import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
-import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
-import com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot
 import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
 import com.swisscom.health.des.cdr.client.config.Connector
@@ -19,9 +17,12 @@ import com.swisscom.health.des.cdr.client.config.Customer
 import com.swisscom.health.des.cdr.client.config.Host
 import com.swisscom.health.des.cdr.client.config.IdpCredentials
 import com.swisscom.health.des.cdr.client.config.LastCredentialRenewalTime
+import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
 import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TenantId
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
+import com.swisscom.health.des.cdr.client.config.auth.AuthStateSnapshot
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
@@ -78,13 +79,13 @@ import kotlin.io.path.walk
 @DirtiesContext(classMode = ClassMode.AFTER_CLASS)
 internal class EventPushFileHandlingTest {
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var config: CdrClientConfig
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var authNService: OAuth2AuthNService
 
-    @SpykBean
+    @MockkSpyBean
     private lateinit var schedulingValidationService: SchedulingValidationService
 
     @Autowired
@@ -118,7 +119,7 @@ internal class EventPushFileHandlingTest {
             tenantId = TenantId("fake-tenant-id"),
             clientId = ClientId("test-client-id"),
             clientSecret = ClientSecret("test-client-secret"),
-            scope = Scope("https://dev.identity.health.swisscom.ch/CdrApi/.default"),
+            scope = Scope(DomainObjects.OAuthScope.INTEGRATION.scope),
             renewCredential = RenewCredential(false),
             maxCredentialAge = Duration.ofDays(365),
             lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
@@ -148,7 +149,7 @@ internal class EventPushFileHandlingTest {
                           "token_type" : "Bearer",
                           "access_token" : "eyJraWQiOiJ0ZXN0LXRlbmFudC1pZC9vYXV0aDIvdjIuMCIsInR5cCI6IkpXVCIsImFsZyI6IkVTMjU2In0.eyJzdWIiOiJ0ZXN0LWNsaWVudC1pZCIsIm5iZiI6MTc2MDU0NjA0Nywicm9sZXMiOlsiQ2RyQXBwbGljYXRpb25NYW5hZ2VyLlJlYWRXcml0ZS5BbGwiXSwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdC90ZXN0LXRlbmFudC1pZC9vYXV0aDIvdjIuMCIsImV4cCI6MTc2MDU0NjQwNywiaWF0IjoxNzYwNTQ2MDQ3LCJqdGkiOiI4MDEzNzc2YS1jMWMyLTRhZGYtODE3Yi1hOWZiMDIxMTc3NmQifQ.RiL2mqiU7e40hmXzPzMIJQJUTa1gjgusFbav1TcXLjnuehaC944AVCWIvg1QQW4dTm89d_YoRTqo6SlIR8qySQ",
                           "expires_in" : 359,
-                          "scope" : "https://dev.identity.health.swisscom.ch/CdrApi/.default"
+                          "scope" : "https://dev-b2c.health.swisscom.ch/CdrApi/.default"
                         }
                         """
                     )
@@ -157,7 +158,7 @@ internal class EventPushFileHandlingTest {
 
         // The test is racing the code under test. We need to make sure that the event watcher task
         // is not yet started to be sure that when it starts, it picks up the configuration we injected
-        // above in the @SpykBean.
+        // above in the @MockkSpyBean.
         if (isFirstTest.compareAndSet(true, false)) {
             val eventWatcher = scheduledTaskHolder.scheduledTasks.filter { it.task.toString().endsWith("launchFileWatcher") }
             assertEquals(1, eventWatcher.size)

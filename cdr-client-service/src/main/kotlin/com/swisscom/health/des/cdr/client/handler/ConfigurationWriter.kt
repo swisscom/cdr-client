@@ -1,13 +1,5 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.PropertyNamingStrategies
-import com.fasterxml.jackson.databind.node.ArrayNode
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
-import com.fasterxml.jackson.module.kotlin.kotlinModule
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
@@ -27,10 +19,19 @@ import org.springframework.core.io.WritableResource
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
 import org.springframework.util.unit.DataSize
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.PropertyNamingStrategies
+import tools.jackson.databind.node.ArrayNode
+import tools.jackson.databind.node.ObjectNode
+import tools.jackson.dataformat.yaml.YAMLFactory
+import tools.jackson.dataformat.yaml.YAMLMapper
+import tools.jackson.dataformat.yaml.YAMLWriteFeature
+import tools.jackson.module.kotlin.kotlinModule
 import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
+import java.util.UUID
 import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.full.memberProperties
 import kotlin.reflect.jvm.jvmErasure
@@ -171,97 +172,96 @@ internal class ConfigurationWriter(
 
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
     private fun updateYamlSource(changedConfigItem: UpdatableConfigurationItem.WritableSource): Unit =
-        YAMLMapper.Builder(
-            YAMLMapper(
-                YAMLFactory()
-                    .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
-                    .enable(YAMLGenerator.Feature.INDENT_ARRAYS_WITH_INDICATOR)
-                    .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
-            )
-        ).run {
-            addModule(kotlinModule())
-            build()
-                .apply { setPropertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE) }
-        }.run {
-            // unmarshal the YAML file the to-be-updated value belongs to
-            val yamlNode: JsonNode = readTree(changedConfigItem.writableResource.inputStream)
-            var tmpNode = yamlNode as ObjectNode
-            val remainingNodeNames = ArrayDeque(changedConfigItem.propertyPath.split(".").map { it.replace("""\[\d+]$""", "") })
-            val toBeUpdatedNodeName = remainingNodeNames.removeLast()
-            while (remainingNodeNames.isNotEmpty()) {
-                tmpNode = tmpNode.get(remainingNodeNames.removeFirst()) as ObjectNode
-            }
+        YAMLMapper.builder(
+            YAMLFactory.builder()
+                .enable(YAMLWriteFeature.MINIMIZE_QUOTES)
+                .enable(YAMLWriteFeature.INDENT_ARRAYS_WITH_INDICATOR)
+                .disable(YAMLWriteFeature.WRITE_DOC_START_MARKER)
+                .build()
+        )
+            .addModule(kotlinModule { })
+            .propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
+            .build()
+            .run {
+                // unmarshal the YAML file the to-be-updated value belongs to
+                val yamlNode: JsonNode = readTree(changedConfigItem.writableResource.inputStream)
+                var tmpNode = yamlNode as ObjectNode
+                val remainingNodeNames = ArrayDeque(changedConfigItem.propertyPath.split(".").map { it.replace("""\[\d+]$""", "") })
+                val toBeUpdatedNodeName = remainingNodeNames.removeLast()
+                while (remainingNodeNames.isNotEmpty()) {
+                    tmpNode = tmpNode.get(remainingNodeNames.removeFirst()) as ObjectNode
+                }
 
-            // unbox kotlin value classes
-            val newValue: Any = if (changedConfigItem.newValue::class.isValue) changedConfigItem.newValue.unbox() else changedConfigItem.newValue
+                // unbox kotlin value classes
+                val newValue: Any = if (changedConfigItem.newValue::class.isValue) changedConfigItem.newValue.unbox() else changedConfigItem.newValue
 
-            // update node with new value
-            tmpNode.apply {
-                when (newValue) {
-                    is Collection<*> -> {
-                        val arrayNode: ArrayNode = valueToTree(newValue)
-                        set<ArrayNode>(toBeUpdatedNodeName, arrayNode)
-                        logger.debug { "set '${changedConfigItem.propertyPath}' to '$arrayNode' as type '${arrayNode::class}'" }
-                    }
+                // update node with new value
+                tmpNode.apply {
+                    when (newValue) {
+                        is Collection<*> -> {
+                            val arrayNode: ArrayNode = valueToTree(newValue)
+                            set(toBeUpdatedNodeName, arrayNode)
+                            logger.debug { "set '${changedConfigItem.propertyPath}' to '$arrayNode' as type '${arrayNode::class}'" }
+                        }
 
-                    is String -> {
-                        put(toBeUpdatedNodeName, newValue)
-                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
-                    }
+                        is String -> {
+                            put(toBeUpdatedNodeName, newValue)
+                            logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                        }
 
-                    is Boolean -> {
-                        put(toBeUpdatedNodeName, newValue)
-                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
-                    }
+                        is Boolean -> {
+                            put(toBeUpdatedNodeName, newValue)
+                            logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                        }
 
-                    is Int -> {
-                        put(toBeUpdatedNodeName, newValue)
-                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
-                    }
+                        is Int -> {
+                            put(toBeUpdatedNodeName, newValue)
+                            logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                        }
 
-                    is Long -> {
-                        put(toBeUpdatedNodeName, newValue)
-                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
-                    }
+                        is Long -> {
+                            put(toBeUpdatedNodeName, newValue)
+                            logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                        }
 
-                    is Float -> {
-                        put(toBeUpdatedNodeName, newValue)
-                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
-                    }
+                        is Float -> {
+                            put(toBeUpdatedNodeName, newValue)
+                            logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                        }
 
-                    is Double -> {
-                        put(toBeUpdatedNodeName, newValue)
-                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
-                    }
+                        is Double -> {
+                            put(toBeUpdatedNodeName, newValue)
+                            logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue}' as type '${newValue::class}'" }
+                        }
 
-                    is Enum<*> -> {
-                        // handle Enums, which are stored as strings in the YAML file
-                        put(toBeUpdatedNodeName, newValue.name)
-                        logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue.name}' as type '${newValue::class}'" }
-                    }
+                        is Enum<*> -> {
+                            // handle Enums, which are stored as strings in the YAML file
+                            put(toBeUpdatedNodeName, newValue.name)
+                            logger.debug { "set '${changedConfigItem.propertyPath}' to '${newValue.name}' as type '${newValue::class}'" }
+                        }
 
-                    is Duration, is DataSize, is Instant, is URL, is Path, is MediaType -> {
-                        // handle Duration, DataSize, Instant, URL, etc., anything that SpringBoot's unmarshalling magic creates
-                        // from what was originally a string
-                        newValue.toString().let { stringValue ->
-                            put(toBeUpdatedNodeName, stringValue)
-                            logger.debug { "set '${changedConfigItem.propertyPath}' to '$stringValue' as type '${stringValue::class}'" }
+                        is Duration, is DataSize, is Instant, is URL, is Path, is MediaType, is UUID -> {
+                            // handle Duration, DataSize, Instant, URL, etc., anything that SpringBoot's unmarshalling magic creates
+                            // from what was originally a string
+                            newValue.toString().let { stringValue ->
+                                put(toBeUpdatedNodeName, stringValue)
+                                logger.debug { "set '${changedConfigItem.propertyPath}' to '$stringValue' as type '${stringValue::class}'" }
+                            }
+                        }
+
+                        else -> {
+                            error("Unsupported type for configuration item '${changedConfigItem.propertyPath}': '${newValue::class}'")
                         }
                     }
+                }
 
-                    else -> {
-                        error("Unsupported type for configuration item '${changedConfigItem.propertyPath}': '${newValue::class}'")
-                    }
+                // persist the updated YAML file
+                changedConfigItem.writableResource.outputStream.use { os ->
+                    writeValue(os.writer(), yamlNode)
                 }
             }
 
-            // persist the updated YAML file
-            changedConfigItem.writableResource.outputStream.use { os ->
-                writeValue(os.writer(), yamlNode)
-            }
-        }
-
-    // the trick to search the unboxing method on Java class was stolen from com.fasterxml.jackson.module.kotlin.ValueClassUnboxSerializer.serialize
+    // the trick to search the unboxing method on Java class was stolen from tools.jackson.module.kotlin.ValueClassUnboxSerializer.serialize
     // the method is not listed as member of the KClass, maybe because it is generated and not declared?
     private fun Any.unbox(): Any = if (this::class.isValue) this::class.java.getMethod("unbox-impl").invoke(this) else this
 
@@ -383,7 +383,7 @@ internal class ConfigurationWriter(
             .mapNotNull { it.getOrigin(propertyPath) }
             // if configuration files are added via the `spring.config.additional-local` property, then a property from an additional
             // location ends up in two origins, a property source origin that encapsulates the actual origin, and that origin directly.
-            .map { if (it is PropertySourceOrigin) it.origin else it }
+            .mapNotNull { if (it is PropertySourceOrigin) it.origin else it }
             .toSet()
 
         when {

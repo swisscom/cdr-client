@@ -229,7 +229,7 @@ internal data class Connector(
                 "sourceFolders=${invert(effectiveSourceFolders)}, targetFolders=${invert(effectiveTargetFolders)}, " +
                 "contentType=$contentType, uploadArchiveEnabled=$sourceArchiveEnabled, sourceArchiveFolder=$sourceArchiveFolder, " +
                 "baseSourceArchiveFolder=${baseSourceArchiveFolder}, archiveFolders=${invert(effectiveArchiveFolders)}, " +
-                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${baseSourceErrorFolder}, errorFolders=${ invert(effectiveErrorFolders)}, " +
+                "sourceErrorFolder=$sourceErrorFolder, baseSourceErrorFolder=${baseSourceErrorFolder}, errorFolders=${invert(effectiveErrorFolders)}, " +
                 "mode=$mode)"
     }
 
@@ -467,8 +467,9 @@ internal data class IdpCredentials(
     val clientSecret: ClientSecret,
 
     /**
-     * Access scope to request from the OAuth identity provider. Currently only ```https://[tst.]identity.health.swisscom.ch/CdrApi/.default```
-     * is supported.
+     * Access scope to request from the OAuth identity provider. Production, staging, and integration scopes are
+     * ```https://identity.health.swisscom.ch/CdrApi/.default```, ```https://tst-b2c.health.swisscom.ch/CdrApi/.default```,
+     * and ```https://dev-b2c.health.swisscom.ch/CdrApi/.default```, respectively.
      * */
     val scope: Scope,
 
@@ -539,12 +540,6 @@ internal value class RenewCredential(val value: Boolean) : PropertyNameAware {
         get() = PROPERTY_NAME
 
     companion object {
-        @JvmStatic
-        val ENABLED = RenewCredential(true)
-
-        @JvmStatic
-        val DISABLED = RenewCredential(false)
-
         private const val PROPERTY_NAME = "renew-credential"
     }
 }
@@ -601,9 +596,6 @@ internal value class LastCredentialRenewalTime(val instant: Instant) : PropertyN
 
     companion object {
         private const val PROPERTY_NAME = "last-credential-renewal-time"
-
-        @JvmStatic
-        val BEGINNING_OF_TIME: LastCredentialRenewalTime = LastCredentialRenewalTime(Instant.ofEpochSecond(0L))
     }
 }
 

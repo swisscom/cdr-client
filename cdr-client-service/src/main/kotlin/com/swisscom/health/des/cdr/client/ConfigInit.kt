@@ -1,9 +1,18 @@
 package com.swisscom.health.des.cdr.client
 
+import com.sun.jna.Native
 import com.sun.jna.Platform
+import com.sun.jna.platform.win32.Advapi32
+import com.sun.jna.platform.win32.Advapi32Util
+import com.sun.jna.platform.win32.Kernel32
+import com.sun.jna.platform.win32.Win32Exception
+import com.sun.jna.platform.win32.WinError
+import com.sun.jna.platform.win32.WinNT
+import com.sun.jna.ptr.IntByReference
 import com.swisscom.health.des.cdr.client.common.escalatingFind
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.attribute.AclEntry
 import java.nio.file.attribute.AclFileAttributeView
 import java.nio.file.attribute.PosixFilePermission
 import kotlin.io.path.absolute
@@ -21,6 +30,8 @@ import kotlin.io.path.writeText
 object ConfigInit {
     private const val DEFAULT_CUSTOMER_CONFIG_FILE = "default-application-customer.yaml"
     private const val SERVICE_LOGBACK_FILE = "logback-service.xml"
+    private const val WINDOWS_SYSTEM_SID = "S-1-5-18"
+    private const val WINDOWS_ADMINISTRATORS_SID = "S-1-5-32-544"
 
     /**
      * Checks if a configuration file already exists at [configPath]. If it does not exist, the default
@@ -151,17 +162,37 @@ object ConfigInit {
                 logbackConfigFile
             }
 
-    private fun Path.removeWorldAccess(): Path =
+    @Suppress("TooGenericExceptionCaught")
+    internal fun Path.removeWorldAccess(): Path =
         when {
             Platform.isWindows() -> {
-                logMsg { "Removing all ACLs but for SYSTEM and Administrators groups from '$this'." }
-                val aclView = Files.getFileAttributeView(this, AclFileAttributeView::class.java)
-                // remove all ACLs for users/groups that do not have 'system' or 'administrators' (en/de/fr/it) in their name; is this good enough,
-                // or do we have to go down the JNA route and call Windows' native API to query the administrator group principal by SID?
-                aclView.acl = aclView.acl.filter { aclEntry ->
-                    aclEntry.principal().name.lowercase().matches("""^.*(system|administrators|administratoren|administrateurs|amministratori)$""".toRegex())
+                val serviceUserSid = currentWindowsUserSid()
+                if (serviceUserSid == null) {
+                    logMsg { "WARNING! Cannot identify the Windows service user; leaving ACLs unchanged for '$this'." }
+                } else {
+                    logMsg { "Removing all ACLs but for SYSTEM, Administrators, and the service user (SID '$serviceUserSid') from '$this'." }
+                    val aclView = Files.getFileAttributeView(this, AclFileAttributeView::class.java)
+                    val currentAcl: List<AclEntry> = aclView.acl
+                    val wellKnownNames = setOf(WINDOWS_SYSTEM_SID, WINDOWS_ADMINISTRATORS_SID, serviceUserSid).map { it.toWindowsAccountName()?.lowercase() }
+                    val retainedAcl = if (wellKnownNames.any { it == null }) null else currentAcl.filter {
+                        logMsg {
+                            "Checking ACL principal '${it.principal().name}' against well-known names: $wellKnownNames: " +
+                                    "${it.principal().name.lowercase() in wellKnownNames}"
+                        }
+                        it.principal().name.lowercase() in wellKnownNames
+                    }
+                    if (retainedAcl == null) {
+                        logMsg { "WARNING! Cannot reliably identify all ACL principals; leaving ACLs unchanged for '$this'." }
+                    } else {
+                        try {
+                            aclView.acl = retainedAcl
+                        } catch (exception: Exception) {
+                            // insufficient rights to modify the ACLs must prevent the startup; the exception is rethrown
+                            logMsg { "ERROR! Cannot modify the ACLs of '$this': $exception" }
+                            throw exception
+                        }
+                    }
                 }
-                logMsg { "Remaining ACL entries: ${aclView.acl}" }
             }
 
             Platform.isLinux() -> {
@@ -185,4 +216,57 @@ object ConfigInit {
             this
         }
 
+    @Suppress("TooGenericExceptionCaught")
+    internal fun currentWindowsUserSid(): String? =
+        try {
+            val processToken = WinNT.HANDLEByReference()
+            val currentProcess = Kernel32.INSTANCE.GetCurrentProcess()
+            if (!Advapi32.INSTANCE.OpenProcessToken(currentProcess, WinNT.TOKEN_QUERY, processToken)) {
+                throw Win32Exception(Native.getLastError())
+            }
+            try {
+                val tokenUserInformation = WinNT.TOKEN_INFORMATION_CLASS.TokenUser
+                val requiredBufferSize = IntByReference()
+
+                // Windows requires two calls: first query the buffer size, then read the token user.
+                Advapi32.INSTANCE.GetTokenInformation(processToken.value, tokenUserInformation, null, 0, requiredBufferSize)
+                val bufferSizeQueryError = Native.getLastError()
+                if (bufferSizeQueryError != WinError.ERROR_INSUFFICIENT_BUFFER || requiredBufferSize.value <= 0) {
+                    throw Win32Exception(bufferSizeQueryError)
+                }
+
+                val tokenUser = WinNT.TOKEN_USER(requiredBufferSize.value)
+                val userInformationRead = Advapi32.INSTANCE.GetTokenInformation(
+                    processToken.value,
+                    tokenUserInformation,
+                    tokenUser,
+                    requiredBufferSize.value,
+                    requiredBufferSize
+                )
+                if (!userInformationRead) {
+                    throw Win32Exception(Native.getLastError())
+                }
+
+                Advapi32Util.convertSidToStringSid(tokenUser.User.Sid)
+            } finally {
+                if (!Kernel32.INSTANCE.CloseHandle(processToken.value)) {
+                    logMsg { "WARNING! Could not close the Windows process token (error ${Native.getLastError()})." }
+                }
+            }
+        } catch (exception: Exception) {
+            logMsg { "WARNING! Could not read the Windows process user SID: $exception" }
+            null
+        } catch (error: LinkageError) {
+            logMsg { "WARNING! Native Windows identity APIs are unavailable: $error" }
+            null
+        }
+
+    @Suppress("TooGenericExceptionCaught")
+    private fun String.toWindowsAccountName(): String? =
+        try {
+            Advapi32Util.getAccountBySid(this).fqn
+        } catch (exception: Exception) {
+            logMsg { "Could not resolve well-known SID '$this' to an account name: $exception" }
+            null
+        }
 }

@@ -1,12 +1,9 @@
 package com.swisscom.health.des.cdr.client.http
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import com.swisscom.health.des.cdr.client.config.CdrApi
-import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
 import com.swisscom.health.des.cdr.client.config.ClientSecret
@@ -28,6 +25,7 @@ import com.swisscom.health.des.cdr.client.config.RenewCredential
 import com.swisscom.health.des.cdr.client.config.Scope
 import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.TenantId
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
@@ -62,17 +60,21 @@ import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
-import org.springframework.boot.actuate.health.HealthEndpoint
-import org.springframework.boot.actuate.health.SystemHealth
+import org.springframework.boot.health.actuate.endpoint.CompositeHealthDescriptor
+import org.springframework.boot.health.actuate.endpoint.HealthDescriptor
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint
+import org.springframework.boot.health.contributor.Status
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.retry.support.RetryTemplate
 import org.springframework.util.unit.DataSize
+import tools.jackson.databind.json.JsonMapper
 import java.net.URI
 import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
 
 @ExtendWith(MockKExtension::class)
 internal class WebOperationsTest {
@@ -98,7 +100,7 @@ internal class WebOperationsTest {
     @MockK
     private lateinit var authNService: OAuth2AuthNService
 
-    private var objectMapper: ObjectMapper = ObjectMapper()
+    private val jsonMapper = JsonMapper.builder().findAndAddModules().build()
 
     private lateinit var webOperations: WebOperations
 
@@ -118,7 +120,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = retryIOExceptionsAndServerErrors,
@@ -241,12 +243,20 @@ internal class WebOperationsTest {
             "AUTHN_DENIED" -> DTOs.StatusResponse.StatusCode.AUTHN_DENIED
             else -> DTOs.StatusResponse.StatusCode.UNKNOWN
         }
-        val systemHealth = mockk<SystemHealth>()
+        val systemHealth = mockk<CompositeHealthDescriptor>()
+        val syncDescriptor = mockk<HealthDescriptor>()
+        val configDescriptor = mockk<HealthDescriptor>()
+        val authNDescriptor = mockk<HealthDescriptor>()
         every { healthEndpoint.health() } returns systemHealth
         every { systemHealth.toString() } returns "fake health status"
-        every { systemHealth.components[FILE_SYNCHRONIZATION_INDICATOR_NAME]?.status?.code } returns fileSyncStatus
-        every { systemHealth.components[CONFIG_INDICATOR_NAME]?.status?.code } returns configStatus
-        every { systemHealth.components[AUTHN_INDICATOR_NAME]?.status?.code } returns authNStatus
+        every { systemHealth.components } returns mapOf(
+            FILE_SYNCHRONIZATION_INDICATOR_NAME to syncDescriptor,
+            CONFIG_INDICATOR_NAME to configDescriptor,
+            AUTHN_INDICATOR_NAME to authNDescriptor,
+        )
+        every { syncDescriptor.status } returns Status(fileSyncStatus)
+        every { configDescriptor.status } returns Status(configStatus)
+        every { authNDescriptor.status } returns Status(authNStatus)
 
         val response = webOperations.status()
         assertEquals(HttpStatus.OK, response.statusCode)
@@ -299,7 +309,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -339,7 +349,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -374,7 +384,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -397,7 +407,7 @@ internal class WebOperationsTest {
 
         webOperationsWithRealRetry.validateCredentials(idpCredentialsWithMaskedSecret)
 
-        assertEquals(DEFAULT_CDR_CONFIG.idpCredentials.clientSecret.value, capturedCredentials.captured.clientSecret.value)
+        assertEquals(DEFAULT_CDR_CONFIG.idpCredentials.clientSecret, capturedCredentials.captured.clientSecret)
     }
 
     @Test
@@ -407,7 +417,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -430,7 +440,7 @@ internal class WebOperationsTest {
 
         webOperationsWithRealRetry.validateCredentials(idpCredentialsWithAnyMaskedSecret)
 
-        assertEquals(DEFAULT_CDR_CONFIG.idpCredentials.clientSecret.value, capturedCredentials.captured.clientSecret.value)
+        assertEquals(DEFAULT_CDR_CONFIG.idpCredentials.clientSecret, capturedCredentials.captured.clientSecret)
     }
 
     @Test
@@ -440,7 +450,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = DEFAULT_CDR_CONFIG,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -464,7 +474,7 @@ internal class WebOperationsTest {
 
         webOperationsWithRealRetry.validateCredentials(idpCredentialsWithRealSecret)
 
-        assertEquals(newSecret, capturedCredentials.captured.clientSecret.value)
+        assertEquals(ClientSecret(newSecret), capturedCredentials.captured.clientSecret)
     }
 
     @Test
@@ -484,7 +494,7 @@ internal class WebOperationsTest {
             shutdownService = shutdownService,
             configWriter = configWriter,
             healthEndpoint = healthEndpoint,
-            objectMapper = objectMapper,
+            jsonMapper = jsonMapper,
             config = configWithOriginalEndpoint,
             configValidationService = configValidationService,
             retryIOExceptionsAndServerErrors = realRetryTemplate,
@@ -547,7 +557,7 @@ internal class WebOperationsTest {
                 clientId = ClientId("fake-client-id"),
                 clientSecret = ClientSecret("fake-client-secret"),
                 scope = Scope(DomainObjects.OAuthScope.LOCALHOST.scope),
-                renewCredential = RenewCredential.ENABLED,
+                renewCredential = RenewCredential(true),
                 maxCredentialAge = Duration.ofDays(30),
                 lastCredentialRenewalTime = LastCredentialRenewalTime(Instant.now()),
             ),

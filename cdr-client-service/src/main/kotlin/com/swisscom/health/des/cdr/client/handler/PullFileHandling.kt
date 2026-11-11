@@ -1,12 +1,11 @@
 package com.swisscom.health.des.cdr.client.handler
 
-import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
+import com.swisscom.health.des.cdr.client.LogCorrelation
 import com.swisscom.health.des.cdr.client.config.Connector
 import com.swisscom.health.des.cdr.client.config.getEffectiveTargetFolder
 import com.swisscom.health.des.cdr.client.handler.CdrApiClient.DownloadDocumentResult
 import com.swisscom.health.des.cdr.client.xml.extractDocumentMetaData
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.micrometer.tracing.Tracer
 import org.springframework.stereotype.Component
 import java.nio.file.Files
 import java.nio.file.Path
@@ -23,7 +22,6 @@ private val logger = KotlinLogging.logger {}
 @Component
 @Suppress("TooManyFunctions")
 internal class PullFileHandling(
-    private val tracer: Tracer,
     private val cdrApiClient: CdrApiClient,
 ) {
     /**
@@ -32,7 +30,7 @@ internal class PullFileHandling(
      * @param connector the connector to synchronize
      */
     suspend fun pullSyncConnector(connector: Connector) {
-        tracer.withSpan("Pull Sync Connector ${connector.connectorId}") {
+        LogCorrelation.withNewTraceIdSuspending {
             logger.info { "Sync connector '${connector.connectorId.id}' (${connector.mode}) - pulling" }
             var counter = 0
             runCatching {
@@ -68,14 +66,14 @@ internal class PullFileHandling(
         cdrApiClient.downloadDocument(
             connectorId = connector.connectorId.id,
             mode = connector.mode,
-            traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
+            traceId = LogCorrelation.currentTraceId()
         ).let { downloadResult: DownloadDocumentResult ->
             if (downloadResult is DownloadDocumentResult.DownloadSuccess) {
                 cdrApiClient.acknowledgeDocumentDownload(
                     connectorId = connector.connectorId.id,
                     mode = connector.mode,
                     downloadId = downloadResult.pullResultId,
-                    traceId = tracer.currentSpan()?.context()?.traceId() ?: EMPTY_STRING
+                    traceId = LogCorrelation.currentTraceId()
                 ).let { ackResult: DownloadDocumentResult ->
                     if (ackResult is DownloadDocumentResult.AcknowledgeSuccess) {
                         moveFileToClientDirectory(connector, downloadResult.file)

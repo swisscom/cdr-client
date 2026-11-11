@@ -141,8 +141,51 @@ class CdrConfigViewModelSplitDefaultsTest {
         val updatedDocTypeFolders = updatedConnector.docTypeFolders.getValue(DocumentType.INVOICE)
 
         assertEquals(false, updatedDocTypeFolders.requestResponseSplit)
+        assertEquals(null, updatedDocTypeFolders.targetFolderReq)
+        assertEquals(null, updatedDocTypeFolders.targetFolderResp)
+        assertEquals(null, updatedDocTypeFolders.sourceFolderReq)
+        assertEquals(null, updatedDocTypeFolders.sourceFolderResp)
         assertEquals(null, updatedDocTypeFolders.errorFolder)
         assertEquals(null, updatedDocTypeFolders.archiveFolder)
+    }
+
+    @Test
+    fun `toggle on and off restores the original config and removes the banner diff`() = runBlocking {
+        val baselineConnector = ConnectorDto.EMPTY.copy(
+            connectorId = "connector-1",
+            targetFolder = "/connector/target",
+            sourceFolder = "/connector/source",
+            sourceArchiveEnabled = true,
+            sourceArchiveFolder = "/connector/archive",
+            sourceErrorFolder = "/connector/error",
+        )
+        val baselineConfig = CdrClientConfigDto.EMPTY.copy(customer = listOf(baselineConnector))
+        val viewModel = CdrConfigViewModel(apiClient)
+        coEvery { apiClient.getClientServiceConfiguration() } returns CdrClientApiClient.Result.Success(baselineConfig)
+
+        viewModel.queryClientServiceConfiguration().join()
+        val initialConfig = viewModel.uiStateFlow.value.clientServiceConfig
+
+        val splitConnector = baselineConfig.customer.single()
+        viewModel.setConnectorDocTypeRequestResponseSplit(DocumentType.INVOICE, true, splitConnector)
+        val splitConfig = viewModel.uiStateFlow.value.clientServiceConfig
+        val splitDocTypeFolders = splitConfig.customer.single().docTypeFolders.getValue(DocumentType.INVOICE)
+        assertTrue(splitDocTypeFolders.requestResponseSplit)
+
+        val detoggledConnector = splitConfig.customer.single()
+        viewModel.setConnectorDocTypeRequestResponseSplit(DocumentType.INVOICE, false, detoggledConnector)
+        val finalConfig = viewModel.uiStateFlow.value.clientServiceConfig
+
+        assertEquals(initialConfig, finalConfig)
+        assertEquals(
+            false,
+            CdrConfigScreenPendingChangesState(baselineConfig = initialConfig)
+                .shouldShowPendingChangesBanner(
+                    currentConfig = finalConfig,
+                    initialConfigLoaded = true,
+                    hasLocalConfigChanges = true,
+                )
+        )
     }
 
     @Test
