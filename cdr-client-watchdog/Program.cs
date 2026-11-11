@@ -48,6 +48,12 @@ public class Program
             options.ServiceName = serviceName;
         });
 
+        // The host (and the SCM stop handler) must wait for the graceful stop plus the forced-termination fallback,
+        // otherwise the watchdog exits while the monitored service process is still running.
+        builder.Services.AddOptions<HostOptions>()
+            .Configure<WatchdogSettings>((options, settings) =>
+                options.ShutdownTimeout = ManagedServiceProcess.GetMaximumStopDuration(settings) + TimeSpan.FromSeconds(5));
+
         // Configure logging from appsettings.json
         builder.Logging.ClearProviders();
         builder.Logging.AddConfiguration(builder.Configuration.GetSection("Logging"));

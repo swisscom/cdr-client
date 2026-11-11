@@ -79,13 +79,23 @@ internal class GracefulShutdownHandler(
     private fun waitForActiveUploads() = runBlocking {
         withContext(NonCancellable) {
             logger.info { "Waiting for '${inProgressUploads.size}' upload jobs to complete..." }
-            val success: Unit? = withTimeoutOrNull(Duration.ofMinutes(1)) { inProgressUploads.keys.joinAll() }
+            val success: Unit? = withTimeoutOrNull(Duration.ofSeconds(GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS)) { inProgressUploads.keys.joinAll() }
             if (success == null) {
                 logger.warn { "Timeout while waiting for upload jobs to complete; check the client source directories for orphaned `.upload` files." }
             } else {
                 logger.info { "All live upload jobs have completed." }
             }
         }
+    }
+
+    private companion object {
+        // The rationale for the current timeout value: The Windows Service Control Manager (SCM) waits 30 seconds for a service to stop before erroring out.
+        // A Windows shutdown will wait for five seconds before forcing a service to stop.
+        // The timeouts applied during MSIX app auto-updates are not documented (according to Claude), so we hope the SCM timeouts apply. To make sure the
+        // update process does not fail due to an SCM error, we keep the timeout for graceful shutdown of the upload jobs well below 20 seconds. The
+        // watchdog service adds another five seconds of margin to our timeout, and then still has to kill the cdr-client-service process and shut itself down,
+        // all within the 30-second window.
+        const val GRACEFUL_SHUTDOWN_TIMEOUT_SECONDS = 15L
     }
 
 }
