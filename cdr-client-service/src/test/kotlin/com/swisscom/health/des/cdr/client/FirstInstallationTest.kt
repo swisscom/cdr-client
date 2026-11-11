@@ -1,6 +1,5 @@
 package com.swisscom.health.des.cdr.client
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientId
@@ -30,6 +29,7 @@ import org.springframework.boot.test.system.CapturedOutput
 import org.springframework.boot.test.system.OutputCaptureExtension
 import org.springframework.core.io.FileSystemResource
 import org.springframework.http.MediaType
+import tools.jackson.databind.json.JsonMapper
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -62,14 +62,14 @@ internal class FirstInstallationTest {
                 val scheduling = context.getBean<SchedulingValidationService>()
                 val validation = context.getBean<ConfigValidationService>()
                 val writer = context.getBean<ConfigurationWriter>()
-                val mapper = context.getBean<ObjectMapper>()
+                val mapper = context.getBean<JsonMapper>()
                 val endpoint = URI("http://localhost:${context.environment.getProperty("local.server.port")}/api/service-configuration")
                 val httpClient = HttpClient.newHttpClient()
 
                 assertEquals("", config.localFolder.value)
                 val response = httpClient.send(HttpRequest.newBuilder(endpoint).GET().build(), BodyHandlers.ofString())
                 assertEquals(200, response.statusCode())
-                assertEquals("", mapper.readTree(response.body()).get("localFolder").asText())
+                assertEquals("", mapper.readTree(response.body()).get("localFolder").asString())
                 assertFalse(validation.isConfigValid)
                 assertFalse(scheduling.isSchedulingAllowed)
                 assertTrue(output.all.contains("No file upload/download will be possible due to configuration validation failure."))
@@ -110,7 +110,7 @@ internal class FirstInstallationTest {
             )),
         )
 
-    private fun HttpClient.updateConfiguration(endpoint: URI, config: CdrClientConfig, mapper: ObjectMapper): HttpResponse<String> =
+    private fun HttpClient.updateConfiguration(endpoint: URI, config: CdrClientConfig, mapper: JsonMapper): HttpResponse<String> =
         send(
             HttpRequest.newBuilder(endpoint)
                 .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
