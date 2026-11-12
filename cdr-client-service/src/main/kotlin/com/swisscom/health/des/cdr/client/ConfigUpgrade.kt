@@ -1,15 +1,7 @@
 package com.swisscom.health.des.cdr.client
 
-import tools.jackson.databind.PropertyNamingStrategies
 import tools.jackson.databind.node.ObjectNode
-import tools.jackson.dataformat.yaml.YAMLFactory
-import tools.jackson.dataformat.yaml.YAMLMapper
-import tools.jackson.dataformat.yaml.YAMLWriteFeature
-import tools.jackson.module.kotlin.kotlinModule
 import java.nio.file.Path
-import java.nio.file.StandardOpenOption
-import kotlin.io.path.inputStream
-import kotlin.io.path.outputStream
 
 /**
  * Utility object responsible for applying necessary upgrade steps to the external SpringBoot configuration file
@@ -32,19 +24,6 @@ object ConfigUpgrade {
         ConfigUpgradeStep.V12ToV13
     )
 
-    @JvmStatic
-    private val YAML_MAPPER: YAMLMapper =
-        YAMLMapper.builder(
-            YAMLFactory.builder()
-                .enable(YAMLWriteFeature.MINIMIZE_QUOTES)
-                .enable(YAMLWriteFeature.INDENT_ARRAYS_WITH_INDICATOR)
-                .disable(YAMLWriteFeature.WRITE_DOC_START_MARKER)
-                .build()
-        )
-            .addModule(kotlinModule { })
-            .propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
-            .build()
-
     /**
      * Applies all known upgrade steps to the external SpringBoot configuration file at [configLocation].
      * The upgrade steps assume the configuration file is in YAML format. Other formats are not supported.
@@ -65,9 +44,7 @@ object ConfigUpgrade {
                         acc + configUpgradeStep.upgrade(
                             configRoot = if (acc.isEmpty()) {
                                 // read original configuration file from disk
-                                configLocation.inputStream(StandardOpenOption.READ).use {
-                                    YAML_MAPPER.readTree(it) as ObjectNode
-                                }
+                                ConfigYaml.read(configLocation)
                             } else {
                                 // use version of the configuration containing changes from previous migration steps
                                 acc.last().configRoot
@@ -79,7 +56,7 @@ object ConfigUpgrade {
 
         return when (val lastUpgradeStep = upgradeStepResults.last()) {
             is UpgradeStepResult.Success -> runCatching {
-                persistConfig(configRoot = lastUpgradeStep.configRoot, configLocation = configLocation)
+                ConfigYaml.write(configFile = configLocation, configRoot = lastUpgradeStep.configRoot)
             }.fold(
                 onSuccess = { _ -> UpgradeResult.Success(version = getConfigVersion(lastUpgradeStep.configRoot)) },
                 onFailure = { t -> UpgradeResult.Failure(version = getConfigVersion(lastUpgradeStep.configRoot), reason = t.toString()) }
@@ -93,11 +70,6 @@ object ConfigUpgrade {
             is UpgradeStepResult.NoStep -> UpgradeResult.AlreadyAtLatestVersion
         }
     }
-
-    private fun persistConfig(configLocation: Path, configRoot: ObjectNode) =
-        configLocation.outputStream().use { os ->
-            YAML_MAPPER.writeValue(os.writer(), configRoot)
-        }
 
 }
 

@@ -1,5 +1,6 @@
 package com.swisscom.health.des.cdr.client.handler
 
+import com.swisscom.health.des.cdr.client.ConfigYaml
 import com.swisscom.health.des.cdr.client.common.DTOs
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
@@ -20,21 +21,14 @@ import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
 import org.springframework.util.unit.DataSize
 import tools.jackson.databind.JsonNode
-import tools.jackson.databind.PropertyNamingStrategies
 import tools.jackson.databind.node.ArrayNode
 import tools.jackson.databind.node.ObjectNode
-import tools.jackson.dataformat.yaml.YAMLFactory
-import tools.jackson.dataformat.yaml.YAMLMapper
-import tools.jackson.dataformat.yaml.YAMLWriteFeature
-import tools.jackson.module.kotlin.kotlinModule
 import java.net.URL
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
-import kotlin.reflect.full.isSubclassOf
 import kotlin.reflect.full.memberProperties
-import kotlin.reflect.jvm.jvmErasure
 
 private val logger = KotlinLogging.logger {}
 
@@ -172,16 +166,7 @@ internal class ConfigurationWriter(
 
     @Suppress("CyclomaticComplexMethod", "NestedBlockDepth", "LongMethod")
     private fun updateYamlSource(changedConfigItem: UpdatableConfigurationItem.WritableSource): Unit =
-        YAMLMapper.builder(
-            YAMLFactory.builder()
-                .enable(YAMLWriteFeature.MINIMIZE_QUOTES)
-                .enable(YAMLWriteFeature.INDENT_ARRAYS_WITH_INDICATOR)
-                .disable(YAMLWriteFeature.WRITE_DOC_START_MARKER)
-                .build()
-        )
-            .addModule(kotlinModule { })
-            .propertyNamingStrategy(PropertyNamingStrategies.KEBAB_CASE)
-            .build()
+        ConfigYaml.MAPPER
             .run {
                 // unmarshal the YAML file the to-be-updated value belongs to
                 val yamlNode: JsonNode = readTree(changedConfigItem.writableResource.inputStream)
@@ -416,7 +401,6 @@ internal class ConfigurationWriter(
 
             else -> {
                 value::class.memberProperties
-                    .filter { it.returnType.jvmErasure.isSubclassOf(PropertyNameAware::class) }
                     .mapNotNull { kProperty -> kProperty.call(value) }
                     .filterIsInstance<PropertyNameAware>()
                     .toList()

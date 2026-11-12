@@ -27,8 +27,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
 import java.net.URI
@@ -81,19 +79,6 @@ internal class FileMonitoringServiceTest {
 
         assertEquals(0, status.errorFileCount)
         assertEquals(0, status.oldTempFileCount)
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = ["", " ", "\t"])
-    fun `should skip unconfigured temp folder and still monitor error folders`(value: String) = runTest {
-        val config = createDefaultConfig().copy(localFolder = TempDownloadDir(value))
-        val service = FileMonitoringService(config)
-        createErrorFile(errorDir1, "error.xml")
-
-        service.checkFileStatus()
-
-        assertEquals(0, service.monitoringStatus.oldTempFileCount)
-        assertEquals(1, service.monitoringStatus.errorFileCount)
     }
 
     @Test

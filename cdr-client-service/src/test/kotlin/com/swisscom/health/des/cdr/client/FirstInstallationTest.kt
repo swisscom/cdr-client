@@ -11,22 +11,16 @@ import com.swisscom.health.des.cdr.client.config.TempDownloadDir
 import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
 import com.swisscom.health.des.cdr.client.handler.ConfigurationWriter
-import com.swisscom.health.des.cdr.client.handler.FileMonitoringService
-import com.swisscom.health.des.cdr.client.handler.SchedulingValidationService
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertInstanceOf
-import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.beans.factory.getBean
 import org.springframework.boot.WebApplicationType
 import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.boot.env.YamlPropertySourceLoader
-import org.springframework.boot.test.system.CapturedOutput
-import org.springframework.boot.test.system.OutputCaptureExtension
 import org.springframework.core.io.FileSystemResource
 import org.springframework.http.MediaType
 import tools.jackson.databind.json.JsonMapper
@@ -38,16 +32,17 @@ import java.net.http.HttpResponse.BodyHandlers
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectory
+import kotlin.io.path.isDirectory
 
-@ExtendWith(OutputCaptureExtension::class)
 internal class FirstInstallationTest {
     @TempDir
     private lateinit var tempDir: Path
 
     @Test
-    fun `fresh installation starts with no local folder and accepts configuration from the UI`(output: CapturedOutput) = runTest {
+    fun `fresh installation starts with the default local folder and accepts configuration from the UI`() = runTest {
         val configFile = tempDir.resolve("application-customer.yaml")
         Files.copy(Path.of("conf/default-application-customer.yaml"), configFile)
+        LocalFolderInit.initLocalFolder(configFile, stateDirectory = null)
 
         SpringApplicationBuilder(CdrClientApplication::class.java)
             .web(WebApplicationType.REACTIVE)
@@ -59,26 +54,21 @@ internal class FirstInstallationTest {
                 "--logging.file.name=${tempDir.resolve("service.log")}",
             ).use { context ->
                 val config = context.getBean<CdrClientConfig>()
-                val scheduling = context.getBean<SchedulingValidationService>()
                 val validation = context.getBean<ConfigValidationService>()
                 val writer = context.getBean<ConfigurationWriter>()
                 val mapper = context.getBean<JsonMapper>()
                 val endpoint = URI("http://localhost:${context.environment.getProperty("local.server.port")}/api/service-configuration")
                 val httpClient = HttpClient.newHttpClient()
 
-                assertEquals("", config.localFolder.value)
+                val defaultLocalFolder = tempDir.resolve(LocalFolderInit.INBOUND_DIR_NAME)
+                assertEquals(defaultLocalFolder, config.localFolder.path)
+                assertTrue(defaultLocalFolder.isDirectory())
                 val response = httpClient.send(HttpRequest.newBuilder(endpoint).GET().build(), BodyHandlers.ofString())
                 assertEquals(200, response.statusCode())
-                assertEquals("", mapper.readTree(response.body()).get("localFolder").asString())
-                assertFalse(validation.isConfigValid)
-                assertFalse(scheduling.isSchedulingAllowed)
-                assertTrue(output.all.contains("No file upload/download will be possible due to configuration validation failure."))
-                assertFalse(output.all.contains("IllegalStateException"))
+                assertEquals(defaultLocalFolder.toString(), mapper.readTree(response.body()).get("localFolder").asString())
                 assertInstanceOf<ConfigurationWriter.ConfigLookupResult.Writable>(
                     writer.isWritableConfigurationItem("client.local-folder")
                 )
-                assertEquals(400, httpClient.updateConfiguration(endpoint, config, mapper).statusCode())
-                context.getBean<FileMonitoringService>().checkFileStatus()
 
                 val downloadDir = tempDir.resolve("inflight").createDirectory()
                 val updated = configuredClient(config, downloadDir)

@@ -41,8 +41,6 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.core.env.Environment
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
@@ -185,22 +183,6 @@ internal class ConfigValidationServiceTest {
             assertInstanceOf<DTOs.ValidationDetail.ConfigItemDetail>(validationDetail)
             assertEquals(DomainObjects.ConfigurationItem.CONNECTOR, validationDetail.configItem)
             assertEquals(DTOs.ValidationMessageKey.NO_CONNECTOR_CONFIGURED, validationDetail.messageKey)
-        }
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = ["", " ", "\t"])
-    fun `test validation error if local directory is blank`(value: String) {
-        val clientConfig = allGoodCdrClientConfig.copy(localFolder = TempDownloadDir(value))
-
-        val validationResult: DTOs.ValidationResult = configValidationService.validateAllConfigurationItems(clientConfig)
-
-        assertInstanceOf<DTOs.ValidationResult.Failure>(validationResult)
-        assertEquals(1, validationResult.validationDetails.size)
-        validationResult.validationDetails.first().let { validationDetail ->
-            assertInstanceOf<DTOs.ValidationDetail.ConfigItemDetail>(validationDetail)
-            assertEquals(DomainObjects.ConfigurationItem.LOCAL_DIRECTORY, validationDetail.configItem)
-            assertEquals(DTOs.ValidationMessageKey.NOT_A_DIRECTORY, validationDetail.messageKey)
         }
     }
 

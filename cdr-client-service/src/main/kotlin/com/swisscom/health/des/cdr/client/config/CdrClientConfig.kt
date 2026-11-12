@@ -513,14 +513,8 @@ internal data class IdpCredentials(
 }
 
 @JvmInline
-internal value class TempDownloadDir(val value: String) : PropertyNameAware {
-    constructor(path: Path) : this(path.toString())
-
-    val path: Path
-        get() {
-            check(value.isNotBlank()) { "client.local-folder must be configured before accessing the download directory" }
-            return Paths.get(value)
-        }
+internal value class TempDownloadDir(val path: Path) : PropertyNameAware {
+    constructor(path: String) : this(Paths.get(path))
 
     override val propertyName: String
         get() = PROPERTY_NAME

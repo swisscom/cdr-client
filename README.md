@@ -194,10 +194,19 @@ If you do not provide a value for `LOGGING_FILE_NAME` the log file gets auto cre
 
 ## Configuration
 
-For a first installation, `client.local-folder: ""` leaves the download staging directory unconfigured.
-The service starts and exposes its configuration API for the UI, but file synchronization remains blocked
-until the complete configuration is valid. Choose an existing, readable and writable directory in the UI;
-the service does not substitute the working directory or a system temporary directory for an empty value.
+If `client.local-folder` is empty (e.g. `""` in the first-installation template), the service sets it on startup to a
+dedicated `inbound` download staging directory, creates that directory with restricted permissions, and writes its
+absolute path into the external configuration file:
+
+- `$STATE_DIRECTORY/inbound` if the `STATE_DIRECTORY` environment variable is set (Linux systemd service), otherwise
+- `inbound` next to the configuration file, or next to its parent directory if that directory is named `conf`.
+
+If the directory cannot be created, the path is written anyway and the configuration validation reports the missing
+directory; create it manually and grant the service account read/write access. If the configuration file cannot be
+written, `local-folder` stays empty: the service starts and exposes its configuration API for the UI, but file
+synchronization remains blocked until a valid directory is configured. The service never uses the working directory or
+a system temporary directory for an empty value. Without an external configuration file (no
+`spring.config.additional-location`), nothing is changed.
 Save the configuration and restart the service to activate it.
 
 ### Per Connector Directories

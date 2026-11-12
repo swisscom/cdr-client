@@ -4,9 +4,6 @@ import com.swisscom.health.des.cdr.client.common.DocumentType
 import com.swisscom.health.des.cdr.client.common.DomainObjects
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 import org.springframework.http.MediaType
 import org.springframework.util.unit.DataSize
 import java.net.URI
@@ -87,7 +84,7 @@ class ConfigConverterTest {
         ),
     )
 
-    private val sameConfigButAbsolutePathsExceptLocalFolder: CdrClientConfig = CdrClientConfig(
+    private val sameConfigButAbsolutePaths: CdrClientConfig = CdrClientConfig(
         fileSynchronizationEnabled = FileSynchronization.ENABLED,
         customer = Customer(
             mutableListOf(
@@ -159,37 +156,13 @@ class ConfigConverterTest {
     @Test
     fun `there and back again - make sure no information is lost in translation`() {
         val configRoundTrip = configAllRelativePaths.toDto().toCdrClientConfig()
-        sameConfigButAbsolutePathsExceptLocalFolder.copy(
-            localFolder = TempDownloadDir(RELATIVE_PATH),
-            idpCredentials = sameConfigButAbsolutePathsExceptLocalFolder.idpCredentials.copy(
+        sameConfigButAbsolutePaths.copy(
+            idpCredentials = sameConfigButAbsolutePaths.idpCredentials.copy(
                 clientSecret = ClientSecret.MASKED_SECRET
             )
-        ).also { expectedConfig ->
-            assertEquals(expectedConfig, configRoundTrip)
+        ).also { sameConfigButAbsolutePathsMaskedSecret ->
+            assertEquals(sameConfigButAbsolutePathsMaskedSecret, configRoundTrip)
         }
-    }
-
-    @Test
-    fun `blank local folder survives dto round trip`() {
-        val config = configAllRelativePaths.copy(localFolder = TempDownloadDir(""))
-
-        val roundTrip = config.toDto().toCdrClientConfig()
-
-        assertEquals("", roundTrip.localFolder.value)
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = ["", " ", "\t"])
-    fun `blank local folder cannot resolve to a filesystem path`(value: String) {
-        val folder = TempDownloadDir(value)
-
-        assertThrows<IllegalStateException> { folder.path }
-    }
-
-    @Test
-    fun `configured local folder retains its path`() {
-        assertEquals(RELATIVE_PATH, TempDownloadDir(RELATIVE_PATH).path)
-        assertEquals(ABSOLUTE_PATH, TempDownloadDir(ABSOLUTE_PATH).path)
     }
 
     private companion object {
