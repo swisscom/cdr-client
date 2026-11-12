@@ -11,6 +11,7 @@ import com.swisscom.health.des.cdr.client.model.RetryableHttpOperation
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.time.delay
@@ -38,9 +39,12 @@ import java.net.Proxy
 import java.nio.file.Path
 import java.time.Duration
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.fileSize
 import kotlin.io.path.name
+import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger {}
 
@@ -54,6 +58,9 @@ internal class CdrClientContext {
 
     @Bean(name = ["cdrClientInstanceId"])
     fun cdrClientInstanceId(): UUID = UUID.randomUUID()
+
+    @Bean(name = ["inProgressUploads"])
+    fun inProgressUploads(): ConcurrentMap<Job, Instant> = ConcurrentHashMap()
 
     /**
      * Configures system-wide proxy authenticator for Nimbus JWT HTTP client.
