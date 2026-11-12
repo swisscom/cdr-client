@@ -55,9 +55,9 @@ public sealed class ManagedServiceProcessTests
     }
 
     [Fact]
-    public void ShutdownWaitRemainsTenSeconds()
+    public void ShutdownWaitRemainsFiveSeconds()
     {
-        Assert.Equal(TimeSpan.FromSeconds(10), ManagedServiceProcess.ShutdownTimeout);
+        Assert.Equal(TimeSpan.FromSeconds(5), ManagedServiceProcess.ShutdownTimeout);
     }
 
     [Fact]
