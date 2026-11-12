@@ -70,7 +70,7 @@ internal sealed class ConsoleShutdownSignal : IShutdownSignal
         }
 
         startInfo.CreateNoWindow = false;
-        // The "ignore Ctrl+C" flag is inherited by child processes; make sure the managed process does not start with it.
+        // The "ignore Ctrl+C" flag is inherited by child processes
         if (!SetConsoleCtrlHandler(IntPtr.Zero, false))
         {
             _logger.LogWarning("Could not enable Ctrl+C handling for the curaLINE Client service (Win32 error {Error})",

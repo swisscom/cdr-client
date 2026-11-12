@@ -52,7 +52,7 @@ public class Program
         // otherwise the watchdog exits while the monitored service process is still running.
         builder.Services.AddOptions<HostOptions>()
             .Configure<WatchdogSettings>((options, settings) =>
-                options.ShutdownTimeout = ManagedServiceProcess.GetMaximumStopDuration(settings) + TimeSpan.FromSeconds(5));
+                options.ShutdownTimeout = ManagedServiceProcess.GetMaximumStopDuration(settings) + TimeSpan.FromSeconds(3));
 
         // Configure logging from appsettings.json
         builder.Logging.ClearProviders();

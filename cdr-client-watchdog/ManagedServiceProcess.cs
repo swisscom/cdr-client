@@ -21,7 +21,7 @@ internal interface IManagedServiceProcess
 
 internal sealed class ManagedServiceProcess : IManagedServiceProcess
 {
-    internal static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(10);
+    internal static readonly TimeSpan ShutdownTimeout = TimeSpan.FromSeconds(5);
 
     internal static TimeSpan GetMaximumStopDuration(WatchdogSettings settings) => settings.GracefulShutdownTimeout + ShutdownTimeout;
 
