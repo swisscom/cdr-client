@@ -44,7 +44,7 @@ internal object LogCorrelation {
             block()
         }
 
-    fun contextElement(traceId: String = currentTraceId()): MdcTraceIdContextElement = MdcTraceIdContextElement(traceId)
+    fun contextElement(traceId: String = currentTraceId()): CoroutineContext.Element = MdcTraceIdContextElement(traceId)
 
     private fun restorePreviousTraceId(previousTraceId: String?) {
         if (previousTraceId == null) {

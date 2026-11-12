@@ -1,9 +1,9 @@
 package com.swisscom.health.des.cdr.client.handler
 
 import com.swisscom.health.des.cdr.client.common.Constants.EMPTY_STRING
-import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.HttpServerErrorException
+import com.swisscom.health.des.cdr.client.model.RetryableHttpOperation
 import io.github.oshai.kotlinlogging.KotlinLogging
 import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaType
@@ -13,11 +13,11 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.springframework.beans.factory.annotation.Qualifier
+import org.springframework.core.retry.RetryException
+import org.springframework.core.retry.RetryTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
-import org.springframework.retry.RetryContext
-import org.springframework.retry.support.RetryTemplate
 import org.springframework.stereotype.Service
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
@@ -47,32 +47,27 @@ internal class CdrApiClient(
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     fun renewClientCredential(traceId: String): RenewClientSecretResult = runCatching {
         logger.debug { "Renewing client secret" }
-        retryIOExceptionsAndServerErrors.execute<Response, Exception> { retry: RetryContext ->
-            if (retry.retryCount > 0) {
-                logger.debug {
-                    "Operation targeting '${buildClientCredentialUrl(cdrClientConfig.idpCredentials.clientId.id)}' has failed; exception: " +
-                            "'${retry.lastThrowable?.let { getRootestCause(it)::class.java }}'; message: '${retry.lastThrowable?.message}'"
-                }
-                logger.info {
-                    "Retry attempt '#${retry.retryCount}' of 'renew client credential' operation targeting " +
-                            "'${buildClientCredentialUrl(cdrClientConfig.idpCredentials.clientId.id)}'"
-                }
+        retryIOExceptionsAndServerErrors.execute<Response>(
+            RetryableHttpOperation(
+                operationName = "renew client credential",
+                url = buildClientCredentialUrl(cdrClientConfig.idpCredentials.clientId.id)
+            ) {
+                httpClient.newCall(
+                    Request.Builder()
+                        .url(buildClientCredentialUrl(cdrClientConfig.idpCredentials.clientId.id))
+                        .headers(
+                            Headers.Builder().run {
+                                this[AZURE_TRACE_ID_HEADER] = traceId
+                                this.build()
+                            }
+                        )
+                        // unfortunately, okHttp requires a non-null body for patch/post requests
+                        // https://github.com/square/okhttp/issues/7005
+                        .patch(byteArrayOf().toRequestBody())
+                        .build()
+                ).execute()
             }
-            httpClient.newCall(
-                Request.Builder()
-                    .url(buildClientCredentialUrl(cdrClientConfig.idpCredentials.clientId.id))
-                    .headers(
-                        Headers.Builder().run {
-                            this[AZURE_TRACE_ID_HEADER] = traceId
-                            this.build()
-                        }
-                    )
-                    // unfortunately, okHttp requires a non-null body for patch/post requests
-                    // https://github.com/square/okhttp/issues/7005
-                    .patch(byteArrayOf().toRequestBody())
-                    .build()
-            ).execute()
-        }.use { response: Response ->
+        ).use { response: Response ->
             /*
              * {
              *   "id": "25944ef9-adc5-47f7-b607-9e85c572e576",
@@ -128,6 +123,16 @@ internal class CdrApiClient(
         onSuccess = { it },
         onFailure = { t ->
             when (t) {
+                is RetryException if t.cause is HttpServerErrorException -> {
+                    RenewClientSecretResult.RenewHttpErrorResponse(
+                        code = (t.cause as HttpServerErrorException).statusCode,
+                        responseBody = (t.cause as HttpServerErrorException).responseBody
+                    ).also {
+                        logger.warn { "Renewing client secret encountered server error; status code: '${(t.cause as HttpServerErrorException).statusCode}'" }
+                        logger.trace { "Response body: '${(t.cause as HttpServerErrorException).responseBody}'" }
+                    }
+                }
+
                 is HttpServerErrorException -> {
                     RenewClientSecretResult.RenewHttpErrorResponse(
                         code = t.statusCode,

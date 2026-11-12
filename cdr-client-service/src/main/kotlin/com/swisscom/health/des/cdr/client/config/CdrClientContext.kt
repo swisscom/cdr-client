@@ -3,12 +3,15 @@ package com.swisscom.health.des.cdr.client.config
 import com.mayakapps.kache.InMemoryKache
 import com.mayakapps.kache.KacheStrategy
 import com.mayakapps.kache.ObjectKache
+import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.auth.AuthFailureMapper
 import com.swisscom.health.des.cdr.client.config.auth.AuthHttpFailure
 import com.swisscom.health.des.cdr.client.config.auth.toAuthNState
+import com.swisscom.health.des.cdr.client.model.RetryableHttpOperation
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.time.delay
@@ -23,8 +26,12 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.core.retry.RetryListener
+import org.springframework.core.retry.RetryPolicy
+import org.springframework.core.retry.RetryState
+import org.springframework.core.retry.RetryTemplate
+import org.springframework.core.retry.Retryable
 import org.springframework.http.HttpStatus
-import org.springframework.retry.support.RetryTemplate
 import java.io.IOException
 import java.net.Authenticator
 import java.net.PasswordAuthentication
@@ -32,9 +39,12 @@ import java.net.Proxy
 import java.nio.file.Path
 import java.time.Duration
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.fileSize
 import kotlin.io.path.name
+import kotlin.time.Instant
 
 private val logger = KotlinLogging.logger {}
 
@@ -48,6 +58,9 @@ internal class CdrClientContext {
 
     @Bean(name = ["cdrClientInstanceId"])
     fun cdrClientInstanceId(): UUID = UUID.randomUUID()
+
+    @Bean(name = ["inProgressUploads"])
+    fun inProgressUploads(): ConcurrentMap<Job, Instant> = ConcurrentHashMap()
 
     /**
      * Configures system-wide proxy authenticator for Nimbus JWT HTTP client.
@@ -251,20 +264,44 @@ internal class CdrClientContext {
     @Bean(name = ["retryIoAndServerErrors"])
     fun retryIOExceptionsAndServerErrorsTemplate(
         @Value($$"${client.retry-template.retries}")
-        retries: Int,
+        retries: Long,
         @Value($$"${client.retry-template.initial-delay}")
         initialDelay: Duration,
         @Value($$"${client.retry-template.multiplier}")
         multiplier: Double,
         @Value($$"${client.retry-template.max-delay}")
         maxDelay: Duration
-    ): RetryTemplate = RetryTemplate.builder()
-        .maxAttempts(retries) // 1 initial attempt + retries
-        .exponentialBackoff(initialDelay, multiplier, maxDelay, true)
-        .retryOn(IOException::class.java)
-        .retryOn(HttpServerErrorException::class.java)
-        .traversingCauses()
-        .build()
+    ): RetryTemplate = RetryPolicy.builder()
+        .maxRetries(retries) // 1 initial attempt + retries
+        .delay(initialDelay)
+        .multiplier(multiplier)
+        .maxDelay(maxDelay)
+        .includes(IOException::class.java, HttpServerErrorException::class.java)
+        .build().let { policy ->
+            RetryTemplate(policy)
+        }.apply {
+            retryListener = object : RetryListener {
+                override fun onRetryableExecution(retryPolicy: RetryPolicy, retryable: Retryable<*>, retryState: RetryState) {
+                    when (retryable) {
+                        is RetryableHttpOperation<*> -> if (!retryState.isSuccessful) logFailedHttpOperation(retryable, retryState)
+                        else -> if (!retryState.isSuccessful) logger.debug { "Retrying operation '${retryable::class.java.simpleName}'" }
+                    }
+                }
+
+                private fun logFailedHttpOperation(retryable: RetryableHttpOperation<*>, retryState: RetryState) {
+                    if (retryState.retryCount > 0) {
+                        logger.debug {
+                            "Operation '${retryable.name}' targeting '${retryable.url}' has failed; exception: " +
+                                    "'${retryState.lastException.let { getRootestCause(it)::class.java }}'; message: '${retryState.lastException.message}'"
+                        }
+                        logger.info {
+                            "Retry attempt '#${retryState.retryCount}' of operation '${retryable.name}' targeting '${retryable.url}'"
+                        }
+                    }
+                }
+            }
+        }
+
 
     @Bean
     @ConditionalOnProperty(prefix = "client", name = ["file-busy-test-strategy"], havingValue = "FILE_SIZE_CHANGED")

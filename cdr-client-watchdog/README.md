@@ -1,6 +1,7 @@
 # CDR Client Watchdog Service
 
-This is a Windows service that monitors the CDR Client service and automatically restarts it when it exits with a non-zero exit code.
+This is a Windows service that monitors the CDR Client service and automatically restarts it when it exits with a
+non-zero exit code.
 
 The watchdog supports two execution modes:
 - **Executable Mode**: Monitors and runs `cdr-client-service.exe` (Windows 10/11 via Conveyor/MSIX)
@@ -12,20 +13,33 @@ The watchdog supports two execution modes:
 - **Failure Protection**: Prevents endless restart loops by limiting consecutive failures
 - **Configurable**: Settings can be adjusted via `appsettings.json`
 - **Logging**: Comprehensive logging to Windows Event Log and console
-- **Coordinated Shutdown**: Cancels monitoring before cleanup and terminates the monitored process tree with a bounded exit wait
+- **Coordinated Shutdown**: Cancels monitoring before cleanup, sends the CDR Client a Ctrl+C (the Windows counterpart of
+  SIGTERM), and only terminates the monitored process tree if that fails or times out
 
 ## MSIX update servicing
 
 Conveyor and Windows App Installer continue to manage MSIX updates. The watchdog
 handles SCM stop requests without starting another client during shutdown.
-Monitoring owns process cleanup, requests forced termination of the entire managed
-process tree, and waits up to 10 seconds for the tracked process to exit. Cleanup
-errors are logged and propagated rather than reported as a successful stop.
+Monitoring owns process cleanup. It first sends Ctrl+C (`GenerateConsoleCtrlEvent`) to
+the managed process. Ctrl+C can only reach processes sharing the sender's console, so
+the watchdog allocates a hidden console and starts the managed process without
+`CREATE_NO_WINDOW` so that it inherits that console. The JVM handles
+Ctrl+C like SIGINT/SIGTERM and runs its shutdown hooks (e.g. Spring's `@PreDestroy`
+waiting for in-flight uploads), which a forced termination would skip. This requires
+that the JVM runs in a console process (`cdr-client-service.exe` is built with 
+`--win-console`; in Jar mode `java.exe`) and is not started with `-Xrs`. The watchdog 
+waits up to `GracefulShutdownTimeoutSeconds` for the process to exit. If the signal 
+cannot be delivered or the process does not exit in time, the watchdog requests 
+forced termination of the entire managed process tree and waits up to 10 seconds for 
+the tracked process to exit. Cleanup errors are logged and propagated rather than 
+reported as a successful stop. The host shutdown timeout is derived from these values 
+so that the watchdog never exits before the managed process.
 
-This is forced termination, not a graceful JVM shutdown. It does not guarantee
-that Windows will request a stop for every update attempt, close the UI, or remove
-descendants that have already outlived their tracked parent. Windows may defer
-package registration while other package processes remain active.
+Keep the graceful timeout plus the service's own shutdown wait well below 30 seconds;
+during OS shutdown Windows allows services only a few seconds before killing them.
+This does not guarantee that Windows will request a stop for every update attempt,
+close the UI, or remove descendants that have already outlived their tracked parent.
+Windows may defer package registration while other package processes remain active.
 
 ## Configuration
 
@@ -76,6 +90,8 @@ These paths must be configured in the `JavaArguments` setting. See [CONFIG_EXAMP
 - **RestartDelaySeconds**: Delay before restarting after a failure (default: 2 seconds)
 - **HealthCheckIntervalSeconds**: How often to check if the service is running (default: 30 seconds)
 - **MaxConsecutiveFailures**: Maximum number of consecutive failures before stopping the watchdog (default: 5)
+- **GracefulShutdownTimeoutSeconds**: How long to wait for the service to exit after sending Ctrl+C before terminating
+  it (default: 20 seconds; `0` disables the graceful shutdown)
 
 **For Executable Mode:**
 - **ServiceExecutionMode**: Set to `"Executable"` (default)
@@ -86,20 +102,21 @@ These paths must be configured in the `JavaArguments` setting. See [CONFIG_EXAMP
 - **ServiceJarPath**: Path to the service JAR file (e.g., `..\\..\\lib\\cdr-client-service.jar`)
 - **JavaExecutablePath**: Path to the Java executable (e.g., `..\\..\\jre\\bin\\java.exe`)
 - **JavaArguments**: Java command-line arguments, including Spring Boot configuration paths
-- The watchdog checks once at startup that Java 25 or newer is available before starting the service. A detected older version is logged and stops the watchdog;
-  if the version cannot be determined (including when `java -version` does not finish within 10 seconds), a warning is logged and startup continues. Stopping
-  the watchdog cancels the check immediately.
+- The watchdog checks once at startup that Java 20 or newer is available before starting the service. A detected older
+  version is logged and stops the watchdog; if the version cannot be determined (including when `java -version` does not
+  finish within 10 seconds), a warning is logged and startup continues. Stopping the watchdog cancels the check
+  immediately.
 
 ## Testing
 
 Run `./gradlew testWatchdog` to execute the watchdog tests. Both `buildWatchdog` and
 `buildWatchdogRelease` run these tests before publishing and fail if any test fails.
 
-The implementation separates monitoring (`WatchdogService`), configuration (`WatchdogSettings`), executable discovery (`ServicePathResolver`), launch validation
-and arguments (`ServiceLaunchConfiguration`), and process ownership and termination (`ManagedServiceProcess`). Monitoring tests can inject
-`IManagedServiceProcess`
-without launching an OS process or using reflection. Process-tree termination is
-also covered by integration tests with real processes.
+The implementation separates monitoring (`WatchdogService`), configuration (`WatchdogSettings`), executable discovery
+(`ServicePathResolver`), launch validation and arguments (`ServiceLaunchConfiguration`), the graceful shutdown signal
+(`ShutdownSignal`), and process ownership and termination (`ManagedServiceProcess`). Monitoring tests can inject
+`IManagedServiceProcess` without launching an OS process or using reflection. Process-tree termination is also covered
+by integration tests with real processes.
 
 ## Installation
 
@@ -113,15 +130,16 @@ also covered by integration tests with real processes.
    ```cmd
    build.bat
    ```
-   
+
    Note: By default, builds as framework-dependent (requires .NET 10 runtime on target system).
    For self-contained build (includes runtime): `build.bat true`
 
 2. **Deploy the files**:
-   - Copy all files from the `publish` folder to your installation directory (e.g., `C:\Program Files\CDR Client\Watchdog\`)
+    - Copy all files from the `publish` folder to your installation directory (e.g.,
+      `C:\Program Files\CDR Client\Watchdog\`)
 
 3. **Configure the service**:
-   - Edit `appsettings.json` to set the correct path to your `cdr-client-service.exe`
+    - Edit `appsettings.json` to set the correct path to your `cdr-client-service.exe`
 
 4. **Install as Windows service**:
    ```cmd
@@ -163,9 +181,11 @@ Or use the Windows Services Manager (`services.msc`).
 1. The watchdog service starts and immediately launches the CDR Client service (either as executable or JAR)
 2. It monitors the CDR Client process at the configured health check interval (default: 30 seconds)
 3. If the CDR Client exits with code 0 (clean exit), the watchdog respects this and doesn't restart
-4. If the CDR Client exits with a non-zero code (error), the watchdog waits for the configured restart delay and restarts it
+4. If the CDR Client exits with a non-zero code (error), the watchdog waits for the configured restart delay and
+   restarts it
 5. If there are too many consecutive failures (default: 5), the watchdog stops to prevent endless loops
-6. When the watchdog service is stopped, monitoring is cancelled and its cleanup terminates the CDR Client process tree
+6. When the watchdog service is stopped, monitoring is canceled and the CDR Client receives Ctrl+C to shut down
+   gracefully; its process tree is terminated only if it does not exit in time
 
 ## Integration with Conveyor
 

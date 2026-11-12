@@ -28,7 +28,7 @@ public class WatchdogService : BackgroundService
     }
 
     private WatchdogService(ILogger<WatchdogService> logger, IHostApplicationLifetime hostLifetime, WatchdogSettings settings)
-        : this(logger, hostLifetime, settings, new ManagedServiceProcess(logger),
+        : this(logger, hostLifetime, settings, new ManagedServiceProcess(logger, settings),
             new ServiceLaunchConfiguration(settings, logger))
     {
     }

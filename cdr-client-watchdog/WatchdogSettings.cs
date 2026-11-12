@@ -13,7 +13,10 @@ internal sealed class WatchdogSettings
     public TimeSpan RestartDelay { get; }
     public TimeSpan HealthCheckInterval { get; }
     public int MaxConsecutiveFailures { get; }
+    public TimeSpan GracefulShutdownTimeout { get; }
     public bool IsJarMode => ServiceExecutionMode.Equals("Jar", StringComparison.OrdinalIgnoreCase);
+
+    internal const int DefaultGracefulShutdownTimeoutSeconds = 20;
 
     public WatchdogSettings(IConfiguration configuration, ServicePathResolver pathResolver)
     {
@@ -25,5 +28,8 @@ internal sealed class WatchdogSettings
         RestartDelay = TimeSpan.FromSeconds(configuration.GetValue<int>("RestartDelaySeconds", 2));
         HealthCheckInterval = TimeSpan.FromSeconds(configuration.GetValue<int>("HealthCheckIntervalSeconds", 30));
         MaxConsecutiveFailures = configuration.GetValue<int>("MaxConsecutiveFailures", 5);
+        // 0 disables the graceful shutdown; the service process is then terminated immediately.
+        GracefulShutdownTimeout = TimeSpan.FromSeconds(
+            Math.Max(0, configuration.GetValue<int>("GracefulShutdownTimeoutSeconds", DefaultGracefulShutdownTimeoutSeconds)));
     }
 }
