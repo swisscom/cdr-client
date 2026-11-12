@@ -6,7 +6,7 @@ variables:
   - name: conveyorCachePath
     value: '$(Agent.ToolsDirectory)'
   - name: conveyorVersion
-    value: '22.3'
+    value: '22.4'
   - name: conveyorCommand
     value: 'make site'
 
