@@ -53,6 +53,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
@@ -65,13 +66,13 @@ import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.annotation.DirtiesContext.ClassMode
 import org.springframework.test.context.ActiveProfiles
 import java.net.URI
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.io.path.createDirectories
@@ -81,7 +82,6 @@ import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.nameWithoutExtension
 import kotlin.io.path.outputStream
 import kotlin.io.path.walk
-import org.slf4j.LoggerFactory
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.NONE,
@@ -179,7 +179,7 @@ internal class PollingPushFileHandlingTest {
                           "token_type" : "Bearer",
                           "access_token" : "eyJraWQiOiJ0ZXN0LXRlbmFudC1pZC9vYXV0aDIvdjIuMCIsInR5cCI6IkpXVCIsImFsZyI6IkVTMjU2In0.eyJzdWIiOiJ0ZXN0LWNsaWVudC1pZCIsIm5iZiI6MTc2MDU0NjA0Nywicm9sZXMiOlsiQ2RyQXBwbGljYXRpb25NYW5hZ2VyLlJlYWRXcml0ZS5BbGwiXSwiaXNzIjoiaHR0cDovL2xvY2FsaG9zdC90ZXN0LXRlbmFudC1pZC9vYXV0aDIvdjIuMCIsImV4cCI6MTc2MDU0NjQwNywiaWF0IjoxNzYwNTQ2MDQ3LCJqdGkiOiI4MDEzNzc2YS1jMWMyLTRhZGYtODE3Yi1hOWZiMDIxMTc3NmQifQ.RiL2mqiU7e40hmXzPzMIJQJUTa1gjgusFbav1TcXLjnuehaC944AVCWIvg1QQW4dTm89d_YoRTqo6SlIR8qySQ",
                           "expires_in" : 359,
-                          "scope" : "https://dev.identity.health.swisscom.ch/CdrApi/.default"
+                          "scope" : "https://dev-b2c.health.swisscom.ch/CdrApi/.default"
                         }
                         """
                     )

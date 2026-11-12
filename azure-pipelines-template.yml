@@ -185,7 +185,7 @@ steps:
       mv "$MANIFEST_DIR/manifest.tmp.json" "$MANIFEST_DIR/manifest.json"
       
       # Conditionally add watchdog if it was built
-      WATCHDOG_FILE="CdrClientWatchdog-${VERSION}.zip"
+      WATCHDOG_FILE="curaLINEClient-watchdog-${VERSION}.zip"
       if [ -f "$MANIFEST_DIR/$WATCHDOG_FILE" ]; then
         WATCHDOG_SHA=$(sha256sum "$MANIFEST_DIR/$WATCHDOG_FILE" | awk '{print $1}')
         echo "Adding Watchdog: $WATCHDOG_FILE (sha256: ${WATCHDOG_SHA:0:16}...)"

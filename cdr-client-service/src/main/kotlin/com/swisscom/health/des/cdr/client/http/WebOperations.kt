@@ -2,8 +2,6 @@ package com.swisscom.health.des.cdr.client.http
 
 import com.swisscom.health.des.cdr.client.common.Constants.SHUTDOWN_DELAY
 import com.swisscom.health.des.cdr.client.common.DTOs
-import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
-import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector as ConnectorDto
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationMessageKey.CREDENTIAL_VALIDATION_FAILED
 import com.swisscom.health.des.cdr.client.common.DTOs.ValidationResult
 import com.swisscom.health.des.cdr.client.common.DomainObjects
@@ -11,12 +9,11 @@ import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DI
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.DIR_SINGLE_USE
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MODE_OVERLAP
 import com.swisscom.health.des.cdr.client.common.DomainObjects.ValidationType.MODE_VALUE
-import com.swisscom.health.des.cdr.client.common.getRootestCause
 import com.swisscom.health.des.cdr.client.config.CdrClientConfig
 import com.swisscom.health.des.cdr.client.config.ClientSecret
 import com.swisscom.health.des.cdr.client.config.ClientSecret.Companion.MASKED_SECRET
-import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.OAuth2AuthNService
+import com.swisscom.health.des.cdr.client.config.auth.AuthNResponse
 import com.swisscom.health.des.cdr.client.config.toCdrClientConfig
 import com.swisscom.health.des.cdr.client.config.toDto
 import com.swisscom.health.des.cdr.client.handler.ConfigValidationService
@@ -37,13 +34,13 @@ import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.CONFIG
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_INDICATOR_NAME
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_DISABLED
 import com.swisscom.health.des.cdr.client.http.HealthIndicators.Companion.FILE_SYNCHRONIZATION_STATUS_ENABLED
+import com.swisscom.health.des.cdr.client.model.RetryableHttpOperation
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.health.actuate.endpoint.CompositeHealthDescriptor
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint
+import org.springframework.core.retry.RetryTemplate
 import org.springframework.http.ResponseEntity
-import org.springframework.retry.RetryContext
-import org.springframework.retry.support.RetryTemplate
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -52,6 +49,8 @@ import org.springframework.web.bind.annotation.RestController
 import tools.jackson.databind.json.JsonMapper
 import java.net.URI
 import java.time.Instant
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig as CdrClientConfigDto
+import com.swisscom.health.des.cdr.client.common.DTOs.CdrClientConfig.Connector as ConnectorDto
 
 private val logger = KotlinLogging.logger {}
 
@@ -190,42 +189,39 @@ internal class WebOperations(
         @RequestBody idpCredentials: CdrClientConfigDto.IdpCredentials,
     ): ResponseEntity<ValidationResult> = runCatching {
         logger.debug { "validating credentials for tenant id: '${idpCredentials.tenantId}'" }
-        retryIOExceptionsAndServerErrors.execute<AuthNResponse, Exception> { retry: RetryContext ->
-            val idpEndpoint = config.idpEndpoint.toString()
-            val correctedIdpEndpoint = if (config.idpCredentials.tenantId.id == idpCredentials.tenantId.tenantId)
-                idpEndpoint
-            else // only replace the first path segment after the host with the tenant id from the provided credentials
-                idpEndpoint.replace(Regex("(http[s]?://[^/]+/)[^/]+"), "$1${idpCredentials.tenantId.tenantId}")
 
-            if (retry.retryCount > 0) {
-                logger.debug {
-                    "Operation targeting '$correctedIdpEndpoint' has failed; exception: " +
-                            "'${retry.lastThrowable?.let { getRootestCause(it)::class.java }}'; message: '${retry.lastThrowable?.message}'"
-                }
-                logger.info {
-                    "Retry attempt '#${retry.retryCount}' of 'validate credentials' operation targeting " +
-                            "'$correctedIdpEndpoint'"
-                }
-            }
-            logger.trace { "validating credentials" }
-            logger.info {
-                val proxy = config.proxyConfig
-                if (proxy.url.value.isNotBlank()) {
-                    "Attempting to validate credentials by requesting a new access token from IdP endpoint '$correctedIdpEndpoint' " +
-                            "with proxy config: ${proxy.url}"
-                } else {
-                    "Attempting to validate credentials by requesting a new access token from IdP endpoint '$correctedIdpEndpoint' (no proxy configured)"
-                }
-            }
-            val effectiveCredentials = if (ClientSecret(idpCredentials.clientSecret) == MASKED_SECRET) {
-                idpCredentials.copy(clientSecret = config.idpCredentials.clientSecret.value)
+        val idpEndpoint = config.idpEndpoint.toString()
+        val correctedIdpEndpoint = if (config.idpCredentials.tenantId.id == idpCredentials.tenantId.tenantId)
+            idpEndpoint
+        else // only replace the first path segment after the host with the tenant id from the provided credentials
+            idpEndpoint.replace(Regex("(http[s]?://[^/]+/)[^/]+"), "$1${idpCredentials.tenantId.tenantId}")
+
+        logger.info {
+            val proxy = config.proxyConfig
+            if (proxy.url.value.isNotBlank()) {
+                "Attempting to validate credentials by requesting a new access token from IdP endpoint '$correctedIdpEndpoint' " +
+                        "with proxy config: ${proxy.url}"
             } else {
-                idpCredentials
+                "Attempting to validate credentials by requesting a new access token from IdP endpoint '$correctedIdpEndpoint' (no proxy configured)"
             }
-            // Validation is a user-facing probe: run a single-shot token call for fast feedback and
-            // keep retry/state ownership in the background auth manager loop.
-            authService.getNewAccessToken(effectiveCredentials.toCdrClientConfig(), URI(correctedIdpEndpoint).toURL(), false)
         }
+
+        val effectiveCredentials = if (ClientSecret(idpCredentials.clientSecret) == MASKED_SECRET) {
+            idpCredentials.copy(clientSecret = config.idpCredentials.clientSecret.value)
+        } else {
+            idpCredentials
+        }
+
+        retryIOExceptionsAndServerErrors.execute(
+            RetryableHttpOperation(
+                operationName = "validate credentials",
+                url = URI(correctedIdpEndpoint).toURL(),
+            ) {
+                // Validation is a user-facing probe: run a single-shot token call for fast feedback and
+                // keep retry/state ownership in the background auth manager loop.
+                authService.getNewAccessToken(effectiveCredentials.toCdrClientConfig(), URI(correctedIdpEndpoint).toURL(), false)
+            }
+        )
     }.fold(
         onSuccess = { authNResponse: AuthNResponse ->
             var validationResult: ValidationResult = ValidationResult.Success

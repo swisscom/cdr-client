@@ -27,13 +27,32 @@ public class Program
         builder.Configuration.SetBasePath(AppContext.BaseDirectory);
         builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
-        builder.Services.AddSingleton<WatchdogService>();
+        builder.Services.AddSingleton<ServicePathResolver>();
+        builder.Services.AddSingleton(provider => new WatchdogSettings(
+            provider.GetRequiredService<IConfiguration>(),
+            provider.GetRequiredService<ServicePathResolver>()));
+        builder.Services.AddSingleton<IManagedServiceProcess, ManagedServiceProcess>();
+        builder.Services.AddSingleton(provider => new ServiceLaunchConfiguration(
+            provider.GetRequiredService<WatchdogSettings>(),
+            provider.GetRequiredService<ILogger<ServiceLaunchConfiguration>>()));
+        builder.Services.AddSingleton(provider => new WatchdogService(
+            provider.GetRequiredService<ILogger<WatchdogService>>(),
+            provider.GetRequiredService<IHostApplicationLifetime>(),
+            provider.GetRequiredService<WatchdogSettings>(),
+            provider.GetRequiredService<IManagedServiceProcess>(),
+            provider.GetRequiredService<ServiceLaunchConfiguration>()));
         builder.Services.AddHostedService<WatchdogService>(provider => provider.GetService<WatchdogService>()!);
 
         builder.Services.AddWindowsService(options =>
         {
             options.ServiceName = serviceName;
         });
+
+        // The host (and the SCM stop handler) must wait for the graceful stop plus the forced-termination fallback,
+        // otherwise the watchdog exits while the monitored service process is still running.
+        builder.Services.AddOptions<HostOptions>()
+            .Configure<WatchdogSettings>((options, settings) =>
+                options.ShutdownTimeout = ManagedServiceProcess.GetMaximumStopDuration(settings) + TimeSpan.FromSeconds(3));
 
         // Configure logging from appsettings.json
         builder.Logging.ClearProviders();

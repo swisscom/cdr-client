@@ -54,7 +54,7 @@ import kotlin.io.path.writeText
         "spring.main.lazy-initialization=true",
         "spring.jmx.enabled=false",
         "client.idp-credentials.renew-credential=false",
-        "client.retry-template.retries=4",
+        "client.retry-template.retries=3",
         "client.retry-template.initial-delay=10ms",
         "client.retry-template.multiplier=1.1",
         "client.retry-template.max-delay=1s",

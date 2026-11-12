@@ -29,9 +29,10 @@ import org.junit.jupiter.api.Timeout
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertInstanceOf
 import org.junit.jupiter.api.extension.ExtendWith
+import org.springframework.core.retry.RetryPolicy
+import org.springframework.core.retry.RetryTemplate
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
-import org.springframework.retry.support.RetryTemplate
 import java.io.IOException
 import java.net.URI
 import java.time.Duration
@@ -49,11 +50,14 @@ class OAuth2AuthNServiceTest {
     @StartStop
     private val idpMock = MockWebServer()
 
-    private val retryIoExceptionsTwice = RetryTemplate.builder()
-        .maxAttempts(MAX_ATTEMPTS)
-        .fixedBackoff(Duration.ofMillis(10))
-        .retryOn(IOException::class.java)
-        .build()
+    private val retryIoExceptionsTwice = RetryPolicy.builder()
+        .maxRetries(MAX_RETRIES)
+        .delay(Duration.ofMillis(10))
+        .multiplier(1.0)
+        .includes(IOException::class.java)
+        .build().let { policy ->
+            RetryTemplate(policy)
+        }
 
     private val testScopes = mutableListOf<CoroutineScope>()
     private val testServices = mutableListOf<OAuth2AuthNService>()
@@ -487,7 +491,7 @@ class OAuth2AuthNServiceTest {
             .until { if (exactCount) idpMock.requestCount == expectedRequestCount else idpMock.requestCount >= expectedRequestCount }
 
     private companion object {
-        const val MAX_ATTEMPTS = 3
+        const val MAX_RETRIES = 2L
         const val ACCESS_TOKEN = "test-access-token"
         const val ERROR_TOKEN_RESPONSE = """
              {

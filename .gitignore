@@ -47,4 +47,5 @@ output_w2019/
 publish/
 publish-release/
 cdr-client-watchdog/obj/
+cdr-client-watchdog/tests/obj/
 cdr-client-updateservice/obj/

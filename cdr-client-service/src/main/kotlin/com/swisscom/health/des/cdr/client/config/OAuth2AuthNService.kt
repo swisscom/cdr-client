@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.springframework.context.annotation.DependsOn
-import org.springframework.retry.support.RetryTemplate
+import org.springframework.core.retry.RetryTemplate
 import org.springframework.stereotype.Service
 import java.net.Proxy
 import java.net.URL

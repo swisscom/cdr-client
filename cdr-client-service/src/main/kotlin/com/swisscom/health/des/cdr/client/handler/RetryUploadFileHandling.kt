@@ -53,7 +53,7 @@ internal class RetryUploadFileHandling(
      */
     @Suppress("NestedBlockDepth", "LongMethod", "CyclomaticComplexMethod")
     suspend fun uploadRetrying(file: Path, docMeta: DocumentMetaData, connector: Connector): UploadOutcome {
-        logger.debug { "Uploading file '$file'" }
+        logger.info { "Uploading file '$file'" }
         var retryCount = 0
 
         // a successful rename of the file to upload should guarantee that we can also delete it after a successful upload,
@@ -62,8 +62,8 @@ internal class RetryUploadFileHandling(
         val uploadFile: Path = moveFileToUploadFile(file)
 
         return runCatching<UploadOutcome> {
-            var outcome: UploadOutcome
             uploadGuard.withPermit {
+                var outcome: UploadOutcome
                 do {
                     val retryIndex = min(retryCount, cdrClientConfig.retryDelay.size - 1)
 
@@ -126,6 +126,9 @@ internal class RetryUploadFileHandling(
                     }
 
                     if (outcome == UploadOutcome.Retry) {
+                        // do not use a Spring retry template! it uses blocking thread sleeps instead of suspending
+                        // the coroutine we are running on, and would therefor not be canceled with the coroutine
+                        // scope we are in during a cdr-client-service shutdown and thus block a graceful shutdown
                         delay(cdrClientConfig.retryDelay[retryIndex])
                         retryCount++
                         logger.info { "Retry attempt '#$retryCount' for file '${uploadFile.fileName}'" }
@@ -134,29 +137,27 @@ internal class RetryUploadFileHandling(
                 outcome
             }
         }.fold(
-            onSuccess = { outcome ->
-                logger.debug { "Upload of file '${uploadFile.fileName}' done." }
-                outcome
-            },
+            onSuccess = { it },
             onFailure = { t: Throwable ->
                 when (t) {
                     is CancellationException -> {
-                        throw t.also {
-                            if (uploadFile.exists()) {
-                                logger.debug {
-                                    "Upload of file '${uploadFile.fileName}' was cancelled due to shutdown, " +
-                                            "renaming it to original name '$file' for a future upload."
-                                }
-                                // we are getting shut down; moving the file back to its original location so it gets picked up again on restart
-                                runCatching { uploadFile.moveTo(file) }
+                        if (uploadFile.exists()) {
+                            logger.info {
+                                "Upload of file '${uploadFile.fileName}' was cancelled due to shutdown, " +
+                                        "renaming it to original name '$file' for a future upload."
                             }
+                            // we are getting shut down; moving the file back to its original location so it gets picked up again on restart
+                            runCatching { uploadFile.moveTo(file) }
+                        } else {
+                            logger.debug { "Upload of file '$file' completed before shutdown." }
                         }
                     }
 
-                    else -> throw t.also {
+                    else -> {
                         logger.error(t) { "Upload of file '${uploadFile.fileName}' has failed." }
                     }
                 }
+                throw t
             }
         )
     }

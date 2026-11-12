@@ -34,8 +34,6 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.core.io.ClassPathResource
 import org.springframework.http.HttpStatus
-import org.springframework.retry.RetryCallback
-import org.springframework.retry.support.RetryTemplate
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.UUID
@@ -43,6 +41,8 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.extension
 import kotlin.io.path.listDirectoryEntries
 import org.slf4j.LoggerFactory
+import org.springframework.core.retry.RetryTemplate
+import org.springframework.core.retry.Retryable
 
 @ExtendWith(MockKExtension::class)
 internal class PullFileHandlingTest {
@@ -83,7 +83,7 @@ internal class PullFileHandlingTest {
         every { config.localFolder } returns TempDownloadDir(inflightDir)
         every { config.idpCredentials.tenantId } returns TenantId("something")
 
-        every { retryIoErrorsThrice.execute(any<RetryCallback<String, Exception>>()) } returns "Mocked Result"
+        every { retryIoErrorsThrice.execute(any<Retryable<String>>()) } returns "Mocked Result"
 
         cdrApiClient = CdrApiClient(
             config,

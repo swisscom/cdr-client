@@ -16,15 +16,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12" />
-    <PackageReference Include="Microsoft.Extensions.Logging.EventLog" Version="10.0.12" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.12" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Logging.EventLog" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.14" />
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="CdrClientWatchdog.Tests" />
+    <Compile Remove="tests/**/*.cs" />
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
