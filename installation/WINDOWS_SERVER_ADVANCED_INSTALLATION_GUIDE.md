@@ -89,6 +89,26 @@ The curaLINE Client service requires configuration files for application setting
    - Copy the contents to `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\application-customer.yaml`
    - Customize the values for your environment
 
+   **Download staging directory (`local-folder`):** Leave the template's empty `local-folder: ""` unchanged to use the default.
+   On its first start, the curaLINE service creates `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\inbound`, restricts it to
+   SYSTEM, Administrators, and the service account, and writes that path into `application-customer.yaml`.
+   To use a different location, set an absolute path instead, for example:
+
+   ```yaml
+   client:
+     local-folder: 'D:\curaLINE\inflight'
+   ```
+
+   A custom directory must already exist and the Watchdog/curaLINE service account must have **Modify** permission on it.
+   Choose a directory whose files will not be automatically cleaned up, and keep it separate from the configured document input,
+   output, archive, and error folders. If the service cannot create the default directory, it still writes the path and logs a
+   configuration validation warning; create the directory manually and grant the permission above. If it cannot update
+   `application-customer.yaml`, `local-folder` stays empty and synchronization is blocked until you set it.
+
+   Configure the remaining required settings, including credentials and at least one connector, before starting synchronization. After changing the
+   configuration, restart the Watchdog
+   so the curaLINE service loads the updated values.
+
 3. **Create Logging Configuration** (`logback-service.xml`):
    
    **Option A - Use Template from Repository:**
@@ -234,7 +254,7 @@ instead of the default account, configure it and its permissions before starting
       |----------|---------------------|
    | `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\conf\application-customer.yaml` | **Full control**, including permission to change the file's ACL |
    | Application data folders under `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\`, including `conf` and `logs`, and their other files | **Modify** |
-   | Configured document input, output, archive, and error folders | **Modify** |
+   | Download staging folder (`local-folder`; default `C:\ProgramData\Swisscom (Schweiz) AG\curaLINEClient\inbound`), document input, output, archive, and error folders | **Modify** |
    | Installation files under `C:\Program Files\Swisscom (Schweiz) AG\curaLINEClient\`, including the JRE and service JAR | **Read & execute** for the Watchdog/CDR service account; the Update Service separately needs permission to replace application files |
 
    Run the following in an **administrator Command Prompt**, replacing `CONTOSO\svc-curaline` with the actual account. Create `application-customer.yaml` from
