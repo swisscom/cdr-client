@@ -35,6 +35,7 @@ internal class CdrClientApplication
 fun main(args: Array<String>): Unit = runCatching {
     initConfig()
     upgradeConfig()
+    initLocalFolder()
     runApplication<CdrClientApplication>(*args)
 }.fold(
     onSuccess = {},
@@ -49,11 +50,7 @@ fun main(args: Array<String>): Unit = runCatching {
  * has been deleted, for whatever reason).
  */
 private fun initConfig() {
-    val serviceConfigLocation: String? =
-        // env variables have higher precedence for SpringBoot configuration than system properties
-        System.getenv(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV1).takeUnless { it.isNullOrBlank() }
-            ?: System.getenv(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV2).takeUnless { it.isNullOrBlank() }
-            ?: System.getProperty(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY).takeUnless { it.isNullOrBlank() }
+    val serviceConfigLocation: String? = serviceConfigLocation()
     serviceConfigLocation
         ?.takeIf { it.isNotBlank() }
         ?.let { configLocation: String -> Path.of(configLocation) }
@@ -96,11 +93,7 @@ private fun initConfig() {
  * default values where necessary.
  */
 private fun upgradeConfig() {
-    val serviceConfigLocation: String? =
-        // env variables have higher precedence for SpringBoot configuration than system properties
-        System.getenv(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV1).takeUnless { it.isNullOrBlank() }
-            ?: System.getenv(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV2).takeUnless { it.isNullOrBlank() }
-            ?: System.getProperty(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY).takeUnless { it.isNullOrBlank() }
+    val serviceConfigLocation: String? = serviceConfigLocation()
     serviceConfigLocation
         ?.let { configLocation: String -> configLocation.takeIf { it.isNotBlank() } }
         ?.let { configLocation: String -> Path.of(configLocation) }
@@ -127,6 +120,21 @@ private fun upgradeConfig() {
                     "or no file exists at configured location, skipping upgrade of SpringBoot configuration"
         }
 }
+
+/**
+ * Sets a blank `client.local-folder` to a default download directory; see [LocalFolderInit].
+ */
+private fun initLocalFolder() {
+    serviceConfigLocation()
+        ?.let { configLocation: String -> Path.of(configLocation) }
+        ?.let { configLocation: Path -> LocalFolderInit.initLocalFolder(configLocation) }
+}
+
+private fun serviceConfigLocation(): String? =
+    // env variables have higher precedence for SpringBoot configuration than system properties
+    System.getenv(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV1).takeUnless { it.isNullOrBlank() }
+        ?: System.getenv(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_ENV2).takeUnless { it.isNullOrBlank() }
+        ?: System.getProperty(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY).takeUnless { it.isNullOrBlank() }
 
 private val tmpLogFile: Path? by lazy {
     val fileOrDirStr: String? = System.getProperty(SPRING_BOOT_ADDITIONAL_CONFIG_FILE_LOCATION_PROPERTY)
