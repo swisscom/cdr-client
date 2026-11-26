@@ -196,14 +196,6 @@ tasks.processResources {
     }
 }
 
-tasks.register("publishVersion") {
-    group = "publishing"
-    description = "Publishes boot jar"
-    dependsOn(tasks.withType<PublishToMavenRepository>().matching {
-        it.repository == publishing.repositories["GitHubPackages"] && it.publication == publishing.publications["bootJava"]
-    })
-}
-
 publishing {
     publications {
         create<MavenPublication>("bootJava") {
