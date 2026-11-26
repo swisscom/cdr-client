@@ -23,6 +23,7 @@ steps:
       scriptLocation: 'inlineScript'
       inlineScript: |
         az storage blob download \
+        --auth-mode login \
         -f $(Agent.BuildDirectory)/microsoft-jdk-25.0.5.1-linux-x64.tar.gz \
         --blob-url https://$(storageName)/build-agent-files/microsoft-jdk-25.0.5.1-linux-x64.tar.gz
 
